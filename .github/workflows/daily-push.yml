@@ -1,0 +1,19 @@
+name: Stih dana — push
+
+on:
+  schedule:
+    # svaki sat u :05; ruta sama odlučuje kome je vrijeme
+    - cron: '5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pokreni slanje
+        run: |
+          curl -fsS -X POST "$APP_URL/api/cron/send-daily" \
+            -H "x-cron-secret: $CRON_SECRET"
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

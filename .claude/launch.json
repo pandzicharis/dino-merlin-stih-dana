@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "stih-dana",
+      "runtimeExecutable": "/Users/harispandzic/.nvm/versions/node/v22.21.0/bin/node",
+      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev", "-p", "3111"],
+      "port": 3111
+    }
+  ]
+}
