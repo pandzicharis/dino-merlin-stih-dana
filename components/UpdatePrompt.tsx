@@ -38,13 +38,19 @@ export function UpdatePrompt({ accent }: { accent: string }) {
     const watch = (reg: ServiceWorkerRegistration) => {
       if (!alive) return
 
-      // `controller` postoji samo ako već radi neka verzija — bez toga je ovo
-      // prva instalacija, a ne nadogradnja, i ne treba ništa nuditi.
+      /**
+       * `reg.waiting` je sam po sebi dokaz nadogradnje: worker moze cekati
+       * samo ako neki drugi vec radi. Ranije se trazio i
+       * `navigator.serviceWorker.controller`, koji pri hladnom startu zna jos
+       * biti prazan — pa se ponuda propustala bas na otvaranju aplikacije,
+       * tamo gdje je najpotrebnija.
+       */
       const offer = (sw: ServiceWorker | null) => {
-        if (alive && sw && navigator.serviceWorker.controller) setWaiting(sw)
+        if (alive && sw) setWaiting(sw)
       }
 
       offer(reg.waiting)
+
       reg.addEventListener('updatefound', () => {
         const sw = reg.installing
         if (!sw) return
@@ -53,7 +59,14 @@ export function UpdatePrompt({ accent }: { accent: string }) {
         })
       })
 
-      const check = () => void reg.update().catch(() => {})
+      // `update()` tek pokrene provjeru; nova verzija je "waiting" par
+      // trenutaka kasnije, pa se gleda i nakon sto se obecanje razrijesi.
+      const check = () =>
+        void reg
+          .update()
+          .then(() => offer(reg.waiting))
+          .catch(() => {})
+
       const onVisible = () => {
         if (!document.hidden) check()
       }
@@ -62,9 +75,13 @@ export function UpdatePrompt({ accent }: { accent: string }) {
       check()
     }
 
-    void registerSW().then((reg) => {
-      if (reg) watch(reg)
-    })
+    // `ready` ceka da neka verzija stvarno radi — tek tada `waiting` ima smisla.
+    void registerSW()
+      .then(() => navigator.serviceWorker.ready)
+      .then((reg) => {
+        if (reg) watch(reg)
+      })
+      .catch(() => {})
 
     return () => {
       alive = false
@@ -86,7 +103,9 @@ export function UpdatePrompt({ accent }: { accent: string }) {
     <AnimatePresence>
       {waiting && (
         <motion.div
-          className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+          // iznad uvodne kapije (z-60) — nadogradnja se nudi i onome ko je
+          // zaglavio na uvodu, jer je popravka mozda bas u novoj verziji
+          className="fixed inset-x-0 bottom-0 z-[70] flex justify-center px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}

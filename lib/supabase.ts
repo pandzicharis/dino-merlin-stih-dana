@@ -21,6 +21,4 @@ export type PushRow = {
   auth: string
   send_hour: number
   tz: string
-  /** Datum stiha koji je ovom uređaju zadnji put poslan (YYYY-MM-DD). */
-  last_sent_on: string | null
 }

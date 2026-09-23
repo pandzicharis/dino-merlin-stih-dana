@@ -69,7 +69,7 @@ export function VerseScreen({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 1.35, ease: 'easeOut' }}
             >
-              <NotifyToggle accent={m.accent} />
+              <NotifyToggle />
               <ShareButton verse={verse} accent={m.accent} />
             </motion.div>
           )}

@@ -69,28 +69,11 @@ export async function POST(req: Request) {
   const today = todayInTz()
 
   /**
-   * Nadoknada radi samo ako kolona `last_sent_on` postoji (vidi schema.sql).
-   * Bez nje nema po čemu znati je li stih već poslan, pa bi "prošlo je
-   * vrijeme" značilo slanje SVAKI SAT — zato se tada vraćamo na stari,
-   * strogi uslov tačnog sata.
+   * Nema pamćenja "već poslano danas" — `?force=1` šalje koliko god puta
+   * treba, što testiranje čini mogućim. Bez `force`, tačan sat je jedino
+   * ograničenje, pa se u redovnom radu stih ionako poklopi jednom dnevno.
    */
-  const tracked = all.length === 0 || 'last_sent_on' in all[0]
-
-  /**
-   * `>=`, ne `===`.
-   *
-   * Ranije se slalo samo u tačnom satu, pa je jedan propušten ili zakašnjeli
-   * cron značio da taj dan niko ne dobije stih. Sada je uslov "prošlo je
-   * vrijeme, a današnji stih još nije poslan" — sljedeći sat to nadoknadi.
-   * `last_sent_on` istovremeno garantuje da niko ne dobije isti stih dvaput.
-   */
-  const due = force
-    ? all
-    : all.filter((s) =>
-        tracked
-          ? hourIn(s.tz) >= s.send_hour && s.last_sent_on !== today
-          : hourIn(s.tz) === s.send_hour,
-      )
+  const due = force ? all : all.filter((s) => hourIn(s.tz) === s.send_hour)
   const verse = pickVerse(today)
 
   if (dry) {
@@ -100,13 +83,7 @@ export async function POST(req: Request) {
       verse: verse.id,
       subscribers: all.length,
       due: due.length,
-      tracked,
-      hours: all.map((s) => ({
-        tz: s.tz,
-        now: hourIn(s.tz),
-        sendHour: s.send_hour,
-        lastSentOn: s.last_sent_on,
-      })),
+      hours: all.map((s) => ({ tz: s.tz, now: hourIn(s.tz), sendHour: s.send_hour })),
     })
   }
 
@@ -147,15 +124,12 @@ export async function POST(req: Request) {
     })
   }
 
-  // Upisuje se TEK nakon uspjeha — pad slanja znači da sljedeći sat pokuša ponovo.
-  let trackError: string | null = null
-  if (tracked && ok.length) {
-    const { error: upErr } = await db
+  // `last_ok` je samo dijagnostika — kad je uređaj zadnji put nešto primio.
+  if (ok.length) {
+    await db
       .from('push_subscriptions')
-      .update({ last_sent_on: today, last_ok: new Date().toISOString() })
+      .update({ last_ok: new Date().toISOString() })
       .in('endpoint', ok)
-    // Tiho preskakanje bi značilo isti stih svaki sat — mora se vidjeti.
-    if (upErr) trackError = upErr.message
   }
 
   // mrtvi uređaji se brišu odmah — inače lista truli
@@ -168,7 +142,5 @@ export async function POST(req: Request) {
     due: due.length,
     sent,
     removed: dead.length,
-    tracked,
-    ...(trackError ? { trackError } : {}),
   })
 }

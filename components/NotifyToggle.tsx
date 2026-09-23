@@ -54,7 +54,7 @@ const ARIA: Record<Exclude<State, 'unsupported'>, string> = {
 const OK = '#4ADE80'
 const NO = '#F87171'
 
-export function NotifyToggle({ accent }: { accent: string }) {
+export function NotifyToggle() {
   const permission = useSyncExternalStore(
     subscribePermission,
     permissionSnapshot,
@@ -125,28 +125,31 @@ export function NotifyToggle({ accent }: { accent: string }) {
   if (state === 'unsupported') return null
 
   const on = state === 'on'
+  // Stanje nosi samo boja zvona: zeleno stiže, crveno ne stiže.
   const mark = on ? OK : NO
 
   return (
     <div className="relative">
-      <button
+      <motion.button
         onClick={onClick}
         aria-pressed={on}
         aria-label={ARIA[state]}
         disabled={state === 'busy'}
-        className="flex items-center gap-1.5 rounded-full border py-[0.3rem] pl-[0.4rem] pr-[0.42rem] transition-colors duration-300"
+        className="flex items-center justify-center rounded-full border p-[0.4rem] transition-colors duration-300"
         style={{
-          color: on ? accent : 'rgba(255,255,255,0.4)',
-          borderColor: on ? `${accent}4D` : 'rgba(255,255,255,0.12)',
-          backgroundColor: on ? `${accent}12` : 'rgba(255,255,255,0.03)',
+          color: mark,
+          borderColor: `${mark}40`,
+          backgroundColor: `${mark}14`,
         }}
+        animate={{ scale: 1 }}
+        whileTap={{ scale: 0.92 }}
       >
         <span className="relative flex h-[18px] w-[18px] items-center justify-center">
           {/* val — jedini znak na ekranu koji stalno kuca */}
           {on && (
             <motion.span
               className="absolute inset-0 rounded-full border"
-              style={{ borderColor: accent }}
+              style={{ borderColor: mark }}
               initial={{ scale: 0.75, opacity: 0.45 }}
               animate={{ scale: 1.9, opacity: 0 }}
               transition={{ duration: 2.6, repeat: Infinity, ease: 'easeOut' }}
@@ -155,34 +158,7 @@ export function NotifyToggle({ accent }: { accent: string }) {
           )}
           <Bell on={on} muted={state === 'denied'} />
         </span>
-
-        {/* Stanje nosi znak, ne riječ: zeleno kvačica, crveno iks. */}
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={String(on)}
-            className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
-            style={{ backgroundColor: mark }}
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.5, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 520, damping: 18 }}
-          >
-            <svg
-              width="9"
-              height="9"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#0B0F1A"
-              strokeWidth="3.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              {on ? <path d="M5 12.5 10 17.5 19 7" /> : <path d="M6 6l12 12M18 6L6 18" />}
-            </svg>
-          </motion.span>
-        </AnimatePresence>
-      </button>
+      </motion.button>
 
       <AnimatePresence>
         {hint && (
