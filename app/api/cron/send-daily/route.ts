@@ -114,7 +114,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ sent: 0, due: 0, subscribers: all.length, date: today })
   }
   const payload = JSON.stringify({
-    title: verse.song,
+    title: 'Stih dana — Dino Merlin',
     // Stih se prelama u više redova; u notifikaciji mora stati u jedan,
     // inače se vidi samo prva polovina.
     body: verse.text.replace(/\s*\n\s*/g, ' '),

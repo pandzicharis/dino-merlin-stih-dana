@@ -50,14 +50,9 @@ const ARIA: Record<Exclude<State, 'unsupported'>, string> = {
   install: 'Obavijesti rade tek kad je aplikacija na početnom ekranu',
 }
 
-/** Natpis mora sam reći u kojem je stanju — ikona to ne stigne. */
-const LABEL: Record<Exclude<State, 'unsupported'>, string> = {
-  on: SEND_TIME,
-  off: 'Isključeno',
-  busy: 'Trenutak…',
-  denied: 'Blokirano',
-  install: 'Nakon instalacije',
-}
+/** Zeleno = stiže, crveno = ne stiže. Ništa između. */
+const OK = '#4ADE80'
+const NO = '#F87171'
 
 export function NotifyToggle({ accent }: { accent: string }) {
   const permission = useSyncExternalStore(
@@ -102,8 +97,8 @@ export function NotifyToggle({ accent }: { accent: string }) {
 
     if (state === 'on') {
       // Prekidač se pomjera odmah; odjava ide u pozadini.
+      // Nema poruke — crveni ✕ je već rekao sve.
       setNotifyIntent(false)
-      showHint('Obavijesti isključene')
       void unsubscribeFromPush()
       return
     }
@@ -117,7 +112,6 @@ export function NotifyToggle({ accent }: { accent: string }) {
     }
 
     setNotifyIntent(true)
-    showHint(`Gotovo — stih ti stiže svaki dan u ${SEND_TIME}`)
     navigator.vibrate?.([8, 40, 8])
 
     // Prijava servera ide poslije; ako padne, prekidač se vraća.
@@ -131,19 +125,18 @@ export function NotifyToggle({ accent }: { accent: string }) {
   if (state === 'unsupported') return null
 
   const on = state === 'on'
-  const muted = state === 'denied' || state === 'install'
+  const mark = on ? OK : NO
 
   return (
     <div className="relative">
-      <motion.button
+      <button
         onClick={onClick}
         aria-pressed={on}
         aria-label={ARIA[state]}
         disabled={state === 'busy'}
-        layout
-        className="flex items-center gap-1.5 rounded-full border py-[0.3rem] pl-[0.4rem] pr-[0.6rem] text-[10px] uppercase tracking-[0.16em] transition-colors duration-300"
+        className="flex items-center gap-1.5 rounded-full border py-[0.3rem] pl-[0.4rem] pr-[0.42rem] transition-colors duration-300"
         style={{
-          color: on ? accent : muted ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.45)',
+          color: on ? accent : 'rgba(255,255,255,0.4)',
           borderColor: on ? `${accent}4D` : 'rgba(255,255,255,0.12)',
           backgroundColor: on ? `${accent}12` : 'rgba(255,255,255,0.03)',
         }}
@@ -163,20 +156,33 @@ export function NotifyToggle({ accent }: { accent: string }) {
           <Bell on={on} muted={state === 'denied'} />
         </span>
 
-        {/* Stanje je ispisano uvijek — ne nagađa se iz boje zvona. */}
+        {/* Stanje nosi znak, ne riječ: zeleno kvačica, crveno iks. */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
-            key={state}
-            initial={{ opacity: 0, y: 3 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -3 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className={`whitespace-nowrap ${on ? 'tabular font-semibold' : 'font-medium'}`}
+            key={String(on)}
+            className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
+            style={{ backgroundColor: mark }}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.5, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 18 }}
           >
-            {LABEL[state]}
+            <svg
+              width="9"
+              height="9"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#0B0F1A"
+              strokeWidth="3.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              {on ? <path d="M5 12.5 10 17.5 19 7" /> : <path d="M6 6l12 12M18 6L6 18" />}
+            </svg>
           </motion.span>
         </AnimatePresence>
-      </motion.button>
+      </button>
 
       <AnimatePresence>
         {hint && (
