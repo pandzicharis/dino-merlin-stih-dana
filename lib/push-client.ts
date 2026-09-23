@@ -66,12 +66,44 @@ export async function getSubscription(): Promise<PushSubscription | null> {
   return reg.pushManager.getSubscription()
 }
 
+/**
+ * Nova pretplata na istoj registraciji.
+ *
+ * Safari (a povremeno i Chrome) odbije `subscribe()` ako je `unsubscribe()`
+ * bio maloprije — zato drugo gasenje/paljenje zaredom nije radilo. Na neuspjeh
+ * se zaostala pretplata ukloni do kraja pa se pokusa jos jednom.
+ */
+async function freshSubscription(
+  reg: ServiceWorkerRegistration,
+  key: string,
+): Promise<PushSubscription> {
+  const existing = await reg.pushManager.getSubscription()
+  if (existing) return existing
+
+  const opts = {
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
+  }
+
+  try {
+    return await reg.pushManager.subscribe(opts)
+  } catch {
+    const stale = await reg.pushManager.getSubscription()
+    if (stale) await stale.unsubscribe().catch(() => {})
+    await new Promise((r) => setTimeout(r, 300))
+    return reg.pushManager.subscribe(opts)
+  }
+}
+
 export async function subscribeToPush(
   sendHour = SEND_HOUR,
 ): Promise<'ok' | 'denied' | 'unsupported' | 'error'> {
   if (!pushSupported()) return 'unsupported'
 
-  const permission = await Notification.requestPermission()
+  // Već data dozvola se ne traži ponovo: drugi `requestPermission()` zna
+  // pasti jer više nije vezan za korisnikov dodir.
+  const permission =
+    Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
   if (permission !== 'granted') return 'denied'
 
   const key = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
@@ -81,12 +113,7 @@ export async function subscribeToPush(
     const reg = (await navigator.serviceWorker.ready) ?? (await registerSW())
     if (!reg) return 'error'
 
-    const sub =
-      (await reg.pushManager.getSubscription()) ??
-      (await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
-      }))
+    const sub = await freshSubscription(reg, key)
 
     const res = await fetch('/api/push/subscribe', {
       method: 'POST',

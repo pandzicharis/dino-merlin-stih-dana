@@ -48,7 +48,7 @@ export function VerseScreen({
         className={
           compact
             ? 'flex min-h-[260px] flex-col justify-between p-5'
-            : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(2rem,calc(env(safe-area-inset-top)+0.9rem))] ${
+            : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(3rem,calc(env(safe-area-inset-top)+1.75rem))] ${
                 OVERRIDE_ON ? 'pb-16' : 'pb-[max(2.25rem,env(safe-area-inset-bottom))]'
               }`
         }
