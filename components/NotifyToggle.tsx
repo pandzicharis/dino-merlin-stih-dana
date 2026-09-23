@@ -50,9 +50,15 @@ const ARIA: Record<Exclude<State, 'unsupported'>, string> = {
   install: 'Obavijesti rade tek kad je aplikacija na početnom ekranu',
 }
 
-/** Zeleno = stiže, crveno = ne stiže. Ništa između. */
-const OK = '#4ADE80'
-const NO = '#F87171'
+/**
+ * Zeleno = stiže, crveno = ne stiže.
+ *
+ * Prigušeni tonovi, ne signalne boje: zvono stoji uz ikonu dijeljenja i ne
+ * smije je nadglasati. Uz boju ide i drugi znak — puno zvono kad stiže,
+ * prazno kad ne — da stanje ne visi samo o nijansi.
+ */
+const OK = '#8DC9A3'
+const NO = '#D08C8C'
 
 export function NotifyToggle() {
   const permission = useSyncExternalStore(
@@ -129,36 +135,21 @@ export function NotifyToggle() {
   const mark = on ? OK : NO
 
   return (
-    <div className="relative">
-      <motion.button
+    // `flex` je bitan: kao blok, omotač bi bio visok koliko linija teksta oko
+    // inline SVG-a, pa bi se centrirala pogrešna kutija i zvono bi stajalo
+    // nekoliko piksela više od ikone dijeljenja pored njega.
+    <div className="relative flex items-center">
+      {/* Isti oblik kao dugme za dijeljenje: gola ikona, bez okvira i podloge. */}
+      <button
         onClick={onClick}
         aria-pressed={on}
         aria-label={ARIA[state]}
         disabled={state === 'busy'}
-        className="flex items-center justify-center rounded-full border p-[0.4rem] transition-colors duration-300"
-        style={{
-          color: mark,
-          borderColor: `${mark}40`,
-          backgroundColor: `${mark}14`,
-        }}
-        animate={{ scale: 1 }}
-        whileTap={{ scale: 0.92 }}
+        className="-m-2 p-2 transition-all duration-500 active:scale-90 disabled:opacity-40"
+        style={{ color: mark }}
       >
-        <span className="relative flex h-[18px] w-[18px] items-center justify-center">
-          {/* val — jedini znak na ekranu koji stalno kuca */}
-          {on && (
-            <motion.span
-              className="absolute inset-0 rounded-full border"
-              style={{ borderColor: mark }}
-              initial={{ scale: 0.75, opacity: 0.45 }}
-              animate={{ scale: 1.9, opacity: 0 }}
-              transition={{ duration: 2.6, repeat: Infinity, ease: 'easeOut' }}
-              aria-hidden
-            />
-          )}
-          <Bell on={on} muted={state === 'denied'} />
-        </span>
-      </motion.button>
+        <Bell on={on} muted={state === 'denied'} />
+      </button>
 
       <AnimatePresence>
         {hint && (
@@ -179,15 +170,15 @@ export function NotifyToggle() {
 function Bell({ on, muted }: { on: boolean; muted: boolean }) {
   return (
     <svg
-      width="15"
-      height="15"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill={on ? 'currentColor' : 'none'}
+      fillOpacity={on ? 0.22 : undefined}
       stroke="currentColor"
       strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="relative"
       aria-hidden
     >
       <path d="M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5" />
