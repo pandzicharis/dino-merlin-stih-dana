@@ -6,8 +6,17 @@ import { MOODS, type Mood } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
 import { MoodBackground } from './MoodBackground'
 import { useMounted } from '@/lib/client-store'
-import { PUSH_EVENT, isIOS, isStandalone, pushSupported, subscribeToPush } from '@/lib/push-client'
+import {
+  ensurePermission,
+  isIOS,
+  isStandalone,
+  permissionSnapshot,
+  pushSupported,
+  subscribePermission,
+  subscribeToPush,
+} from '@/lib/push-client'
 import { SEND_HOUR, SEND_TIME } from '@/lib/date'
+import { setNotifyIntent } from '@/lib/storage'
 import { BrandLockup } from './BrandLockup'
 
 type Platform = 'ios' | 'android' | 'desktop'
@@ -41,27 +50,6 @@ function subscribeInstalled(cb: () => void) {
     mq.removeEventListener('change', cb)
     window.removeEventListener('appinstalled', cb)
   }
-}
-
-/**
- * Dozvola za obavijesti — isto vanjski store.
- * Korisnik je može dati i izvan aplikacije (postavke telefona), pa se
- * čita ponovo i na povratak u prozor.
- */
-function subscribePermission(cb: () => void) {
-  window.addEventListener(PUSH_EVENT, cb)
-  window.addEventListener('focus', cb)
-  document.addEventListener('visibilitychange', cb)
-  return () => {
-    window.removeEventListener(PUSH_EVENT, cb)
-    window.removeEventListener('focus', cb)
-    document.removeEventListener('visibilitychange', cb)
-  }
-}
-
-function permissionSnapshot(): string {
-  if (typeof Notification === 'undefined') return 'unsupported'
-  return Notification.permission
 }
 
 /**
@@ -126,9 +114,15 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
 
   const allow = useCallback(async () => {
     setBusy(true)
-    await subscribeToPush(SEND_HOUR)
-    setAsked(true)
+    const p = await ensurePermission()
     setBusy(false)
+    setAsked(true)
+    if (p !== 'granted') return
+
+    // Kapija se otvara na dozvolu, ne na odgovor servera — prijava pretplate
+    // ide u pozadini, a zvono na stihu je tiho popravi ako padne.
+    setNotifyIntent(true)
+    void subscribeToPush(SEND_HOUR)
   }, [])
 
   /**

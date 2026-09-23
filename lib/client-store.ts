@@ -44,6 +44,24 @@ export function useDevParams(serverDate: string): {
   }, [snap, serverDate])
 }
 
+/* ── obavijesti ─────────────────────────────────────────────── */
+
+const NOTIFY = 'stihdana:notify'
+const subscribeNotify = subscribeTo(['notifychange', 'storage'])
+
+function notifySnapshot(): string {
+  try {
+    return localStorage.getItem(NOTIFY) ?? 'true'
+  } catch {
+    return 'true'
+  }
+}
+
+/** Korisnikov prekidač za obavijesti. Sinhrono — zvono se ne smije čekati. */
+export function useNotifyIntent(): boolean {
+  return useSyncExternalStore(subscribeNotify, notifySnapshot, () => 'true') === 'true'
+}
+
 /** Je li klijent već hidratiran (za stvari koje ne smiju renderati na serveru). */
 export function useMounted(): boolean {
   return useSyncExternalStore(

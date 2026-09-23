@@ -4,9 +4,11 @@ import { useEffect } from 'react'
 import { pickVerse, verseById } from '@/lib/pickVerse'
 import { useDevParams } from '@/lib/client-store'
 import { setLastSeen } from '@/lib/storage'
+import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
 import { DevDateBar } from './DevDateBar'
 import { Onboarding } from './Onboarding'
+import { UpdatePrompt } from './UpdatePrompt'
 
 /**
  * Rješava KOJI stih se prikazuje.
@@ -25,6 +27,7 @@ export function DailyVerse({ serverDate }: { serverDate: string }) {
     <>
       <Onboarding mood={mood ?? verse.mood} seed={verse.id} />
       <VerseScreen verse={verse} date={date} mood={mood} />
+      <UpdatePrompt accent={MOODS[mood ?? verse.mood].accent} />
       <DevDateBar date={date} verseId={verse.id} mood={mood ?? verse.mood} />
     </>
   )

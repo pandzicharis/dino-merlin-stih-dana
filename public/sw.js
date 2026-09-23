@@ -5,11 +5,23 @@
  * samo offline fallback za zadnji viđeni ekran + push notifikacije.
  */
 
-const CACHE = 'stihdana-v1'
+const CACHE = 'stihdana-v2'
 const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png']
 
+/**
+ * NEMA `skipWaiting()` ovdje — nova verzija čeka.
+ *
+ * Aplikacija se otvara s početnog ekrana i zna stajati otvorena danima;
+ * da nova verzija preuzme sama od sebe, stranica bi se promijenila pod
+ * prstima. Umjesto toga se javi korisniku, a preuzima na njegovu potvrdu.
+ */
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(OFFLINE)).then(() => self.skipWaiting()))
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(OFFLINE)))
+})
+
+/** Potvrda iz aplikacije: preuzmi sad. */
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting()
 })
 
 self.addEventListener('activate', (e) => {

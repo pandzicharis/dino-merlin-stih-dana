@@ -4,6 +4,7 @@
  */
 
 const SEEN = 'stihdana:lastSeen'
+const NOTIFY = 'stihdana:notify'
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
@@ -22,6 +23,22 @@ function write(key: string, value: unknown) {
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * Želi li korisnik obavijesti — prekidač u aplikaciji, odvojen od sistemske
+ * dozvole. Dozvola se traži na uvodu i više se ne dira; ovo je ono što
+ * korisnik pali i gasi, i po čemu se ekran crta ODMAH, bez čekanja mreže.
+ *
+ * Podrazumijeva se `true`: ko je dozvolu dao, taj je obavijesti i htio.
+ */
+export function getNotifyIntent(): boolean {
+  return read<boolean>(NOTIFY, true)
+}
+
+export function setNotifyIntent(on: boolean) {
+  write(NOTIFY, on)
+  window.dispatchEvent(new Event('notifychange'))
 }
 
 export function getLastSeen(): string | null {

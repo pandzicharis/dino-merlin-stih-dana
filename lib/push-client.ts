@@ -147,6 +147,38 @@ export async function unsubscribeFromPush(): Promise<boolean> {
 /** Zvono i onboarding slušaju isti signal, da nikad ne pokazuju različito stanje. */
 export const PUSH_EVENT = 'pushchange'
 
-function notifyChange() {
+export function announcePushChange() {
   window.dispatchEvent(new Event(PUSH_EVENT))
+}
+
+const notifyChange = announcePushChange
+
+/**
+ * Sistemska dozvola kao vanjski store — čita se sinhrono, bez `await`.
+ * Korisnik je može promijeniti i izvan aplikacije, pa se osvježava i na
+ * povratak u prozor.
+ */
+export function subscribePermission(cb: () => void) {
+  window.addEventListener(PUSH_EVENT, cb)
+  window.addEventListener('focus', cb)
+  document.addEventListener('visibilitychange', cb)
+  return () => {
+    window.removeEventListener(PUSH_EVENT, cb)
+    window.removeEventListener('focus', cb)
+    document.removeEventListener('visibilitychange', cb)
+  }
+}
+
+export function permissionSnapshot(): string {
+  if (typeof Notification === 'undefined') return 'unsupported'
+  return Notification.permission
+}
+
+/** Traži dozvolu samo ako je nema — drugi poziv nije vezan za dodir i zna pasti. */
+export async function ensurePermission(): Promise<NotificationPermission> {
+  if (typeof Notification === 'undefined') return 'denied'
+  if (Notification.permission === 'granted') return 'granted'
+  const p = await Notification.requestPermission()
+  announcePushChange()
+  return p
 }

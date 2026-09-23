@@ -1,26 +1,40 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import {
-  PUSH_EVENT,
+  ensurePermission,
   getSubscription,
   needsInstallFirst,
+  permissionSnapshot,
   pushSupported,
   registerSW,
+  subscribePermission,
   subscribeToPush,
   unsubscribeFromPush,
 } from '@/lib/push-client'
 import { SEND_HOUR, SEND_TIME } from '@/lib/date'
+import { useNotifyIntent } from '@/lib/client-store'
+import { getNotifyIntent, setNotifyIntent } from '@/lib/storage'
 
-type State = 'checking' | 'off' | 'on' | 'denied' | 'install' | 'unsupported' | 'busy'
+type State = 'off' | 'on' | 'denied' | 'install' | 'unsupported' | 'busy'
 
-/** Čita stvarno stanje dozvole i pretplate. Izvan komponente da render ostane čist. */
-async function resolveState(): Promise<State> {
+/**
+ * Stanje se računa SINHRONO iz dozvole i korisnikovog prekidača.
+ *
+ * Ranije se čekalo `getSubscription()`, koji čeka service worker, koji čeka
+ * mrežu — pa je zvono prvo bilo nevidljivo, a paljenje i gašenje su stajali
+ * dok se ne vrati odgovor sa servera. Server sad radi u pozadini.
+ */
+function resolve(permission: string, intent: boolean): State {
+  // Na serveru (i pri hidrataciji) store vraća 'unsupported' — zvono se tada
+  // ne crta, pa se HTML sa servera i prvi klijentski render poklapaju.
+  if (permission === 'unsupported') return 'unsupported'
   if (!pushSupported()) return 'unsupported'
   if (needsInstallFirst()) return 'install'
-  if (Notification.permission === 'denied') return 'denied'
-  return (await getSubscription()) ? 'on' : 'off'
+  if (permission === 'denied') return 'denied'
+  if (permission !== 'granted') return 'off'
+  return intent ? 'on' : 'off'
 }
 
 const HINTS: Partial<Record<State, string>> = {
@@ -28,7 +42,7 @@ const HINTS: Partial<Record<State, string>> = {
   install: 'Dodaj aplikaciju na početni ekran da bi obavijesti radile',
 }
 
-const ARIA: Record<Exclude<State, 'unsupported' | 'checking'>, string> = {
+const ARIA: Record<Exclude<State, 'unsupported'>, string> = {
   on: `Obavijesti uključene, stih stiže u ${SEND_TIME}. Isključi.`,
   off: 'Uključi dnevnu obavijest',
   busy: 'Trenutak…',
@@ -36,11 +50,8 @@ const ARIA: Record<Exclude<State, 'unsupported' | 'checking'>, string> = {
   install: 'Obavijesti rade tek kad je aplikacija na početnom ekranu',
 }
 
-/**
- * Natpis mora sam reći u kojem je stanju — ikona to ne stigne.
- * Uključeno nosi vrijeme (to je cijela poruka), ostalo kaže zašto ne radi.
- */
-const LABEL: Record<Exclude<State, 'unsupported' | 'checking'>, string> = {
+/** Natpis mora sam reći u kojem je stanju — ikona to ne stigne. */
+const LABEL: Record<Exclude<State, 'unsupported'>, string> = {
   on: SEND_TIME,
   off: 'Isključeno',
   busy: 'Trenutak…',
@@ -48,30 +59,35 @@ const LABEL: Record<Exclude<State, 'unsupported' | 'checking'>, string> = {
   install: 'Nakon instalacije',
 }
 
-/**
- * Dnevna obavijest — stoji u zaglavlju, uz dijeljenje.
- *
- * Uključeno stanje se ne nagađa iz ikone: zvono se ispuni bojom naglaska,
- * dobije okvir, tihi val i ispisano vrijeme dolaska stiha. Isključeno je
- * gola kontura u istoj težini kao ikona dijeljenja.
- */
 export function NotifyToggle({ accent }: { accent: string }) {
-  const [state, setState] = useState<State>('checking')
+  const permission = useSyncExternalStore(
+    subscribePermission,
+    permissionSnapshot,
+    () => 'unsupported',
+  )
+  const intent = useNotifyIntent()
+  /** Privremeno stanje dok traje sistemski dijalog. */
+  const [pending, setPending] = useState<State | null>(null)
   const [hint, setHint] = useState<string | null>(null)
+
+  const state = pending ?? resolve(permission, intent)
 
   useEffect(() => {
     registerSW()
+
+    // Tiho popravljanje: dozvola je data i prekidač je upaljen, ali pretplate
+    // na serveru nema (npr. prva posjeta nakon uvoda, ili je istekla).
+    // Prekidač se MORA provjeriti — bez toga bi se isključeni korisnik
+    // ponovo pretplatio pri svakom otvaranju.
+    if (!pushSupported() || needsInstallFirst()) return
+    if (permissionSnapshot() !== 'granted' || !getNotifyIntent()) return
     let alive = true
-    const sync = () => {
-      void resolveState().then((next) => {
-        if (alive) setState(next)
-      })
-    }
-    sync()
-    window.addEventListener(PUSH_EVENT, sync)
+    void (async () => {
+      const sub = await getSubscription()
+      if (alive && !sub) void subscribeToPush(SEND_HOUR)
+    })()
     return () => {
       alive = false
-      window.removeEventListener(PUSH_EVENT, sync)
     }
   }, [])
 
@@ -81,33 +97,38 @@ export function NotifyToggle({ accent }: { accent: string }) {
   }
 
   const onClick = async () => {
-    if (state === 'busy' || state === 'checking') return
+    if (state === 'busy') return
     if (HINTS[state]) return showHint(HINTS[state]!)
 
-    setState('busy')
     if (state === 'on') {
-      await unsubscribeFromPush()
-      setState('off')
+      // Prekidač se pomjera odmah; odjava ide u pozadini.
+      setNotifyIntent(false)
       showHint('Obavijesti isključene')
+      void unsubscribeFromPush()
       return
     }
 
+    // Dozvolu treba sačekati — to je sistemski dijalog i korisnik ga vidi.
+    if (permissionSnapshot() !== 'granted') {
+      setPending('busy')
+      const p = await ensurePermission()
+      setPending(null)
+      if (p !== 'granted') return
+    }
+
+    setNotifyIntent(true)
+    showHint(`Gotovo — stih ti stiže svaki dan u ${SEND_TIME}`)
+    navigator.vibrate?.([8, 40, 8])
+
+    // Prijava servera ide poslije; ako padne, prekidač se vraća.
     const r = await subscribeToPush(SEND_HOUR)
-    if (r === 'ok') {
-      setState('on')
-      showHint(`Gotovo — stih ti stiže svaki dan u ${SEND_TIME}`)
-      navigator.vibrate?.([8, 40, 8])
-    } else if (r === 'denied') {
-      setState('denied')
-      showHint(HINTS.denied!)
-    } else {
-      // Ne pretpostavljaj 'off' — pretplata je možda prošla a prijava pala.
-      setState(await resolveState())
+    if (r !== 'ok') {
+      setNotifyIntent(false)
       showHint('Nije uspjelo — pokušaj ponovo')
     }
   }
 
-  if (state === 'unsupported' || state === 'checking') return null
+  if (state === 'unsupported') return null
 
   const on = state === 'on'
   const muted = state === 'denied' || state === 'install'
@@ -117,10 +138,10 @@ export function NotifyToggle({ accent }: { accent: string }) {
       <motion.button
         onClick={onClick}
         aria-pressed={on}
-        aria-label={ARIA[state as keyof typeof ARIA]}
+        aria-label={ARIA[state]}
         disabled={state === 'busy'}
         layout
-        className="flex items-center gap-1.5 rounded-full border py-[0.3rem] pl-[0.4rem] pr-[0.6rem] text-[10px] uppercase tracking-[0.16em] transition-colors duration-500"
+        className="flex items-center gap-1.5 rounded-full border py-[0.3rem] pl-[0.4rem] pr-[0.6rem] text-[10px] uppercase tracking-[0.16em] transition-colors duration-300"
         style={{
           color: on ? accent : muted ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.45)',
           borderColor: on ? `${accent}4D` : 'rgba(255,255,255,0.12)',
@@ -149,10 +170,10 @@ export function NotifyToggle({ accent }: { accent: string }) {
             initial={{ opacity: 0, y: 3 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -3 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             className={`whitespace-nowrap ${on ? 'tabular font-semibold' : 'font-medium'}`}
           >
-            {LABEL[state as keyof typeof LABEL]}
+            {LABEL[state]}
           </motion.span>
         </AnimatePresence>
       </motion.button>
