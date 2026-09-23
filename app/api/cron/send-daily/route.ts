@@ -16,6 +16,18 @@ export const maxDuration = 60
 
 const BATCH = 100
 
+/**
+ * PRIVREMENO — režim testiranja.
+ *
+ * `true` znači: svaki poziv rute šalje stih SVIMA, bez obzira na doba dana.
+ * Tako "Test run" iz cron konzole uvijek stvarno pošalje.
+ *
+ * Za povratak na jednom dnevno, u korisnikovih 12h, vrati na `false`.
+ * Dok je ovo `true`, satni raspored u .github/workflows/daily-push.yml MORA
+ * ostati pauziran — inače svaki pretplatnik dobije stih svakih sat vremena.
+ */
+const ALWAYS_SEND = true
+
 function hourIn(tz: string): number {
   try {
     return Number(
@@ -69,11 +81,11 @@ export async function POST(req: Request) {
   const today = todayInTz()
 
   /**
-   * Nema pamćenja "već poslano danas" — `?force=1` šalje koliko god puta
-   * treba, što testiranje čini mogućim. Bez `force`, tačan sat je jedino
-   * ograničenje, pa se u redovnom radu stih ionako poklopi jednom dnevno.
+   * Nema pamćenja "već poslano danas". Dok je `ALWAYS_SEND` uključen, svaki
+   * poziv šalje svima; inače šalje samo onima kojima je lokalno tačno njihov
+   * sat, pa se u redovnom radu stih poklopi jednom dnevno.
    */
-  const due = force ? all : all.filter((s) => hourIn(s.tz) === s.send_hour)
+  const due = force || ALWAYS_SEND ? all : all.filter((s) => hourIn(s.tz) === s.send_hour)
   const verse = pickVerse(today)
 
   if (dry) {

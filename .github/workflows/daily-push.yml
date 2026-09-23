@@ -1,9 +1,13 @@
 name: Stih dana — push
 
 on:
-  schedule:
-    # svaki sat u :05; ruta sama odlučuje kome je vrijeme
-    - cron: '5 * * * *'
+  # PAUZIRANO dok je ALWAYS_SEND uključen u app/api/cron/send-daily/route.ts.
+  # Tada svaki poziv šalje svima, pa bi satni raspored značio notifikaciju
+  # svakom pretplatniku svakih sat vremena. Otkomentariši kad ALWAYS_SEND
+  # vrati na false.
+  # schedule:
+  #   # svaki sat u :05; ruta sama odlučuje kome je vrijeme
+  #   - cron: '5 * * * *'
   workflow_dispatch:
 
 jobs:
