@@ -6,8 +6,12 @@ import type { Verse } from '@/data/verses'
 type State = 'idle' | 'busy' | 'done' | 'error'
 
 /**
- * Share — pokuša native share sa slikom (mobitel), pa fallback
- * na download slike + kopiran link (desktop).
+ * Share — dijeli se link, ništa više.
+ *
+ * Ranije se ovdje generisala slika pa slala kao fajl: čekalo se na server,
+ * na desktopu se umjesto dijeljenja pokretao download, a slika nikad nije
+ * izgledala kao ekran sa stihom. Link se otvara u aplikaciji i sam povuče
+ * svoj pregled — slika za pregled i dalje postoji u metapodacima stranice.
  */
 export function ShareButton({ verse, accent }: { verse: Verse; accent: string }) {
   const [state, setState] = useState<State>('idle')
@@ -15,23 +19,13 @@ export function ShareButton({ verse, accent }: { verse: Verse; accent: string })
   const share = async () => {
     if (state === 'busy') return
     setState('busy')
-    try {
-      const res = await fetch(`/og/${verse.id}?f=story`)
-      if (!res.ok) throw new Error('og')
-      const blob = await res.blob()
-      const file = new File([blob], `stih-dana-${verse.id}.png`, { type: 'image/png' })
-      const url = `${location.origin}/stih/${verse.id}`
 
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], text: `${verse.song} — Dino Merlin`, url })
+    const url = `${location.origin}/stih/${verse.id}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Stih dana', text: `${verse.song} — Dino Merlin`, url })
       } else {
-        const href = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = href
-        a.download = file.name
-        a.click()
-        URL.revokeObjectURL(href)
-        await navigator.clipboard?.writeText(url).catch(() => {})
+        await navigator.clipboard.writeText(url)
       }
       setState('done')
       setTimeout(() => setState('idle'), 2000)

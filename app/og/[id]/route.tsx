@@ -4,6 +4,7 @@ import { ImageResponse } from 'next/og'
 import { MOODS } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
 import { verseById } from '@/lib/pickVerse'
+import { withPeriod } from '@/lib/text'
 
 /**
  * Share slika — jedini kanal rasta koji nam treba.
@@ -59,14 +60,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const { width, height } = FORMATS[f === 'post' ? 'post' : 'story']
   const m = MOODS[verse.mood]
 
-  const chars = `${verse.text}${verse.song}${verse.album}${verse.year}Stih dana${BRAND.name}`
+  const text = withPeriod(verse.text)
+  const chars = `${text}${verse.song}${verse.album}${verse.year}Stih dana${BRAND.name}`
   const [serif, sans] = await Promise.all([
     loadFont('Fraunces:opsz,wght@9..144,400', chars),
     loadFont('Rubik:wght@500', chars.toUpperCase() + chars),
   ])
   const logo = wordmarkDataUri()
 
-  const long = verse.text.length > 70
+  const long = text.length > 70
   const fontSize = Math.round((height === 1080 ? 82 : 92) * (long ? 0.82 : 1))
 
   return new ImageResponse(
@@ -117,7 +119,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
             alignItems: 'center',
           }}
         >
-          {verse.text.split('\n').map((line, i) => (
+          {text.split('\n').map((line, i) => (
             <div key={i} style={{ display: 'flex' }}>
               {line}
             </div>

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { VERSES } from '@/data/verses'
 import { verseById } from '@/lib/pickVerse'
+import { oneLine, withPeriod } from '@/lib/text'
 import { todayInTz } from '@/lib/date'
 import { VerseScreen } from '@/components/VerseScreen'
 import { BackLink } from '@/components/BackLink'
@@ -22,10 +23,11 @@ export async function generateMetadata({
   if (!v) return { title: 'Stih dana' }
 
   const image = { url: `/og/${id}?f=post`, width: 1080, height: 1080 }
+  const text = oneLine(withPeriod(v.text))
   return {
     title: v.song,
-    description: v.text.replace(/\n/g, ' '),
-    openGraph: { title: v.song, description: v.text.replace(/\n/g, ' '), images: [image] },
+    description: text,
+    openGraph: { title: v.song, description: text, images: [image] },
     twitter: { card: 'summary_large_image', images: [image.url] },
   }
 }

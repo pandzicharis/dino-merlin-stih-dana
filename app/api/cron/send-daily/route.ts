@@ -3,6 +3,7 @@ import webpush from 'web-push'
 import { supabase, type PushRow } from '@/lib/supabase'
 import { todayInTz } from '@/lib/date'
 import { pickVerse } from '@/lib/pickVerse'
+import { oneLine, withPeriod } from '@/lib/text'
 
 /**
  * Šalje stih dana. Radi SVAKI SAT, ne jednom dnevno — tako podržava
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
     title: 'Stih dana — Dino Merlin',
     // Stih se prelama u više redova; u notifikaciji mora stati u jedan,
     // inače se vidi samo prva polovina.
-    body: verse.text.replace(/\s*\n\s*/g, ' '),
+    body: oneLine(withPeriod(verse.text)),
     url: '/',
     tag: `stih-${today}`,
   })

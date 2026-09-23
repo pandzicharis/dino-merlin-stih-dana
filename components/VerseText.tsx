@@ -2,6 +2,7 @@
 
 import { Fragment } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
+import { withPeriod } from '@/lib/text'
 
 /** Ispis počinje ovoliko sekundi nakon učitavanja. */
 export const VERSE_START = 0.4
@@ -34,10 +35,12 @@ export function verseFontSize(text: string): string {
  */
 export function VerseText({ text, color, glow }: { text: string; color: string; glow?: string }) {
   const reduced = useReducedMotion()
-  const lines = text.split('\n')
+  // Tačka dolazi iz `withPeriod` — u podacima je stih bez nje.
+  const full = withPeriod(text)
+  const lines = full.split('\n')
   const style = {
     color,
-    fontSize: verseFontSize(text),
+    fontSize: verseFontSize(full),
     // dvostruka sjena: crna za čitljivost, naglasak za dubinu
     textShadow: glow
       ? `0 2px 30px rgba(0,0,0,0.5), 0 0 48px ${glow}2e`
