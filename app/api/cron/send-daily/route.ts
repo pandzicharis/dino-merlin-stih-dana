@@ -66,32 +66,65 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const all = data as PushRow[]
-  const due = force ? all : all.filter((s) => hourIn(s.tz) === s.send_hour)
-  const verse = pickVerse(todayInTz())
+  const today = todayInTz()
+
+  /**
+   * Nadoknada radi samo ako kolona `last_sent_on` postoji (vidi schema.sql).
+   * Bez nje nema po čemu znati je li stih već poslan, pa bi "prošlo je
+   * vrijeme" značilo slanje SVAKI SAT — zato se tada vraćamo na stari,
+   * strogi uslov tačnog sata.
+   */
+  const tracked = all.length === 0 || 'last_sent_on' in all[0]
+
+  /**
+   * `>=`, ne `===`.
+   *
+   * Ranije se slalo samo u tačnom satu, pa je jedan propušten ili zakašnjeli
+   * cron značio da taj dan niko ne dobije stih. Sada je uslov "prošlo je
+   * vrijeme, a današnji stih još nije poslan" — sljedeći sat to nadoknadi.
+   * `last_sent_on` istovremeno garantuje da niko ne dobije isti stih dvaput.
+   */
+  const due = force
+    ? all
+    : all.filter((s) =>
+        tracked
+          ? hourIn(s.tz) >= s.send_hour && s.last_sent_on !== today
+          : hourIn(s.tz) === s.send_hour,
+      )
+  const verse = pickVerse(today)
 
   if (dry) {
     return NextResponse.json({
       dry: true,
-      date: todayInTz(),
+      date: today,
       verse: verse.id,
       subscribers: all.length,
       due: due.length,
-      hours: all.map((s) => ({ tz: s.tz, now: hourIn(s.tz), sendHour: s.send_hour })),
+      tracked,
+      hours: all.map((s) => ({
+        tz: s.tz,
+        now: hourIn(s.tz),
+        sendHour: s.send_hour,
+        lastSentOn: s.last_sent_on,
+      })),
     })
   }
 
   if (due.length === 0) {
-    return NextResponse.json({ sent: 0, due: 0, subscribers: all.length, date: todayInTz() })
+    return NextResponse.json({ sent: 0, due: 0, subscribers: all.length, date: today })
   }
   const payload = JSON.stringify({
-    title: 'Stih dana',
-    body: verse.text.split('\n')[0],
+    title: verse.song,
+    // Stih se prelama u više redova; u notifikaciji mora stati u jedan,
+    // inače se vidi samo prva polovina.
+    body: verse.text.replace(/\s*\n\s*/g, ' '),
     url: '/',
-    tag: `stih-${todayInTz()}`,
+    tag: `stih-${today}`,
   })
 
   let sent = 0
   const dead: string[] = []
+  const ok: string[] = []
 
   for (let i = 0; i < due.length; i += BATCH) {
     const results = await Promise.allSettled(
@@ -104,23 +137,38 @@ export async function POST(req: Request) {
       ),
     )
     results.forEach((r, j) => {
-      if (r.status === 'fulfilled') sent++
-      else {
+      if (r.status === 'fulfilled') {
+        sent++
+        ok.push(due[i + j].endpoint)
+      } else {
         const code = (r.reason as { statusCode?: number })?.statusCode
         if (code === 404 || code === 410) dead.push(due[i + j].endpoint)
       }
     })
   }
 
+  // Upisuje se TEK nakon uspjeha — pad slanja znači da sljedeći sat pokuša ponovo.
+  let trackError: string | null = null
+  if (tracked && ok.length) {
+    const { error: upErr } = await db
+      .from('push_subscriptions')
+      .update({ last_sent_on: today, last_ok: new Date().toISOString() })
+      .in('endpoint', ok)
+    // Tiho preskakanje bi značilo isti stih svaki sat — mora se vidjeti.
+    if (upErr) trackError = upErr.message
+  }
+
   // mrtvi uređaji se brišu odmah — inače lista truli
   if (dead.length) await db.from('push_subscriptions').delete().in('endpoint', dead)
 
   return NextResponse.json({
-    date: todayInTz(),
+    date: today,
     verse: verse.id,
     subscribers: all.length,
     due: due.length,
     sent,
     removed: dead.length,
+    tracked,
+    ...(trackError ? { trackError } : {}),
   })
 }
