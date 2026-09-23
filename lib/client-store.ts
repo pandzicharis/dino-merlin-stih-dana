@@ -44,35 +44,6 @@ export function useDevParams(serverDate: string): {
   }, [snap, serverDate])
 }
 
-/* ── favoriti ───────────────────────────────────────────────── */
-
-const FAV = 'stihdana:favorites'
-const subscribeFav = subscribeTo(['favoriteschange', 'storage'])
-
-function favSnapshot(): string {
-  try {
-    return localStorage.getItem(FAV) ?? '[]'
-  } catch {
-    return '[]'
-  }
-}
-
-export function useFavorites(): string[] {
-  const snap = useSyncExternalStore(subscribeFav, favSnapshot, () => '[]')
-  return useMemo(() => {
-    try {
-      const v = JSON.parse(snap)
-      return Array.isArray(v) ? (v as string[]) : []
-    } catch {
-      return []
-    }
-  }, [snap])
-}
-
-export function useIsFavorite(id: string): boolean {
-  return useFavorites().includes(id)
-}
-
 /** Je li klijent već hidratiran (za stvari koje ne smiju renderati na serveru). */
 export function useMounted(): boolean {
   return useSyncExternalStore(

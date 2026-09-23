@@ -20,7 +20,16 @@ import { FloatingNotes } from './FloatingNotes'
  * Animira se ISKLJUČIVO transform i opacity — sve ostalo obara framerate
  * na starijim telefonima.
  */
-export function MoodBackground({ mood, seed }: { mood: Mood; seed: string }) {
+export function MoodBackground({
+  mood,
+  seed,
+  /** Zaustavi portret — na uvodnom ekranu tekst stoji, pa i lice treba mirovati. */
+  still = false,
+}: {
+  mood: Mood
+  seed: string
+  still?: boolean
+}) {
   const m = MOODS[mood]
   const reduced = useReducedMotion()
   const dur = (base: number) => base / m.speed
@@ -33,14 +42,14 @@ export function MoodBackground({ mood, seed }: { mood: Mood; seed: string }) {
   const py = useSpring(my, { stiffness: 38, damping: 22, mass: 0.6 })
 
   useEffect(() => {
-    if (reduced || !window.matchMedia('(pointer: fine)').matches) return
+    if (still || reduced || !window.matchMedia('(pointer: fine)').matches) return
     const onMove = (e: PointerEvent) => {
       mx.set((e.clientX / window.innerWidth - 0.5) * 22)
       my.set((e.clientY / window.innerHeight - 0.5) * 14)
     }
     window.addEventListener('pointermove', onMove, { passive: true })
     return () => window.removeEventListener('pointermove', onMove)
-  }, [reduced, mx, my])
+  }, [still, reduced, mx, my])
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
@@ -103,7 +112,7 @@ export function MoodBackground({ mood, seed }: { mood: Mood; seed: string }) {
               WebkitMaskImage: 'radial-gradient(ellipse 72% 60% at 50% 26%, black 30%, transparent 82%)',
               willChange: 'transform',
             }}
-            animate={reduced ? undefined : { scale: [1, 1.045, 1] }}
+            animate={reduced || still ? undefined : { scale: [1, 1.045, 1] }}
             transition={{ duration: dur(34), repeat: Infinity, ease: 'easeInOut' }}
           />
 

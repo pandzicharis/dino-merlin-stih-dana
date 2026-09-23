@@ -1,5 +1,7 @@
 'use client'
 
+import { SEND_HOUR } from './date'
+
 /** Sve što se tiče Web Push-a na strani browsera. */
 
 export function isIOS(): boolean {
@@ -64,7 +66,9 @@ export async function getSubscription(): Promise<PushSubscription | null> {
   return reg.pushManager.getSubscription()
 }
 
-export async function subscribeToPush(sendHour = 20): Promise<'ok' | 'denied' | 'unsupported' | 'error'> {
+export async function subscribeToPush(
+  sendHour = SEND_HOUR,
+): Promise<'ok' | 'denied' | 'unsupported' | 'error'> {
   if (!pushSupported()) return 'unsupported'
 
   const permission = await Notification.requestPermission()

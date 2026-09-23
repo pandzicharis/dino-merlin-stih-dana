@@ -4,7 +4,7 @@ create table if not exists push_subscriptions (
   endpoint   text primary key,
   p256dh     text not null,
   auth       text not null,
-  send_hour  smallint not null default 20,          -- lokalno vrijeme korisnika
+  send_hour  smallint not null default 12,          -- lokalno vrijeme korisnika
   tz         text not null default 'Europe/Sarajevo',
   created_at timestamptz not null default now(),
   last_ok    timestamptz

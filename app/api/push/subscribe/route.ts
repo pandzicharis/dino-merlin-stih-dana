@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { SEND_HOUR } from '@/lib/date'
 
 export const runtime = 'nodejs'
 
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
       endpoint,
       p256dh: keys.p256dh,
       auth: keys.auth,
-      send_hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 20,
+      send_hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : SEND_HOUR,
       tz: typeof body.tz === 'string' && body.tz ? body.tz : 'Europe/Sarajevo',
     },
     { onConflict: 'endpoint' },

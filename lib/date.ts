@@ -8,6 +8,15 @@
 export const TZ = 'Europe/Sarajevo'
 export const EPOCH = '2026-01-01'
 
+/**
+ * Sat kad stiže dnevna obavijest, u lokalnom vremenu korisnika.
+ * Stoji na jednom mjestu — i pretplata i svaki ispis vremena čitaju odavde.
+ */
+export const SEND_HOUR = 12
+
+/** "12:00h" — za ispis na ekranu. */
+export const SEND_TIME = `${String(SEND_HOUR).padStart(2, '0')}:00h`
+
 /** Današnji datum u Sarajevu, format YYYY-MM-DD. Radi i na serveru i u browseru. */
 export function todayInTz(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(now)

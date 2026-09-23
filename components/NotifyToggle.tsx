@@ -11,10 +11,9 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from '@/lib/push-client'
+import { SEND_HOUR, SEND_TIME } from '@/lib/date'
 
 type State = 'checking' | 'off' | 'on' | 'denied' | 'install' | 'unsupported' | 'busy'
-
-const SEND_HOUR = 20
 
 /** Čita stvarno stanje dozvole i pretplate. Izvan komponente da render ostane čist. */
 async function resolveState(): Promise<State> {
@@ -25,15 +24,24 @@ async function resolveState(): Promise<State> {
 }
 
 const HINTS: Partial<Record<State, string>> = {
-  denied: 'Obavijesti su blokirane u postavkama browsera',
+  denied: 'Obavijesti su blokirane u postavkama telefona',
   install: 'Dodaj aplikaciju na početni ekran da bi obavijesti radile',
 }
 
+const ARIA: Record<Exclude<State, 'unsupported' | 'checking'>, string> = {
+  on: `Obavijesti uključene, stih stiže u ${SEND_TIME}. Isključi.`,
+  off: 'Uključi dnevnu obavijest',
+  busy: 'Trenutak…',
+  denied: 'Obavijesti su blokirane u postavkama telefona',
+  install: 'Obavijesti rade tek kad je aplikacija na početnom ekranu',
+}
+
 /**
- * Uključivanje i isključivanje dnevne obavijesti, jednim dodirom.
+ * Dnevna obavijest — stoji u zaglavlju, uz dijeljenje.
  *
- * Na iPhoneu Web Push radi isključivo iz instaliranog PWA-a, pa se tamo
- * umjesto dozvole prikazuje uputa.
+ * Uključeno stanje se ne nagađa iz ikone: zvono se ispuni bojom naglaska,
+ * dobije okvir, tihi val i ispisano vrijeme dolaska stiha. Isključeno je
+ * gola kontura u istoj težini kao ikona dijeljenja.
  */
 export function NotifyToggle({ accent }: { accent: string }) {
   const [state, setState] = useState<State>('checking')
@@ -75,7 +83,7 @@ export function NotifyToggle({ accent }: { accent: string }) {
     const r = await subscribeToPush(SEND_HOUR)
     if (r === 'ok') {
       setState('on')
-      showHint('Stih ti stiže svaki dan u 20:00')
+      showHint(`Gotovo — stih ti stiže svaki dan u ${SEND_TIME}`)
       navigator.vibrate?.([8, 40, 8])
     } else if (r === 'denied') {
       setState('denied')
@@ -89,37 +97,55 @@ export function NotifyToggle({ accent }: { accent: string }) {
   if (state === 'unsupported' || state === 'checking') return null
 
   const on = state === 'on'
+  const muted = state === 'denied' || state === 'install'
 
   return (
-    <div className="relative flex flex-col items-center">
-      <button
+    <div className="relative">
+      <motion.button
         onClick={onClick}
         aria-pressed={on}
-        aria-label={on ? 'Isključi dnevnu obavijest' : 'Uključi dnevnu obavijest'}
+        aria-label={ARIA[state as keyof typeof ARIA]}
         disabled={state === 'busy'}
-        className="group flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] transition-colors duration-300"
-        style={{ color: on ? accent : 'rgba(255,255,255,0.28)' }}
+        layout
+        className="flex items-center gap-1.5 rounded-full border transition-colors duration-500"
+        style={{
+          color: on ? accent : muted ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.4)',
+          borderColor: on ? `${accent}4D` : 'transparent',
+          backgroundColor: on ? `${accent}12` : 'transparent',
+          padding: on ? '0.3rem 0.6rem 0.3rem 0.45rem' : '0.3rem',
+        }}
       >
-        <motion.span
-          className="relative flex h-4 w-4 items-center justify-center"
-          animate={on ? { rotate: [0, -12, 10, -6, 0] } : { rotate: 0 }}
-          transition={{ duration: 0.75, ease: 'easeInOut' }}
-        >
-          {/* val koji se širi kad su obavijesti uključene */}
+        <span className="relative flex h-[22px] w-[22px] items-center justify-center">
+          {/* val — jedini znak na ekranu koji stalno kuca */}
           {on && (
             <motion.span
               className="absolute inset-0 rounded-full border"
               style={{ borderColor: accent }}
-              initial={{ scale: 0.8, opacity: 0.5 }}
-              animate={{ scale: 2.1, opacity: 0 }}
+              initial={{ scale: 0.75, opacity: 0.45 }}
+              animate={{ scale: 1.9, opacity: 0 }}
               transition={{ duration: 2.6, repeat: Infinity, ease: 'easeOut' }}
               aria-hidden
             />
           )}
           <Bell on={on} muted={state === 'denied'} />
-        </motion.span>
-        <span className="transition-opacity group-hover:opacity-80">Obavijesti</span>
-      </button>
+        </span>
+
+        {/* Vrijeme stoji ispisano samo kad je uključeno — to je cijela poruka. */}
+        <AnimatePresence initial={false}>
+          {on && (
+            <motion.span
+              key="at"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: 'auto' }}
+              exit={{ opacity: 0, width: 0 }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className="tabular overflow-hidden whitespace-nowrap text-[10px] font-semibold tracking-[0.12em]"
+            >
+              {SEND_TIME}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
 
       <AnimatePresence>
         {hint && (
@@ -127,7 +153,7 @@ export function NotifyToggle({ accent }: { accent: string }) {
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="absolute -bottom-7 w-[min(78vw,20rem)] text-center text-[10px] leading-relaxed text-white/45"
+            className="absolute right-0 top-full mt-2 w-[min(70vw,16rem)] text-right text-[10px] leading-relaxed text-white/45"
           >
             {hint}
           </motion.p>
@@ -140,12 +166,12 @@ export function NotifyToggle({ accent }: { accent: string }) {
 function Bell({ on, muted }: { on: boolean; muted: boolean }) {
   return (
     <svg
-      width="14"
-      height="14"
+      width="18"
+      height="18"
       viewBox="0 0 24 24"
       fill={on ? 'currentColor' : 'none'}
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
       className="relative"

@@ -1,13 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { motion } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { OVERRIDE_ON, formatFullDateBs } from '@/lib/date'
 import { BRAND } from '@/lib/brand'
-import { toggleFavorite } from '@/lib/storage'
-import { useIsFavorite } from '@/lib/client-store'
 import { MoodBackground } from './MoodBackground'
 import { VerseText, verseTail } from './VerseText'
 import { VerseOrnament } from './VerseOrnament'
@@ -35,7 +32,6 @@ export function VerseScreen({
   compact?: boolean
 }) {
   const m = MOODS[mood ?? verse.mood]
-  const fav = useIsFavorite(verse.id)
 
   // Sve na ekranu ide po JEDNOM rasporedu izvedenom iz dužine stiha.
   // Ranije se čekalo da zadnja riječ javi da je gotova, pa se osjećao zastoj
@@ -52,13 +48,13 @@ export function VerseScreen({
         className={
           compact
             ? 'flex min-h-[260px] flex-col justify-between p-5'
-            : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(2rem,env(safe-area-inset-top))] ${
+            : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(2rem,calc(env(safe-area-inset-top)+0.9rem))] ${
                 OVERRIDE_ON ? 'pb-16' : 'pb-[max(2.25rem,env(safe-area-inset-bottom))]'
               }`
         }
       >
         {/* zaglavlje — brend stoji tiho gore lijevo */}
-        <header className="flex items-start justify-between">
+        <header className="relative z-10 flex items-start justify-between">
           {compact ? (
             <p className="meta" style={{ color: m.accent }}>
               {m.label}
@@ -73,27 +69,8 @@ export function VerseScreen({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 1.35, ease: 'easeOut' }}
             >
+              <NotifyToggle accent={m.accent} />
               <ShareButton verse={verse} accent={m.accent} />
-              <button
-                aria-label={fav ? 'Ukloni iz favorita' : 'Dodaj u favorite'}
-                aria-pressed={fav}
-                onClick={() => {
-                  toggleFavorite(verse.id)
-                  navigator.vibrate?.(12)
-                }}
-                className="-m-2 p-2 text-white/40 transition-transform active:scale-90"
-              >
-                {/* opruga na spašavanju — jedini trenutak kad aplikacija uzvrati */}
-                <motion.span
-                  key={String(fav)}
-                  className="block"
-                  initial={{ scale: fav ? 0.6 : 1 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 520, damping: 15 }}
-                >
-                  <Heart filled={fav} color={m.accent} />
-                </motion.span>
-              </button>
             </motion.div>
           )}
         </header>
@@ -146,23 +123,11 @@ export function VerseScreen({
           ) : (
             <>
               <SongCredit verse={verse} />
-              <div className="flex w-full max-w-xs flex-col items-center gap-5">
-                <span
-                  className="h-px w-16"
-                  style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
-                  aria-hidden
-                />
-                <div className="flex items-center gap-7">
-                  <Link
-                    href="/favoriti"
-                    className="group flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/28 transition-colors hover:text-white/70"
-                  >
-                    <Heart filled={false} color={m.accent} size={14} />
-                    Favoriti
-                  </Link>
-                  <NotifyToggle accent={m.accent} />
-                </div>
-              </div>
+              <span
+                className="h-px w-16"
+                style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
+                aria-hidden
+              />
             </>
           )}
         </motion.footer>
@@ -201,22 +166,5 @@ function MoodBackgroundSlot({ mood, compact, seed }: { mood: Mood; compact: bool
         }}
       />
     </div>
-  )
-}
-
-function Heart({ filled, color, size = 22 }: { filled: boolean; color: string; size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={filled ? color : 'none'}
-      stroke={filled ? color : 'currentColor'}
-      strokeWidth="1.6"
-      className={filled ? undefined : 'text-current'}
-      aria-hidden
-    >
-      <path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z" strokeLinejoin="round" />
-    </svg>
   )
 }

@@ -5,19 +5,27 @@ import { motion, useReducedMotion } from 'motion/react'
 
 const GLYPHS = ['♪', '♫', '♩', '♬']
 
+/**
+ * Koliko se moodov broj nota množi prije crtanja.
+ * Odnos među moodovima ostaje onakav kakav je u `data/moods.ts` — ovdje se
+ * podiže samo ukupna prisutnost, da se note stvarno vide.
+ */
+const DENSITY = 1.8
+
 /** Deterministički raspored — izvan komponente, da render ostane čist. */
 function buildNotes(count: number, speed: number, seed: string) {
   let h = 0
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
   const rand = () => ((h = (h * 1664525 + 1013904223) >>> 0) / 4294967296)
 
-  return Array.from({ length: count }, () => ({
-    left: 6 + rand() * 88,
+  return Array.from({ length: Math.round(count * DENSITY) }, () => ({
+    left: 4 + rand() * 92,
     glyph: GLYPHS[Math.floor(rand() * GLYPHS.length)],
-    size: 11 + rand() * 13,
-    delay: rand() * 18,
+    size: 14 + rand() * 18,
+    // kraći raspon kašnjenja — inače prvih pola minute ekran izgleda prazno
+    delay: rand() * 9,
     duration: (22 + rand() * 16) / speed,
-    drift: (rand() - 0.5) * 70,
+    drift: (rand() - 0.5) * 90,
   }))
 }
 
@@ -56,14 +64,17 @@ export function FloatingNotes({
             bottom: -40,
             fontSize: n.size,
             color: accent,
+            // tihi sjaj u boji naglaska — nota tako ima težinu, a ne izgleda
+            // kao znak nalijepljen preko pozadine
+            textShadow: `0 0 14px ${accent}73`,
             willChange: 'transform, opacity',
           }}
           initial={{ opacity: 0 }}
           animate={{
             y: ['0vh', '-115vh'],
             x: [0, n.drift, 0],
-            opacity: [0, 0.32, 0.32, 0],
-            rotate: [0, n.drift > 0 ? 14 : -14, 0],
+            opacity: [0, 0.55, 0.55, 0],
+            rotate: [0, n.drift > 0 ? 16 : -16, 0],
           }}
           transition={{
             duration: n.duration,
