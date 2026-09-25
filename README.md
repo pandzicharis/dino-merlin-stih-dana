@@ -141,7 +141,34 @@ ekranu, pa se tamo umjesto njega pokaže uputa (`NotifyPrompt`).
 
 Stih se **ne bira u bazi — računa se iz datuma** (`lib/pickVerse.ts`).
 Stranica je zato statična i servira se s CDN-a: 500 i 500.000 korisnika
-koštaju isto. Baza postoji samo za push subscriptions.
+koštaju isto. Isto vrijedi za share slike — svih nekoliko desetina se
+izgradi u buildu (`app/og/[id]/[format]`), pa u produkciji nema ni crtanja
+na zahtjev ni odlaska po font na Google Fonts.
+
+Baza postoji samo za push subscriptions, i tu je jedino mjesto gdje broj
+korisnika zaista nešto znači. Slanje zato ne čita cijelu tabelu nego je
+uzima u porcijama, kroz `claim_due_subscriptions`:
+
+- porcija se **uzme i označi kao poslana u istoj transakciji**
+  (`for update skip locked`), pa dva paralelna workera ne mogu dobiti istog
+  čovjeka, a ni dva cron prolaza koja se preklope
+- `last_sent_on` pamti korisnikov lokalni dan, pa ponovljen poziv rute ne
+  znači i ponovljenu obavijest
+- ruta iznad par stotina na redu **sama sebe podigne u više paralelnih
+  workera**, jer jedan serverless poziv ne stigne odraditi desetak hiljada
+  šifrovanja i HTTPS rundi prije nego istekne
+
+Pravila koja se lako prekrše pri sljedećoj izmjeni:
+
+- **`select('*')` nad `push_subscriptions` vraća najviše 1000 redova**
+  (Supabase `db-max-rows`), i to bez greške. Sve preko toga ide kroz
+  `.range()` ili kroz RPC.
+- **Liste endpointa ne idu kroz `.in(...)`** — supabase-js ih lijepi u URL,
+  a nekoliko hiljada ih je nekoliko megabajta query stringa. Zato
+  `finish_push_batch` prima nizove u tijelu zahtjeva.
+- **Trigger nad tabelom mora ostati `update of tz, send_hour`.** Slanje ne
+  radi ništa drugo nego u petlji ažurira ostale kolone; trigger na svaki
+  update značio bi provjeru zone po svakoj poslanoj obavijesti.
 
 ## Prije javnog launcha
 
