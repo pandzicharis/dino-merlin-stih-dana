@@ -2,15 +2,18 @@ name: Stih dana — push
 
 on:
   schedule:
-    # Svaki sat u :05. Ruta sama gleda kome je po njegovoj zoni vrijeme, pa
-    # satni raspored pokriva sve vremenske zone i prelazak na ljetno vrijeme.
+    # JEDNOM DNEVNO. Ruta ne gleda sat — šalje kad god je pozovemo — pa je
+    # ovaj raspored jedino mjesto gdje se podešava kad stih stiže.
     #
-    # Dupli poziv ne pravi duplu obavijest: `claim_due_subscriptions` u istoj
-    # transakciji uzme i označi red, a `last_sent_on` pamti da je dan potrošen.
-    - cron: '5 * * * *'
+    # 10:00 UTC je 12:00 u Sarajevu ljeti, a 11:00 zimi: GitHub prima samo
+    # UTC i ne zna za ljetno vrijeme. Ako ti taj sat zimi smeta, prebaci
+    # okidač na cron-job.org, gdje se rasporedu zada vremenska zona.
+    #
+    # Ponovljen poziv ne šalje duplo: `last_sent_on` nosi sarajevski datum
+    # stiha, pa drugi prolaz istog dana nema kome.
+    - cron: '0 10 * * *'
   workflow_dispatch:
 
-# Ako prethodni prolaz još traje, ne pokreći drugi preko njega.
 concurrency:
   group: daily-push
   cancel-in-progress: false

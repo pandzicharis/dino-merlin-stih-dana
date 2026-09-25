@@ -27,18 +27,19 @@ with provjere as (
   union all
   -- Imena parametara se provjeravaju namjerno: supabase-js šalje argumente
   -- po imenu, pa preimenovan parametar obara RPC iako funkcija postoji.
-  select 4, 'funkcija claim_due_subscriptions(p_run, p_limit, p_force)',
+  select 4, 'funkcija claim_due_subscriptions(p_run, p_today, p_limit, p_force)',
          count(*) = 1
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'claim_due_subscriptions'
-     and pg_get_function_identity_arguments(p.oid) = 'p_run uuid, p_limit integer, p_force boolean'
+     and pg_get_function_identity_arguments(p.oid)
+         = 'p_run uuid, p_today date, p_limit integer, p_force boolean'
 
   union all
-  select 5, 'funkcija count_due_subscriptions(p_run, p_force)',
+  select 5, 'funkcija count_due_subscriptions(p_run, p_today, p_force)',
          count(*) = 1
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'count_due_subscriptions'
-     and pg_get_function_identity_arguments(p.oid) = 'p_run uuid, p_force boolean'
+     and pg_get_function_identity_arguments(p.oid) = 'p_run uuid, p_today date, p_force boolean'
 
   union all
   select 6, 'funkcija finish_push_batch(p_ok, p_dead, p_retry, p_error)',
@@ -48,11 +49,12 @@ with provjere as (
      and pg_get_function_identity_arguments(p.oid) = 'p_ok text[], p_dead text[], p_retry text[], p_error text'
 
   union all
-  select 7, 'funkcija push_subscription_is_due(p_tz, p_send_hour, p_last_sent_on)',
-         count(*) = 1
+  -- Stara verzija je gledala sat i zonu. Ako je jos tu, u bazi su ostala i
+  -- stara pravila slanja — znaci da schema.sql nije pokrenut do kraja.
+  select 7, 'stara push_subscription_is_due je uklonjena',
+         count(*) = 0
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'push_subscription_is_due'
-     and pg_get_function_identity_arguments(p.oid) = 'p_tz text, p_send_hour smallint, p_last_sent_on date'
 
   union all
   select 8, 'trigger za čišćenje zone postoji',
@@ -99,12 +101,15 @@ with provjere as (
      and has_function_privilege('service_role', p.oid, 'execute')
 
   union all
-  -- Zona koju Postgres ne poznaje obara `now() at time zone tz`, a to obori
-  -- cijeli upit — dakle jedan takav red zaustavi slanje SVIMA.
-  select 14, 'nijedan postojeći red nema nepoznatu vremensku zonu',
+  -- Provjere 4 i 5 traze tacan novi potpis, ali bi prosle i da uz novu
+  -- funkciju u bazi jos stoji i stara. Ovo hvata bas taj slucaj: preskocen
+  -- `drop function` znaci da PostgREST moze pozvati pogresnu.
+  select 14, 'nema zaostalih funkcija sa starim potpisom',
          count(*) = 0
-    from push_subscriptions s
-   where not exists (select 1 from pg_timezone_names z where z.name = s.tz)
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('claim_due_subscriptions', 'count_due_subscriptions')
+     and pg_get_function_identity_arguments(p.oid) not like '%p_today date%'
 )
 select rb as "#",
        case when ok then '✔ PROLAZ' else '✘ PAD' end as ishod,

@@ -8,10 +8,18 @@ import { pickVerse } from '@/lib/pickVerse'
 import { oneLine, withPeriod } from '@/lib/text'
 
 /**
- * Šalje stih dana. Radi SVAKI SAT, ne jednom dnevno — tako podržava
- * različita vremena po korisniku i preživljava prelazak na ljetno vrijeme.
+ * Šalje stih dana.
  *
- * Okidač: GitHub Actions (besplatno) ili Vercel Cron (Pro).
+ * O VREMENU ODLUČUJE OKIDAČ, NE RUTA. Kad god se pozove, šalje svima koji
+ * još nisu dobili stih za taj dan. Raspored crona je jedino mjesto gdje se
+ * podešava kad to biva — ranije je uslov stajao i u upitu, pa se vrijeme
+ * mijenjalo na dva mjesta i lako razilazilo.
+ *
+ * Isti dan se ne šalje dvaput: `last_sent_on` nosi sarajevski datum stiha,
+ * pa ponovljen poziv, preklopljen cron ili "Test run" iz konzole ne mogu
+ * proizvesti drugu obavijest. Kad se stvarno hoće ponovo — `?force=1`.
+ *
+ * Okidač: cron-job.org, GitHub Actions ili Vercel Cron (Pro).
  *
  * ── Oblik posla ──────────────────────────────────────────────────────
  * Jedan zahtjev ne može poslati desetak hiljada obavijesti: svaka je
@@ -173,10 +181,16 @@ async function sendBatch(rows: Row[], payload: string): Promise<Tally> {
 
 /**
  * Worker: uzimaj porciju i šalji dok ima posla ili dok ima vremena.
- * Prekid po budžetu nije gubitak — neposlani ostaju neoznačeni i pokupi ih
- * sljedeći prolaz, jer je uslov "kome je vrijeme" `>=` a ne `=`.
+ * Prekid po budžetu nije gubitak — neposlani ostaju neoznačeni, pa ih pokupi
+ * sljedeći poziv rute.
  */
-async function runWorker(run: string, force: boolean, payload: string, deadline: number) {
+async function runWorker(
+  run: string,
+  today: string,
+  force: boolean,
+  payload: string,
+  deadline: number,
+) {
   const db = supabase()
   if (!db) return { ...emptyTally(), error: 'baza nije konfigurisana' }
 
@@ -191,6 +205,7 @@ async function runWorker(run: string, force: boolean, payload: string, deadline:
 
     const { data, error } = await db.rpc('claim_due_subscriptions', {
       p_run: run,
+      p_today: today,
       p_limit: BATCH,
       p_force: force,
     })
@@ -249,7 +264,7 @@ export async function POST(req: Request) {
   /* ── worker ──────────────────────────────────────────────────────── */
 
   if (workerRun) {
-    const out = await runWorker(workerRun, force, payload, started + WORKER_BUDGET_MS)
+    const out = await runWorker(workerRun, today, force, payload, started + WORKER_BUDGET_MS)
     return NextResponse.json({ worker: workerRun, ...out, ms: Date.now() - started })
   }
 
@@ -259,6 +274,7 @@ export async function POST(req: Request) {
 
   const { data: dueRaw, error: countError } = await db.rpc('count_due_subscriptions', {
     p_run: run,
+    p_today: today,
     p_force: force,
   })
   if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
@@ -279,13 +295,24 @@ export async function POST(req: Request) {
   }
 
   if (due === 0) {
-    return NextResponse.json({ date: today, verse: verse.id, due: 0, sent: 0, ms: Date.now() - started })
+    // Odgovor sam kaže zašto je prazan — inače `due: 0` izgleda kao kvar,
+    // a najčešće znači da je stih za ovaj dan već otišao.
+    return NextResponse.json({
+      date: today,
+      verse: verse.id,
+      due: 0,
+      sent: 0,
+      note: force
+        ? 'nema nijedne pretplate u bazi'
+        : 'stih za ovaj dan je već poslan svima — ?force=1 šalje ponovo',
+      ms: Date.now() - started,
+    })
   }
 
   // Mali broj na redu se odradi odmah — dijeljenje posla bi tu koštalo više
   // nego što donese.
   if (due <= INLINE_LIMIT) {
-    const out = await runWorker(run, force, payload, started + DISPATCH_BUDGET_MS)
+    const out = await runWorker(run, today, force, payload, started + DISPATCH_BUDGET_MS)
     return NextResponse.json({
       date: today,
       verse: verse.id,

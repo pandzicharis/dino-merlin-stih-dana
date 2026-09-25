@@ -55,7 +55,8 @@ npx web-push generate-vapid-keys
 
 Šemu baze primijeni iz [`supabase/schema.sql`](supabase/schema.sql).
 Slanje pokreće [`.github/workflows/daily-push.yml`](.github/workflows/daily-push.yml)
-svaki sat; ruta `/api/cron/send-daily` sama odlučuje kome je vrijeme.
+jednom dnevno. Ruta `/api/cron/send-daily` ne gleda sat — šalje kad god je
+pozovu, pa se vrijeme podešava u rasporedu crona, a ne u kodu.
 
 > **iOS:** Web Push radi isključivo iz PWA-a dodanog na početni ekran (iOS 16.4+),
 > nikad iz Safari taba. Onboarding to vodi korak po korak.
@@ -152,8 +153,10 @@ uzima u porcijama, kroz `claim_due_subscriptions`:
 - porcija se **uzme i označi kao poslana u istoj transakciji**
   (`for update skip locked`), pa dva paralelna workera ne mogu dobiti istog
   čovjeka, a ni dva cron prolaza koja se preklope
-- `last_sent_on` pamti korisnikov lokalni dan, pa ponovljen poziv rute ne
-  znači i ponovljenu obavijest
+- `last_sent_on` nosi **sarajevski datum stiha** — stih dana je jedan za sve,
+  pa je "dobio stih za 25.09." jedina činjenica koju treba pamtiti. Ponovljen
+  poziv rute zato ne znači i ponovljenu obavijest, a iz vruće putanje ispada
+  svako računanje s vremenskim zonama
 - ruta iznad par stotina na redu **sama sebe podigne u više paralelnih
   workera**, jer jedan serverless poziv ne stigne odraditi desetak hiljada
   šifrovanja i HTTPS rundi prije nego istekne
@@ -169,6 +172,8 @@ Pravila koja se lako prekrše pri sljedećoj izmjeni:
 - **Trigger nad tabelom mora ostati `update of tz, send_hour`.** Slanje ne
   radi ništa drugo nego u petlji ažurira ostale kolone; trigger na svaki
   update značio bi provjeru zone po svakoj poslanoj obavijesti.
+- **`SEND_HOUR` u `lib/date.ts` ne utiče na slanje** — to je natpis u
+  aplikaciji. Ko pomjeri cron, mora pomjeriti i njega.
 
 ## Prije javnog launcha
 

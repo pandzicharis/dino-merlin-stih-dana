@@ -14,7 +14,7 @@ create table if not exists push_subscriptions (
   last_ok    timestamptz
 );
 
--- Dan (po KORISNIKOVOM lokalnom kalendaru) kad mu je zadnji put otišao stih.
+-- Sarajevski datum stiha koji je ovom uređaju zadnji put otišao.
 -- Ovo je jedina odbrana od duplih obavijesti: cron se ponovi, worker padne na
 -- pola, neko klikne "Test run" — bez ovoga svaki od tih slučajeva pošalje opet.
 alter table push_subscriptions add column if not exists last_sent_on date;
@@ -27,13 +27,15 @@ alter table push_subscriptions add column if not exists last_run uuid;
 
 alter table push_subscriptions add column if not exists last_error text;
 
-create index if not exists push_subscriptions_send_hour_idx
-  on push_subscriptions (send_hour);
+-- Slanje više ne gleda ni sat ni zonu, pa indeks po `send_hour` nema koga
+-- posluživati. Stariji oblik `due_idx` je bio (last_sent_on, send_hour) —
+-- `create index if not exists` ga ne bi prepisao, zato prvo ispada.
+drop index if exists push_subscriptions_send_hour_idx;
+drop index if exists push_subscriptions_due_idx;
 
--- Pokriva vruć upit: "ko još danas nije dobio". Postgres prvo odbaci sve
--- kojima je već poslano, pa tek na ostatku računa lokalni sat.
+-- Pokriva cijeli uslov slanja: "ko još nije dobio stih za ovaj dan".
 create index if not exists push_subscriptions_due_idx
-  on push_subscriptions (last_sent_on, send_hour);
+  on push_subscriptions (last_sent_on);
 
 create index if not exists push_subscriptions_last_run_idx
   on push_subscriptions (last_run);
@@ -90,25 +92,26 @@ create trigger push_subscriptions_sanitize_trg
 
 
 -- ─────────────────────────────────────────────────────────────────────
---  Uslov "kome je vrijeme"
+--  Kad se šalje
 --
---  `>=` a ne `=`: ako slanje u 12:05 padne, sljedeći prolaz u 13:05 ga
---  pokupi. Uz `last_sent_on` to ne može značiti dvije obavijesti — znači
---  samo da propušten sat nije izgubljen dan.
+--  Ruta NE odlučuje o vremenu — odlučuje okidač. Kad god se pozove, šalje
+--  svima koji još nisu dobili stih za taj dan. Vrijeme se podešava
+--  rasporedom crona, na jednom mjestu, umjesto da se krije u uslovu upita.
+--
+--  Ključ za duplikate je zato SARAJEVSKI datum, ne korisnikov lokalni dan:
+--  stih dana je jedan za sve (vidi lib/date.ts), pa je "dobio stih za 25.09."
+--  jedina činjenica koja se pamti. Time iz vruće putanje ispada svako
+--  računanje s vremenskim zonama.
+--
+--  `send_hour` i `tz` ostaju u tabeli — više ne odlučuju ni o čemu, ali su
+--  tu ako se ikad uvede da svako bira svoje vrijeme.
 -- ─────────────────────────────────────────────────────────────────────
 
-create or replace function push_subscription_is_due(
-  p_tz           text,
-  p_send_hour    smallint,
-  p_last_sent_on date
-)
-returns boolean
-language sql
-stable
-as $$
-  select (now() at time zone p_tz)::date is distinct from p_last_sent_on
-     and extract(hour from (now() at time zone p_tz)) >= p_send_hour;
-$$;
+-- Potpisi se mijenjaju, a `create or replace` ne mijenja potpis — staro mora
+-- ispasti prvo, inače bi uz nove ostale i stare funkcije.
+drop function if exists claim_due_subscriptions(uuid, int, boolean);
+drop function if exists count_due_subscriptions(uuid, boolean);
+drop function if exists push_subscription_is_due(text, smallint, date);
 
 
 -- ─────────────────────────────────────────────────────────────────────
@@ -117,11 +120,12 @@ $$;
 --  `for update skip locked` je ovdje cijela poenta: više workera može zvati
 --  ovu funkciju istovremeno i svaki dobije SVOJ, tuđem disjunktan skup.
 --  Red se označi kao poslan u istoj transakciji u kojoj je i uzet, pa ni
---  preklapanje dva cron prolaza ne može proizvesti duplu obavijest.
+--  preklapanje dva prolaza ne može proizvesti duplu obavijest.
 -- ─────────────────────────────────────────────────────────────────────
 
 create or replace function claim_due_subscriptions(
   p_run   uuid,
+  p_today date,
   p_limit int default 500,
   p_force boolean default false
 )
@@ -132,13 +136,13 @@ as $$
     select s.endpoint
       from push_subscriptions s
      where s.last_run is distinct from p_run
-       and (p_force or push_subscription_is_due(s.tz, s.send_hour, s.last_sent_on))
+       and (p_force or s.last_sent_on is distinct from p_today)
      order by s.endpoint
      limit p_limit
        for update skip locked
   )
   update push_subscriptions s
-     set last_sent_on = (now() at time zone s.tz)::date,
+     set last_sent_on = p_today,
          last_run     = p_run
     from due
    where s.endpoint = due.endpoint
@@ -148,6 +152,7 @@ $$;
 
 create or replace function count_due_subscriptions(
   p_run   uuid,
+  p_today date,
   p_force boolean default false
 )
 returns bigint
@@ -157,7 +162,7 @@ as $$
   select count(*)
     from push_subscriptions s
    where s.last_run is distinct from p_run
-     and (p_force or push_subscription_is_due(s.tz, s.send_hour, s.last_sent_on));
+     and (p_force or s.last_sent_on is distinct from p_today);
 $$;
 
 
@@ -191,8 +196,8 @@ begin
     delete from push_subscriptions where endpoint = any(p_dead);
   end if;
 
-  -- Prolazna greška (mreža, 5xx kod push servisa). Oznaka DANA se povuče
-  -- nazad da ga sljedeći prolaz pokupi — zato `>=` u uslovu iznad.
+  -- Prolazna greška (mreža, 5xx kod push servisa). Oznaka dana se povuče
+  -- nazad da ga sljedeći prolaz pokupi.
   --
   -- `last_run` se NE dira, i to je bitno. Njega je claim postavio na tekući
   -- prolaz, pa ovako isti worker ovaj red više ne može uzeti — a sljedeći
@@ -212,10 +217,10 @@ $$;
 --  Dozvole: sve ide preko service-role ključa sa servera.
 -- ─────────────────────────────────────────────────────────────────────
 
-revoke all on function claim_due_subscriptions(uuid, int, boolean) from public, anon, authenticated;
-revoke all on function count_due_subscriptions(uuid, boolean)      from public, anon, authenticated;
-revoke all on function finish_push_batch(text[], text[], text[], text) from public, anon, authenticated;
+revoke all on function claim_due_subscriptions(uuid, date, int, boolean) from public, anon, authenticated;
+revoke all on function count_due_subscriptions(uuid, date, boolean)      from public, anon, authenticated;
+revoke all on function finish_push_batch(text[], text[], text[], text)   from public, anon, authenticated;
 
-grant execute on function claim_due_subscriptions(uuid, int, boolean) to service_role;
-grant execute on function count_due_subscriptions(uuid, boolean)      to service_role;
-grant execute on function finish_push_batch(text[], text[], text[], text) to service_role;
+grant execute on function claim_due_subscriptions(uuid, date, int, boolean) to service_role;
+grant execute on function count_due_subscriptions(uuid, date, boolean)      to service_role;
+grant execute on function finish_push_batch(text[], text[], text[], text)   to service_role;

@@ -86,23 +86,28 @@ npm run verses:check
 
 Ruta je `POST /api/cron/send-daily` (radi i `GET`).
 
-**Pokreće se svaki sat, ne jednom dnevno.** Ruta sama gleda kome je po
-njegovoj vremenskoj zoni došao njegov sat. Zato preživljava ljetno/zimsko
-vrijeme i podržava da svako bira svoje vrijeme.
+**Ruta ne gleda sat.** Kad god je pozoveš, pošalje svima koji još nisu dobili
+stih za taj dan. Kad se to dešava određuje isključivo raspored crona — jedno
+mjesto, koje ti mijenjaš.
 
 Poziv koji se ponovi **ne šalje duplo**: porcija se uzima i označava u istoj
-transakciji, a `last_sent_on` pamti korisnikov lokalni dan. Slobodno ga
-pokreni ručno koliko puta hoćeš.
+transakciji, a `last_sent_on` nosi sarajevski datum stiha. Slobodno pokreni
+ručno koliko puta hoćeš — drugi put istog dana nema kome.
 
-Uslov je "lokalni sat **>=** izabranog", ne "tačno jednak". Ako slanje u 12:05
-padne ili istekne, sljedeći prolaz u 13:05 pokupi ostatak — propušten sat ne
-znači propušten dan.
+Kad baš hoćeš da ode ponovo (test, ili si pomjerio vrijeme usred dana),
+`?force=1` zaobilazi i tu oznaku.
+
+> Ako pomjeriš raspored, pomjeri i `SEND_HOUR` u [`lib/date.ts`](lib/date.ts).
+> Taj broj ne utiče na slanje — samo je natpis u aplikaciji ("stih stiže u
+> 12:00h"), pa bi inače aplikacija govorila jedno a telefon radio drugo.
 
 ### cron-job.org
 
 1. **Create cronjob**
 2. URL: `https://tvoja-adresa.vercel.app/api/cron/send-daily`
-3. Schedule: **Every hour**, minuta `5` (da se ne poklopi s vršnim opterećenjem)
+3. Schedule: **jednom dnevno**, u sat koji hoćeš. cron-job.org ume zadati i
+   **vremensku zonu** — izaberi `Europe/Sarajevo` i vrijeme ostaje isto i
+   ljeti i zimi, bez ijedne izmjene u kodu.
 4. **Advanced → Headers**:
    ```
    x-cron-secret: <CRON_SECRET>
@@ -113,12 +118,14 @@ znači propušten dan.
 
 ### Vercel Cron (alternativa)
 
-Vercel Hobby dopušta cron **samo jednom dnevno**, što ne pokriva vremenske
-zone. Na Pro planu dodaj `vercel.json`:
+Vercel Hobby dopušta cron jednom dnevno, što je sada tačno ono što treba.
+Dodaj `vercel.json`:
 
 ```json
-{ "crons": [{ "path": "/api/cron/send-daily", "schedule": "5 * * * *" }] }
+{ "crons": [{ "path": "/api/cron/send-daily", "schedule": "0 10 * * *" }] }
 ```
+
+Raspored je u UTC: `0 10` je 12:00 u Sarajevu ljeti, 11:00 zimi.
 
 Vercel šalje `Authorization: Bearer $CRON_SECRET` — ruta i to prihvata.
 
@@ -127,9 +134,13 @@ Vercel šalje `Authorization: Bearer $CRON_SECRET` — ruta i to prihvata.
 [`.github/workflows/daily-push.yml`](.github/workflows/daily-push.yml) radi
 isto, besplatno. Treba mu dva secreta u repou: `APP_URL` i `CRON_SECRET`.
 
-Dvije stvari koje treba znati o njemu: zakazani workflow zna kasniti i po
-desetak minuta kad je GitHub pod opterećenjem, i **sam se ugasi nakon 60 dana
-bez ijednog commita** u repo. Za ozbiljan rad je cron-job.org pouzdaniji.
+Podešen je na `0 10 * * *` — 12:00 u Sarajevu ljeti, 11:00 zimi, jer GitHub
+prima samo UTC i ne zna za ljetno vrijeme.
+
+Tri stvari koje treba znati o njemu: taj zimski pomak, zakazani workflow zna
+kasniti i po desetak minuta kad je GitHub pod opterećenjem, i **sam se ugasi
+nakon 60 dana bez ijednog commita** u repo. Za ozbiljan rad je cron-job.org
+pouzdaniji — i jedini od troje koji zna za vremensku zonu.
 
 Koristi jedno od troje. Ako pokreneš dva, ništa se neće pokvariti — samo
 plaćaš dva puta isti posao.
@@ -138,9 +149,9 @@ plaćaš dva puta isti posao.
 
 Ruta iznad ~400 pretplatnika na redu sama sebe podigne u više paralelnih
 workera (do 8). Desetak hiljada obavijesti tako stane u nekoliko sekundi.
-Ako i to ne stigne prije isteka funkcije, odgovor nosi `"truncated": true`
-i ostatak pokupi sljedeći sat — niko ne ostane bez stiha i niko ga ne dobije
-dvaput.
+Ako i to ne stigne prije isteka funkcije, odgovor nosi `"truncated": true` —
+pozovi rutu ponovo i ona nastavi tamo gdje je stala, bez `?force=1`. Oni koji
+su već dobili preskaču se sami.
 
 ---
 
@@ -151,13 +162,16 @@ dvaput.
 curl -s "https://tvoja-adresa.vercel.app/api/cron/send-daily?dry=1" \
   -H "x-cron-secret: $CRON_SECRET" | jq
 
-# pošalji ODMAH svima, bez obzira na sat i na to je li danas već poslano
+# pošalji ponovo, i onima koji su stih za ovaj dan već dobili
 curl -s -X POST "https://tvoja-adresa.vercel.app/api/cron/send-daily?force=1" \
   -H "x-cron-secret: $CRON_SECRET" | jq
 ```
 
-`dry=1` vrati ukupan broj pretplatnika, koliko ih je trenutno na redu, koji je
-stih i koliko bi se workera podiglo.
+`dry=1` vrati ukupan broj pretplatnika, koliko ih je na redu, koji je stih i
+koliko bi se workera podiglo.
+
+Ako `due` bude 0, odgovor sam kaže zašto — ili je stih za taj dan već otišao
+svima, ili u bazi nema nijedne pretplate. To je dvoje se lako pomiješa.
 
 Odgovor pravog slanja izgleda ovako:
 
@@ -171,9 +185,9 @@ Odgovor pravog slanja izgleda ovako:
 | `due` | koliko ih je bilo na redu |
 | `sent` | koliko je stvarno otišlo |
 | `removed` | uređaji koji više ne postoje (404/410) — obrisani iz baze |
-| `retry` | prolazna greška kod push servisa; vraćeni u red za sljedeći sat |
+| `retry` | prolazna greška kod push servisa; vraćeni u red za sljedeći poziv |
 | `failed` | **naša** greška, npr. pogrešan VAPID ključ — vidi `last_error` u bazi |
-| `truncated` | posao nije stao u jedan prolaz; ostatak ide sljedeći sat |
+| `truncated` | posao nije stao u jedan prolaz; pozovi rutu ponovo |
 
 `failed` veći od nule je jedini broj koji traži da odmah pogledaš. Takvi se
 namjerno **ne ponavljaju**: da se ponavljaju, jedna pogrešna varijabla okoline
@@ -184,22 +198,14 @@ značila bi da ruta u krug gađa sve pretplatnike.
 1. Otvori aplikaciju, dodirni **zvono** → prihvati dozvolu
 2. `?dry=1` → mora pisati `subscribers: 1`
 3. `?force=1` → obavijest stiže za par sekundi
-4. Ostavi satni cron da radi i sutra u 12:00 provjeri bez `force`
+4. Ostavi cron da radi i sutra u zakazano vrijeme provjeri bez `force`
 
-> Ako se pretplatiš **poslije** svog sata, danas više ništa ne stiže — počinje
-> sutra. To je namjerno, inače bi prijava u 20h na sat 12h značila obavijest za
-> par minuta. Za test koristi `?force=1`.
-
-### Bez čekanja do 12:00
-
-U Supabaseu pomjeri sebi sat na sljedeći puni i obriši oznaku dana:
+Drugi put istog dana `?force=1` je obavezan — bez njega ruta nema kome, jer
+si stih za taj dan već dobio. Isto se postiže i iz Supabasea:
 
 ```sql
-update push_subscriptions set send_hour = 14, last_sent_on = null;  -- pa čekaj 14:05
+update push_subscriptions set last_sent_on = null;
 ```
-
-`last_sent_on = null` je bitan: bez njega si za danas već potrošen i ruta te
-preskače.
 
 ---
 

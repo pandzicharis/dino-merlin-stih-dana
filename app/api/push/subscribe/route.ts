@@ -35,24 +35,13 @@ function isPushEndpoint(raw: string): boolean {
 
 const isKey = (s: string) => s.length > 0 && s.length <= MAX_KEY && /^[A-Za-z0-9_\-=]+$/.test(s)
 
-/** Lokalni datum i sat korisnika. `null` ako zona nije poznata ovom runtimeu. */
-function localParts(tz: string): { date: string; hour: number } | null {
+/** Poznaje li runtime ovu vremensku zonu. */
+function isKnownTz(tz: string): boolean {
   try {
-    const parts = Object.fromEntries(
-      new Intl.DateTimeFormat('en-CA', {
-        timeZone: tz,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        hourCycle: 'h23',
-      })
-        .formatToParts(new Date())
-        .map((p) => [p.type, p.value]),
-    )
-    return { date: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) }
+    new Intl.DateTimeFormat('en', { timeZone: tz })
+    return true
   } catch {
-    return null
+    return false
   }
 }
 
@@ -109,31 +98,24 @@ export async function POST(req: Request) {
   const rawHour = Number(body.sendHour)
   const hour = Number.isInteger(rawHour) && rawHour >= 0 && rawHour <= 23 ? rawHour : SEND_HOUR
 
-  // Nepoznata zona se svede na Sarajevo. Isto radi i okidač u bazi — ovdje
-  // zato što lokalni sat treba i za `alreadyPast` ispod.
+  // Nepoznata zona se svede na Sarajevo. Isto radi i okidač u bazi.
+  //
+  // `tz` i `send_hour` se i dalje pamte, ali više ne odlučuju kad stiže stih
+  // — o tome odlučuje raspored crona. Stoje tu ako se ikad uvede da svako
+  // bira svoje vrijeme.
   const wanted = typeof body.tz === 'string' ? body.tz.slice(0, 64) : ''
-  const wantedParts = wanted ? localParts(wanted) : null
-  const tz = wantedParts ? wanted : TZ
-  const local = wantedParts ?? localParts(TZ)
+  const tz = wanted && isKnownTz(wanted) ? wanted : TZ
 
   /**
-   * Ko se pretplati poslije svog sata, danas ne dobije ništa — počinje sutra.
+   * `last_sent_on` se namjerno ne dira.
    *
-   * Uslov slanja je "lokalni sat >= izabrani", da propušten cron prolaz ne
-   * pojede cijeli dan. Bez ove linije bi ta ista popustljivost značila da
-   * neko ko se u 20h prijavi na 12h dobije obavijest za par minuta.
+   * Nova pretplata kreće kao "nije još dobio stih za ovaj dan", pa je dobije
+   * na prvom sljedećem okidaču. Ranije se ovdje upisivao današnji datum ako
+   * je korisnikov sat već prošao — to je imalo smisla dok je ruta radila
+   * svaki sat, a sada bi samo značilo da nova pretplata tiho preskoči dan.
    */
-  const alreadyPast = local ? local.hour >= hour : false
-
   const { error } = await db.from('push_subscriptions').upsert(
-    {
-      endpoint,
-      p256dh: keys.p256dh,
-      auth: keys.auth,
-      send_hour: hour,
-      tz,
-      ...(alreadyPast && local ? { last_sent_on: local.date } : {}),
-    },
+    { endpoint, p256dh: keys.p256dh, auth: keys.auth, send_hour: hour, tz },
     { onConflict: 'endpoint' },
   )
 

@@ -9,8 +9,14 @@ export const TZ = 'Europe/Sarajevo'
 export const EPOCH = '2026-01-01'
 
 /**
- * Sat kad stiže dnevna obavijest, u lokalnom vremenu korisnika.
- * Stoji na jednom mjestu — i pretplata i svaki ispis vremena čitaju odavde.
+ * Sat koji aplikacija OBEĆAVA korisniku ("stih stiže u 12:00h").
+ *
+ * Ovo je samo natpis. Kad stih stvarno stiže odlučuje raspored crona
+ * (.github/workflows/daily-push.yml ili cron-job.org) — ruta za slanje ne
+ * gleda sat nego šalje kad god je pozovu.
+ *
+ * Ako pomjeriš cron, pomjeri i ovaj broj, inače aplikacija govori jedno a
+ * telefon radi drugo.
  */
 export const SEND_HOUR = 12
 
