@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
+import { VERSES } from '@/data/verses'
 import { MOODS } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
 import { verseById } from '@/lib/pickVerse'
@@ -8,14 +9,33 @@ import { withPeriod } from '@/lib/text'
 
 /**
  * Share slika — jedini kanal rasta koji nam treba.
- *   /og/<id>?f=story  → 1080×1920 (IG Story)
- *   /og/<id>?f=post   → 1080×1080 (feed)
+ *   /og/<id>/story  → 1080×1920 (IG Story)
+ *   /og/<id>/post   → 1080×1080 (feed)
  *
- * Slika za dati id se nikad ne mijenja, pa se generiše jednom u životu
- * i keširá zauvijek.
+ * Slika za dati stih se ne mijenja nikad, a stihova je šaka — pa se svih
+ * nekoliko desetina generiše U BUILDU i dalje su običan statični fajl s CDN-a.
+ *
+ * Ranije se crtalo na zahtjev. To znači Satori render i odlazak po font na
+ * Google Fonts u trenutku kad neko podijeli stih — dakle najsporiji mogući
+ * odgovor tačno u trenutku kad WhatsApp ili Instagram čeka preview, i vanjska
+ * zavisnost koja u produkciji može pasti. Sad se oboje desi jednom, kod nas.
+ *
+ * Zato je format u putanji a ne u `?f=`: query string ne može biti dio
+ * `generateStaticParams`.
  */
 
-export const runtime = 'nodejs'
+export const dynamic = 'force-static'
+
+const FORMATS = {
+  story: { width: 1080, height: 1920 },
+  post: { width: 1080, height: 1080 },
+} as const
+
+type Format = keyof typeof FORMATS
+
+export function generateStaticParams() {
+  return VERSES.flatMap((v) => Object.keys(FORMATS).map((format) => ({ id: v.id, format })))
+}
 
 /** Logotip kao data URI — Satori ga tako umeće bez mrežnog poziva. */
 let wordmark: string | null = null
@@ -31,33 +51,43 @@ function wordmarkDataUri(): string {
   return wordmark
 }
 
-const FORMATS = {
-  story: { width: 1080, height: 1920 },
-  post: { width: 1080, height: 1080 },
-} as const
+/**
+ * Font iz Google Fonts-a, sveden na znakove koji se stvarno crtaju.
+ * Build crta desetine slika u istom procesu, pa se isti podskup ne skida dvaput.
+ */
+const fontCache = new Map<string, Promise<ArrayBuffer | null>>()
 
-/** Font iz Google Fonts-a, sveden na znakove koji se stvarno crtaju. */
-async function loadFont(family: string, text: string): Promise<ArrayBuffer | null> {
-  try {
-    const css = await fetch(
-      `https://fonts.googleapis.com/css2?family=${family}&text=${encodeURIComponent(text)}`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' }, next: { revalidate: 86_400 } },
-    ).then((r) => r.text())
-    const url = css.match(/src:\s*url\((.+?)\)/)?.[1]
-    if (!url) return null
-    return await fetch(url).then((r) => r.arrayBuffer())
-  } catch {
-    return null
-  }
+function loadFont(family: string, text: string): Promise<ArrayBuffer | null> {
+  const key = `${family}|${text}`
+  const hit = fontCache.get(key)
+  if (hit) return hit
+
+  const p = (async () => {
+    try {
+      const css = await fetch(
+        `https://fonts.googleapis.com/css2?family=${family}&text=${encodeURIComponent(text)}`,
+        { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10_000) },
+      ).then((r) => r.text())
+      const url = css.match(/src:\s*url\((.+?)\)/)?.[1]
+      if (!url) throw new Error('Google Fonts nije vratio putanju do fajla')
+      return await fetch(url, { signal: AbortSignal.timeout(10_000) }).then((r) => r.arrayBuffer())
+    } catch (e) {
+      // Slika i bez ovoga izađe, ali u sistemskom fontu — u buildu se to mora vidjeti.
+      console.warn(`[og] font ${family} nije preuzet, ide fallback:`, (e as Error).message)
+      return null
+    }
+  })()
+
+  fontCache.set(key, p)
+  return p
 }
 
-export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const { id } = await ctx.params
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string; format: string }> }) {
+  const { id, format } = await ctx.params
   const verse = verseById(id)
-  if (!verse) return new Response('Nepoznat stih', { status: 404 })
+  if (!verse || !(format in FORMATS)) return new Response('Nepoznat stih', { status: 404 })
 
-  const f = new URL(req.url).searchParams.get('f')
-  const { width, height } = FORMATS[f === 'post' ? 'post' : 'story']
+  const { width, height } = FORMATS[format as Format]
   const m = MOODS[verse.mood]
 
   const text = withPeriod(verse.text)
@@ -151,7 +181,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         ...(serif ? [{ name: 'Serif', data: serif, style: 'normal' as const, weight: 400 as const }] : []),
         ...(sans ? [{ name: 'Sans', data: sans, style: 'normal' as const, weight: 500 as const }] : []),
       ],
-      headers: { 'Cache-Control': 'public, immutable, no-transform, max-age=31536000' },
+      headers: {
+        // Slika za dati stih je nepromjenjiva — i u pregledniku i na CDN-u.
+        'Cache-Control': 'public, immutable, no-transform, max-age=31536000, s-maxage=31536000',
+      },
     },
   )
 }

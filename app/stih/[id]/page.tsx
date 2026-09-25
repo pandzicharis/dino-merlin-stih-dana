@@ -22,7 +22,7 @@ export async function generateMetadata({
   const v = verseById(id)
   if (!v) return { title: 'Stih dana' }
 
-  const image = { url: `/og/${id}?f=post`, width: 1080, height: 1080 }
+  const image = { url: `/og/${id}/post`, width: 1080, height: 1080 }
   const text = oneLine(withPeriod(v.text))
   return {
     title: v.song,
