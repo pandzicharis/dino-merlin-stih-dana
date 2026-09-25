@@ -26,10 +26,24 @@ export function UpdatePrompt({ accent }: { accent: string }) {
     let reloading = false
     let timer: ReturnType<typeof setInterval> | undefined
 
+    /**
+     * Je li stranica UČITANA pod kontrolom service workera.
+     *
+     * Prvo otvaranje instalirane aplikacije nema kontrolera: worker se tek
+     * registruje, `activate` pozove `clients.claim()` i `controllerchange`
+     * stigne iako nikakve nadogradnje nema. Bez ove provjere aplikacija sama
+     * sebe reloada u prvih par sekundi — a to je tačno onaj mig i dvostruko
+     * učitavanje na prvom otvaranju.
+     *
+     * Čita se prije `registerSW()`, dok je vrijednost još ona s učitavanja.
+     */
+    const hadController = Boolean(navigator.serviceWorker.controller)
+
     // Nova verzija preuzima tek kad je korisnik potvrdi, pa je ovo jedino
-    // mjesto gdje se stranica sama osvježava.
+    // mjesto gdje se stranica sama osvježava. Prvo preuzimanje nije
+    // nadogradnja — tu se ne dira ništa.
     const onController = () => {
-      if (reloading) return
+      if (!hadController || reloading) return
       reloading = true
       window.location.reload()
     }
