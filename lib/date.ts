@@ -22,6 +22,42 @@ export function todayInTz(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(now)
 }
 
+/**
+ * Pomak zone u milisekundama za dati trenutak. Čita se iz same zone, pa
+ * ljetno/zimsko vrijeme nije poseban slučaj.
+ */
+function tzOffsetMs(at: Date, tz: string): number {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(at)
+      .map((x) => [x.type, x.value]),
+  )
+  const asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second)
+  return asUTC - Math.floor(at.getTime() / 1000) * 1000
+}
+
+/**
+ * Koliko milisekundi do sljedeće ponoći u Sarajevu.
+ *
+ * Dva puta godišnje, u satu prelaska na ljetno vrijeme, promaši za sat.
+ * To nije problem: ko god ovo koristi ponovo pita `todayInTz()` kad istekne,
+ * pa rani okidač ne promijeni ništa i samo se zakaže idući.
+ */
+export function msUntilNextDay(now: Date = new Date()): number {
+  const DAY = 86_400_000
+  const local = now.getTime() + tzOffsetMs(now, TZ)
+  return Math.floor(local / DAY) * DAY + DAY - local
+}
+
 export function addDays(iso: string, n: number): string {
   const d = new Date(`${iso}T12:00:00Z`)
   d.setUTCDate(d.getUTCDate() + n)
