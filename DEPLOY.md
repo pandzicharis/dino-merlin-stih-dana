@@ -38,8 +38,13 @@ Shema je idempotentna i nema zasebnih migracija: na svaku izmjenu pokreni
 `claim_due_subscriptions` ne postoji.
 
 Da provjeriš je li prošlo, pokreni u istom SQL Editoru
-[`supabase/verify.sql`](supabase/verify.sql). Ništa ne mijenja — ispiše 14
+[`supabase/verify.sql`](supabase/verify.sql). Ništa ne mijenja — ispiše 15
 redova i svaki mora pisati PROLAZ.
+
+> **Redoslijed kod nadogradnje:** prvo pusti deploy koda, pa onda `schema.sql`.
+> Obrnuto ide takođe, ali kratko ostaviš staru rutu nad novom shemom — a ona
+> ne zna upisati oznaku dana, pa bi se u tom prozoru mogla poslati jedna
+> obavijest viška.
 
 > `service_role` zaobilazi RLS. Nikad ga ne stavljaj u `NEXT_PUBLIC_*` i nikad u klijentski kod — ovdje se koristi samo u API rutama.
 
@@ -90,24 +95,66 @@ Ruta je `POST /api/cron/send-daily` (radi i `GET`).
 stih za taj dan. Kad se to dešava određuje isključivo raspored crona — jedno
 mjesto, koje ti mijenjaš.
 
-Poziv koji se ponovi **ne šalje duplo**: porcija se uzima i označava u istoj
-transakciji, a `last_sent_on` nosi sarajevski datum stiha. Slobodno pokreni
-ručno koliko puta hoćeš — drugi put istog dana nema kome.
+Zato je i napravljena da se smije zvati **koliko god puta**: pozovi je deset
+puta u toku dana i obavijest ode najviše jednom. Na tome počiva cijela
+odbrana od propuštenog dana — okidač pokušava više puta, prvi uspjeh zatvori
+dan, ostali zateknu prazan red.
 
-Kad baš hoćeš da ode ponovo (test, ili si pomjerio vrijeme usred dana),
-`?force=1` zaobilazi i tu oznaku.
+**Dan zatvara samo uspjeh.** `last_sent_on` se upisuje tek kad push servis
+primi obavijest. Ono što ne prođe — pad usred slanja, istekla funkcija,
+pogrešan VAPID ključ — ostaje neoznačeno i čeka sljedeći poziv. (Ranije je
+oznaku postavljalo preuzimanje porcije, prije slanja, pa je svaki takav
+slučaj tiho pojeo dan: sljedeći prolaz bi zatekao prazan red i mirno javio
+da je sve poslano.)
+
+`?force=1` šalje i onima koji su stih za taj dan već dobili — i **ne dira
+oznaku dana**. Test u deset ujutro zato ne može pojesti pravo slanje u podne.
 
 > Ako pomjeriš raspored, pomjeri i `SEND_HOUR` u [`lib/date.ts`](lib/date.ts).
 > Taj broj ne utiče na slanje — samo je natpis u aplikaciji ("stih stiže u
 > 12:00h"), pa bi inače aplikacija govorila jedno a telefon radio drugo.
 
-### cron-job.org
+### GitHub Actions (već u repou)
+
+[`.github/workflows/daily-push.yml`](.github/workflows/daily-push.yml) radi
+posao besplatno. Treba mu dva secreta u repou — **Settings → Secrets and
+variables → Actions**:
+
+| Secret | Vrijednost |
+|---|---|
+| `APP_URL` | puna adresa aplikacije, npr. `https://stih-dana.vercel.app` (bez `/` na kraju) |
+| `CRON_SECRET` | ista tajna kao u Vercelu |
+
+Fali li ijedan, workflow pada odmah i **kaže koji** — ranije je to izgledalo
+kao obična mrežna greška.
+
+Ono što treba znati o njemu:
+
+- **Pokušava šest puta**, od 10:00 do 11:40 UTC. Zakazani workflow na GitHubu
+  zna kasniti desetak minuta, a pod opterećenjem zna i biti preskočen; jedan
+  preskočen okidač je ranije značio dan bez stiha. Sad prvi koji prođe
+  zatvori dan, ostali ne rade ništa.
+- **Ljetno vrijeme se rješava samo.** GitHub prima samo UTC, pa je podne u
+  Sarajevu ljeti 10:00 UTC a zimi 11:00. Pokušaji pokrivaju oba sata, a
+  workflow pusti dalje samo one koji su u Sarajevu stvarno između 12 i 15 —
+  tako da dva puta godišnje ne mijenjaš ništa.
+- **Sam se ugasi nakon 60 dana bez ijednog commita** u repo. To je GitHubovo
+  pravilo za zakazane workflowe i jedini razlog zbog kojeg ovo nije potpuno
+  bez održavanja.
+- Ručno pokretanje: **Actions → Stih dana — push → Run workflow**. Ide odmah,
+  bez obzira na sat, a kvačica `force` šalje i onima koji su danas već dobili.
+- Log svakog pokretanja nosi **cijeli odgovor rute**. Zeleno uz `"due": 0`
+  znači da je stih već otišao, a ne da se ništa nije desilo.
+
+### cron-job.org (najpouzdanije)
+
+Ako hoćeš da slanje ne ovisi o GitHubovom raspoloženju ni o tome kad si
+zadnji put commitao:
 
 1. **Create cronjob**
 2. URL: `https://tvoja-adresa.vercel.app/api/cron/send-daily`
-3. Schedule: **jednom dnevno**, u sat koji hoćeš. cron-job.org ume zadati i
-   **vremensku zonu** — izaberi `Europe/Sarajevo` i vrijeme ostaje isto i
-   ljeti i zimi, bez ijedne izmjene u kodu.
+3. Schedule: **svaki dan u 12:00**, uz timezone `Europe/Sarajevo` — jedini od
+   troje koji zna za vremensku zonu, pa ljeti i zimi stiže u isti sat.
 4. **Advanced → Headers**:
    ```
    x-cron-secret: <CRON_SECRET>
@@ -116,34 +163,20 @@ Kad baš hoćeš da ode ponovo (test, ili si pomjerio vrijeme usred dana),
 6. Timeout podigni na **60 s**; na većem broju pretplatnika odgovor stiže
    tek kad svi workeri završe.
 
+Slobodno ga pusti **uz** GitHub Actions. Ne pokvari ništa — ko je dobio stih,
+dobio ga je; drugi okidač samo zatekne prazan red. To je i najjeftinija
+polisa: dva nezavisna okidača ne padaju istog dana.
+
 ### Vercel Cron (alternativa)
 
-Vercel Hobby dopušta cron jednom dnevno, što je sada tačno ono što treba.
-Dodaj `vercel.json`:
+Vercel Hobby dopušta cron jednom dnevno. Dodaj `vercel.json`:
 
 ```json
 { "crons": [{ "path": "/api/cron/send-daily", "schedule": "0 10 * * *" }] }
 ```
 
-Raspored je u UTC: `0 10` je 12:00 u Sarajevu ljeti, 11:00 zimi.
-
-Vercel šalje `Authorization: Bearer $CRON_SECRET` — ruta i to prihvata.
-
-### GitHub Actions (već u repou)
-
-[`.github/workflows/daily-push.yml`](.github/workflows/daily-push.yml) radi
-isto, besplatno. Treba mu dva secreta u repou: `APP_URL` i `CRON_SECRET`.
-
-Podešen je na `0 10 * * *` — 12:00 u Sarajevu ljeti, 11:00 zimi, jer GitHub
-prima samo UTC i ne zna za ljetno vrijeme.
-
-Tri stvari koje treba znati o njemu: taj zimski pomak, zakazani workflow zna
-kasniti i po desetak minuta kad je GitHub pod opterećenjem, i **sam se ugasi
-nakon 60 dana bez ijednog commita** u repo. Za ozbiljan rad je cron-job.org
-pouzdaniji — i jedini od troje koji zna za vremensku zonu.
-
-Koristi jedno od troje. Ako pokreneš dva, ništa se neće pokvariti — samo
-plaćaš dva puta isti posao.
+Raspored je u UTC: `0 10` je 12:00 u Sarajevu ljeti, 11:00 zimi. Vercel šalje
+`Authorization: Bearer $CRON_SECRET` — ruta i to prihvata.
 
 ### Koliko dugo traje
 
@@ -152,8 +185,6 @@ workera (do 8). Desetak hiljada obavijesti tako stane u nekoliko sekundi.
 Ako i to ne stigne prije isteka funkcije, odgovor nosi `"truncated": true` —
 pozovi rutu ponovo i ona nastavi tamo gdje je stala, bez `?force=1`. Oni koji
 su već dobili preskaču se sami.
-
----
 
 ## 5. Testiranje
 
@@ -168,7 +199,8 @@ curl -s -X POST "https://tvoja-adresa.vercel.app/api/cron/send-daily?force=1" \
 ```
 
 `dry=1` vrati ukupan broj pretplatnika, koliko ih je na redu, koji je stih i
-koliko bi se workera podiglo.
+koliko bi se workera podiglo. `force=1` pošalje odmah, a dan ostavlja
+otvorenim — pravo slanje u podne ide svejedno.
 
 Ako `due` bude 0, odgovor sam kaže zašto — ili je stih za taj dan već otišao
 svima, ili u bazi nema nijedne pretplate. To je dvoje se lako pomiješa.
@@ -189,9 +221,11 @@ Odgovor pravog slanja izgleda ovako:
 | `failed` | **naša** greška, npr. pogrešan VAPID ključ — vidi `last_error` u bazi |
 | `truncated` | posao nije stao u jedan prolaz; pozovi rutu ponovo |
 
-`failed` veći od nule je jedini broj koji traži da odmah pogledaš. Takvi se
-namjerno **ne ponavljaju**: da se ponavljaju, jedna pogrešna varijabla okoline
-značila bi da ruta u krug gađa sve pretplatnike.
+`failed` veći od nule je jedini broj koji traži da odmah pogledaš — zato i
+obara GitHub Actions u crveno. Takvima dan ostaje otvoren, pa ih sljedeći
+pokušaj pokupi: popraviš varijablu okoline u 12:10 i stih ode u 12:20. U
+petlju ne mogu — unutar istog prolaza ih drži `last_run`, a sljedeći okidač
+dolazi tek za dvadeset minuta.
 
 ### Redoslijed prve provjere
 
@@ -206,6 +240,29 @@ si stih za taj dan već dobio. Isto se postiže i iz Supabasea:
 ```sql
 update push_subscriptions set last_sent_on = null;
 ```
+
+### Stih nije stigao u podne
+
+Redoslijed je uvijek isti — od okidača prema telefonu, jer je okidač dosad
+bio kriv devet puta od deset.
+
+1. **Actions → Stih dana — push.** Ima li uopšte pokretanja u to vrijeme?
+   Ako nema — GitHub je preskočio (ili se workflow ugasio nakon 60 dana bez
+   commita: otvori ga i klikni *Enable workflow*). Ako ima crveno, log kaže
+   šta: fali secret, ruta je vratila 401, ili `failed` nije nula.
+2. **Log zelenog pokretanja.** Tu stoji cijeli odgovor rute. `"due": 0` znači
+   da je stih taj dan nekome već otišao — pogledaj kome i kad:
+   ```sql
+   select endpoint, last_sent_on, last_ok, claimed_at, last_error
+     from push_subscriptions order by last_ok desc nulls last;
+   ```
+   `last_sent_on` = danas uz prazan `last_ok` ne bi smio postojati; ako ga
+   vidiš, u bazi je stara shema — pokreni `supabase/schema.sql` ponovo.
+3. **`last_error`.** Tu piše odgovor push servisa, doslovno. Najčešće je
+   `403 VAPID credentials mismatch` — promijenjeni ključevi, pa sve stare
+   pretplate treba obrisati i ponovo uključiti zvono.
+4. **Tek onda telefon.** Ugašene obavijesti u sistemskim postavkama, Focus
+   režim, ili PWA obrisan s početnog ekrana.
 
 ---
 

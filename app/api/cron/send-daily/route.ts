@@ -15,9 +15,19 @@ import { oneLine, withPeriod } from '@/lib/text'
  * podešava kad to biva — ranije je uslov stajao i u upitu, pa se vrijeme
  * mijenjalo na dva mjesta i lako razilazilo.
  *
- * Isti dan se ne šalje dvaput: `last_sent_on` nosi sarajevski datum stiha,
- * pa ponovljen poziv, preklopljen cron ili "Test run" iz konzole ne mogu
- * proizvesti drugu obavijest. Kad se stvarno hoće ponovo — `?force=1`.
+ * Zato je ruta napravljena da se smije zvati koliko god puta: pozovi je
+ * deset puta u toku dana i obavijest ode najviše jednom. To je i cijela
+ * odbrana od propuštenog dana — okidač pokušava više puta, prvi uspjeh
+ * zatvori dan, ostali zateknu prazan red.
+ *
+ * DAN ZATVARA SAMO USPJEH. `last_sent_on` se upisuje tek kad push servis
+ * primi obavijest, nikad pri preuzimanju porcije. Ranije je oznaku
+ * postavljalo preuzimanje — pa je svaki pad između preuzimanja i slanja, i
+ * svaki test, značio da pravi prolaz zatekne prazan red i mirno javi da je
+ * sve poslano. Ono što ne prođe ostaje neoznačeno i čeka sljedeći poziv.
+ *
+ * `?force=1` zato NE troši dan: obavijest ode, ali oznaka se ne upisuje, pa
+ * pravo slanje u podne i dalje ima kome otići.
  *
  * Okidač: cron-job.org, GitHub Actions ili Vercel Cron (Pro).
  *
@@ -121,19 +131,27 @@ function add(a: Tally, b: Tally): Tally {
 /**
  * Jedna porcija: pošalji i razvrstaj ishode.
  *
+ *   uspjeh   → upisuje se `stamp` (sarajevski datum) i dan je zatvoren
  *   404/410  uređaj više ne postoji  → briše se
- *   429/5xx  prolazno kod servisa    → oznaka slanja se povuče, ide u idući prolaz
- *   ostalo   naša greška (npr. pogrešan VAPID ključ) → ostaje označeno
+ *   429/5xx  prolazno kod servisa    → ostaje neoznačen, ide u idući prolaz
+ *   ostalo   naša greška (npr. pogrešan VAPID ključ) → takođe ostaje neoznačen
  *
- * Zadnji slučaj je namjerno bez ponavljanja: da se i on vraća u red, jedna
- * pogrešna varijabla okoline značila bi da ruta u krug gađa sve pretplatnike.
- * Ovako greška stoji u `last_error` i u odgovoru, a niko ne dobije ništa dva puta.
+ * Zadnja dva reda su ista stvar za bazu, a razdvojena su samo u brojkama:
+ * `failed` je naša greška i jedini broj koji traži da odmah pogledaš. Ranije
+ * je takav red ostajao označen kao poslan — jedna pogrešna varijabla okoline
+ * tako je tiho pojela dan svima. Sad se i on vrati u red, a u petlju ne može:
+ * `last_run` ga drži van ovog prolaza, a sljedeći okidač je dvadeset minuta
+ * dalje.
+ *
+ * `stamp` je null kad je pozvan `?force=1` — tada obavijest ode, a dan ostaje
+ * otvoren, da test ne pojede pravo slanje.
  */
-async function sendBatch(rows: Row[], payload: string): Promise<Tally> {
+async function sendBatch(rows: Row[], payload: string, stamp: string | null): Promise<Tally> {
   const t = emptyTally()
   const ok: string[] = []
   const dead: string[] = []
-  const retry: string[] = []
+  // Sve što nije prošlo ide istim putem nazad u red — bez obzira čija je greška.
+  const again: string[] = []
   let firstError: string | null = null
 
   await pool(rows, CONCURRENCY, async (s) => {
@@ -149,11 +167,10 @@ async function sendBatch(rows: Row[], payload: string): Promise<Tally> {
       const code = err?.statusCode ?? 0
       if (code === 404 || code === 410) {
         dead.push(s.endpoint)
-      } else if (code === 429 || code >= 500) {
-        retry.push(s.endpoint)
-        firstError ??= `${code} ${err.body ?? err.message ?? ''}`.trim().slice(0, 300)
       } else {
-        t.failed++
+        again.push(s.endpoint)
+        if (code === 429 || code >= 500) t.retry++
+        else t.failed++
         firstError ??= `${code} ${err.body ?? err.message ?? ''}`.trim().slice(0, 300)
       }
     }
@@ -161,18 +178,20 @@ async function sendBatch(rows: Row[], payload: string): Promise<Tally> {
 
   t.sent = ok.length
   t.removed = dead.length
-  t.retry = retry.length
   t.batches = 1
 
   const db = supabase()
-  if (db && (ok.length || dead.length || retry.length)) {
+  if (db && (ok.length || dead.length || again.length)) {
     const { error } = await db.rpc('finish_push_batch', {
       p_ok: ok,
       p_dead: dead,
-      p_retry: retry,
+      p_retry: again,
       p_error: firstError,
+      p_today: stamp,
     })
-    // Neuspjeh ovdje ne smije srušiti prolaz: obavijesti su već otišle.
+    // Neuspjeh ovdje ne smije srušiti prolaz: obavijesti su već otišle. Dan
+    // tad ostaje otvoren, pa ih sljedeći okidač može pokupiti još jednom —
+    // ista `tag` oznaka na telefonu samo zamijeni staru obavijest.
     if (error) console.error('finish_push_batch:', error.message)
   }
 
@@ -218,7 +237,7 @@ async function runWorker(
     const rows = (data ?? []) as Row[]
     if (rows.length === 0) break
 
-    total = add(total, await sendBatch(rows, payload))
+    total = add(total, await sendBatch(rows, payload, force ? null : today))
   }
 
   return { ...total, truncated }
@@ -242,7 +261,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'push nije konfigurisan' }, { status: 503 })
   }
 
-  // ?force=1  preskače provjeru sata (za testiranje)
+  // ?force=1  šalje i onima koji su stih za ovaj dan već dobili; NE upisuje
+  //           oznaku dana, pa test ne može pojesti pravo slanje
   // ?dry=1    ništa ne šalje, samo javi kome bi otišlo
   // ?worker=  interno: ovaj zahtjev je jedan od podignutih workera
   const q = new URL(req.url).searchParams
@@ -304,7 +324,7 @@ export async function POST(req: Request) {
       sent: 0,
       note: force
         ? 'nema nijedne pretplate u bazi'
-        : 'stih za ovaj dan je već poslan svima — ?force=1 šalje ponovo',
+        : 'stih za ovaj dan je već poslan svima — ?force=1 šalje ponovo, bez diranja oznake dana',
       ms: Date.now() - started,
     })
   }

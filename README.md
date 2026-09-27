@@ -54,9 +54,13 @@ npx web-push generate-vapid-keys
 ```
 
 Šemu baze primijeni iz [`supabase/schema.sql`](supabase/schema.sql).
-Slanje pokreće [`.github/workflows/daily-push.yml`](.github/workflows/daily-push.yml)
-jednom dnevno. Ruta `/api/cron/send-daily` ne gleda sat — šalje kad god je
-pozovu, pa se vrijeme podešava u rasporedu crona, a ne u kodu.
+Slanje pokreće [`.github/workflows/daily-push.yml`](.github/workflows/daily-push.yml).
+Ruta `/api/cron/send-daily` ne gleda sat — šalje kad god je pozovu, pa se
+vrijeme podešava u rasporedu crona, a ne u kodu.
+
+Zato okidač i pokušava više puta (10:00–11:40 UTC, a šalje samo ako je u
+Sarajevu prošlo podne): ruta se smije zvati koliko god puta, prvi uspjeh
+zatvori dan, ostali zateknu prazan red. Detalji u [DEPLOY.md](DEPLOY.md#4-cron--slanje-obavijesti).
 
 > **iOS:** Web Push radi isključivo iz PWA-a dodanog na početni ekran (iOS 16.4+),
 > nikad iz Safari taba. Onboarding to vodi korak po korak.
@@ -150,13 +154,18 @@ Baza postoji samo za push subscriptions, i tu je jedino mjesto gdje broj
 korisnika zaista nešto znači. Slanje zato ne čita cijelu tabelu nego je
 uzima u porcijama, kroz `claim_due_subscriptions`:
 
-- porcija se **uzme i označi kao poslana u istoj transakciji**
-  (`for update skip locked`), pa dva paralelna workera ne mogu dobiti istog
+- porcija se **uzme i posudi u istoj transakciji** (`for update skip locked`,
+  posudba traje dvije minute), pa dva paralelna workera ne mogu dobiti istog
   čovjeka, a ni dva cron prolaza koja se preklope
 - `last_sent_on` nosi **sarajevski datum stiha** — stih dana je jedan za sve,
   pa je "dobio stih za 25.09." jedina činjenica koju treba pamtiti. Ponovljen
   poziv rute zato ne znači i ponovljenu obavijest, a iz vruće putanje ispada
   svako računanje s vremenskim zonama
+- **dan zatvara samo uspjeh**: oznaka se upisuje tek kad push servis primi
+  obavijest. Pad usred slanja ili pogrešan ključ ostave red neoznačenim, pa
+  ga sljedeći pokušaj pokupi. Dok je oznaku postavljalo preuzimanje porcije,
+  svaki takav slučaj je tiho pojeo dan — sljedeći prolaz bi zatekao prazan
+  red i javio da je sve poslano
 - ruta iznad par stotina na redu **sama sebe podigne u više paralelnih
   workera**, jer jedan serverless poziv ne stigne odraditi desetak hiljada
   šifrovanja i HTTPS rundi prije nego istekne
@@ -174,6 +183,9 @@ Pravila koja se lako prekrše pri sljedećoj izmjeni:
   update značio bi provjeru zone po svakoj poslanoj obavijesti.
 - **`SEND_HOUR` u `lib/date.ts` ne utiče na slanje** — to je natpis u
   aplikaciji. Ko pomjeri cron, mora pomjeriti i njega.
+- **Oznaka dana se ne smije vratiti u `claim_due_subscriptions`.** Tamo je
+  jeftinija i djeluje sigurnije, ali označava i one kojima obavijest nikad
+  nije otišla — a to se vidi tek sutra, kao dan bez stiha.
 
 ## Prije javnog launcha
 

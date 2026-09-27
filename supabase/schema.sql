@@ -14,9 +14,14 @@ create table if not exists push_subscriptions (
   last_ok    timestamptz
 );
 
--- Sarajevski datum stiha koji je ovom uređaju zadnji put otišao.
--- Ovo je jedina odbrana od duplih obavijesti: cron se ponovi, worker padne na
--- pola, neko klikne "Test run" — bez ovoga svaki od tih slučajeva pošalje opet.
+-- Sarajevski datum stiha koji je ovom uređaju STVARNO otišao.
+--
+-- Upisuje se tek kad push servis primi obavijest (`finish_push_batch`), nikad
+-- unaprijed. Ranije je oznaku postavljalo samo preuzimanje porcije, prije
+-- slanja — i to je bio tihi gubitak dana: svaki pad između preuzimanja i
+-- slanja, svaki `?force=1` test i svaka pogrešna varijabla okoline označili
+-- bi ljude kao "dobili su", pa bi pravi prolaz u 12 zatekao prazan red i
+-- mirno javio da je sve poslano. Sada dan zatvara jedino uspjeh.
 alter table push_subscriptions add column if not exists last_sent_on date;
 
 -- Oznaka konkretnog prolaza slanja. Dispatcher generiše jedan uuid i da ga
@@ -24,6 +29,12 @@ alter table push_subscriptions add column if not exists last_sent_on date;
 -- put. Time i `?force=1` postaje bezopasan — bez ovoga bi force petlja vrtjela
 -- iste ljude unedogled.
 alter table push_subscriptions add column if not exists last_run uuid;
+
+-- Kad je red zadnji put preuzet. Kratka posudba (vidi CLAIM_LEASE dolje):
+-- dok traje, drugi prolaz ovaj red ne dira, pa se dva okidača koja se
+-- preklope ne mogu sudariti. Kad istekne, red je opet na redu — zato pad
+-- usred slanja više ne znači propušten dan, nego zakašnjelu obavijest.
+alter table push_subscriptions add column if not exists claimed_at timestamptz;
 
 alter table push_subscriptions add column if not exists last_error text;
 
@@ -83,9 +94,9 @@ drop trigger if exists push_subscriptions_sanitize_trg on push_subscriptions;
 -- `update of tz, send_hour` je ovdje bitno, ne kozmetika.
 --
 -- Bez toga se trigger vrti na SVAKI update reda — a slanje ne radi ništa
--- drugo nego u petlji ažurira `last_sent_on`, `last_run` i `last_ok`. Provjera
--- zone bi se tako plaćala na svaku poslanu obavijest, u poslu u kojem su
--- upravo ta ažuriranja vruća putanja.
+-- drugo nego u petlji ažurira `last_sent_on`, `last_run`, `claimed_at` i
+-- `last_ok`. Provjera zone bi se tako plaćala na svaku poslanu obavijest, u
+-- poslu u kojem su upravo ta ažuriranja vruća putanja.
 create trigger push_subscriptions_sanitize_trg
   before insert or update of tz, send_hour on push_subscriptions
   for each row execute function push_subscriptions_sanitize();
@@ -103,15 +114,22 @@ create trigger push_subscriptions_sanitize_trg
 --  jedina činjenica koja se pamti. Time iz vruće putanje ispada svako
 --  računanje s vremenskim zonama.
 --
+--  Zato okidač smije biti pozvan i deset puta dnevno: prvi uspjeh zatvori
+--  dan, ostali prolazi zateknu prazan red. Upravo to i koristi raspored u
+--  .github/workflows/daily-push.yml — više pokušaja, da propušten okidač ne
+--  znači propušten dan.
+--
 --  `send_hour` i `tz` ostaju u tabeli — više ne odlučuju ni o čemu, ali su
 --  tu ako se ikad uvede da svako bira svoje vrijeme.
 -- ─────────────────────────────────────────────────────────────────────
 
 -- Potpisi se mijenjaju, a `create or replace` ne mijenja potpis — staro mora
--- ispasti prvo, inače bi uz nove ostale i stare funkcije.
+-- ispasti prvo, inače bi uz nove ostale i stare funkcije. Dvije istoimene
+-- funkcije nisu bezazlene: PostgREST tad ne zna koju da zove i vrati grešku.
 drop function if exists claim_due_subscriptions(uuid, int, boolean);
 drop function if exists count_due_subscriptions(uuid, boolean);
 drop function if exists push_subscription_is_due(text, smallint, date);
+drop function if exists finish_push_batch(text[], text[], text[], text);
 
 
 -- ─────────────────────────────────────────────────────────────────────
@@ -119,8 +137,13 @@ drop function if exists push_subscription_is_due(text, smallint, date);
 --
 --  `for update skip locked` je ovdje cijela poenta: više workera može zvati
 --  ovu funkciju istovremeno i svaki dobije SVOJ, tuđem disjunktan skup.
---  Red se označi kao poslan u istoj transakciji u kojoj je i uzet, pa ni
---  preklapanje dva prolaza ne može proizvesti duplu obavijest.
+--
+--  Preuzimanje NE zatvara dan — samo posuđuje red na dvije minute i pamti
+--  koji ga je prolaz uzeo. Dan zatvara tek `finish_push_batch`, i to samo
+--  onima kojima je obavijest stvarno otišla. Dvije minute su duže od
+--  najduže porcije, a kraće od razmaka između dva okidača: preklopljena
+--  prolaza se zato ne mogu sudariti, a red koji ostane visiti nakon pada
+--  sam se vrati u posao.
 -- ─────────────────────────────────────────────────────────────────────
 
 create or replace function claim_due_subscriptions(
@@ -137,13 +160,14 @@ as $$
       from push_subscriptions s
      where s.last_run is distinct from p_run
        and (p_force or s.last_sent_on is distinct from p_today)
+       and (p_force or s.claimed_at is null or s.claimed_at < now() - interval '2 minutes')
      order by s.endpoint
      limit p_limit
        for update skip locked
   )
   update push_subscriptions s
-     set last_sent_on = p_today,
-         last_run     = p_run
+     set last_run   = p_run,
+         claimed_at = now()
     from due
    where s.endpoint = due.endpoint
   returning s.endpoint, s.p256dh, s.auth;
@@ -162,7 +186,8 @@ as $$
   select count(*)
     from push_subscriptions s
    where s.last_run is distinct from p_run
-     and (p_force or s.last_sent_on is distinct from p_today);
+     and (p_force or s.last_sent_on is distinct from p_today)
+     and (p_force or s.claimed_at is null or s.claimed_at < now() - interval '2 minutes');
 $$;
 
 
@@ -172,21 +197,30 @@ $$;
 --  Endpointi putuju u TIJELU zahtjeva, ne u URL-u. `.in('endpoint', [...])`
 --  iz supabase-js ih lijepi u query string; na par hiljada pretplatnika to
 --  je URL od nekoliko megabajta i odgovor 414.
+--
+--  `p_today` je datum koji se upisuje uspješnima. Kad je null — a tako ga
+--  šalje `?force=1` — obavijest ode, ali dan ostaje otvoren. Tako test ne
+--  može pojesti pravo slanje u 12.
 -- ─────────────────────────────────────────────────────────────────────
 
 create or replace function finish_push_batch(
   p_ok    text[] default '{}',
   p_dead  text[] default '{}',
   p_retry text[] default '{}',
-  p_error text    default null
+  p_error text    default null,
+  p_today date    default null
 )
 returns void
 language plpgsql
 as $$
 begin
+  -- Jedino mjesto na kojem se dan zatvara, i to tek nakon što je push servis
+  -- obavijest primio.
   if array_length(p_ok, 1) is not null then
     update push_subscriptions
-       set last_ok = now(), last_error = null
+       set last_ok      = now(),
+           last_error   = null,
+           last_sent_on = coalesce(p_today, last_sent_on)
      where endpoint = any(p_ok);
   end if;
 
@@ -196,17 +230,19 @@ begin
     delete from push_subscriptions where endpoint = any(p_dead);
   end if;
 
-  -- Prolazna greška (mreža, 5xx kod push servisa). Oznaka dana se povuče
-  -- nazad da ga sljedeći prolaz pokupi.
+  -- Sve što nije prošlo: prolazna greška kod push servisa (429/5xx) i naša
+  -- greška (npr. pogrešan VAPID ključ) idu istim putem — dan im ostaje
+  -- otvoren, posudba se pušta odmah, pa ih sljedeći okidač pokupi.
   --
   -- `last_run` se NE dira, i to je bitno. Njega je claim postavio na tekući
-  -- prolaz, pa ovako isti worker ovaj red više ne može uzeti — a sljedeći
-  -- prolaz, s drugim uuid-om, može. Da se ovdje brisao i `last_run`, red bi
-  -- odmah opet bio na redu istom workeru: push servis koji uporno vraća 503
+  -- prolaz, pa ovako isti prolaz ovaj red više ne može uzeti — a sljedeći,
+  -- s drugim uuid-om, može. Da se ovdje brisao i `last_run`, red bi odmah
+  -- opet bio na redu istom workeru: push servis koji uporno vraća 503
   -- značio bi vrtnju u prazno dok ne istekne cijeli budžet funkcije.
   if array_length(p_retry, 1) is not null then
     update push_subscriptions
-       set last_sent_on = null, last_error = p_error
+       set last_error = p_error,
+           claimed_at = null
      where endpoint = any(p_retry);
   end if;
 end;
@@ -217,10 +253,10 @@ $$;
 --  Dozvole: sve ide preko service-role ključa sa servera.
 -- ─────────────────────────────────────────────────────────────────────
 
-revoke all on function claim_due_subscriptions(uuid, date, int, boolean) from public, anon, authenticated;
-revoke all on function count_due_subscriptions(uuid, date, boolean)      from public, anon, authenticated;
-revoke all on function finish_push_batch(text[], text[], text[], text)   from public, anon, authenticated;
+revoke all on function claim_due_subscriptions(uuid, date, int, boolean)     from public, anon, authenticated;
+revoke all on function count_due_subscriptions(uuid, date, boolean)          from public, anon, authenticated;
+revoke all on function finish_push_batch(text[], text[], text[], text, date) from public, anon, authenticated;
 
-grant execute on function claim_due_subscriptions(uuid, date, int, boolean) to service_role;
-grant execute on function count_due_subscriptions(uuid, date, boolean)      to service_role;
-grant execute on function finish_push_batch(text[], text[], text[], text)   to service_role;
+grant execute on function claim_due_subscriptions(uuid, date, int, boolean)     to service_role;
+grant execute on function count_due_subscriptions(uuid, date, boolean)          to service_role;
+grant execute on function finish_push_batch(text[], text[], text[], text, date) to service_role;
