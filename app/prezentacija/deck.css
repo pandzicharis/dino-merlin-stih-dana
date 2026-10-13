@@ -1,0 +1,392 @@
+/*
+ * Prezentacija — isti jezik kao aplikacija: crna podloga, šampanj zlatna,
+ * Fraunces za ono što se čita kao stih, Rubik za sve ostalo.
+ *
+ * Mjere rastu s prozorom, a ograničene su i visinom — projektor je 16:9,
+ * laptop 16:10, i na oba slajd mora stati bez skrolanja.
+ */
+
+.dk {
+  --gold: #bfa87f;
+  --gold-hi: #e2cfa6;
+  --gold-lo: #8a7148;
+  --gold-grad: linear-gradient(180deg, #e2cfa6, #bfa87f);
+  --paper: #f6f1e7;
+  --t1: rgba(255, 255, 255, 0.95);
+  --t2: rgba(255, 255, 255, 0.66);
+  --t3: rgba(255, 255, 255, 0.44);
+  --t4: rgba(255, 255, 255, 0.26);
+  --line: rgba(255, 255, 255, 0.09);
+  --card: rgba(255, 255, 255, 0.035);
+  --ok: #8dc9a3;
+  --no: #d08c8c;
+
+  --fs-eyebrow: clamp(10px, min(0.7vw, 1.3vh), 14px);
+  --fs-h1: clamp(44px, min(6.4vw, 11vh), 128px);
+  --fs-h2: clamp(30px, min(3.5vw, 6.3vh), 70px);
+  --fs-h3: clamp(18px, min(1.55vw, 2.8vh), 30px);
+  --fs-lead: clamp(16px, min(1.3vw, 2.35vh), 26px);
+  --fs-body: clamp(14px, min(1.04vw, 1.9vh), 20px);
+  --fs-small: clamp(12px, min(0.84vw, 1.55vh), 16px);
+
+  --pad-x: clamp(24px, 5vw, 104px);
+  --pad-t: clamp(28px, 7vh, 88px);
+  --bar: 64px;
+  /* telefon je visok koliko prozor dopušta; dok je širok tačno toliko —
+     višak širine ide tekstu, ne praznini oko telefona */
+  --dock-phone: min(36vw, calc((100vh - var(--pad-t) - var(--bar) - 40px) * 0.473 + 2vw));
+  --dock-desktop: 58vw;
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: #0b0b0c;
+  color: #f5f5f5;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── tipografija ─────────────────────────────────────────────── */
+
+.dk-eyebrow {
+  font-size: var(--fs-eyebrow);
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.dk-serif {
+  font-family: var(--font-serif), Georgia, serif;
+  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
+}
+
+.dk-h1 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
+  font-weight: 360;
+  font-size: var(--fs-h1);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #fbf6ec;
+  text-wrap: balance;
+}
+
+.dk-h2 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 0;
+  font-weight: 380;
+  font-size: var(--fs-h2);
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+  color: #fbf6ec;
+  text-wrap: balance;
+}
+
+.dk-h2-sm {
+  font-size: clamp(26px, min(2.75vw, 5vh), 56px);
+}
+
+.dk-h2 em,
+.dk-h1 em {
+  font-style: italic;
+  color: #e9d9b6;
+}
+
+.dk-h3 {
+  font-family: var(--font-serif), Georgia, serif;
+  font-variation-settings: 'opsz' 72, 'SOFT' 30;
+  font-size: var(--fs-h3);
+  line-height: 1.2;
+  color: var(--t1);
+}
+
+.dk-lead {
+  font-size: var(--fs-lead);
+  line-height: 1.55;
+  color: var(--t2);
+  text-wrap: pretty;
+}
+
+.dk-body {
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--t2);
+  text-wrap: pretty;
+}
+
+.dk-small {
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  color: var(--t3);
+}
+
+.dk-body b,
+.dk-lead b,
+.dk-small b {
+  font-weight: 500;
+  color: var(--t1);
+}
+
+.dk-gold {
+  color: var(--gold);
+}
+
+.dk-hair {
+  display: block;
+  height: 1px;
+  width: clamp(48px, 5vw, 96px);
+  background: linear-gradient(90deg, var(--gold), transparent);
+  opacity: 0.8;
+}
+
+/* ── raspored slajda ─────────────────────────────────────────── */
+
+.dk-slide {
+  position: absolute;
+  top: var(--pad-t);
+  bottom: calc(var(--bar) + 12px);
+  left: var(--pad-x);
+  right: var(--pad-x);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.dk-slide[data-features] {
+  /* lista funkcija se širi i skuplja — vrh mora stajati mirno */
+  justify-content: flex-start;
+  padding-top: clamp(0px, 3vh, 48px);
+}
+
+.dk-slide[data-mode='phone'] {
+  right: calc(var(--pad-x) + var(--dock-phone) + 3.5vw);
+}
+
+.dk-slide[data-mode='desktop'] {
+  right: calc(var(--pad-x) + var(--dock-desktop) + 2.5vw);
+  --fs-h2: clamp(26px, min(2.5vw, 5vh), 52px);
+  --fs-lead: clamp(15px, min(1.08vw, 2vh), 21px);
+  --fs-body: clamp(13px, min(0.94vw, 1.75vh), 18px);
+}
+
+.dk-dock {
+  position: absolute;
+  top: calc(var(--pad-t) - 1vh);
+  bottom: calc(var(--bar) + 4px);
+  right: var(--pad-x);
+  width: var(--dock-phone);
+  transition:
+    width 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.5s ease,
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dk-dock[data-mode='desktop'] {
+  width: var(--dock-desktop);
+}
+
+.dk-dock[data-mode='none'] {
+  opacity: 0;
+  transform: translateX(6vw) scale(0.96);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    width 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.4s ease,
+    transform 0.6s ease,
+    visibility 0s linear 0.6s;
+}
+
+/* uski prozor: telefon ne stane pored teksta — slajd ide preko cijele širine */
+@media (max-width: 960px) {
+  .dk {
+    --pad-x: 20px;
+    --fs-h2: 30px;
+    --fs-lead: 16px;
+  }
+  .dk-slide[data-mode='phone'],
+  .dk-slide[data-mode='desktop'] {
+    right: var(--pad-x);
+  }
+  .dk-dock {
+    display: none;
+  }
+  .dk-slide {
+    overflow-y: auto;
+    justify-content: flex-start;
+  }
+}
+
+.dk .dk-only-narrow {
+  display: none;
+}
+@media (max-width: 960px) {
+  .dk .dk-only-narrow {
+    display: inline-flex;
+  }
+}
+
+/* ── sitni dijelovi ──────────────────────────────────────────── */
+
+.dk-card {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: clamp(16px, 1.4vw, 28px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.dk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  height: 2.5em;
+  padding: 0 1.05em;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t2);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s,
+    transform 0.15s;
+}
+.dk-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--t1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.dk-chip:active {
+  transform: scale(0.97);
+}
+.dk-chip[aria-pressed='true'] {
+  color: #14100a;
+  background: var(--gold-grad);
+  border-color: transparent;
+}
+
+.dk-btn-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  height: 2.9em;
+  padding: 0 1.4em;
+  border-radius: 999px;
+  background: var(--gold-grad);
+  color: #14100a;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  transition: transform 0.15s, filter 0.2s;
+}
+.dk-btn-gold:hover {
+  filter: brightness(1.06);
+}
+.dk-btn-gold:active {
+  transform: scale(0.97);
+}
+
+.dk-num {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2em;
+  height: 2em;
+  border-radius: 50%;
+  border: 1px solid rgba(191, 168, 127, 0.4);
+  color: rgba(191, 168, 127, 0.9);
+  font-size: 0.78em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dk-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.8em;
+  height: 1.8em;
+  padding: 0 0.4em;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.85em;
+  color: var(--t2);
+}
+
+/* ── plakat za štampu ────────────────────────────────────────── */
+
+.print-page {
+  min-height: 100dvh;
+  background: #161616;
+  color: #f4f4f4;
+}
+
+.print-sheet {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0 64px;
+}
+
+.print-sheet > * {
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.poster,
+.poster * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* veličina papira (@page) postavlja svaka stranica za sebe */
+@media print {
+  /*
+   * Chrome u PDF-u mutne sjene, stapanje (mix-blend) i filtere pretvori u
+   * sličice — na tamnoj podlozi se onda vide pravougaonici. U štampi zato
+   * otpadaju: razlika se na papiru ionako ne vidi, a rubova nema.
+   */
+  .poster * {
+    text-shadow: none !important;
+  }
+  .poster .poster-fx {
+    mix-blend-mode: normal !important;
+    filter: none !important;
+  }
+  .poster .poster-shadow {
+    box-shadow: none !important;
+  }
+  .poster .poster-grain {
+    display: none !important;
+  }
+
+  html,
+  body,
+  .print-page {
+    background: #070708 !important;
+  }
+  .print-page {
+    min-height: 0;
+  }
+  .print-toolbar {
+    display: none !important;
+  }
+  .print-sheet {
+    padding: 0;
+    display: block;
+  }
+  .print-sheet > * {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dk-dock {
+    transition: none;
+  }
+}
