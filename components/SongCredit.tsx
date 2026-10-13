@@ -10,20 +10,29 @@ import { BRAND } from '@/lib/brand'
  * Potpis pjesme ispod stiha.
  *
  * Naziv je u zlatnoj, verzalom — jedina zlatna stvar na ekranu osim
- * zaglavlja. Dodir na naziv pusti zvuk pjesme u pozadini (/api/audio ga
- * izvuče s YouTubea) — play/pauza, prsten napretka, ekvilajzer, bez
- * plejera i bez iframea. Ako zvuk ne stigne, ostaje YouTube znak.
+ * zaglavlja. Dodir na naziv pusti zvuk pjesme u pozadini — play/pauza,
+ * prsten napretka, ekvilajzer, bez plejera i bez iframea.
+ *
+ * Zvuk se traži redom: `public/audio/<pjesma>.m4a` sa CDN-a, pa /api/audio
+ * (lokalno ga izvuče s YouTubea). Ako ni jedno ne stigne, ostaje YouTube znak.
  */
 export function SongCredit({ verse }: { verse: Verse }) {
   const id = youtubeId(verse.youtube)
   // dok audio ne pukne, dodir pušta pjesmu; ako server ne može do zvuka, ostaje YouTube link
-  const [failed, setFailed] = useState(false)
-  useEffect(() => setFailed(false), [id])
+  // pamti se ZA KOJU pjesmu je zvuk pao — nova pjesma kreće ispočetka sama
+  const [failedId, setFailedId] = useState<string | null>(null)
+  const failed = failedId === id
 
   return (
     <div className="flex w-full flex-col items-center">
       {id && !failed ? (
-        <AudioSong key={id} verse={verse} src={`/api/audio/${id}?s=${audioSlug(verse.song)}`} onFail={() => setFailed(true)} />
+        <AudioSong
+          key={id}
+          verse={verse}
+          src={`/audio/${audioSlug(verse.song)}.m4a`}
+          fallback={`/api/audio/${id}?s=${audioSlug(verse.song)}`}
+          onFail={() => setFailedId(id)}
+        />
       ) : id ? (
         /* Naziv i znak su JEDAN link: hover i dodir zumiraju oboje zajedno,
            a prst pogodi bilo koji od njih. */
@@ -115,15 +124,16 @@ type State = 'idle' | 'loading' | 'playing' | 'paused'
  * se razvuče traka: ekvilajzer, vrijeme i premotavanje prstom. Kontrole
  * rade i sa zaključanog ekrana (Media Session).
  */
-function AudioSong({ verse, src, onFail }: { verse: Verse; src: string; onFail: () => void }) {
+function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string; fallback: string; onFail: () => void }) {
   const audio = useRef<HTMLAudioElement | null>(null)
   const [state, setState] = useState<State>('idle')
   const [cur, setCur] = useState(0)
   const [dur, setDur] = useState(0)
 
-  // server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan
+  // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
+  // Na Vercelu nema yt-dlp-a, pa tamo svira samo statični fajl i ovo ne treba.
   useEffect(() => {
-    fetch(`${src}&warm=1`).catch(() => {})
+    if (process.env.NODE_ENV === 'development') fetch(`${fallback}&warm=1`).catch(() => {})
     // prezentacija: odlaskom s koraka pjesma stane i plejer se sklopi
     const stop = () => {
       const a = audio.current
@@ -140,7 +150,7 @@ function AudioSong({ verse, src, onFail }: { verse: Verse; src: string; onFail: 
       audio.current?.pause()
       audio.current = null
     }
-  }, [src])
+  }, [fallback])
 
   function player(): HTMLAudioElement {
     if (audio.current) return audio.current
@@ -160,6 +170,12 @@ function AudioSong({ verse, src, onFail }: { verse: Verse; src: string; onFail: 
       setState('paused')
     })
     a.addEventListener('error', () => {
+      // statičnog fajla nema (nova pjesma iz admina) → pokušaj preko servera
+      if (a.src.endsWith(src)) {
+        a.src = fallback
+        a.play().catch(() => {})
+        return
+      }
       setState('idle')
       onFail()
     })

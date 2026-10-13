@@ -32,6 +32,13 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
       {
+        // Omoti i pjesme: bez ovoga Vercel kaže `max-age=0`, pa telefon svaki
+        // put pita server — omot na slici za dijeljenje i pjesma kasne. Sedmica,
+        // a ne zauvijek: omot se zna zamijeniti istim imenom.
+        source: '/:path(albumi|audio|ig)/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=2592000' }],
+      },
+      {
         /**
          * Service worker se NE smije keširati: on je taj koji donosi novu
          * verziju aplikacije. Keširan `sw.js` znači da korisnik zaglavi na

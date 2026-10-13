@@ -128,7 +128,7 @@ export function Tips() {
 
   // tekst stoji ispod/iznad dugmeta, ali uvijek na istom mjestu po širini i
   // poravnat lijevo — svaki savjet počinje u istoj liniji, gdje god dugme bilo
-  const W = Math.min(320, vp.w - 48)
+  const W = Math.min(340, vp.w - 32)
   const left = (vp.w - W) / 2
   const GAP = 12
 
@@ -186,17 +186,24 @@ export function Tips() {
             ))}
           </svg>
 
+          {/* kartica — isti jezik kao paneli: tamno staklo, zlatna nit gore */}
           <motion.div
             role="dialog"
             aria-label={tip.title}
-            className="absolute"
+            className="absolute overflow-hidden rounded-[22px] border border-white/10 p-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
             style={{
               left,
               width: W,
+              background: `radial-gradient(120% 70% at 0% 0%, ${BRAND.gold}17 0%, transparent 60%), linear-gradient(180deg, #161312 0%, #0d0b0b 100%)`,
               ...(!main ? { top: vp.h / 2 - 70 } : below ? { top: main.y + main.h + GAP } : { bottom: vp.h - main.y + GAP }),
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            <span
+              className="pointer-events-none absolute inset-x-8 top-0 h-px"
+              style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)` }}
+              aria-hidden
+            />
             <AnimatePresence mode="wait">
               <motion.div
                 key={step}
@@ -227,7 +234,7 @@ export function Tips() {
               </motion.div>
             </AnimatePresence>
 
-            <div className="mt-4 flex items-center justify-between">
+            <div className="mt-4 flex items-center justify-between border-t border-white/[0.07] pt-3">
               <button
                 type="button"
                 onClick={finish}

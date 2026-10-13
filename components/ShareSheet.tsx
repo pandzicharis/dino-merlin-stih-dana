@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { Verse } from '@/data/verses'
+import { getSharePrefs } from '@/lib/storage'
 
 /**
  * Panel, pregled i crtanje slike (~15 KB) ne idu uz prvo učitavanje — stih
@@ -24,11 +25,24 @@ export function ShareButton({ verse, accent, date }: { verse: Verse; accent: str
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
-  // panel se preuzme u tišini kad se ekran smiri — prvi dodir ga otvara odmah
+  // panel se preuzme u tišini kad se ekran smiri, a slika se nacrta unaprijed
+  // u formatu koji korisnik zadnji birao — prvi dodir je otvara odmah
   useEffect(() => {
-    const t = setTimeout(load, 3000)
-    return () => clearTimeout(t)
-  }, [])
+    let idle = 0
+    const t = setTimeout(() => {
+      load()
+      const warm = () =>
+        import('@/lib/share-image').then(({ warmShareImage, SHARE_FORMATS }) => {
+          const f = getSharePrefs().format
+          warmShareImage({ verse, date, format: f && f in SHARE_FORMATS ? (f as keyof typeof SHARE_FORMATS) : 'story' })
+        })
+      idle = window.requestIdleCallback?.(warm, { timeout: 2000 }) ?? window.setTimeout(warm, 0)
+    }, 3000)
+    return () => {
+      clearTimeout(t)
+      if (idle) (window.cancelIdleCallback ?? clearTimeout)(idle)
+    }
+  }, [verse, date])
 
   return (
     <>

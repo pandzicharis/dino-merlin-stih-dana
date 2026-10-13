@@ -332,29 +332,36 @@ function Presenter() {
   )
 }
 
+/** Potpis | Magaza, krupno — naslovna i zadnji slajd, isto. */
+function Lockup() {
+  return (
+    <div className="flex items-center gap-[clamp(18px,2.2vw,40px)]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/signature.webp" alt="Dino Merlin" style={{ height: 'clamp(64px, 12vh, 140px)', width: 'auto' }} />
+      <span className="block w-px bg-white/25" style={{ height: 'clamp(40px, 7vh, 84px)' }} />
+      <span
+        role="img"
+        aria-label="Magaza"
+        className="block"
+        style={{
+          height: 'clamp(30px, 5.2vh, 56px)',
+          aspectRatio: '316 / 87',
+          background: 'rgba(255,255,255,0.92)',
+          mask: 'url(/brand/magaza.svg) left center / contain no-repeat',
+          WebkitMask: 'url(/brand/magaza.svg) left center / contain no-repeat',
+        }}
+      />
+    </div>
+  )
+}
+
 function Intro() {
   return (
     <div className="max-w-[min(64vw,980px)]">
       {/* potpis i Magaza jedan do drugog, ulaze kao i sve ostalo — u donjoj
           traci ih na naslovnoj nema */}
       <R i={1}>
-        <div className="flex items-center gap-[clamp(18px,2.2vw,40px)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/signature.webp" alt="Dino Merlin" style={{ height: 'clamp(64px, 12vh, 140px)', width: 'auto' }} />
-          <span className="block w-px bg-white/25" style={{ height: 'clamp(40px, 7vh, 84px)' }} />
-          <span
-            role="img"
-            aria-label="Magaza"
-            className="block"
-            style={{
-              height: 'clamp(30px, 5.2vh, 56px)',
-              aspectRatio: '316 / 87',
-              background: 'rgba(255,255,255,0.92)',
-              mask: 'url(/brand/magaza.svg) left center / contain no-repeat',
-              WebkitMask: 'url(/brand/magaza.svg) left center / contain no-repeat',
-            }}
-          />
-        </div>
+        <Lockup />
       </R>
       <R i={3}>
         <h1 className="dk-h1 mt-[5.5vh]">
@@ -1403,12 +1410,12 @@ function Pitanja({ d }: { d: DeckData }) {
   return (
     <div className="grid h-full items-center gap-[5vw] lg:grid-cols-[1fr_auto]">
       <div>
+        {/* isto zaglavlje kao naslovna — prezentacija se zatvara kako je počela */}
         <R i={1}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/signature.webp" alt="Dino Merlin" style={{ height: 'clamp(56px, 10vh, 120px)', width: 'auto' }} />
+          <Lockup />
         </R>
         <R i={2}>
-          <h1 className="dk-h1 mt-[4vh]">
+          <h1 className="dk-h1 mt-[5.5vh]">
             Pitanja<em>?</em>
           </h1>
         </R>

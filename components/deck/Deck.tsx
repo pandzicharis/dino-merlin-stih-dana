@@ -673,8 +673,8 @@ function Bar({
   onOverview: () => void
 }) {
   const slide = SLIDES[index]
-  // naslovna već nosi oba znaka, krupno — traka ih ne ponavlja
-  const bare = index === 0
+  // naslovna i zadnji slajd već nose oba znaka, krupno — traka ih ne ponavlja
+  const bare = index === 0 || index === SLIDES.length - 1
   return (
     <div
       className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-4 px-[var(--pad-x)]"

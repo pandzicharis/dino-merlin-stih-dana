@@ -187,7 +187,53 @@ export type ShareInput = {
   format: ShareFormat
 }
 
+/**
+ * Gotove slike, da se panel otvori odmah. Crtanje 1080×1920 sa sjenama i
+ * zrnom na telefonu traje i sekundu-dvije — zato se slika nacrta unaprijed
+ * (`warmShareImage`, dok korisnik čita stih), a panel je samo prepiše.
+ * Najviše tri — svaka je ~8 MB memorije.
+ */
+const drawn = new Map<string, HTMLCanvasElement>()
+const pending = new Map<string, Promise<HTMLCanvasElement>>()
+
+function key({ verse, date, format }: ShareInput) {
+  return [verse.id, verse.text, verse.mood, verse.song, verse.album, verse.year, date, format].join('|')
+}
+
+function show(target: HTMLCanvasElement, c: HTMLCanvasElement) {
+  target.width = c.width
+  target.height = c.height
+  target.getContext('2d')!.drawImage(c, 0, 0)
+}
+
 export async function drawShareImage(target: HTMLCanvasElement, input: ShareInput) {
+  show(target, await shareCanvas(input))
+}
+
+/** Nacrtaj sliku unaprijed, u tišini — prvi dodir na „Podijeli“ je onda trenutan. */
+export function warmShareImage(input: ShareInput) {
+  shareCanvas(input).catch(() => {})
+}
+
+function shareCanvas(input: ShareInput): Promise<HTMLCanvasElement> {
+  const k = key(input)
+  const hit = drawn.get(k)
+  if (hit) return Promise.resolve(hit)
+  let p = pending.get(k)
+  if (!p) {
+    p = render(input)
+      .then((c) => {
+        drawn.set(k, c)
+        if (drawn.size > 3) drawn.delete(drawn.keys().next().value!)
+        return c
+      })
+      .finally(() => pending.delete(k))
+    pending.set(k, p)
+  }
+  return p
+}
+
+async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   const { verse, date, format } = input
   const { w: W, h: H } = SHARE_FORMATS[format]
   const p = palette(verse.mood)
@@ -208,7 +254,7 @@ export async function drawShareImage(target: HTMLCanvasElement, input: ShareInpu
   ])
 
   // Crta se van ekrana pa se prebaci odjednom — pregled ne trepće pri
-  // promjeni formata ili stila.
+  // promjeni formata ili stila, a gotova slika se pamti.
   const c = document.createElement('canvas')
   c.width = W
   c.height = H
@@ -555,9 +601,7 @@ export async function drawShareImage(target: HTMLCanvasElement, input: ShareInpu
     ctx.restore()
   }
 
-  target.width = W
-  target.height = H
-  target.getContext('2d')!.drawImage(c, 0, 0)
+  return c
 }
 
 /** JPEG, ne PNG: zrno čini PNG teškim ~3 MB, a Instagram i WhatsApp ga
