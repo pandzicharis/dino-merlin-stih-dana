@@ -16,14 +16,13 @@ name: Stih dana — push
 #   zimi    10:00 UTC = 11:00 → stane;  11:00 UTC = 12:00 → šalje
 #
 # Dva puta godišnje se, dakle, ništa ne mijenja ni u kodu ni u rasporedu.
+#
+# ── ZAKAZANO SLANJE JE ISKLJUČENO (oktobar 2026) ──────────────────────────
+# GitHub je zakazane pokušaje pokretao 6–10 sati kasnije (10:00 UTC → 16–20h
+# UTC), pa ih je provjera "je li prošlo podne" ionako sve preskakala, a svaki
+# pad je slao mail. Za slanje u 12h koristi cron-job.org (DEPLOY.md, korak 4).
+# Ovaj workflow ostaje samo za ručni test (Actions → Run workflow).
 on:
-  schedule:
-    - cron: '0 10 * * *'
-    - cron: '20 10 * * *'
-    - cron: '40 10 * * *'
-    - cron: '0 11 * * *'
-    - cron: '20 11 * * *'
-    - cron: '40 11 * * *'
   workflow_dispatch:
     inputs:
       force:
