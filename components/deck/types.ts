@@ -60,7 +60,7 @@ export type SlideDef = {
   body: (d: DeckData) => ReactNode
 }
 
-export type Simulation = 'notify' | 'update' | 'lock' | 'chat'
+export type Simulation = 'notify' | 'welcome' | 'update' | 'lock' | 'chat'
 
 export type DeckApi = {
   data: DeckData

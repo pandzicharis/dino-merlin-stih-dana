@@ -22,10 +22,10 @@ import type { Simulation } from './types'
 import { LockScreenMock, MoodStill } from './Screens'
 import { albumOf } from '@/data/albums'
 import { AppIcon, HomeScreen, ROBOTO, SF, Tap, homeSlot } from './phoneUi'
-import { MOODS } from '@/data/moods'
 import { formatDateBs, formatDayBs } from '@/lib/date'
 import { PhoneScript, type Script } from './PhoneScript'
 import { ChatDemo } from './ChatDemo'
+import { WELCOME } from '../Tips'
 
 /** Veličina kutije u kojoj uređaj stoji — uređaj se upiše u nju. */
 function useBox<T extends HTMLElement>() {
@@ -214,11 +214,12 @@ function Simulated({
   const ios = kind === 'iphone'
   return (
     <AnimatePresence>
-      {sim === 'notify' && (
+      {/* obavijest sa stihom, ili dobrodošlica kad savjeti prođu (ona se samo skloni) */}
+      {(sim === 'notify' || sim === 'welcome') && (
         <motion.button
           key="notify"
           type="button"
-          onClick={() => onSim('open')}
+          onClick={() => onSim(sim === 'welcome' ? 'dismiss' : 'open')}
           initial={{ y: '-140em', opacity: 0, scale: 0.96 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: '-140em', opacity: 0 }}
@@ -252,7 +253,7 @@ function Simulated({
           />
           <span style={{ minWidth: 0, flex: 1 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8em' }}>
-              <span style={{ fontSize: '14.5em', fontWeight: 600 }}>Stih dana — Dino Merlin</span>
+              <span style={{ fontSize: '14.5em', fontWeight: 600 }}>{sim === 'welcome' ? WELCOME.title : 'Stih dana — Dino Merlin'}</span>
               <span style={{ fontSize: '12.5em', color: 'rgba(255,255,255,0.5)' }}>sada</span>
             </span>
             <span
@@ -267,7 +268,7 @@ function Simulated({
                 color: 'rgba(255,255,255,0.85)',
               }}
             >
-              {oneLine(withPeriod(verse.text))}
+              {sim === 'welcome' ? WELCOME.body : oneLine(withPeriod(verse.text))}
             </span>
           </span>
         </motion.button>

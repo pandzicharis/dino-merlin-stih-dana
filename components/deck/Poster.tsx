@@ -96,7 +96,7 @@ export function Poster({ data, width, style }: { data: PosterData; width: string
           <Rule margin="3em 0 2em" />
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '2em' }}>
             <div>
-              <Platforms size="1.3em" />
+              <Platforms size="1.25em" />
               <p style={{ marginTop: '0.6em', fontSize: '1.45em', color: 'rgba(255,255,255,0.5)' }}>{data.host}</p>
             </div>
             <MagazaMark height={3.6} color="rgba(255,255,255,0.9)" />
@@ -131,9 +131,10 @@ export function PosterLandscape({ data, width, style }: { data: PosterData; widt
           </div>
         </div>
         <Rule margin="3.2em 0 1.6em" />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2em' }}>
+        {/* adresa u jednom redu — s PWA oznakom je red tijesan, pa se ona ne lomi */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5em' }}>
           <Platforms size="0.9em" />
-          <p style={{ fontSize: '1em', color: 'rgba(255,255,255,0.5)' }}>{data.host}</p>
+          <p style={{ fontSize: '1em', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', flexShrink: 0 }}>{data.host}</p>
         </div>
       </div>
 
@@ -411,12 +412,14 @@ function Steps({ title, sub, gap }: { title: string; sub: string; gap: string })
 /** "Besplatno" i znakovi platformi — da se odmah vidi da radi na oba. */
 function Platforms({ size }: { size: string }) {
   return (
-    <div style={{ fontSize: size, display: 'flex', alignItems: 'center', gap: '0.9em', flexWrap: 'wrap' }}>
+    <div style={{ fontSize: size, display: 'flex', alignItems: 'center', gap: '0.65em', flexWrap: 'wrap' }}>
       <span style={{ fontWeight: 500, letterSpacing: '0.24em', textTransform: 'uppercase', color: BRAND.gold }}>
         Besplatno
       </span>
       <Pill icon={<AppleGlyph />}>iPhone</Pill>
       <Pill icon={<AndroidGlyph />}>Android</Pill>
+      {/* web aplikacija — da se zna da nema App Storea */}
+      <Pill icon={<PwaGlyph />}>PWA</Pill>
     </div>
   )
 }
@@ -447,6 +450,25 @@ function AppleGlyph() {
   return (
     <svg viewBox="0 0 24 24" style={{ width: '1.15em', height: '1.15em', marginTop: '-0.12em' }} fill="currentColor" aria-hidden>
       <path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.4-.9-2.3-4.3zM14 5.3c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.5 2.8-1.3z" />
+    </svg>
+  )
+}
+
+/** Telefon sa strelicom unutra — instalacija na početni ekran, bez storea. */
+function PwaGlyph() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      style={{ width: '1.15em', height: '1.15em' }}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="6" y="2.5" width="12" height="19" rx="2.6" />
+      <path d="M12 7v7.5M9 11.5l3 3 3-3" />
     </svg>
   )
 }

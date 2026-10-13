@@ -235,6 +235,24 @@ export function Deck({ data }: { data: DeckData }) {
     navigator.vibrate?.(8)
   }, [])
 
+  // Savjeti na telefonu su prošli → dobrodošlica kao obavijest, pa se skloni
+  // sama. U aplikaciji je to prava obavijest (Tips.tsx), ovdje telefon na slajdu.
+  useEffect(() => {
+    let t = 0
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== phoneRef.current?.contentWindow) return
+      if (e.data?.type !== 'stihdana:tips-done') return
+      simulate('welcome')
+      clearTimeout(t)
+      t = window.setTimeout(() => setSim((s) => (s?.kind === 'welcome' ? null : s)), 4500)
+    }
+    window.addEventListener('message', onMessage)
+    return () => {
+      window.removeEventListener('message', onMessage)
+      clearTimeout(t)
+    }
+  }, [simulate])
+
   // Ulazak na zaustavljanje postavi uređaj tamo gdje ono traži — ali samo ako
   // već nije tamo, da se ono što je prezenter otvorio ne izgubi bez razloga.
   useEffect(() => {

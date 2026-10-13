@@ -55,6 +55,24 @@ const TIPS: Tip[] = [
   },
 ]
 
+/** Dobrodošlica kad savjeti prođu — prva obavijest koju korisnik dobije. */
+export const WELCOME = { title: 'Mir svim dobrim ljudima', body: 'Dobro došli na Stih dana. — Dino Merlin' }
+
+function welcome() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  navigator.serviceWorker?.ready
+    .then((reg) =>
+      reg.showNotification(WELCOME.title, {
+        body: WELCOME.body,
+        tag: 'stih-dana-dobrodoslica',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        data: { url: '/' },
+      }),
+    )
+    .catch(() => {})
+}
+
 /** Pokreni savjete. `force` ih pokaže i ako su već viđeni (prezentacija). */
 export function startTips(force = false) {
   try {
@@ -116,7 +134,9 @@ export function Tips() {
   const finish = () => {
     setStep(null)
     setHoles([])
+    // u prezentaciji obavijest pokaže telefon na slajdu, a ne pravi sistem
     if (window.parent !== window) window.parent.postMessage({ type: 'stihdana:tips-done' }, window.location.origin)
+    else welcome()
   }
   const next = () => (step !== null && step < TIPS.length - 1 ? setStep(step + 1) : finish())
 
@@ -204,14 +224,16 @@ export function Tips() {
               style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)` }}
               aria-hidden
             />
-            <AnimatePresence mode="wait">
+            {/* prvi savjet ulazi s karticom, bez svoje animacije — inače kartica
+                stoji prazna dok tekst ne stigne */}
+            <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={step}
                 className="flex items-start gap-3.5"
-                initial={{ opacity: 0, y: below ? -6 : 6, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, filter: 'blur(4px)' }}
-                transition={{ duration: 0.55, ease }}
+                initial={{ opacity: 0, y: below ? -4 : 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                transition={{ duration: 0.28, ease }}
               >
                 <span
                   className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"

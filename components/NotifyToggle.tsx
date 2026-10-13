@@ -171,8 +171,8 @@ export function NotifyToggle() {
 function Bell({ on, muted }: { on: boolean; muted: boolean }) {
   return (
     <svg
-      width="20"
-      height="20"
+      width="23"
+      height="23"
       viewBox="0 0 24 24"
       fill={on ? 'currentColor' : 'none'}
       fillOpacity={on ? 0.22 : undefined}
