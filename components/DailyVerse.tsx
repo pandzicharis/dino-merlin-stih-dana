@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
-import { pickVerse, verseById } from '@/lib/pickVerse'
+import { useEffect, useState } from 'react'
+import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
-import { setLastSeen } from '@/lib/storage'
+import { recordVisit, setLastSeen } from '@/lib/storage'
+import { addDays, todayInTz } from '@/lib/date'
 import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
 import { DevDateBar } from './DevDateBar'
@@ -13,15 +14,39 @@ import { UpdatePrompt } from './UpdatePrompt'
 /**
  * Rješava KOJI stih se prikazuje.
  *
- * Server proslijedi stvarni datum (ISR, revalidate 1h) pa nema treperenja
- * pri hidrataciji. Klijent onda primijeni dev override — u produkciji
- * OVERRIDE_ON je false, pa se ovdje nikad ništa ne mijenja.
+ * Server donese stihove za nekoliko dana oko danas, pa prelaz preko ponoći
+ * ne treba mrežu. Tek kad je traženi dan van toga (aplikacija otvorena
+ * danima, ili dev pomjeranje datuma), stih se dohvati s `/api/day` — a do
+ * tad ostaje zadnji poznati, bez praznog ekrana.
  */
-export function DailyVerse({ serverDate }: { serverDate: string }) {
+export function DailyVerse({ serverDate, days }: { serverDate: string; days: Record<string, Verse> }) {
   const { date, verseId, mood } = useDevParams(serverDate)
-  const verse = (verseId ? verseById(verseId) : undefined) ?? pickVerse(date)
+  const known = verseId ? undefined : days[date]
+  const key = verseId ? `id=${encodeURIComponent(verseId)}` : `d=${date}`
+  const [fetched, setFetched] = useState<{ key: string; verse: Verse } | null>(null)
+
+  useEffect(() => {
+    if (known) return
+    let alive = true
+    fetch(`/api/day?${key}`)
+      .then((r) => (r.ok ? (r.json() as Promise<Verse>) : null))
+      .then((v) => alive && v && setFetched({ key, verse: v }))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [known, key])
+
+  const verse =
+    known ?? (fetched?.key === key ? fetched.verse : undefined) ?? fetched?.verse ?? days[serverDate] ?? Object.values(days)[0]
 
   useEffect(() => setLastSeen(date), [date])
+
+  // Niz dana broji STVARNE dane u Sarajevu — dev pomjeranje datuma ga ne dira.
+  useEffect(() => {
+    const today = todayInTz()
+    recordVisit(today, addDays(today, -1))
+  }, [date])
 
   return (
     <>

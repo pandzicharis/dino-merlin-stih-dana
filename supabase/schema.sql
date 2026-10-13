@@ -1,4 +1,6 @@
--- Jedina tabela u sistemu. Stihovi NIKAD ne idu kroz bazu.
+-- Tabele: pretplate na obavijesti (ispod) i stihovi + raspored koje uređuje
+-- admin (na dnu fajla). Javni sajt stihove NE čita iz baze po posjeti — čita
+-- ih regeneracija stranice, jednom po izmjeni (vidi lib/catalog.ts).
 --
 -- Shema je idempotentna: isti fajl se pokreće i na praznom projektu i preko
 -- onog koji već radi. Nakon svake izmjene ovdje — SQL Editor → pokreni cijeli
@@ -260,3 +262,52 @@ revoke all on function finish_push_batch(text[], text[], text[], text, date) fro
 grant execute on function claim_due_subscriptions(uuid, date, int, boolean)     to service_role;
 grant execute on function count_due_subscriptions(uuid, date, boolean)          to service_role;
 grant execute on function finish_push_batch(text[], text[], text[], text, date) to service_role;
+
+
+-- ─────────────────────────────────────────────────────────────────────
+--  Stihovi i raspored — uređuje ih admin (/admin)
+--
+--  `verse_schedule` drži zapisane dane: prošlost i narednih 60 dana (složeno
+--  nasumično, mijenja ga samo admin). Dalje od toga dani se računaju: svaki
+--  dobije stih koji najduže nije bio. Novi stih ide na nasumičan dan.
+--
+--  Dok je `verses` prazna, sajt koristi početnu listu iz data/verses.ts, a
+--  prva izmjena u adminu je upiše ovdje.
+-- ─────────────────────────────────────────────────────────────────────
+
+create table if not exists verses (
+  id         text primary key,
+  text       text not null check (char_length(text) between 1 and 200),
+  song       text not null,
+  album      text not null,
+  year       smallint not null,
+  mood       text not null,
+  youtube    text,
+  sort       integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists verses_sort_idx on verses (sort, id);
+
+create table if not exists verse_schedule (
+  day      date primary key,
+  -- brisanje stiha vraća njegove dane u automatsku rotaciju
+  verse_id text not null references verses (id) on delete cascade
+);
+
+-- Dan koji je admin sam postavio (oznaka u kalendaru).
+alter table verse_schedule add column if not exists manual boolean not null default false;
+
+-- Arhiviran stih ne ulazi u raspored, ali ostaje za prošle dane i stare linkove.
+alter table verses add column if not exists active boolean not null default true;
+
+-- Sitna podešavanja kataloga; za sada samo `plan_start` — dan od kojeg se
+-- raspored računa (sve prije njega je zaključano u verse_schedule).
+create table if not exists catalog_meta (
+  key   text primary key,
+  value text
+);
+
+alter table verses enable row level security;
+alter table catalog_meta enable row level security;
+alter table verse_schedule enable row level security;

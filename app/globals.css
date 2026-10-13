@@ -51,6 +51,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* vodoravni red koji klizi prstom, bez vidljive trake */
+.no-scrollbar {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 ::selection {
   background: rgba(255, 255, 255, 0.18);
 }

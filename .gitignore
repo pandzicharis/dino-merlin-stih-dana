@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# admin u razvoju, dok Supabase shema nije pokrenuta
+/.data

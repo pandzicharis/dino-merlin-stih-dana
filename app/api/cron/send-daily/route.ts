@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { supabase } from '@/lib/supabase'
 import { todayInTz } from '@/lib/date'
-import { pickVerse } from '@/lib/pickVerse'
+import { verseForDayFresh } from '@/lib/catalog'
 import { oneLine, withPeriod } from '@/lib/text'
 
 /**
@@ -271,7 +271,8 @@ export async function POST(req: Request) {
   const workerRun = q.get('worker')
 
   const today = todayInTz()
-  const verse = pickVerse(today)
+  // isti izvor kao i sajt: admin raspored, pa automatska rotacija
+  const verse = await verseForDayFresh(today)
   const payload = JSON.stringify({
     title: 'Stih dana — Dino Merlin',
     // Stih se prelama u više redova; u notifikaciji mora stati u jedan,

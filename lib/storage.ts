@@ -48,3 +48,55 @@ export function getLastSeen(): string | null {
 export function setLastSeen(iso: string) {
   write(SEEN, iso)
 }
+
+/* ── dijeljenje: zadnji izabrani format ───────────────────────── */
+
+const SHARE = 'stihdana:share'
+
+export function getSharePrefs(): { format?: string } {
+  return read<{ format?: string }>(SHARE, {})
+}
+
+export function setSharePrefs(prefs: { format: string }) {
+  write(SHARE, prefs)
+}
+
+/* ── favoriti: lista id-eva, bez logina ──────────────────────── */
+
+const FAVORITES = 'stihdana:favorites'
+
+export function getFavorites(): string[] {
+  const v = read<unknown>(FAVORITES, [])
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+}
+
+/** Vraća novo stanje: je li stih sada sačuvan. Najnoviji ide na vrh liste. */
+export function toggleFavorite(id: string): boolean {
+  const list = getFavorites()
+  const on = !list.includes(id)
+  write(FAVORITES, on ? [id, ...list] : list.filter((x) => x !== id))
+  window.dispatchEvent(new Event('favchange'))
+  return on
+}
+
+/* ── niz dana zaredom ────────────────────────────────────────── */
+
+const STREAK = 'stihdana:streak'
+
+type Streak = { last: string; count: number }
+
+export function getStreak(): Streak | null {
+  return read<Streak | null>(STREAK, null)
+}
+
+/**
+ * Upiši posjetu za dati dan (uvijek stvarni dan u Sarajevu, nikad dev datum).
+ * Jučer → niz raste; danas → ništa; rupa → kreće ispočetka.
+ */
+export function recordVisit(today: string, yesterday: string) {
+  const s = getStreak()
+  if (s?.last === today) return
+  const count = s?.last === yesterday ? s.count + 1 : 1
+  write(STREAK, { last: today, count })
+  window.dispatchEvent(new Event('streakchange'))
+}

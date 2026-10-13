@@ -2,9 +2,7 @@
 
 import { useEffect } from 'react'
 import { MOOD_KEYS } from '@/data/moods'
-import { OVERRIDE_ON, addDays, setDevDate } from '@/lib/date'
-import { verseMeta } from '@/lib/pickVerse'
-import { VERSES } from '@/data/verses'
+import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
 
 /**
  * Ručno pomjeranje datuma — samo u dev modu (ili uz NEXT_PUBLIC_DATE_OVERRIDE=1).
@@ -57,7 +55,7 @@ export function DevDateBar({
 
   if (!OVERRIDE_ON) return null
 
-  const { day, cycle, pos } = verseMeta(date)
+  const day = daysSinceEpoch(date)
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 bg-black/85 px-3 py-2 font-mono text-[11px] text-white/80 backdrop-blur">
@@ -74,8 +72,11 @@ export function DevDateBar({
       <a href="/dev/moods" className="px-1.5 text-white/50 hover:text-white">
         moods
       </a>
+      <a href="/admin" className="px-1.5 text-white/50 hover:text-white">
+        admin
+      </a>
       <span className="ml-auto text-white/40">
-        dan {day} · ciklus {cycle} · {pos + 1}/{VERSES.length}
+        dan {day}
       </span>
       <span className="text-white">
         {verseId} · {mood}

@@ -1,77 +1,57 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import type { Verse } from '@/data/verses'
 
-type State = 'idle' | 'busy' | 'done' | 'error'
+/**
+ * Panel, pregled i crtanje slike (~15 KB) ne idu uz prvo učitavanje — stih
+ * se mora pojaviti odmah, a dijeli ga manjina. Kod se povuče kad prst
+ * dotakne dugme (ili miš pređe preko), pa je do klika već tu.
+ */
+const load = () => import('./SharePanel')
+const SharePanel = dynamic(load, { ssr: false })
 
 /**
- * Share — dijeli se link, ništa više.
+ * Dijeljenje stiha kao slike — za Story, objavu ili kvadrat.
  *
- * Ranije se ovdje generisala slika pa slala kao fajl: čekalo se na server,
- * na desktopu se umjesto dijeljenja pokretao download, a slika nikad nije
- * izgledala kao ekran sa stihom. Link se otvara u aplikaciji i sam povuče
- * svoj pregled — slika za pregled i dalje postoji u metapodacima stranice.
+ * Slika se crta u pregledniku (`lib/share-image.ts`) istim fontovima i
+ * paletom kao ekran, pa je pregled trenutan i ono što vidiš je tačno ono
+ * što odlazi. Svaki share je reklama u publici koja već voli Merlina —
+ * zato ovo mora izgledati kao poster, ne kao screenshot.
  */
-export function ShareButton({ verse, accent }: { verse: Verse; accent: string }) {
-  const [state, setState] = useState<State>('idle')
-
-  const share = async () => {
-    if (state === 'busy') return
-    setState('busy')
-
-    const url = `${location.origin}/stih/${verse.id}`
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'Stih dana', text: `${verse.song} — Dino Merlin`, url })
-      } else {
-        await navigator.clipboard.writeText(url)
-      }
-      setState('done')
-      setTimeout(() => setState('idle'), 2000)
-    } catch (e) {
-      // korisnik je otkazao native share — to nije greška
-      if ((e as Error)?.name === 'AbortError') setState('idle')
-      else setState('error')
-      setTimeout(() => setState('idle'), 2500)
-    }
-  }
+export function ShareButton({ verse, accent, date }: { verse: Verse; accent: string; date: string }) {
+  const [open, setOpen] = useState(false)
+  // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
+  const [used, setUsed] = useState(false)
 
   return (
-    <button
-      onClick={share}
-      aria-label="Podijeli stih"
-      disabled={state === 'busy'}
-      className="-m-2 p-2 text-white/40 transition-all active:scale-90 disabled:opacity-40"
-      style={state === 'done' ? { color: accent } : undefined}
-    >
-      {state === 'busy' ? <Spinner /> : state === 'done' ? <Check /> : <ShareIcon />}
-    </button>
+    <>
+      <button
+        onPointerEnter={load}
+        onTouchStart={load}
+        onClick={() => {
+          navigator.vibrate?.(8)
+          setUsed(true)
+          setOpen(true)
+        }}
+        aria-label="Podijeli stih"
+        className="-m-2 p-2 text-white/40 transition-all hover:text-white/70 active:scale-90"
+        style={open ? { color: accent } : undefined}
+      >
+        <ShareIcon />
+      </button>
+      {used && <SharePanel open={open} onClose={() => setOpen(false)} verse={verse} date={date} />}
+    </>
   )
 }
+
 
 function ShareIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3v13M12 3 8 7M12 3l4 4" />
       <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
-    </svg>
-  )
-}
-
-function Check() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m5 13 4 4L19 7" />
-    </svg>
-  )
-}
-
-function Spinner() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
-      <circle cx="12" cy="12" r="9" opacity="0.25" />
-      <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" />
     </svg>
   )
 }

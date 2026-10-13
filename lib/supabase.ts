@@ -1,8 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * Supabase se koristi ISKLJUČIVO za push subscriptions.
- * Stihovi nikad ne idu kroz bazu — vidi lib/pickVerse.ts.
+ * Supabase drži push pretplate i stihove koje uređuje admin.
+ * Javni sajt stihove ne čita po posjeti — vidi lib/catalog.ts.
  *
  * Klijent se pravi jednom po instanci funkcije i živi između zahtjeva.
  * Nova instanca po zahtjevu značila bi novo TLS rukovanje prema Supabaseu

@@ -11,6 +11,14 @@ export function withPeriod(text: string): string {
 }
 
 /** Stih u jednom redu — za notifikaciju, gdje prelom ne postoji. */
+/** Iz punog linka ili golog ID-a izvuci YouTube video ID. */
+export function youtubeId(input?: string): string | null {
+  if (!input) return null
+  if (/^[\w-]{11}$/.test(input)) return input
+  const m = input.match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/)
+  return m ? m[1] : null
+}
+
 export function oneLine(text: string): string {
   return text.replace(/\s*\n\s*/g, ' ')
 }

@@ -16,9 +16,27 @@ nvm use && npm install && npm run dev
 
 → http://localhost:3111
 
-## Dodavanje stihova
+## Stihovi i raspored — admin
 
-Sve ide u [`data/verses.ts`](data/verses.ts) — jedini fajl koji se dira.
+Stihove dodaje, uređuje, briše i raspoređuje urednik na **`/admin`**, uz
+šifru iz `ADMIN_PASSWORD`. Sve ide u Supabase (tabele `verses` i
+`verse_schedule` iz [`supabase/schema.sql`](supabase/schema.sql)).
+
+- **Raspored:** narednih 60 dana; stih se prevlači na drugi dan, strelicama
+  mijenja sa susjednim, ili se za dan bira bilo koji stih iz biblioteke.
+- **Biblioteka:** dodaj / uredi / obriši, uz živi pregled i opcioni datum.
+- Svaka izmjena „zaključa“ narednih 60 dana, pa novi stih ne preslaže
+  raspored koji je već najavljen. Obrisan stih ostavlja dan koji dobije stih
+  kojeg nema u blizini.
+- Sajt se osvježi odmah nakon izmjene (`revalidateTag`), a posjetioci i dalje
+  dobijaju statičnu stranicu s CDN-a — baza se ne čita po posjeti
+  ([`lib/catalog.ts`](lib/catalog.ts)).
+
+**Lokalno, bez sheme u bazi**, admin piše u `.data/catalog.json` (van gita) —
+dovoljno za demo. U produkciji bez sheme admin je samo za čitanje.
+
+[`data/verses.ts`](data/verses.ts) je početna lista: koristi se dok je baza
+prazna, a prva izmjena u adminu je prepiše u bazu.
 Palete po raspoloženju su u [`data/moods.ts`](data/moods.ts).
 
 ```bash
@@ -40,10 +58,23 @@ Stih se računa iz datuma, pa se svaki dan može reproducirati:
 | `/?verse=moja-svila` | forsiran stih |
 | `/?mood=nostalgija` | forsirana paleta |
 | `/dev/moods` | sve palete na jednom ekranu |
+| `/?streak=12` | prikaži niz dana (za demo) |
 
 Tipke: `[` dan nazad · `]` dan naprijed · `\` reset na danas · `m` sljedeći mood · `0` ukloni override.
 
 Sve je aktivno samo u dev modu, ili uz `NEXT_PUBLIC_DATE_OVERRIDE=1` na stagingu.
+
+## Stranice
+
+| | |
+|---|---|
+| `/admin` | uređivanje stihova i rasporeda (šifra) |
+| `/sacuvano` | stihovi sačuvani srcem (localStorage, bez naloga) |
+| `/stih/<id>` | trajni link na jedan stih |
+
+Slika za dijeljenje (Story 9:16, objava 4:5, kvadrat 1:1, tri stila) crta
+se u pregledniku, u [`lib/share-image.ts`](lib/share-image.ts). Ruta `/og`
+ostaje samo za pregled linka na WhatsAppu i sl.
 
 ## Notifikacije
 

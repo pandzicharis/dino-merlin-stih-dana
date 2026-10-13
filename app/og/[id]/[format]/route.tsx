@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
-import { VERSES } from '@/data/verses'
 import { MOODS } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
-import { verseById } from '@/lib/pickVerse'
+import { findVerse, getCatalog } from '@/lib/catalog'
 import { withPeriod } from '@/lib/text'
 
 /**
@@ -25,6 +24,8 @@ import { withPeriod } from '@/lib/text'
  */
 
 export const dynamic = 'force-static'
+// izmjena stiha u adminu stigne i do pregleda linka, najkasnije za sat
+export const revalidate = 3600
 
 const FORMATS = {
   story: { width: 1080, height: 1920 },
@@ -33,8 +34,8 @@ const FORMATS = {
 
 type Format = keyof typeof FORMATS
 
-export function generateStaticParams() {
-  return VERSES.flatMap((v) => Object.keys(FORMATS).map((format) => ({ id: v.id, format })))
+export async function generateStaticParams() {
+  return (await getCatalog()).verses.flatMap((v) => Object.keys(FORMATS).map((format) => ({ id: v.id, format })))
 }
 
 /** Logotip kao data URI — Satori ga tako umeće bez mrežnog poziva. */
@@ -84,7 +85,7 @@ function loadFont(family: string, text: string): Promise<ArrayBuffer | null> {
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string; format: string }> }) {
   const { id, format } = await ctx.params
-  const verse = verseById(id)
+  const verse = await findVerse(id)
   if (!verse || !(format in FORMATS)) return new Response('Nepoznat stih', { status: 404 })
 
   const { width, height } = FORMATS[format as Format]
@@ -182,8 +183,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
         ...(sans ? [{ name: 'Sans', data: sans, style: 'normal' as const, weight: 500 as const }] : []),
       ],
       headers: {
-        // Slika za dati stih je nepromjenjiva — i u pregledniku i na CDN-u.
-        'Cache-Control': 'public, immutable, no-transform, max-age=31536000, s-maxage=31536000',
+        // Admin sada može ispraviti stih, pa slika više nije vječna: dan na
+        // CDN-u, a zastarjela se servira dok se nova crta u pozadini.
+        'Cache-Control': 'public, no-transform, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
       },
     },
   )

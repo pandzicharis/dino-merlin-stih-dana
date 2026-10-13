@@ -24,3 +24,12 @@ Aplikacija radi i bez njih:
   `components/DailyVerse.tsx`
 
 Isti razgovor u kojem tražiš dozvolu za stihove pokriva i ovo.
+
+## Magaza
+
+| Fajl | Izvor | Status |
+|---|---|---|
+| `magaza.svg` | `magaza.com.ba/assets/img/magaza_logo_20190410.svg` | znak izdavača — koristi se uz njihovo odobrenje |
+
+SVG je crn; aplikacija ga boji preko CSS maske (`components/MagazaLogo.tsx`)
+i na slici za dijeljenje preko canvasa.

@@ -7,11 +7,14 @@ import { OVERRIDE_ON, formatFullDateBs } from '@/lib/date'
 import { BRAND } from '@/lib/brand'
 import { MoodBackground } from './MoodBackground'
 import { VerseText, verseTail } from './VerseText'
-import { VerseOrnament } from './VerseOrnament'
 import { SongCredit } from './SongCredit'
 import { NotifyToggle } from './NotifyToggle'
 import { ShareButton } from './ShareSheet'
 import { BrandLockup } from './BrandLockup'
+import { FavoriteButton } from './FavoriteButton'
+import { SavedLink } from './SavedLink'
+import { RitualLine } from './RitualLine'
+import { MagazaLogo } from './MagazaLogo'
 
 /**
  * Čista prezentacija — datum i stih dolaze izvana.
@@ -54,7 +57,7 @@ export function VerseScreen({
         }
       >
         {/* zaglavlje — brend stoji tiho gore lijevo */}
-        <header className="relative z-10 flex items-start justify-between">
+        <header className="relative z-10 flex items-center justify-between">
           {compact ? (
             <p className="meta" style={{ color: m.accent }}>
               {m.label}
@@ -70,7 +73,8 @@ export function VerseScreen({
               transition={{ duration: 0.8, delay: 1.35, ease: 'easeOut' }}
             >
               <NotifyToggle />
-              <ShareButton verse={verse} accent={m.accent} />
+              <SavedLink />
+              <ShareButton verse={verse} accent={m.accent} date={date} />
             </motion.div>
           )}
         </header>
@@ -97,7 +101,18 @@ export function VerseScreen({
 
           <VerseText key={verse.id} text={verse.text} color={m.text} glow={m.accent} />
 
-          <VerseOrnament key={`o-${verse.id}`} accent={m.accent} delay={tail - 0.15} />
+
+          {/* odmah ispod stiha — sačuvati se želi baš ono što se upravo pročitalo */}
+          {!compact && (
+            <motion.div
+              key={`s-${verse.id}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: tail + 0.1, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <FavoriteButton id={verse.id} accent={m.accent} />
+            </motion.div>
+          )}
         </div>
 
         {/* podnožje — uvijek prisutno, samo se stiša */}
@@ -128,6 +143,16 @@ export function VerseScreen({
                 style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
                 aria-hidden
               />
+              <RitualLine accent={m.accent} />
+              <a
+                href="https://magaza.com.ba"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Magaza"
+                className="relative z-10 opacity-90"
+              >
+                <MagazaLogo height={22} color="#FFFFFF" />
+              </a>
             </>
           )}
         </motion.footer>

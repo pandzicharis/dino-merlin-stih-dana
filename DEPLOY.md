@@ -70,6 +70,7 @@ Onda na [vercel.com/new](https://vercel.com/new) → import repozitorija. Next.j
 | `VAPID_SUBJECT` | `mailto:tvoj@email.com` |
 | `SUPABASE_URL` | Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role ključ |
+| `ADMIN_PASSWORD` | šifra za `/admin` (uređivanje stihova) — duga, nasumična |
 | `CRON_SECRET` | nasumična tajna iz koraka 1 |
 | `NEXT_PUBLIC_SITE_URL` | puna adresa, npr. `https://stih-dana.vercel.app` |
 
@@ -115,6 +116,11 @@ oznaku dana**. Test u deset ujutro zato ne može pojesti pravo slanje u podne.
 > 12:00h"), pa bi inače aplikacija govorila jedno a telefon radio drugo.
 
 ### GitHub Actions (već u repou)
+
+> **Zakazani pokušaji su isključeni (oktobar 2026).** GitHub ih je pokretao
+> 6–10 sati kasnije, pa nijedan nije stigao u podne, a svaki pad je slao
+> mail. Za svakodnevno slanje koristi **cron-job.org** (ispod). Workflow je
+> ostao samo za ručni test.
 
 [`.github/workflows/daily-push.yml`](.github/workflows/daily-push.yml) radi
 posao besplatno. Treba mu dva secreta u repou — **Settings → Secrets and
@@ -163,7 +169,7 @@ zadnji put commitao:
 6. Timeout podigni na **60 s**; na većem broju pretplatnika odgovor stiže
    tek kad svi workeri završe.
 
-Slobodno ga pusti **uz** GitHub Actions. Ne pokvari ništa — ko je dobio stih,
+Može i uz Vercel Cron kao rezervu. Ne pokvari ništa — ko je dobio stih,
 dobio ga je; drugi okidač samo zatekne prazan red. To je i najjeftinija
 polisa: dva nezavisna okidača ne padaju istog dana.
 

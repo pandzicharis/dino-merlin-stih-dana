@@ -196,10 +196,5 @@ export const VERSES: Verse[] = [
 /** Brz lookup po id-u (share linkovi, favoriti, ?verse=). */
 export const VERSE_BY_ID = new Map(VERSES.map((v) => [v.id, v]))
 
-/** Iz punog linka ili golog ID-a izvuci YouTube video ID. */
-export function youtubeId(input?: string): string | null {
-  if (!input) return null
-  if (/^[\w-]{11}$/.test(input)) return input
-  const m = input.match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/)
-  return m ? m[1] : null
-}
+/** Živi u lib/text.ts da klijent ne povuče cijelu listu stihova uz njega. */
+export { youtubeId } from '../lib/text'

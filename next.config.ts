@@ -29,6 +29,12 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
       {
+        // Pregled stiha u adminu je iframe na ISTOM sajtu. Zadnje pravilo za
+        // isti ključ pobjeđuje, pa ovo popušta DENY samo ovdje i samo za nas.
+        source: '/pregled',
+        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
+      },
+      {
         /**
          * Service worker se NE smije keširati: on je taj koji donosi novu
          * verziju aplikacije. Keširan `sw.js` znači da korisnik zaglavi na

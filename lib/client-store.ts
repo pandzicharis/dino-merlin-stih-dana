@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from 'react'
 import { MOOD_KEYS, type Mood } from '@/data/moods'
-import { OVERRIDE_ON, msUntilNextDay, readDevParams, todayInTz } from './date'
+import { OVERRIDE_ON, addDays, msUntilNextDay, readDevParams, todayInTz } from './date'
 
 /**
  * URL i localStorage su vanjski store-ovi — čitaju se kroz useSyncExternalStore,
@@ -114,4 +114,54 @@ export function useMounted(): boolean {
     () => true,
     () => false,
   )
+}
+
+/* ── favoriti i niz dana ────────────────────────────────────── */
+
+const subscribeFavorites = subscribeTo(['favchange', 'storage'])
+
+function favoritesSnapshot(): string {
+  try {
+    return localStorage.getItem('stihdana:favorites') ?? '[]'
+  } catch {
+    return '[]'
+  }
+}
+
+/** Sačuvani stihovi, najnoviji prvi. Na serveru prazno. */
+export function useFavorites(): string[] {
+  const snap = useSyncExternalStore(subscribeFavorites, favoritesSnapshot, () => '[]')
+  return useMemo(() => {
+    try {
+      const v = JSON.parse(snap)
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+    } catch {
+      return []
+    }
+  }, [snap])
+}
+
+const subscribeStreak = subscribeTo(['streakchange', 'storage', 'popstate'])
+
+function streakSnapshot(): string {
+  // dev: ?streak=12 — da se na prezentaciji vidi kako izgleda niz
+  if (OVERRIDE_ON) {
+    const forced = new URLSearchParams(window.location.search).get('streak')
+    if (forced && Number(forced) > 0) return forced
+  }
+  try {
+    const raw = localStorage.getItem('stihdana:streak')
+    const s = raw ? (JSON.parse(raw) as { last?: string; count?: number }) : null
+    // niz vrijedi samo ako je zadnja posjeta danas ili jučer
+    if (!s?.last || !s.count) return '0'
+    const today = todayInTz()
+    return s.last === today || s.last === addDays(today, -1) ? String(s.count) : '0'
+  } catch {
+    return '0'
+  }
+}
+
+/** Koliko dana zaredom je stih otvoren. 0 dok se ne zna (server, prvi frejm). */
+export function useStreak(): number {
+  return Number(useSyncExternalStore(subscribeStreak, streakSnapshot, () => '0'))
 }

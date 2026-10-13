@@ -95,21 +95,25 @@ export function MoodBackground({
             />
           ))}
 
-          {/* 3 — portret */}
+          {/* 3 — portret: krupan, u gornjem desnom uglu, da stih u sredini
+                 ostane na čistoj podlozi a lice ne bude iza teksta */}
           <motion.div
             className="absolute inset-0 bg-no-repeat"
             style={{
               backgroundImage: `url(${FIGURE_SRC})`,
               // visinom, ne "cover" — na širokom ekranu inače proguta sve
-              backgroundSize: 'auto 95%',
-              backgroundPosition: m.focus,
+              backgroundSize: 'auto 118%',
+              // Lice je na ~45% širine slike, a slika je široka 0.885 visine
+              // ekrana (118% × 3/4). Zato se lijevi rub računa tako da lice
+              // uvijek padne na 70% širine — isto na telefonu i na monitoru.
+              backgroundPosition: 'calc(70vw - 40dvh) -2dvh',
               mixBlendMode: m.blend,
               opacity: m.figure,
               x: px,
               y: py,
               // utapa se prije nego dođe do stiha
-              maskImage: 'radial-gradient(ellipse 72% 60% at 50% 26%, black 30%, transparent 82%)',
-              WebkitMaskImage: 'radial-gradient(ellipse 72% 60% at 50% 26%, black 30%, transparent 82%)',
+              maskImage: 'radial-gradient(ellipse 80% 62% at 78% 22%, black 30%, transparent 80%)',
+              WebkitMaskImage: 'radial-gradient(ellipse 80% 62% at 78% 22%, black 30%, transparent 80%)',
               willChange: 'transform',
             }}
             animate={reduced || still ? undefined : { scale: [1, 1.045, 1] }}
