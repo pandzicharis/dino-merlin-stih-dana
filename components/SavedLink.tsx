@@ -43,6 +43,11 @@ export function SavedLink() {
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
+  // panel se preuzme u tišini kad se ekran smiri — prvi dodir ga otvara odmah
+  useEffect(() => {
+    const t = setTimeout(load, 3000)
+    return () => clearTimeout(t)
+  }, [])
 
   return (
     <>
@@ -66,6 +71,7 @@ export function SavedLink() {
               }}
               aria-label={`Sačuvani stihovi (${count})`}
               title="Sačuvani stihovi"
+              data-tip="saved"
               className="relative -m-2 p-2 text-white/40 transition-all hover:text-white/70 active:scale-90"
             >
               {/* dvije kartice jedna iza druge, srce na prednjoj */}
@@ -74,14 +80,13 @@ export function SavedLink() {
                 <rect x="4" y="6.5" width="13" height="14" rx="2.5" />
                 <path d="M10.5 16.8s-3-1.8-3-4a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 2.2-3 4-3 4z" fill="currentColor" stroke="none" />
               </svg>
-              {/* mali, tihi brojač — u tonu ikonice, ne kao crvena obavijest */}
+              {/* mali brojač, puna zlatna — u boji brenda, ne kao crvena obavijest */}
               <span
-                className="tabular absolute right-0 top-0.5 inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full px-[3px] text-[8.5px] font-semibold leading-none"
+                className="tabular absolute right-0 top-0.5 inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full px-[3px] text-[8.5px] font-bold leading-none"
                 style={{
-                  background: 'rgba(191,168,127,0.22)',
-                  color: '#D9C49C',
-                  boxShadow: 'inset 0 0 0 1px rgba(191,168,127,0.45)',
-                  backdropFilter: 'blur(6px)',
+                  background: 'linear-gradient(135deg, #F1E2BF, #BFA87F 55%, #9C8458)',
+                  color: '#16110A',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.5)',
                 }}
                 aria-hidden
               >

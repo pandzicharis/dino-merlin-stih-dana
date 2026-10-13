@@ -58,7 +58,6 @@ Stih se računa iz datuma, pa se svaki dan može reproducirati:
 | `/?verse=moja-svila` | forsiran stih |
 | `/?mood=nostalgija` | forsirana paleta |
 | `/dev/moods` | sve palete na jednom ekranu |
-| `/?streak=12` | prikaži niz dana (za demo) |
 
 Tipke: `[` dan nazad · `]` dan naprijed · `\` reset na danas · `m` sljedeći mood · `0` ukloni override.
 

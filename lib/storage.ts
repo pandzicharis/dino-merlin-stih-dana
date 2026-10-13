@@ -88,25 +88,3 @@ export function pruneFavorites(valid: Set<string>) {
     window.dispatchEvent(new Event('favchange'))
   }
 }
-
-/* ── niz dana zaredom ────────────────────────────────────────── */
-
-const STREAK = 'stihdana:streak'
-
-type Streak = { last: string; count: number }
-
-export function getStreak(): Streak | null {
-  return read<Streak | null>(STREAK, null)
-}
-
-/**
- * Upiši posjetu za dati dan (uvijek stvarni dan u Sarajevu, nikad dev datum).
- * Jučer → niz raste; danas → ništa; rupa → kreće ispočetka.
- */
-export function recordVisit(today: string, yesterday: string) {
-  const s = getStreak()
-  if (s?.last === today) return
-  const count = s?.last === yesterday ? s.count + 1 : 1
-  write(STREAK, { last: today, count })
-  window.dispatchEvent(new Event('streakchange'))
-}

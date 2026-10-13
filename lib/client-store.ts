@@ -2,8 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from 'react'
 import { MOOD_KEYS, type Mood } from '@/data/moods'
-import { OVERRIDE_ON, addDays, msUntilNextDay, readDevParams, todayInTz } from './date'
-import { deckParam } from './deck'
+import { msUntilNextDay, readDevParams, todayInTz } from './date'
 
 /**
  * URL i localStorage su vanjski store-ovi — čitaju se kroz useSyncExternalStore,
@@ -140,27 +139,4 @@ export function useFavorites(): string[] {
       return []
     }
   }, [snap])
-}
-
-const subscribeStreak = subscribeTo(['streakchange', 'storage', 'popstate'])
-
-function streakSnapshot(): string {
-  // ?streak=12 — da se na prezentaciji vidi kako izgleda niz
-  const forced = OVERRIDE_ON ? new URLSearchParams(window.location.search).get('streak') : deckParam('streak')
-  if (forced && Number(forced) > 0) return forced
-  try {
-    const raw = localStorage.getItem('stihdana:streak')
-    const s = raw ? (JSON.parse(raw) as { last?: string; count?: number }) : null
-    // niz vrijedi samo ako je zadnja posjeta danas ili jučer
-    if (!s?.last || !s.count) return '0'
-    const today = todayInTz()
-    return s.last === today || s.last === addDays(today, -1) ? String(s.count) : '0'
-  } catch {
-    return '0'
-  }
-}
-
-/** Koliko dana zaredom je stih otvoren. 0 dok se ne zna (server, prvi frejm). */
-export function useStreak(): number {
-  return Number(useSyncExternalStore(subscribeStreak, streakSnapshot, () => '0'))
 }

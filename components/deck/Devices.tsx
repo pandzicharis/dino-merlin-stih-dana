@@ -269,7 +269,7 @@ export function PunchHole() {
 
 /* ── statusne trake ─────────────────────────────────────────── */
 
-export function IosStatus({ time }: { time: string }) {
+export function IosStatus({ time, dark = false }: { time: string; /** crni tekst — za svijetle ekrane */ dark?: boolean }) {
   return (
     <div
       aria-hidden
@@ -284,7 +284,7 @@ export function IosStatus({ time }: { time: string }) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 30em 0 52em',
-        color: '#fff',
+        color: dark ? '#000' : '#fff',
         pointerEvents: 'none',
       }}
     >

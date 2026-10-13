@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
+import { albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
 import { oneLine, withPeriod } from '@/lib/text'
@@ -16,13 +17,36 @@ import { oneLine, withPeriod } from '@/lib/text'
 
 const fill: CSSProperties = { position: 'absolute', inset: 0 }
 
+// omot albuma: isto utapanje kao u aplikaciji (MoodBackground)
+const ART_MASK =
+  'linear-gradient(to bottom, transparent 0%, black 18%, black 40%, rgba(0,0,0,0.35) 64%, transparent 86%), linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%)'
+const ART_SHADE =
+  'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.12) 22%, rgba(0,0,0,0.38) 50%, rgba(0,0,0,0.7) 78%, rgba(0,0,0,0.85) 100%)'
+
 const GRAIN =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")"
 
 /** Pozadina po moodu — isti slojevi kao `MoodBackground`, zaustavljeni. */
-export function MoodStill({ mood, w, h, dim = 0 }: { mood: Mood; w: number; h: number; dim?: number }) {
+export function MoodStill({
+  mood,
+  w,
+  h,
+  dim = 0,
+  cover,
+  lift = 0,
+}: {
+  mood: Mood
+  w: number
+  h: number
+  dim?: number
+  /** omot albuma stiha — umjesto portreta, kao u aplikaciji */
+  cover?: string
+  /** koliko je omot podignut (dio njegove visine) */
+  lift?: number
+}) {
   const m = MOODS[mood]
   const blob = Math.max(w, h) * 0.85
+  const art = Math.min(w, h * 0.74)
   return (
     <div aria-hidden style={{ ...fill, overflow: 'hidden', background: m.gradient[0] }}>
       {m.gradient.map((c, i) => (
@@ -39,6 +63,45 @@ export function MoodStill({ mood, w, h, dim = 0 }: { mood: Mood; w: number; h: n
           }}
         />
       ))}
+      {cover && (
+        <>
+          {/* atmosfera: omot preko svega, jako zamućen */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: '-15%',
+              backgroundImage: `url(${cover})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: `blur(${(w * 0.14).toFixed(0)}em) saturate(1.2)`,
+              opacity: 0.32,
+              transform: 'scale(1.1)',
+            }}
+          />
+          {/* omot gore, preko cijele širine — nestaje u strane i prema stihu */}
+          <div
+            style={{
+              position: 'absolute',
+              // spušten od vrha, kao u aplikaciji
+              top: `${(h * 0.06 - art * lift).toFixed(1)}em`,
+              left: `${((w - art) / 2).toFixed(1)}em`,
+              width: `${art.toFixed(1)}em`,
+              height: `${art.toFixed(1)}em`,
+              backgroundImage: `url(${cover})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              opacity: 0.42,
+              maskImage: ART_MASK,
+              WebkitMaskImage: ART_MASK,
+              maskComposite: 'intersect',
+              WebkitMaskComposite: 'source-in',
+            }}
+          />
+          <div style={{ ...fill, backgroundColor: m.gradient[1], mixBlendMode: 'color', opacity: 0.4 }} />
+          <div style={{ ...fill, background: ART_SHADE }} />
+        </>
+      )}
+      {!cover && (
       <div
         className="poster-fx"
         style={{
@@ -54,6 +117,7 @@ export function MoodStill({ mood, w, h, dim = 0 }: { mood: Mood; w: number; h: n
           WebkitMaskImage: 'radial-gradient(ellipse 80% 62% at 78% 22%, black 30%, transparent 80%)',
         }}
       />
+      )}
       {m.bloom > 0 && (
         <div
           style={{
@@ -133,7 +197,6 @@ export function VerseMock({
   saved = true,
   savedCount = 3,
   bellOn = true,
-  streak = 12,
 }: {
   verse: Verse
   date: string
@@ -147,7 +210,6 @@ export function VerseMock({
   /** broj na ikonici sačuvanih; 0 = ikonice nema, kao u aplikaciji */
   savedCount?: number
   bellOn?: boolean
-  streak?: number
 }) {
   const m = MOODS[mood ?? verse.mood]
   const text = withPeriod(verse.text)
@@ -155,7 +217,7 @@ export function VerseMock({
 
   return (
     <div style={{ ...fill, color: '#f5f5f5', fontFamily: 'var(--font-sans), sans-serif' }}>
-      <MoodStill mood={mood ?? verse.mood} w={w} h={h} />
+      <MoodStill mood={mood ?? verse.mood} w={w} h={h} cover={albumOf(verse.album)?.cover} lift={albumOf(verse.album)?.lift} />
       <Notes
         accent={m.accent}
         spots={[
@@ -243,7 +305,14 @@ export function VerseMock({
               textTransform: 'uppercase',
             }}
           >
-            <svg viewBox="0 0 24 24" style={{ width: '1.4em', height: '1.4em' }} fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              style={{ width: '1.4em', height: '1.4em' }}
+              fill={saved ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            >
               <path d={HEART} />
             </svg>
             {saved ? 'Sačuvano' : 'Sačuvaj stih'}
@@ -288,19 +357,6 @@ export function VerseMock({
               background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`,
             }}
           />
-          {streak > 1 && (
-            <p
-              className="tabular"
-              style={{
-                fontSize: '9.5em',
-                letterSpacing: '0.22em',
-                textTransform: 'uppercase',
-                color: 'rgba(255,255,255,0.38)',
-              }}
-            >
-              <span style={{ color: m.accent }}>{streak}</span> dana zaredom
-            </p>
-          )}
           <MagazaMark height={22} style={{ marginTop: '22em', opacity: 0.9 }} />
         </div>
       </div>
@@ -312,15 +368,34 @@ export function VerseMock({
  * Zaključan ekran Androida s obavijesti od 12:00 — ritual u jednoj slici.
  * Pozadina je ista atmosfera kao stih koji stiže.
  */
-export function LockScreenMock({ verse, date, w, h }: { verse: Verse; date: string; w: number; h: number }) {
+export function LockScreenMock({
+  verse,
+  date,
+  w,
+  h,
+  notify = true,
+}: {
+  verse: Verse
+  date: string
+  w: number
+  h: number
+  /** kartica obavijesti sa stihom; bez nje samo sat i pozadina */
+  notify?: boolean
+}) {
   const m = MOODS[verse.mood]
   const day = formatDayBs(date)
   const [d, mon] = formatDateBs(date).split(' ')
 
   return (
     <div style={{ ...fill, color: '#fff', fontFamily: 'var(--font-sans), sans-serif' }}>
-      <MoodStill mood={verse.mood} w={w} h={h} dim={0.12} />
-      <Notes accent={m.accent} spots={[[16, 70, 26, '♫'], [78, 80, 20, '♪']]} />
+      <MoodStill mood={verse.mood} w={w} h={h} dim={0.12} cover={albumOf(verse.album)?.cover} lift={albumOf(verse.album)?.lift} />
+      <Notes
+        accent={m.accent}
+        spots={[
+          [16, 70, 26, '♫'],
+          [78, 80, 20, '♪'],
+        ]}
+      />
 
       <div style={{ position: 'absolute', top: '84em', left: 0, right: 0, textAlign: 'center' }}>
         <p style={{ fontSize: '15em', fontWeight: 500, color: 'rgba(255,255,255,0.88)' }}>
@@ -342,38 +417,42 @@ export function LockScreenMock({ verse, date, w, h }: { verse: Verse; date: stri
       </div>
 
       {/* obavijest — kao u One UI: zaobljena kartica, ikona, naziv, vrijeme */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '322em',
-          left: '14em',
-          right: '14em',
-          borderRadius: '26em',
-          padding: '15em 16em 16em',
-          background: 'rgba(28,28,32,0.72)',
-          border: '1em solid rgba(255,255,255,0.08)',
-          boxShadow: '0 10em 30em rgba(0,0,0,0.35)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8em', color: 'rgba(255,255,255,0.62)' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/icon-192.png" alt="" style={{ width: '20em', height: '20em', borderRadius: '6em' }} />
-          <span style={{ fontSize: '12.5em' }}>Stih dana</span>
-          <span style={{ fontSize: '12.5em', opacity: 0.7 }}>· sada</span>
-        </div>
-        <p style={{ marginTop: `${(10 / 15).toFixed(3)}em`, fontSize: '15em', fontWeight: 600 }}>Stih dana — Dino Merlin</p>
-        <p
+      {notify && (
+        <div
           style={{
-            marginTop: '0.25em',
-            fontSize: '15em',
-            lineHeight: 1.35,
-            color: 'rgba(255,255,255,0.82)',
-            fontFamily: 'var(--font-serif), serif',
+            position: 'absolute',
+            top: '322em',
+            left: '14em',
+            right: '14em',
+            borderRadius: '26em',
+            padding: '15em 16em 16em',
+            background: 'rgba(28,28,32,0.72)',
+            border: '1em solid rgba(255,255,255,0.08)',
+            boxShadow: '0 10em 30em rgba(0,0,0,0.35)',
           }}
         >
-          {oneLine(withPeriod(verse.text))}
-        </p>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8em', color: 'rgba(255,255,255,0.62)' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/icon-192.png" alt="" style={{ width: '20em', height: '20em', borderRadius: '6em' }} />
+            <span style={{ fontSize: '12.5em' }}>Stih dana</span>
+            <span style={{ fontSize: '12.5em', opacity: 0.7 }}>· sada</span>
+          </div>
+          <p style={{ marginTop: `${(10 / 15).toFixed(3)}em`, fontSize: '15em', fontWeight: 600 }}>
+            Stih dana — Dino Merlin
+          </p>
+          <p
+            style={{
+              marginTop: '0.25em',
+              fontSize: '15em',
+              lineHeight: 1.35,
+              color: 'rgba(255,255,255,0.82)',
+              fontFamily: 'var(--font-serif), serif',
+            }}
+          >
+            {oneLine(withPeriod(verse.text))}
+          </p>
+        </div>
+      )}
 
       {/* prečice na dnu */}
       <div
@@ -402,7 +481,15 @@ const HEART = 'M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5
 
 function Icon({ d, color = 'currentColor', fill = 'none' }: { d: string; color?: string; fill?: string }) {
   return (
-    <svg viewBox="0 0 24 24" style={{ width: '20em', height: '20em', color }} fill={fill} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      style={{ width: '20em', height: '20em', color }}
+      fill={fill}
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d={d} />
     </svg>
   )
@@ -412,10 +499,22 @@ function Icon({ d, color = 'currentColor', fill = 'none' }: { d: string; color?:
 function SavedIcon({ count }: { count: number }) {
   return (
     <span style={{ position: 'relative', display: 'flex' }}>
-      <svg viewBox="0 0 24 24" style={{ width: '20em', height: '20em' }} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        style={{ width: '20em', height: '20em' }}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M8 3.5h9.5A2.5 2.5 0 0 1 20 6v11" />
         <rect x="4" y="6.5" width="13" height="14" rx="2.5" />
-        <path d="M10.5 16.8s-3-1.8-3-4a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 2.2-3 4-3 4z" fill="currentColor" stroke="none" />
+        <path
+          d="M10.5 16.8s-3-1.8-3-4a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 2.2-3 4-3 4z"
+          fill="currentColor"
+          stroke="none"
+        />
       </svg>
       <span
         className="tabular"
@@ -454,7 +553,14 @@ function Shortcut({ d }: { d: string }) {
         background: 'rgba(255,255,255,0.12)',
       }}
     >
-      <svg viewBox="0 0 24 24" style={{ width: '22em', height: '22em' }} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        style={{ width: '22em', height: '22em' }}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      >
         <path d={d} />
       </svg>
     </span>

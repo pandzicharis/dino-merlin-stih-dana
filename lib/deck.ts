@@ -6,7 +6,7 @@
  * na sljedećem, a prijava u admin važi i za okvir računara.
  *
  * Unutar nje aplikacija sluša nekoliko parametara koje inače čita samo dev
- * mod — `?uvod=`, `?verse=`, `?mood=`, `?streak=` — da se svaki dio može
+ * mod — `?uvod=`, `?verse=`, `?mood=` — da se svaki dio može
  * pokazati na komandu, bez pravog telefona. Van prezentacije ne mijenjaju
  * ništa. Okvir s drugog sajta je ionako nemoguć (`X-Frame-Options`).
  */

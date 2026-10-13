@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type Ref } from 'react'
+import { useEffect, useRef, useState, type Ref, type RefObject } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
@@ -19,6 +19,13 @@ import {
   type DeviceKind,
 } from './Devices'
 import type { Simulation } from './types'
+import { LockScreenMock, MoodStill } from './Screens'
+import { albumOf } from '@/data/albums'
+import { AppIcon, HomeScreen, ROBOTO, SF, Tap, homeSlot } from './phoneUi'
+import { MOODS } from '@/data/moods'
+import { formatDateBs, formatDayBs } from '@/lib/date'
+import { PhoneScript, type Script } from './PhoneScript'
+import { ChatDemo } from './ChatDemo'
 
 /** Veličina kutije u kojoj uređaj stoji — uređaj se upiše u nju. */
 function useBox<T extends HTMLElement>() {
@@ -50,14 +57,37 @@ export function LivePhone({
   sim,
   onSim,
   verse,
+  lock,
+  script,
+  onScriptDone,
+  manual,
+  tap,
+  date,
+  simKey,
+  host,
 }: {
   kind: DeviceKind
   src: string
-  frameRef: Ref<HTMLIFrameElement>
+  frameRef: RefObject<HTMLIFrameElement | null>
   onLoad: () => void
   sim: Simulation | null
-  onSim: (action: 'open' | 'dismiss') => void
+  onSim: (action: 'open' | 'dismiss' | 'link') => void
   verse: Verse
+  /** zaključan ekran preko aplikacije (dok papirić ne sleti) */
+  lock?: { verse: Verse; date: string } | null
+  /** režirana scena preko aplikacije (instalacija, dozvola) */
+  script?: { kind: Script; expect: string } | null
+  onScriptDone?: () => void
+  /** režirana scena se klikće ručno */
+  manual?: boolean
+  /** dodir koji prezentacija nacrta preko aplikacije */
+  tap?: { x: number; y: number; n: number } | null
+  /** datum za zaključan ekran */
+  date: string
+  /** nova simulacija iste vrste kreće ispočetka */
+  simKey?: number
+  /** adresa sajta — za link u porukama */
+  host: string
 }) {
   const [box, size] = useBox<HTMLDivElement>()
   const outer = deviceOuter(kind)
@@ -108,10 +138,43 @@ export function LivePhone({
               background: '#000',
             }}
           />
+          <AnimatePresence>
+            {lock && (
+              <motion.div
+                key="lock"
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, scale: 1.04 }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+              >
+                <LockScreenMock verse={lock.verse} date={lock.date} w={D.w} h={D.h} notify={false} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {script && (
+            <PhoneScript
+              key={`${script.kind}-${kind}-${manual ? 'm' : 'a'}`}
+              script={script.kind}
+              platform={kind === 'galaxy' ? 'android' : 'ios'}
+              frameRef={frameRef}
+              expect={script.expect}
+              w={D.w}
+              h={D.h}
+              top={bar}
+              onDone={onScriptDone}
+              manual={manual}
+            />
+          )}
+          {tap && (
+            <div className="pointer-events-none absolute inset-0" style={{ zIndex: 21 }}>
+              <Tap key={tap.n} platform={kind === 'galaxy' ? 'android' : 'ios'} x={tap.x} y={bar + tap.y} />
+            </div>
+          )}
           {kind === 'iphone' ? <IosStatus time="12:00" /> : <AndroidStatus time="12:00" />}
           {kind === 'iphone' ? <Island /> : <PunchHole />}
           <Glass />
-          <Simulated kind={kind} sim={sim} verse={verse} onSim={onSim} />
+          <Simulated kind={kind} sim={sim} simKey={simKey} verse={verse} date={date} host={host} w={D.w} h={D.h} bar={bar} manual={manual} onSim={onSim} />
         </div>
       </div>
     </div>
@@ -126,13 +189,27 @@ export function LivePhone({
 function Simulated({
   kind,
   sim,
+  simKey,
   verse,
+  date,
+  host,
+  bar,
+  manual,
+  w,
+  h,
   onSim,
 }: {
   kind: DeviceKind
   sim: Simulation | null
+  simKey?: number
   verse: Verse
-  onSim: (action: 'open' | 'dismiss') => void
+  date: string
+  host: string
+  bar: number
+  manual?: boolean
+  w: number
+  h: number
+  onSim: (action: 'open' | 'dismiss' | 'link') => void
 }) {
   const ios = kind === 'iphone'
   return (
@@ -196,6 +273,36 @@ function Simulated({
         </motion.button>
       )}
 
+      {sim === 'lock' && (
+        <motion.div
+          key="lock"
+          className="absolute inset-0"
+          style={{ zIndex: 60 }}
+          initial={false}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+        >
+          <LockNotify
+            key={`${ios ? 'ios' : 'android'}-${simKey}`}
+            ios={ios}
+            verse={verse}
+            date={date}
+            w={w}
+            h={h}
+            top={bar}
+            manual={manual}
+            onOpen={() => onSim('open')}
+          />
+        </motion.div>
+      )}
+
+      {sim === 'chat' && (
+        <motion.div key="chat" className="absolute inset-0" style={{ zIndex: 60 }} initial={false} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          <ChatDemo key={`${ios ? 'ios' : 'android'}-${simKey}`} ios={ios} verse={verse} host={host} w={w} h={h} onOpen={() => onSim('link')} />
+        </motion.div>
+      )}
+
       {sim === 'update' && (
         <motion.div
           key="update"
@@ -207,10 +314,12 @@ function Simulated({
             position: 'absolute',
             left: 0,
             right: 0,
-            bottom: '30em',
+            bottom: 0,
             zIndex: 50,
             display: 'flex',
             justifyContent: 'center',
+            padding: '80em 24em 34em',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.7) 45%, transparent 100%)',
           }}
         >
           {/* isto dugme kao UpdatePrompt u aplikaciji */}
@@ -221,10 +330,11 @@ function Simulated({
               display: 'flex',
               alignItems: 'center',
               gap: '10em',
-              padding: '10em 16em',
+              padding: '12em 20em',
               borderRadius: '99em',
               border: `1em solid ${BRAND.gold}4D`,
-              background: 'rgba(0,0,0,0.6)',
+              background: 'rgba(0,0,0,0.55)',
+              boxShadow: '0 10em 30em rgba(0,0,0,0.5)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
               color: BRAND.gold,
@@ -235,7 +345,7 @@ function Simulated({
               <path d="M21 12a9 9 0 1 1-2.64-6.36" />
               <path d="M21 3v6h-6" />
             </svg>
-            <span style={{ fontSize: '10em', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '10.5em', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
               Nova verzija — osvježi
             </span>
           </button>
@@ -319,6 +429,325 @@ export function LiveDesktop({
           />
         </div>
       </div>
+    </div>
+  )
+}
+
+const SF_DISPLAY = '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", var(--font-sans), sans-serif'
+
+/**
+ * Zaključan ekran — budan, u 11:59. Sat pređe na 12:00 i obavijest sa
+ * stihom stigne sama. iOS 18: operater gore, datum i veliki sat, obavijest
+ * dole iznad svjetiljke i kamere. Android: sat gore, obavijest ispod njega.
+ * Dodir na obavijest otvara aplikaciju.
+ */
+function LockNotify({
+  ios,
+  verse,
+  date,
+  w,
+  h,
+  top,
+  manual = false,
+  onOpen,
+}: {
+  ios: boolean
+  verse: Verse
+  date: string
+  w: number
+  h: number
+  /** statusna traka — za mrežu ikonica na početnom ekranu */
+  top: number
+  /** Ručno: prezenter dodirne obavijest, pa ikonicu */
+  manual?: boolean
+  onOpen: () => void
+}) {
+  const [noon, setNoon] = useState(false)
+  const [arrived, setArrived] = useState(false)
+  // cijeli tok: obavijest → otključavanje (prevlačenje nagore) → početni ekran
+  // s bedžom na ikonici → dodir → aplikacija se otvori i stih se ispiše
+  const [phase, setPhase] = useState<'lock' | 'home' | 'opening'>('lock')
+  const [swipe, setSwipe] = useState(false)
+  const [tapIcon, setTapIcon] = useState(false)
+  const timers = useRef<number[]>([])
+  const after = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms))
+  const unlock = () => {
+    setSwipe(true)
+    after(650, () => setPhase('home'))
+  }
+  const openApp = () => {
+    setTapIcon(true)
+    after(380, () => setPhase('opening'))
+    after(1300, onOpen)
+  }
+  useEffect(() => {
+    after(1400, () => setNoon(true))
+    after(2000, () => {
+      setArrived(true)
+      navigator.vibrate?.([12, 60, 12])
+    })
+    if (!manual) {
+      after(6000, unlock)
+      after(6000 + 650 + 4500, openApp)
+    }
+    const ts = timers.current
+    return () => ts.forEach(clearTimeout)
+    // tok se igra jednom po montaži
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const slot = homeSlot(ios ? 'ios' : 'android', w, top)
+  const day = formatDayBs(date)
+  const [d, mon] = formatDateBs(date).split(' ')
+  const when = `${day[0].toUpperCase() + day.slice(1)}, ${d} ${mon}`
+  const clock = noon ? '12:00' : '11:59'
+  const text = oneLine(withPeriod(verse.text))
+
+  const card = ios ? (
+    <motion.button
+      type="button"
+      onClick={unlock}
+      initial={{ y: '90em', opacity: 0, scale: 0.9 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+      style={{
+        position: 'absolute',
+        left: '12em',
+        right: '12em',
+        bottom: '124em',
+        display: 'flex',
+        gap: '10em',
+        alignItems: 'center',
+        padding: '14em 14em 14em 12em',
+        borderRadius: '23em',
+        background: 'rgba(30,30,32,0.55)',
+        backdropFilter: 'blur(30px) saturate(1.8)',
+        WebkitBackdropFilter: 'blur(30px) saturate(1.8)',
+        textAlign: 'left',
+        color: '#fff',
+        cursor: 'pointer',
+        fontFamily: SF,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/icons/icon-192.png" alt="" style={{ width: '38em', height: '38em', borderRadius: '8.5em', flexShrink: 0 }} />
+      <span style={{ minWidth: 0, flex: 1 }}>
+        <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8em' }}>
+          <span style={{ fontSize: '15em', fontWeight: 600, letterSpacing: '-0.01em' }}>Stih dana — Dino Merlin</span>
+          <span style={{ fontSize: '13em', color: 'rgba(255,255,255,0.55)' }}>sada</span>
+        </span>
+        <span
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 4,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            marginTop: '0.1em',
+            fontSize: '15em',
+            lineHeight: 1.27,
+            letterSpacing: '-0.01em',
+            color: 'rgba(255,255,255,0.92)',
+          }}
+        >
+          {text}
+        </span>
+      </span>
+    </motion.button>
+  ) : (
+    <motion.button
+      type="button"
+      onClick={unlock}
+      initial={{ y: '-24em', opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+      style={{
+        position: 'absolute',
+        left: '14em',
+        right: '14em',
+        top: '268em',
+        display: 'flex',
+        gap: '12em',
+        alignItems: 'flex-start',
+        padding: '15em 16em 16em',
+        borderRadius: '26em',
+        background: 'rgba(28,28,32,0.72)',
+        backdropFilter: 'blur(28px) saturate(1.5)',
+        WebkitBackdropFilter: 'blur(28px) saturate(1.5)',
+        border: '1em solid rgba(255,255,255,0.08)',
+        textAlign: 'left',
+        color: '#fff',
+        cursor: 'pointer',
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/icons/icon-192.png" alt="" style={{ width: '34em', height: '34em', borderRadius: '50%', flexShrink: 0 }} />
+      <span style={{ minWidth: 0, flex: 1 }}>
+        <span style={{ display: 'flex', alignItems: 'baseline', gap: '6em', color: 'rgba(255,255,255,0.62)' }}>
+          <span style={{ fontSize: '12.5em' }}>Stih dana</span>
+          <span style={{ fontSize: '12.5em' }}>· sada</span>
+        </span>
+        <span style={{ display: 'block', marginTop: '0.3em', fontSize: '15em', fontWeight: 600 }}>Stih dana — Dino Merlin</span>
+        <span
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            marginTop: '0.15em',
+            fontSize: '15em',
+            lineHeight: 1.3,
+            color: 'rgba(255,255,255,0.85)',
+          }}
+        >
+          {text}
+        </span>
+      </span>
+    </motion.button>
+  )
+
+  return (
+    <div className="absolute inset-0 overflow-hidden" style={{ color: '#fff', fontFamily: ios ? SF : ROBOTO }}>
+      {/* početni ekran ispod zaključanog — s bedžom na Stih dana */}
+      {phase !== 'lock' && (
+        <>
+          <HomeScreen platform={ios ? 'ios' : 'android'} w={w} h={h} top={top} badge tapping={tapIcon && phase === 'home'} />
+          {ios ? <IosStatus time="12:00" /> : <AndroidStatus time="12:00" />}
+          {manual && phase === 'home' && (
+            <button
+              type="button"
+              aria-label="Otvori Stih dana"
+              onClick={openApp}
+              className="absolute cursor-pointer"
+              style={{ left: `${slot.x}em`, top: `${slot.y}em`, width: `${slot.size}em`, height: `${slot.size}em`, borderRadius: `${slot.size * 0.24}em`, zIndex: 5 }}
+            />
+          )}
+        </>
+      )}
+      {/* aplikacija se raširi iz ikonice */}
+      {phase === 'opening' && (
+        <motion.div
+          className="absolute flex items-center justify-center overflow-hidden"
+          style={{ background: '#000', zIndex: 6 }}
+          initial={{ left: `${slot.x}em`, top: `${slot.y}em`, width: `${slot.size}em`, height: `${slot.size}em`, borderRadius: `${slot.size * 0.24}em` }}
+          animate={{ left: 0, top: 0, width: `${w}em`, height: `${h}em`, borderRadius: ios ? '54em' : '34em' }}
+          transition={{ type: 'spring', stiffness: 210, damping: 27 }}
+        >
+          <motion.span initial={{ opacity: 1, scale: 1 }} animate={ios ? { opacity: 0, scale: 1.6 } : { opacity: 1, scale: 1.7 }} transition={{ duration: 0.35 }}>
+            <AppIcon platform={ios ? 'ios' : 'android'} size={slot.size} />
+          </motion.span>
+        </motion.div>
+      )}
+
+      {/* zaključan ekran — otključavanjem klizi nagore */}
+      <motion.div
+        className="absolute inset-0 overflow-hidden"
+        style={{ zIndex: 4 }}
+        initial={false}
+        animate={{ y: phase === 'lock' ? 0 : '-100%' }}
+        transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
+      >
+      <MoodStill mood={verse.mood} w={w} h={h} dim={ios ? 0.1 : 0.18} cover={albumOf(verse.album)?.cover} lift={albumOf(verse.album)?.lift} />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: ios
+            ? 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, transparent 30%, transparent 60%, rgba(0,0,0,0.35) 100%)'
+            : 'radial-gradient(ellipse at 50% 30%, transparent 30%, rgba(0,0,0,0.45) 100%)',
+        }}
+      />
+
+      {/* na zaključanom ekranu sat je veliki, pa gore lijevo nema ničega */}
+      {ios ? <IosStatus time="" /> : <AndroidStatus time="" />}
+
+      {ios ? (
+        <div style={{ position: 'absolute', top: '62em', left: 0, right: 0, textAlign: 'center', fontFamily: SF_DISPLAY }}>
+          <p style={{ fontSize: '21em', fontWeight: 600, letterSpacing: '-0.01em', color: 'rgba(255,255,255,0.88)' }}>{when}</p>
+          <p
+            className="tabular"
+            style={{
+              fontSize: '110em',
+              fontWeight: 700,
+              letterSpacing: '-0.025em',
+              lineHeight: 1,
+              marginTop: '-0.02em',
+              color: 'rgba(255,255,255,0.94)',
+              textShadow: '0 0.02em 0.2em rgba(0,0,0,0.18)',
+            }}
+          >
+            {clock}
+          </p>
+        </div>
+      ) : (
+        <div style={{ position: 'absolute', top: '78em', left: 0, right: 0, textAlign: 'center' }}>
+          <p style={{ fontSize: '15em', fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>{when}</p>
+          <p
+            className="tabular"
+            style={{ fontSize: '96em', fontWeight: 300, letterSpacing: '-0.03em', lineHeight: 1, marginTop: '0.04em' }}
+          >
+            {clock}
+          </p>
+        </div>
+      )}
+
+      <AnimatePresence>{arrived && card}</AnimatePresence>
+
+      {ios ? (
+        <>
+          {/* svjetiljka i kamera — iOS 18 */}
+          <div style={{ position: 'absolute', bottom: '46em', left: '46em', right: '46em', display: 'flex', justifyContent: 'space-between' }}>
+            {[
+              'M8.5 2h7l-1.2 5.5h-4.6zM9.7 8.5h4.6v12a1.6 1.6 0 0 1-1.6 1.6h-1.4a1.6 1.6 0 0 1-1.6-1.6zM12 12.5v2.5',
+              'M3.5 8.5A1.5 1.5 0 0 1 5 7h2.6l1.6-2.2h5.6L16.4 7H19a1.5 1.5 0 0 1 1.5 1.5v9.5A1.5 1.5 0 0 1 19 19.5H5A1.5 1.5 0 0 1 3.5 18zM12 16.5a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2z',
+            ].map((p) => (
+              <span
+                key={p}
+                style={{
+                  width: '50em',
+                  height: '50em',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(0,0,0,0.28)',
+                  backdropFilter: 'blur(18px)',
+                  WebkitBackdropFilter: 'blur(18px)',
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="#fff" style={{ width: '22em', height: '22em' }}>
+                  <path d={p} />
+                </svg>
+              </span>
+            ))}
+          </div>
+          <span
+            style={{ position: 'absolute', bottom: '8em', left: '50%', width: '138em', height: '5em', marginLeft: '-69em', borderRadius: '3em', background: '#fff' }}
+          />
+        </>
+      ) : (
+        <>
+          <div style={{ position: 'absolute', bottom: '34em', left: '34em', right: '34em', display: 'flex', justifyContent: 'space-between' }}>
+            {['M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2', 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'].map((p) => (
+              <svg key={p} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.7" strokeLinejoin="round" style={{ width: '24em', height: '24em' }}>
+                <path d={p} />
+              </svg>
+            ))}
+          </div>
+        </>
+      )}
+      </motion.div>
+
+      {/* prevlačenje nagore — prst ide od dna */}
+      {swipe && phase === 'lock' && (
+        <motion.span
+          className="absolute left-1/2"
+          style={{ zIndex: 7, top: 0 }}
+          initial={{ y: `${h - 30}em` }}
+          animate={{ y: `${h * 0.55}em` }}
+          transition={{ duration: 0.55, ease: [0.3, 0, 0.2, 1] }}
+        >
+          <Tap platform={ios ? 'ios' : 'android'} x={0} y={0} />
+        </motion.span>
+      )}
+      <span style={{ position: 'absolute', inset: 0, zIndex: 8, pointerEvents: 'none' }}>{ios ? <Island /> : <PunchHole />}</span>
     </div>
   )
 }

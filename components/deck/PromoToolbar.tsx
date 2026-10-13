@@ -22,7 +22,7 @@ export function PromoToolbar({
   return (
     <div className="print-toolbar sticky top-0 z-10 flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-white/[0.06] bg-black/70 px-5 py-3 backdrop-blur-xl">
       <Link
-        href={active === '/prezentacija/objava' ? '/prezentacija#mreze' : '/prezentacija#qr'}
+        href="/prezentacija#grafike"
         className="flex h-10 items-center gap-2 rounded-full border border-white/10 px-4 text-[13px] text-white/70 hover:text-white"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

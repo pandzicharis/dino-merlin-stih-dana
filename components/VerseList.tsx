@@ -1,5 +1,6 @@
 'use client'
 
+import { albumOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
@@ -7,8 +8,9 @@ import { oneLine, withPeriod } from '@/lib/text'
 
 /**
  * Kartice stihova: stih gore, ispod tanke linije pjesma i album, a desno
- * u istom redu akcija (npr. ukloni iz sačuvanih). Staklo, jednobojno —
- * raspoloženje se vidi samo po maloj tački uz pjesmu.
+ * u istom redu akcija (npr. ukloni iz sačuvanih). Kao ekran stiha, samo
+ * tiše: omot albuma desno, rastopljen prema tekstu, pod nijansom
+ * raspoloženja — a stih ostaje na tamnom i čitak.
  */
 export function VerseList({
   items,
@@ -24,38 +26,65 @@ export function VerseList({
 
   return (
     <ul className="flex flex-col gap-3">
-      {items.map(({ verse }) => (
-        <li
-          key={verse.id}
-          className="rounded-[22px] border border-white/10 bg-white/[0.05] px-5 pb-3.5 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl"
-        >
-          {/* u jednom redu, bez prelomâ iz pjesme — lista se čita kao lista */}
-          <p
-            className="text-[1.08rem] leading-snug text-white/95"
-            style={{ fontFamily: 'var(--font-serif), serif', fontVariationSettings: "'opsz' 48, 'SOFT' 30" }}
+      {items.map(({ verse }) => {
+        const m = MOODS[verse.mood]
+        const cover = albumOf(verse.album)?.cover
+        return (
+          <li
+            key={verse.id}
+            className="relative isolate overflow-hidden rounded-[22px] border border-white/10 px-5 pb-3.5 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_30px_rgba(0,0,0,0.35)]"
+            style={{
+              background: `radial-gradient(120% 150% at 100% 0%, ${m.gradient[2]}2e 0%, transparent 62%), linear-gradient(180deg, ${m.gradient[0]}cc, ${m.gradient[0]}99)`,
+            }}
           >
-            {oneLine(withPeriod(verse.text))}
-          </p>
-
-          <div className="mt-3 flex items-center gap-3 border-t border-white/[0.07] pt-3">
-            <i
-              className="block h-2 w-2 shrink-0 rounded-full"
-              style={{ background: MOODS[verse.mood].accent }}
-              title={MOODS[verse.mood].label}
-              aria-hidden
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: BRAND.gold }}>
-                {verse.song}
-              </p>
-              <p className="mt-1 truncate text-[10px] uppercase tracking-[0.16em] text-white/35">
-                {verse.album} &middot; {verse.year}
-              </p>
+            {/* omot i boja — samo pozadina, ispod teksta i dugmeta */}
+            <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+              {cover && (
+                // soft-light: bijeli papir ne postane bijela mrlja, a crn omot
+                // ne nestane — svaki album ostane tiha tekstura iste jačine.
+                // Utopljen na sve strane (globals.css), pa se kvadrat nigdje ne vidi.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={cover}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="card-art absolute inset-y-0 right-0 h-full w-[72%] object-cover"
+                  style={{ opacity: 0.5, mixBlendMode: 'soft-light' }}
+                />
+              )}
+              {/* nijansa raspoloženja preko omota, kao na ekranu stiha */}
+              <div className="absolute inset-0" style={{ backgroundColor: m.gradient[1], mixBlendMode: 'color', opacity: 0.3 }} />
+              {/* tama s lijeva i odozdo, da stih i pjesma ostanu čitki */}
+              <div
+                className="absolute inset-0"
+                style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.04) 100%)' }}
+              />
             </div>
-            {action?.(verse)}
-          </div>
-        </li>
-      ))}
+
+            {/* u jednom redu, bez prelomâ iz pjesme — lista se čita kao lista */}
+            <p
+              className="text-[1.08rem] leading-snug text-white/95 [text-shadow:0_1px_12px_rgba(0,0,0,0.45)]"
+              style={{ fontFamily: 'var(--font-serif), serif', fontVariationSettings: "'opsz' 48, 'SOFT' 30" }}
+            >
+              {oneLine(withPeriod(verse.text))}
+            </p>
+
+            <div className="mt-3 flex items-center gap-3 border-t border-white/[0.08] pt-3">
+              <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: m.accent }} title={m.label} aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: BRAND.gold }}>
+                  {verse.song}
+                </p>
+                <p className="mt-1 truncate text-[10px] uppercase tracking-[0.16em] text-white/45">
+                  {verse.album} &middot; {verse.year}
+                </p>
+              </div>
+              {action?.(verse)}
+            </div>
+          </li>
+        )
+      })}
     </ul>
   )
 }

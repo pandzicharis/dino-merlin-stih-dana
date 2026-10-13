@@ -23,6 +23,7 @@ export function FavoriteButton({ id, accent }: { id: string; accent: string }) {
         navigator.vibrate?.(now ? [10, 40, 10] : 6)
       }}
       aria-pressed={on}
+      data-tip="save"
       className="relative flex h-9 min-w-[9.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[10px] font-medium uppercase tracking-[0.22em] backdrop-blur-sm transition-colors duration-300"
       style={{
         color: on ? accent : 'rgba(255,255,255,0.6)',

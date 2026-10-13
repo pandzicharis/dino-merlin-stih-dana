@@ -157,7 +157,7 @@ export default function SharePanel({
             role="dialog"
             aria-modal="true"
             aria-label="Podijeli stih"
-            className="relative flex max-h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px] sm:pb-6"
+            className="os-sheet relative flex max-h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px] sm:pb-6"
             style={{
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
@@ -178,7 +178,7 @@ export default function SharePanel({
               style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)` }}
               aria-hidden
             />
-            <span className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
+            <span className="os-grabber mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
 
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -216,6 +216,7 @@ export default function SharePanel({
                   <button
                     key={f}
                     onClick={() => choose(f)}
+                    data-format={f}
                     aria-pressed={on}
                     aria-label={`${F.label} ${F.hint}`}
                     className="relative flex h-9 items-center justify-center gap-1.5 rounded-full text-[12px] transition-colors"
@@ -249,6 +250,7 @@ export default function SharePanel({
             </motion.button>
             <button
               onClick={() => run('save')}
+              data-tip="download"
               disabled={!ready || busy !== null}
               className="mt-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 text-[14px] text-white/80 transition-colors hover:bg-white/5 disabled:opacity-50"
             >

@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import dynamic from 'next/dynamic'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { MOODS, type Mood } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
@@ -19,8 +20,13 @@ import { SEND_HOUR, SEND_TIME } from '@/lib/date'
 import { setNotifyIntent } from '@/lib/storage'
 import { deckParam, inDeck } from '@/lib/deck'
 import { BrandLockup } from './BrandLockup'
+import { startTips } from './Tips'
 
 type Platform = 'ios' | 'android' | 'desktop'
+
+/** Animacija instalacije — preuzima se tek kad uvod stoji, nikad u instaliranoj aplikaciji. */
+const loadHowTo = () => import('./InstallHowTo')
+const InstallHowTo = dynamic(loadHowTo, { ssr: false })
 
 /** Kapija ima dvoja vrata: prvo instalacija, pa dozvola za obavijesti. */
 type Stage = 'install' | 'permission' | null
@@ -97,6 +103,8 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
   const [busy, setBusy] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const [asked, setAsked] = useState(false)
+  const [howTo, setHowTo] = useState(false)
+  const closeHowTo = useCallback(() => setHowTo(false), [])
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
@@ -114,6 +122,11 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
   }, [])
 
   const install = useCallback(async () => {
+    // u prezentaciji Chromeov dijalog crta prezentacija
+    if (deck !== '') {
+      window.parent.postMessage({ type: 'stihdana:install' }, window.location.origin)
+      return
+    }
     if (!prompt) return
     setBusy(true)
     try {
@@ -125,9 +138,15 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
     }
     setPrompt(null)
     setBusy(false)
-  }, [prompt])
+  }, [prompt, deck])
 
   const allow = useCallback(async () => {
+    // U prezentaciji sistemski prozor crta prezentacija — pravi bi iskočio
+    // na računaru prezentera.
+    if (deck !== '') {
+      window.parent.postMessage({ type: 'stihdana:permission' }, window.location.origin)
+      return
+    }
     setBusy(true)
     const p = await ensurePermission()
     setBusy(false)
@@ -138,7 +157,27 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
     // ide u pozadini, a zvono na stihu je tiho popravi ako padne.
     setNotifyIntent(true)
     void subscribeToPush(SEND_HOUR)
-  }, [])
+    startTips()
+  }, [deck])
+
+  // Odgovor na sistemski prozor iz prezentacije.
+  useEffect(() => {
+    if (deck === '') return
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return
+      // savjeti u prezentaciji imaju svoj korak, odmah poslije ovog
+      if (e.data?.type === 'stihdana:permission-granted') setSkipped(true)
+      if (e.data?.type === 'stihdana:installed') setWaiting(true)
+      if (e.data?.type === 'stihdana:permission-denied') setAsked(true)
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [deck])
+
+  // Chrome na računaru prezentera nudi svoj install — u prezentaciji se on
+  // ne koristi. Android u prezentaciji ipak izgleda kao pravi Android u
+  // Chromeu: jedno dugme, a Chromeov dijalog nacrta prezentacija.
+  const canPrompt = (Boolean(prompt) && deck === '') || deck === 'android'
 
   /**
    * Prvo instalacija, pa dozvola. Ako uređaj uopšte ne zna za Web Push
@@ -159,6 +198,16 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
   // Sadržaj čeka montažu (ovisi o platformi), pa je prvi frejm samo crno:
   // instalirana aplikacija tako ne vidi ništa od uvoda dok se ne makne.
   const show = stage !== null && !skipped
+
+  // "Pogledaj kako" postoji samo uz korake (bez Chromeovog dijaloga), pa se
+  // tad unaprijed i preuzme — da se na dodir otvori odmah.
+  const steps = platform === 'ios' ? IOS_STEPS : platform === 'android' && !canPrompt ? ANDROID_STEPS : null
+  const canShowHow = show && stage === 'install' && !waiting && steps !== null
+  useEffect(() => {
+    if (!canShowHow) return
+    const t = setTimeout(loadHowTo, 1500)
+    return () => clearTimeout(t)
+  }, [canShowHow])
 
   return (
     <AnimatePresence>
@@ -224,17 +273,33 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
                       />
 
                       <div className="w-full">
-                        {platform === 'ios' && <IosSteps />}
+                        {platform === 'ios' && <Steps steps={IOS_STEPS} />}
                         {platform === 'android' && (
-                          <AndroidSteps canPrompt={Boolean(prompt)} busy={busy} onInstall={install} />
+                          <AndroidSteps canPrompt={canPrompt} busy={busy} onInstall={install} />
                         )}
                         {platform === 'desktop' && <DesktopSteps />}
+                        {steps && (
+                          <HowToButton
+                            onClick={() =>
+                              // u prezentaciji animaciju preko cijelog telefona pušta prezentacija
+                              deck !== ''
+                                ? window.parent.postMessage({ type: 'stihdana:howto' }, window.location.origin)
+                                : setHowTo(true)
+                            }
+                          />
+                        )}
                       </div>
                     </>
                   )}
                 </motion.div>
 
               </div>
+
+              <AnimatePresence>
+                {canShowHow && howTo && steps && platform !== 'desktop' && (
+                  <InstallHowTo key="how" platform={platform} mood={mood} steps={steps} onClose={closeHowTo} />
+                )}
+              </AnimatePresence>
 
               {/* Dev komande — ista traka kao DevDateBar, da localhost ima
                   jedan jezik umjesto dva. */}
@@ -366,6 +431,7 @@ function PermissionStage({
         aria-hidden
       />
       <button
+        data-deck="allow"
         onClick={onAllow}
         disabled={busy}
         className="w-full rounded-full px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-black transition-opacity active:opacity-80 disabled:opacity-60"
@@ -418,19 +484,59 @@ function Done() {
   )
 }
 
-function IosSteps() {
+/**
+ * Koraci instalacije — isti tekst stoji na uvodu, u umanjenom uvodu unutar
+ * animacije i ispod nje, uz korak koji se upravo odigrava.
+ */
+const IOS_STEPS: ReactNode[] = [
+  <>
+    Dodirni <Glyph kind="share" /> na dnu Safarija
+  </>,
+  <>
+    Skrolaj i odaberi <b className="font-medium text-white/90">Add to Home Screen</b>
+  </>,
+  <>
+    Potvrdi sa <b className="font-medium text-white/90">Add</b>, pa otvori ikonu
+  </>,
+]
+
+const ANDROID_STEPS: ReactNode[] = [
+  <>
+    Dodirni <Glyph kind="dots" /> gore desno u Chromeu
+  </>,
+  <>
+    Odaberi <b className="font-medium text-white/90">Add to Home screen</b>
+  </>,
+  <>
+    Potvrdi sa <b className="font-medium text-white/90">Install</b>, pa otvori ikonu
+  </>,
+]
+
+function Steps({ steps }: { steps: ReactNode[] }) {
   return (
     <ol className="mx-auto flex flex-col gap-4 text-left">
-      <Step n={1}>
-        Dodirni <Glyph kind="share" /> na dnu Safarija
-      </Step>
-      <Step n={2}>
-        Skrolaj i odaberi <b className="font-medium text-white/90">Add to Home Screen</b>
-      </Step>
-      <Step n={3}>
-        Potvrdi sa <b className="font-medium text-white/90">Add</b>, pa otvori ikonu
-      </Step>
+      {steps.map((s, k) => (
+        <Step key={k} n={k + 1}>
+          {s}
+        </Step>
+      ))}
     </ol>
+  )
+}
+
+/** Otvara animaciju instalacije — tihije od zlatnog dugmeta, jer nije radnja nego pomoć. */
+function HowToButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      data-deck="howto"
+      onClick={onClick}
+      className="mx-auto mt-8 flex items-center gap-2.5 rounded-full border border-white/15 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70 transition-colors active:bg-white/10"
+    >
+      <svg width="9" height="10" viewBox="0 0 9 10" fill={BRAND.gold} aria-hidden>
+        <path d="M0 0.8v8.4a.6.6 0 0 0 .9.5l7.6-4.2a.6.6 0 0 0 0-1L.9.3A.6.6 0 0 0 0 .8z" />
+      </svg>
+      Pogledaj kako
+    </button>
   )
 }
 
@@ -449,6 +555,7 @@ function AndroidSteps({
       <button
         onClick={onInstall}
         disabled={busy}
+        data-deck="install"
         className="w-full rounded-full px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-black transition-opacity active:opacity-80 disabled:opacity-60"
         style={{ backgroundColor: BRAND.gold }}
       >
@@ -457,19 +564,7 @@ function AndroidSteps({
     )
   }
 
-  return (
-    <ol className="mx-auto flex flex-col gap-4 text-left">
-      <Step n={1}>
-        Dodirni <Glyph kind="dots" /> gore desno u Chromeu
-      </Step>
-      <Step n={2}>
-        Odaberi <b className="font-medium text-white/90">Add to Home screen</b>
-      </Step>
-      <Step n={3}>
-        Potvrdi sa <b className="font-medium text-white/90">Install</b>, pa otvori ikonu
-      </Step>
-    </ol>
-  )
+  return <Steps steps={ANDROID_STEPS} />
 }
 
 function DesktopSteps() {
@@ -493,15 +588,15 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
 function Glyph({ kind }: { kind: 'share' | 'dots' }) {
   return (
     <svg
-      width="15"
-      height="15"
+      width="1.15em"
+      height="1.15em"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="mx-0.5 inline-block align-[-2px] text-white/90"
+      className="mx-[0.15em] inline-block align-[-0.15em] text-white/90"
       aria-hidden
     >
       {kind === 'share' ? (

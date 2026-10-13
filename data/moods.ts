@@ -42,7 +42,7 @@ export type MoodStyle = {
 export const MOODS = {
   ljubav: {
     label: 'Ljubav',
-    gradient: ['#2A0A18', '#5C1730', '#7A2340'],
+    gradient: ['#260E18', '#541F32', '#702D43'],
     accent: '#F2A7B8',
     text: '#FFF4F6',
     speed: 0.9,
@@ -58,7 +58,7 @@ export const MOODS = {
   },
   nostalgija: {
     label: 'Nostalgija',
-    gradient: ['#0F1219', '#232838', '#3A3E52'],
+    gradient: ['#101218', '#252936', '#3D404F'],
     accent: '#D9C3A0',
     text: '#F3EEE6',
     speed: 0.55,
@@ -74,7 +74,7 @@ export const MOODS = {
   },
   nada: {
     label: 'Nada',
-    gradient: ['#0B1420', '#153244', '#1E4A5C'],
+    gradient: ['#0D141E', '#1A313F', '#254755'],
     accent: '#F4C77B',
     text: '#FBF6EC',
     speed: 1,
@@ -90,7 +90,7 @@ export const MOODS = {
   },
   sloboda: {
     label: 'Sloboda i sreća',
-    gradient: ['#0A0F1C', '#132844', '#1B3A6B'],
+    gradient: ['#0C101A', '#18293F', '#243C62'],
     accent: '#7FD0E8',
     text: '#EEF7FB',
     speed: 1.35,

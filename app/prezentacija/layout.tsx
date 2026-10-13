@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './deck.css'
 
+
 export const metadata: Metadata = {
   title: 'Prezentacija',
   robots: { index: false, follow: false },

@@ -60,6 +60,93 @@ body {
   display: none;
 }
 
+/*
+ * Sistem ispod aplikacije — data-os na <html> postavlja skripta u layoutu
+ * (pravi telefon) ili prekidač u prezentaciji. Modali tad imaju font,
+ * zaobljenje i ručku sistema: isto u prezentaciji kao na pravom telefonu.
+ */
+html[data-os='ios'] {
+  --font-os: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', var(--font-sans), sans-serif;
+  --sheet-radius: 38px;
+}
+html[data-os='android'] {
+  --font-os: var(--font-roboto), Roboto, var(--font-sans), sans-serif;
+  --sheet-radius: 28px;
+}
+/* telefon nema desktop trake za skrol */
+html[data-os],
+html[data-os] * {
+  scrollbar-width: none;
+}
+html[data-os] ::-webkit-scrollbar {
+  display: none;
+}
+html[data-os] .os-sheet {
+  font-family: var(--font-os);
+  border-top-left-radius: var(--sheet-radius);
+  border-top-right-radius: var(--sheet-radius);
+}
+html[data-os='ios'] .os-sheet {
+  letter-spacing: -0.005em;
+}
+html[data-os='ios'] .os-grabber {
+  width: 36px;
+  height: 5px;
+  margin-top: -4px;
+  border-radius: 2.5px;
+  background: rgba(255, 255, 255, 0.3);
+}
+html[data-os='android'] .os-grabber {
+  width: 32px;
+  height: 4px;
+  margin-top: 6px;
+  margin-bottom: 18px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/*
+ * Omot albuma iza stiha (MoodBackground). Telefon: spušten od vrha, utapa se
+ * gore, dole prema stihu i u strane. Računar: ovalno na sve strane, mekano — da se ne vidi kvadrat.
+ */
+.album-art {
+  mask-image: linear-gradient(to bottom, transparent 0%, black 18%, black 40%, rgba(0, 0, 0, 0.35) 64%, transparent 86%),
+    linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 18%, black 40%, rgba(0, 0, 0, 0.35) 64%, transparent 86%),
+    linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+@media (min-width: 768px) {
+  .album-art {
+    mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, black 0%, rgba(0, 0, 0, 0.6) 30%, rgba(0, 0, 0, 0.2) 52%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, black 0%, rgba(0, 0, 0, 0.6) 30%, rgba(0, 0, 0, 0.2) 52%, transparent 70%);
+    mask-composite: add;
+    -webkit-mask-composite: source-over;
+  }
+}
+
+/*
+ * Omot albuma na kartici sačuvanog stiha (VerseList): desno, nestaje mekano
+ * prema tekstu, gore i dole — kartica ga nigdje ne odsiječe.
+ */
+.card-art {
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.1) 25%, rgba(0, 0, 0, 0.4) 50%, rgba(0, 0, 0, 0.7) 75%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.55) 22%, black 45%, black 55%, rgba(0, 0, 0, 0.55) 78%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.1) 25%, rgba(0, 0, 0, 0.4) 50%, rgba(0, 0, 0, 0.7) 75%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.55) 22%, black 45%, black 55%, rgba(0, 0, 0, 0.55) 78%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+
+/* u telefonu prezentacije nema localhost trake — ekran je kao na pravom telefonu */
+html[data-deck] .dev-bar {
+  display: none;
+}
+html[data-deck] .dev-pad {
+  padding-bottom: max(2.25rem, env(safe-area-inset-bottom));
+}
+
 ::selection {
   background: rgba(255, 255, 255, 0.18);
 }

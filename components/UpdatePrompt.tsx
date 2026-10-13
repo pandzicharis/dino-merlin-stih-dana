@@ -119,7 +119,9 @@ export function UpdatePrompt({ accent }: { accent: string }) {
         <motion.div
           // iznad uvodne kapije (z-60) — nadogradnja se nudi i onome ko je
           // zaglavio na uvodu, jer je popravka mozda bas u novoj verziji
-          className="fixed inset-x-0 bottom-0 z-[70] flex justify-center px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+          className="fixed inset-x-0 bottom-0 z-[70] flex justify-center px-6 pt-20 pb-[max(1.75rem,env(safe-area-inset-bottom))]"
+          // tamni prelaz odozdo: dno ekrana (potpis pjesme, logo) se povuče iza dugmeta
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.7) 45%, transparent 100%)' }}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}
@@ -128,7 +130,7 @@ export function UpdatePrompt({ accent }: { accent: string }) {
           <button
             onClick={apply}
             disabled={busy}
-            className="flex items-center gap-2.5 rounded-full border px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] backdrop-blur-xl transition-opacity active:opacity-80 disabled:opacity-60"
+            className="flex items-center gap-2.5 rounded-full border px-5 py-3 text-[10.5px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-opacity active:opacity-80 disabled:opacity-60"
             style={{
               color: accent,
               borderColor: `${accent}4D`,

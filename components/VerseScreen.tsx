@@ -6,6 +6,7 @@ import type { Verse } from '@/data/verses'
 import { OVERRIDE_ON, formatFullDateBs } from '@/lib/date'
 import { BRAND } from '@/lib/brand'
 import { MoodBackground } from './MoodBackground'
+import { albumOf } from '@/data/albums'
 import { VerseText, verseTail } from './VerseText'
 import { SongCredit } from './SongCredit'
 import { NotifyToggle } from './NotifyToggle'
@@ -13,7 +14,6 @@ import { ShareButton } from './ShareSheet'
 import { BrandLockup } from './BrandLockup'
 import { FavoriteButton } from './FavoriteButton'
 import { SavedLink } from './SavedLink'
-import { RitualLine } from './RitualLine'
 import { MagazaLogo } from './MagazaLogo'
 
 /**
@@ -44,7 +44,7 @@ export function VerseScreen({
   return (
     <div className={compact ? 'relative isolate overflow-hidden rounded-2xl' : ''}>
       <div className={compact ? 'absolute inset-0 -z-10' : ''}>
-        <MoodBackgroundSlot mood={mood ?? verse.mood} compact={compact} seed={verse.id} />
+        <MoodBackgroundSlot mood={mood ?? verse.mood} compact={compact} seed={verse.id} cover={albumOf(verse.album)?.cover} coverLift={albumOf(verse.album)?.lift} />
       </div>
 
       <main
@@ -52,7 +52,7 @@ export function VerseScreen({
           compact
             ? 'flex min-h-[260px] flex-col justify-between p-5'
             : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(3rem,calc(env(safe-area-inset-top)+1.75rem))] ${
-                OVERRIDE_ON ? 'pb-16' : 'pb-[max(2.25rem,env(safe-area-inset-bottom))]'
+                OVERRIDE_ON ? 'dev-pad pb-16' : 'pb-[max(2.25rem,env(safe-area-inset-bottom))]'
               }`
         }
       >
@@ -143,7 +143,6 @@ export function VerseScreen({
                 style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
                 aria-hidden
               />
-              <RitualLine accent={m.accent} />
               <a
                 href="https://magaza.com.ba"
                 target="_blank"
@@ -162,9 +161,21 @@ export function VerseScreen({
 }
 
 /** U compact modu pozadina se ne smije fiksirati preko cijelog ekrana. */
-function MoodBackgroundSlot({ mood, compact, seed }: { mood: Mood; compact: boolean; seed: string }) {
+function MoodBackgroundSlot({
+  mood,
+  compact,
+  seed,
+  cover,
+  coverLift,
+}: {
+  mood: Mood
+  compact: boolean
+  seed: string
+  cover?: string
+  coverLift?: number
+}) {
   const m = MOODS[mood]
-  if (!compact) return <MoodBackground mood={mood} seed={seed} />
+  if (!compact) return <MoodBackground mood={mood} seed={seed} cover={cover} coverLift={coverLift} />
   return (
     <div
       className="relative h-full w-full"

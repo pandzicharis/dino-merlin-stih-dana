@@ -55,7 +55,7 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
             role="dialog"
             aria-modal="true"
             aria-label="Sačuvani stihovi"
-            className="relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
+            className="os-sheet relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
             style={{
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
@@ -83,7 +83,7 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
               className="shrink-0 cursor-grab touch-none px-5 pt-3 active:cursor-grabbing"
               onPointerDown={(e) => drag.start(e)}
             >
-              <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
+              <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>

@@ -36,6 +36,7 @@
      višak širine ide tekstu, ne praznini oko telefona */
   --dock-phone: min(36vw, calc((100vh - var(--pad-t) - var(--bar) - 40px) * 0.473 + 2vw));
   --dock-desktop: 58vw;
+  --dock-site: 50vw;
 
   position: fixed;
   inset: 0;
@@ -187,6 +188,14 @@
   width: var(--dock-desktop);
 }
 
+.dk-dock[data-mode='site'] {
+  width: var(--dock-site);
+}
+
+.dk-slide[data-mode='site'] {
+  right: calc(var(--pad-x) + var(--dock-site) + 3vw);
+}
+
 .dk-dock[data-mode='none'] {
   opacity: 0;
   transform: translateX(6vw) scale(0.96);
@@ -207,7 +216,8 @@
     --fs-lead: 16px;
   }
   .dk-slide[data-mode='phone'],
-  .dk-slide[data-mode='desktop'] {
+  .dk-slide[data-mode='desktop'],
+  .dk-slide[data-mode='site'] {
     right: var(--pad-x);
   }
   .dk-dock {
@@ -269,6 +279,60 @@
   color: #14100a;
   background: var(--gold-grad);
   border-color: transparent;
+}
+
+/* iPhone / Android ispod telefona */
+.dk-os {
+  display: inline-flex;
+  padding: 0.25em;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.dk-os button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 2.3em;
+  padding: 0 1.1em;
+  border-radius: 999px;
+  color: var(--t2);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+.dk-os button:hover {
+  color: var(--t1);
+}
+.dk-os button[aria-checked='true'] {
+  color: #14100a;
+}
+.dk-os--wide {
+  display: flex;
+  width: 100%;
+}
+.dk-os--wide button {
+  flex: 1;
+  justify-content: center;
+}
+.dk-os--sm {
+  padding: 0.2em;
+}
+.dk-os--sm button {
+  height: 1.9em;
+  padding: 0 0.85em;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.dk-os-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--gold-grad);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
 }
 
 .dk-btn-gold {

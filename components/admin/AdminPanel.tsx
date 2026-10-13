@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { MOODS, MOOD_KEYS, type Mood } from '@/data/moods'
+import { ALBUMS, albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { addDays, formatDayBs } from '@/lib/date'
 import { withPeriod } from '@/lib/text'
+import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview } from './DevicePreview'
 
@@ -101,6 +103,16 @@ export function AdminPanel() {
   const send = async (op: Op, ok: string | ((s: Snapshot) => string)) => {
     if (busy || !month) return false
     setBusy(true)
+    // U prezentaciji se izmjena vidi, ali ne ide na server — pravi raspored
+    // i katalog ostaju netaknuti. Ponovno učitavanje sve vrati.
+    if (inDeck() && data) {
+      await new Promise((r) => setTimeout(r, 350))
+      const s = applyLocal(data, op)
+      setData(s)
+      flash(typeof ok === 'function' ? ok(s) : ok)
+      setBusy(false)
+      return true
+    }
     try {
       const r = await fetch('/api/admin/catalog', {
         method: 'POST',
@@ -174,6 +186,7 @@ export function AdminPanel() {
                 <button
                   key={k}
                   onClick={() => setTab(k)}
+                  data-tab={k}
                   className="relative h-9 flex-1 rounded-full px-3 text-[12px] font-medium transition-colors"
                   style={{ color: tab === k ? '#14100A' : 'rgba(255,255,255,0.6)' }}
                 >
@@ -191,6 +204,7 @@ export function AdminPanel() {
             <button
               onClick={() => setEditor({})}
               disabled={!data.writable}
+              data-new
               className="flex h-11 shrink-0 items-center gap-2 rounded-full px-5 text-[13px] font-semibold text-black disabled:opacity-40"
               style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
             >
@@ -320,17 +334,43 @@ export function AdminPanel() {
   )
 }
 
+/** Izmjena primijenjena samo na ekranu (prezentacija) — isti ishod kao sa servera. */
+function applyLocal(s: Snapshot, op: Op): Snapshot {
+  const days = s.days.map((d) => ({ ...d }))
+  let verses = s.verses
+  const next = { ...s.next }
+  let placed: string | null = null
+  const day = (date: string) => days.find((d) => d.date === date)
+  if (op.op === 'swap') {
+    const a = day(op.a)
+    const b = day(op.b)
+    if (a && b) [a.verseId, b.verseId, a.manual, b.manual] = [b.verseId, a.verseId, true, true]
+  } else if (op.op === 'assign') {
+    const d = day(op.date)
+    if (d) [d.verseId, d.manual] = [op.id, true]
+  } else if (op.op === 'add') {
+    const id = `novi-${Date.now().toString(36)}`
+    const { year, youtube, ...rest } = op.verse
+    verses = [...verses, { ...rest, id, year: Number(year), ...(youtube ? { youtube } : {}), active: true }]
+    const d = op.date ? day(op.date) : undefined
+    if (d) [d.verseId, d.manual] = [id, true]
+    placed = op.date ?? null
+    next[id] = placed
+  } else if (op.op === 'update') {
+    const { year, youtube, ...rest } = op.verse
+    verses = verses.map((v) => (v.id === op.id ? { ...v, ...rest, year: Number(year), youtube: youtube || undefined } : v))
+  } else {
+    const on = op.op === 'restore'
+    verses = verses.map((v) => (v.id === op.id ? { ...v, active: on } : v))
+  }
+  return { ...s, days, verses, next, placed }
+}
+
 /* ── dijelovi ───────────────────────────────────────────────── */
 
 function Status({ data }: { data: Snapshot }) {
-  if (data.writable === 'supabase') {
-    return (
-      <p className="mb-5 flex items-center gap-2 text-[12px] text-white/40">
-        <i className="block h-2 w-2 rounded-full bg-emerald-400/80 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
-        Povezano s bazom · izmjene su odmah na sajtu
-      </p>
-    )
-  }
+  // sve u redu — ništa se ne prikazuje
+  if (data.writable === 'supabase') return null
   if (data.writable === 'file') {
     return (
       <p className="mb-5 rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 text-[12px] leading-relaxed text-white/50">
@@ -546,6 +586,8 @@ function CalendarView({
               // prošli dani se samo vide — ne otvaraju se
               disabled={d.past}
               onClick={() => onOpen(d.date)}
+              data-cal={d.date}
+              data-today={isToday || undefined}
               draggable={writable && !d.past}
               onDragStart={(e) => {
                 setDrag(d.date)
@@ -718,6 +760,7 @@ function Library({
           return (
             <button
               key={label}
+              data-scope={isArchive ? 'archive' : 'active'}
               onClick={() => {
                 setArchived(isArchive)
                 setPage(0)
@@ -769,6 +812,7 @@ function Library({
           setPage(0)
         }}
         placeholder="Traži stih, pjesmu ili album…"
+        data-search
         className="mb-3 h-10 w-full rounded-full border border-white/10 bg-black/30 px-4 text-[13px] text-white outline-none placeholder:text-white/25 focus:border-[#BFA87F]/50"
       />
 
@@ -777,6 +821,7 @@ function Library({
         {MOOD_KEYS.map((k) => (
           <button
             key={k}
+            data-filter={k}
             onClick={() => {
               setMood(mood === k ? null : k)
               setPage(0)
@@ -1189,6 +1234,7 @@ function Editor({
         <label className="text-[11px] uppercase tracking-[0.16em] text-white/40">
           Stih <span className="normal-case tracking-normal text-white/25">— novi red kako se pjeva, najviše 3</span>
           <textarea
+            name="text"
             value={d.text}
             onChange={set('text')}
             rows={3}
@@ -1200,19 +1246,40 @@ function Editor({
         <div className="grid grid-cols-2 gap-3">
           <label className="text-[11px] uppercase tracking-[0.16em] text-white/40">
             Pjesma
-            <input value={d.song} onChange={set('song')} required className={`mt-1.5 ${field}`} />
+            <input name="song" value={d.song} onChange={set('song')} required className={`mt-1.5 ${field}`} />
           </label>
           <label className="text-[11px] uppercase tracking-[0.16em] text-white/40">
             Album
-            <input value={d.album} onChange={set('album')} required className={`mt-1.5 ${field}`} />
+            {/* zakucana lista albuma — naziv uvijek tačan, a godina se popuni sama */}
+            <select
+              name="album"
+              value={albumOf(d.album)?.title ?? d.album}
+              onChange={(e) => {
+                const a = ALBUMS.find((x) => x.title === e.target.value)
+                setD({ ...d, album: e.target.value, year: a ? String(a.year) : d.year })
+              }}
+              required
+              className={`mt-1.5 ${field} appearance-none [color-scheme:dark]`}
+            >
+              <option value="" disabled>
+                Izaberi album
+              </option>
+              {ALBUMS.map((a) => (
+                <option key={a.id} value={a.title}>
+                  {a.title} · {a.year}
+                </option>
+              ))}
+              {/* stari zapis koji nije na listi — da se ne izgubi pri uređivanju */}
+              {d.album && !albumOf(d.album) && <option value={d.album}>{d.album}</option>}
+            </select>
           </label>
           <label className="text-[11px] uppercase tracking-[0.16em] text-white/40">
             Godina
-            <input value={d.year} onChange={set('year')} inputMode="numeric" required className={`mt-1.5 ${field}`} />
+            <input name="year" value={d.year} onChange={set('year')} inputMode="numeric" required className={`mt-1.5 ${field}`} />
           </label>
           <label className="text-[11px] uppercase tracking-[0.16em] text-white/40">
             YouTube <span className="normal-case tracking-normal text-white/25">(opcija)</span>
-            <input value={d.youtube} onChange={set('youtube')} placeholder="link" className={`mt-1.5 ${field}`} />
+            <input name="youtube" value={d.youtube} onChange={set('youtube')} placeholder="link" className={`mt-1.5 ${field}`} />
           </label>
         </div>
         <div>
@@ -1222,6 +1289,7 @@ function Editor({
               <button
                 type="button"
                 key={k}
+                data-edit-mood={k}
                 onClick={() => setD({ ...d, mood: k })}
                 className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[12px] transition-colors"
                 style={{

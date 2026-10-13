@@ -25,10 +25,16 @@ export function MoodBackground({
   seed,
   /** Zaustavi portret — na uvodnom ekranu tekst stoji, pa i lice treba mirovati. */
   still = false,
+  /** omot albuma stiha — umjesto portreta, utopljen da se ne vidi da je kvadrat */
+  cover,
+  /** koliko je omot podignut (dio njegove visine) */
+  coverLift = 0,
 }: {
   mood: Mood
   seed: string
   still?: boolean
+  cover?: string
+  coverLift?: number
 }) {
   const m = MOODS[mood]
   const reduced = useReducedMotion()
@@ -95,8 +101,42 @@ export function MoodBackground({
             />
           ))}
 
+          {/* 3a — album stiha, u dva sloja:
+                  atmosfera — omot preko cijelog ekrana, jako zamućen: boja albuma
+                  omot — jasan i krupan gore, ivice utopljene (nema kvadrata)
+                  pa tama odozdo, da stih ostane čitak */}
+          {cover && (
+            <>
+              {/* album miruje — ne prati pokazivač i ne diše, da ne odvlači od stiha */}
+              <div
+                className="absolute -inset-[15%] scale-110 bg-cover bg-center"
+                style={{
+                  backgroundImage: `url(${cover})`,
+                  filter: 'blur(56px) saturate(1.2)',
+                  opacity: 0.32,
+                }}
+              />
+              {/* omot gore — na telefonu preko cijele širine, nestaje u strane i prema
+                  stihu; na računaru veći i rastopljen ovalno na sve strane (globals.css) */}
+              <div
+                className="album-art absolute inset-x-0 top-[6dvh] mx-auto aspect-square w-[min(100vw,74dvh,760px)] bg-cover bg-center md:top-[2dvh] md:w-[min(118dvh,1100px)]"
+                style={{ backgroundImage: `url(${cover})`, opacity: 0.42, transform: coverLift ? `translateY(-${coverLift * 100}%)` : undefined }}
+              />
+              {/* nijansa raspoloženja preko albuma — ekran ostaje "njegov" */}
+              <div className="absolute inset-0" style={{ backgroundColor: m.gradient[1], mixBlendMode: 'color', opacity: 0.4 }} />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.12) 22%, rgba(0,0,0,0.38) 50%, rgba(0,0,0,0.7) 78%, rgba(0,0,0,0.85) 100%)',
+                }}
+              />
+            </>
+          )}
+
           {/* 3 — portret: krupan, u gornjem desnom uglu, da stih u sredini
                  ostane na čistoj podlozi a lice ne bude iza teksta */}
+          {!cover && (
           <motion.div
             className="absolute inset-0 bg-no-repeat"
             style={{
@@ -119,6 +159,7 @@ export function MoodBackground({
             animate={reduced || still ? undefined : { scale: [1, 1.045, 1] }}
             transition={{ duration: dur(34), repeat: Infinity, ease: 'easeInOut' }}
           />
+          )}
 
           {/* 4 — sjaj iza stiha */}
           {m.bloom > 0 && (

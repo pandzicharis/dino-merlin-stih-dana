@@ -1,27 +1,24 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { MOODS } from '@/data/moods'
-import { BRAND } from '@/lib/brand'
+import { albumOf } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
-import { oneLine, withPeriod } from '@/lib/text'
 import { useDeck } from './context'
-import { Poster, SocialPost, SocialStory } from './Poster'
+import { Grafike, LANSIRANJE, LaunchPlan, Ostalo, PwaNative } from './launch'
 import { QrCode } from './QrCode'
 import {
+  Dot,
   ActionChip,
   Acts,
   Bullets,
   FeatureSlide,
   Ico,
-  Lead,
-  PhoneChip,
-  Points,
   R,
   Text,
-  Try,
 } from './ui'
+import type { Verse } from '@/data/verses'
 import type { DeckData, FeatureDef, SlideDef } from './types'
 
 /**
@@ -37,129 +34,67 @@ import type { DeckData, FeatureDef, SlideDef } from './types'
 const STIH: FeatureDef[] = [
   {
     id: 'instalacija',
-    title: 'Bez App Storea',
-    enter: '/?uvod=ios',
-    body: () => (
-      <>
-        <Text>
-          Link ili QR kod otvara aplikaciju, a ona prvo vodi do početnog ekrana: na iPhoneu tri jasna koraka, na
-          Androidu jedno dugme. Zatim jedna dozvola — obavijest u {SEND_TIME}.
-        </Text>
-        <Bullets
-          items={[
-            <>
-              Na iPhoneu obavijesti rade <b>samo</b> iz aplikacije na početnom ekranu (iOS 16.4+) — zato ovaj korak
-              ide prvi.
-            </>,
-          ]}
-        />
-        <Acts>
-          <PhoneChip src="/?uvod=ios" frame="iphone">
-            {Ico.apple} iPhone
-          </PhoneChip>
-          <PhoneChip src="/?uvod=android" frame="galaxy">
-            {Ico.android} Android
-          </PhoneChip>
-          <PhoneChip src="/?uvod=dozvola">{Ico.bell} Dozvola</PhoneChip>
-        </Acts>
-      </>
-    ),
+    title: 'PWA app — bez storea',
+    enter: (_, frame) => (frame === 'galaxy' ? '/?uvod=android' : '/?uvod=ios'),
+    script: 'install',
+    body: () => <Instalacija />,
   },
   {
-    id: 'ispis',
-    title: 'Stih se ispiše',
+    id: 'dozvola',
+    title: 'Dozvola za obavijesti',
+    enter: '/?uvod=dozvola',
+    script: 'permission',
+    body: () => <Dozvola />,
+  },
+  {
+    id: 'savjeti',
+    title: 'Savjeti pri prvom otvaranju',
     enter: '/',
-    body: () => <Ispis />,
+    body: () => <Savjeti />,
   },
   {
     id: 'atmosfera',
     title: 'Atmosfera po raspoloženju',
-    body: (d) => (
-      <>
-        <Text>
-          Raspoloženje stiha boji cijeli ekran: svjetlo koje sporo pluta, portret jedva prisutan, note koje se dižu,
-          zrno filma. Nikad dvije večeri isti osjećaj.
-        </Text>
-        <div className="mt-[1.8vh] grid max-w-[34em] grid-cols-2 gap-2 xl:grid-cols-4">
-          {d.moods.map(({ mood, verse }) => (
-            <MoodCard key={mood} mood={mood} verseId={verse.id} song={verse.song} />
-          ))}
-        </div>
-      </>
-    ),
+    // /pregled mijenja stih porukom, bez ponovnog učitavanja — pozadina se pretapa
+    enter: '/pregled',
+    body: (d) => <Atmosfera d={d} />,
+  },
+  {
+    id: 'sacuvano',
+    title: 'Sačuvaj stih',
+    body: () => <Sacuvano />,
   },
   {
     id: 'slusanje',
     title: 'Poslušaj pjesmu',
-    body: () => (
-      <>
-        <Text>
-          Naziv pjesme i zlatni YouTube znak vode pravo na pjesmu. Namjerno bez ugrađenog plejera: ekran ostaje stih,
-          a to je i licencno najčistiji put.
-        </Text>
-        <Try steps={['Dodirni naziv pjesme ispod stiha']} />
-      </>
-    ),
+    enter: '/',
+    body: () => <Slusanje />,
+  },
+  {
+    id: 'dijeljenje',
+    title: 'Podijeli kao sliku',
+    body: () => <Dijeljenje />,
   },
   {
     id: 'obavijest',
     title: `Obavijest u ${SEND_TIME}`,
-    body: () => <Obavijest />,
+    body: (d) => <Obavijest d={d} />,
   },
 ]
 
 const UZ_STIH: FeatureDef[] = [
   {
-    id: 'sacuvano',
-    title: 'Sačuvani stihovi',
-    body: () => (
-      <>
-        <Text>
-          „Sačuvaj stih“ ispod stiha, a lista sa brojem sačuvanih u zaglavlju. Bez naloga i prijave — sve ostaje na
-          telefonu, bez ikakvog opterećenja servera.
-        </Text>
-        <Try steps={['„Sačuvaj stih“', 'ikonica gore desno', 'lista']} />
-      </>
-    ),
-  },
-  {
-    id: 'dijeljenje',
-    title: 'Dijeljenje kao slika',
-    body: () => (
-      <>
-        <Text>
-          Story 9:16, objava 4:5 ili kvadrat — istim fontovima i bojama kao na ekranu, pravo u Instagram, WhatsApp ili
-          Viber. Slika se crta na samom telefonu, odmah.
-        </Text>
-        <Bullets items={[<>Diskretan potpis aplikacije na slici: <b>svako dijeljenje je preporuka.</b></>]} />
-        <Try steps={['ikonica dijeljenja', 'format', 'Podijeli']} />
-      </>
-    ),
+    id: 'azuriranje',
+    title: 'Nova verzija stiže sama',
+    enter: '/',
+    body: () => <Azuriranje />,
   },
   {
     id: 'link',
     title: 'Link koji izgleda kao poster',
-    enter: (d) => `/stih/${d.todayVerse.id}`,
-    body: (d) => <LinkPreview d={d} />,
-  },
-  {
-    id: 'niz',
-    title: 'Niz dana',
-    enter: '/?streak=12',
-    body: () => (
-      <>
-        <Text>
-          Ispod potpisa tiho piše koliko dana zaredom je stih otvoren — ne kao igra s bodovima, nego kao podsjetnik da
-          je ovo postao ritual. Broji stvarne dane po Sarajevu.
-        </Text>
-        <Bullets items={['Na ovom koraku niz je postavljen na 12, da se vidi kako izgleda.']} />
-      </>
-    ),
-  },
-  {
-    id: 'azuriranje',
-    title: 'Nova verzija stiže sama',
-    body: () => <Azuriranje />,
+    // bez svoje adrese: chat prekriva ekran, pa se naprijed/nazad ništa ne
+    // učitava iznova — stih s linka se otvori tek na dodir kartice
+    body: () => <LinkPreview />,
   },
 ]
 
@@ -169,71 +104,88 @@ const UREDNIK: FeatureDef[] = [
   {
     id: 'pristup',
     title: 'Pristup jednom šifrom',
-    enter: '/admin',
-    body: () => (
-      <>
-        <Text>
-          Na /admin urednik bira i raspoređuje stihove — bez programera i bez čekanja. Prijava traje 12 sati.
-        </Text>
-        <Bullets items={[<><b>Preporuka: računar.</b> Radi i na telefonu.</>]} />
-      </>
-    ),
+    // ?prijava: ekran za prijavu i kad je prezenter već prijavljen
+    enter: '/admin?prijava',
+    body: () => <Pristup />,
   },
   {
     id: 'kalendar',
     title: 'Kalendar objave',
-    body: () => (
-      <>
-        <Text>Koji stih izlazi kojeg dana, obojen raspoloženjem. Stih se prevuče na drugi dan, ili se za dan bira bilo koji.</Text>
-        <Bullets
-          items={[
-            'Današnji je zaključan — ono što je ljudima stiglo, ne mijenja se.',
-            'Upozorenje kad se stih vrati za manje od dvije sedmice.',
-          ]}
-        />
-      </>
-    ),
+    // poslije prijave admin je na /admin — ne vraćati na ekran za prijavu
+    enter: '/admin',
+    body: () => <Kalendar />,
   },
   {
     id: 'biblioteka',
     title: 'Biblioteka stihova',
-    body: () => (
-      <>
-        <Text>Pretraga, filter po raspoloženju, i za svaki stih — kad sljedeći put izlazi.</Text>
-        <Bullets items={['Arhiviran stih izlazi iz rasporeda, a linkovi i sačuvani i dalje rade.']} />
-      </>
-    ),
+    // poslije prijave admin je na /admin — ne vraćati na ekran za prijavu
+    enter: '/admin',
+    body: () => <Biblioteka />,
   },
   {
     id: 'novi',
     title: 'Novi stih uz živi pregled',
-    body: () => (
-      <>
-        <Text>
-          Tekst, pjesma, album, godina, raspoloženje i YouTube. Pored je pravi ekran aplikacije, na telefonu ili
-          računaru, i mijenja se dok se kuca.
-        </Text>
-        <Bullets items={[<><b>Izmjena je na sajtu odmah</b>, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>]} />
-      </>
-    ),
+    // poslije prijave admin je na /admin — ne vraćati na ekran za prijavu
+    enter: '/admin',
+    body: () => <NoviStih />,
+  },
+]
+
+/* ── priča: zašto Stih dana ─────────────────────────────────── */
+
+/**
+ * Stih s ovog slajda (Individualizam) nije u katalogu — telefon ga prikaže kroz /pregled,
+ * pravi ekran aplikacije koji stih prima porukom (isto kao pregled u adminu).
+ */
+const STIH_PRICE: Verse = {
+  id: 'ptica-u-letu',
+  text: 'U jednom sigurno možeš\nbiti najbolji na svijetu\nbudi to što jesi',
+  song: 'Individualizam',
+  album: 'Ispočetka',
+  year: 2008,
+  mood: 'sloboda',
+  youtube: 'https://www.youtube.com/watch?v=aO3fvcqI4vE',
+}
+
+/** Priča — sve rečenice se vide odmah, ulaze jedna za drugom. */
+const PRICA: FeatureDef[] = [
+  { id: 'magaza', title: 'Kad god prođem pored Magaze, uzmem stih dana.', body: () => null },
+  { id: 'inspiracija', title: 'Ti stihovi su me pratili od studentskih dana do posla kojim se danas bavim.', body: () => null },
+  { id: 'snaga', title: 'Mnogo puta su mi bili motiv da izguram najteže dane i najteže zadatke.', body: () => null },
+  { id: 'kod', title: 'Zato sam s njima uradio ono što najbolje znam — pretočio ih u kod.', body: () => null },
+  {
+    id: 'autenticnost',
+    title: 'Jer danas, kad je oko nas sve više vještačkog, upravo nas autentičnost drži budnim.',
+    body: () => null,
   },
 ]
 
 export const SLIDES: SlideDef[] = [
   { id: 'uvod', section: 'Uvod', title: 'Stih dana', backdrop: 'nostalgija', body: () => <Intro /> },
-  { id: 'o-meni', section: 'Uvod', title: 'O meni', body: () => <OMeni /> },
-  { id: 'ideja', section: 'Ideja', title: 'Jedan stih, jedan trenutak', body: () => <Ideja /> },
+  { id: 'o-meni', section: 'Uvod', title: 'O meni', mode: 'site', body: () => <OMeni /> },
+  {
+    id: 'ideja',
+    section: 'Uvod',
+    title: 'Zašto Stih dana?',
+    mode: 'phone',
+    enter: '/pregled',
+    preview: STIH_PRICE,
+    body: () => <Ideja />,
+  },
   {
     id: 'stih',
     section: 'Aplikacija',
     title: 'Stih dana',
     mode: 'phone',
+    // dolaskom na slajd telefon mirno stoji na aplikaciji; demo kreće na strelicu
+    intro: true,
+    enter: '/',
     features: STIH,
     body: (d) => (
       <FeatureSlide
         d={d}
         features={STIH}
-        eyebrow={<>Aplikacija · uživo</>}
+        eyebrow={<>Aplikacija</>}
         title={
           <>
             Jedan stih, <em>preko cijelog ekrana</em>
@@ -247,15 +199,18 @@ export const SLIDES: SlideDef[] = [
     section: 'Aplikacija',
     title: 'Uz stih',
     mode: 'phone',
+    // kao "Stih dana": prvo pregled koraka, nova verzija tek na strelicu
+    intro: true,
+    enter: '/',
     features: UZ_STIH,
     body: (d) => (
       <FeatureSlide
         d={d}
         features={UZ_STIH}
-        eyebrow={<>Aplikacija · uživo</>}
+        eyebrow={<>Aplikacija</>}
         title={
           <>
-            Sačuvaj, podijeli — <em>vrati se sutra</em>
+            Link kao poster, <em>verzija sama stiže</em>
           </>
         }
       />
@@ -266,12 +221,15 @@ export const SLIDES: SlideDef[] = [
     section: 'Aplikacija',
     title: 'Urednički panel',
     mode: 'desktop',
+    // prvo pregled i miran ekran za prijavu; šifra se kuca tek na strelicu
+    intro: true,
+    enter: '/admin?prijava',
     features: UREDNIK,
     body: (d) => (
       <FeatureSlide
         d={d}
         features={UREDNIK}
-        eyebrow={<>Urednički panel · uživo</>}
+        eyebrow={<>Urednički panel</>}
         title={
           <>
             Magaza <em>ima kontrolu</em>
@@ -280,11 +238,18 @@ export const SLIDES: SlideDef[] = [
       />
     ),
   },
-  { id: 'performanse', section: 'Plan za launch', title: 'Ispod haube', body: () => <Performanse /> },
   { id: 'pwa', section: 'Plan za launch', title: 'PWA ili prava mobilna aplikacija', body: () => <PwaNative /> },
+  {
+    id: 'launch',
+    section: 'Plan za launch',
+    title: 'Plan za launch',
+    // koraci (izlog → objava → kapacitet) idu strelicom; slika desno prati korak
+    features: LANSIRANJE,
+    center: true,
+    body: (d) => <LaunchPlan d={d} />,
+  },
   { id: 'ostalo', section: 'Plan za launch', title: 'Šta je ostalo', body: (d) => <Ostalo d={d} /> },
-  { id: 'qr', section: 'Plan za launch', title: 'QR plakat u Magazi', body: (d) => <Qr d={d} /> },
-  { id: 'mreze', section: 'Plan za launch', title: 'Objava za društvene mreže', body: (d) => <Mreze d={d} /> },
+  { id: 'grafike', section: 'Plan za launch', title: 'Grafike', body: (d) => <Grafike d={d} /> },
   { id: 'pitanja', section: 'Pitanja', title: 'Pitanja', backdrop: 'nada', body: (d) => <Pitanja d={d} /> },
 ]
 
@@ -293,8 +258,39 @@ export const SLIDES: SlideDef[] = [
    ═══════════════════════════════════════════════════════════════ */
 
 /** Ime, logo i web — na prvom i zadnjem slajdu. */
+const SOCIALS: { label: string; href: string; handle: string; icon: React.ReactNode }[] = [
+  {
+    label: 'GitHub',
+    handle: 'pandzicharis',
+    href: 'https://github.com/pandzicharis',
+    icon: (
+      <path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .8.1-.6.3-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c2-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.8V21c0 .3.2.6.7.5A10 10 0 0 0 12 2z" />
+    ),
+  },
+  {
+    label: 'LinkedIn',
+    handle: 'Haris Pandžić',
+    href: 'https://www.linkedin.com/in/haris-pand%C5%BEi%C4%87-3680951ab/',
+    icon: (
+      <path d="M4.5 3A1.5 1.5 0 0 0 3 4.5v15A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5v-15A1.5 1.5 0 0 0 19.5 3zM8 18H5.5v-8H8zM6.8 8.9a1.4 1.4 0 1 1 0-2.9 1.4 1.4 0 0 1 0 2.9zM18.5 18H16v-3.9c0-1-.1-2.2-1.4-2.2s-1.6 1-1.6 2.1v4H10.5v-8h2.4v1.1c.4-.7 1.2-1.3 2.4-1.3 2.6 0 3.2 1.7 3.2 3.9z" />
+    ),
+  },
+  {
+    label: 'Instagram',
+    handle: '@_harispandzic',
+    href: 'https://www.instagram.com/_harispandzic/',
+    icon: (
+      <path
+        fillRule="evenodd"
+        d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2zm0 2A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm5.3-3.3a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"
+      />
+    ),
+  },
+]
+
 function Presenter() {
   return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
     <div className="flex items-center gap-4">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -312,6 +308,25 @@ function Presenter() {
         >
           harispandzic.dev
         </a>
+      </div>
+    </div>
+      {/* GitHub, LinkedIn, Instagram */}
+      <div className="flex flex-wrap items-center gap-2">
+        {SOCIALS.map((x) => (
+          <a
+            key={x.label}
+            href={x.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`${x.label} · ${x.handle}`}
+            className="dk-chip !h-[2.3em] !gap-[0.5em] !px-[0.9em]"
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden>
+              {x.icon}
+            </svg>
+            {x.label === 'Instagram' ? x.handle : x.label}
+          </a>
+        ))}
       </div>
     </div>
   )
@@ -369,18 +384,13 @@ function Intro() {
 }
 
 /**
- * Ko sam i čime se bavim — kratko. Podaci su s harispandzic.dev.
- * Poslodavac namjerno ne stoji: Stih dana je lični projekat.
+ * Ko sam i čime se bavim — kratko, kao na harispandzic.dev.
+ * Desno je portfolio uživo — stalni okvir u Deck.tsx (mode: 'site').
  */
 function OMeni() {
-  const stats: [string, string][] = [
-    ['~5', 'godina iskustva'],
-    ['13', 'proizvoda'],
-    ['6', 'industrija'],
-  ]
-  const daily = ['Stih dana — Dino Merlin', 'My Islamic Reminder', 'Ammar Bašić — misao dana']
+  const industries = ['Ljudski resursi', 'Automobilska industrija', 'Fitnes', 'Sport', 'Obrazovanje', 'Platforme za kreatore']
   return (
-    <div className="grid items-center gap-[5vw] lg:grid-cols-[1.05fr_1fr]">
+    <div>
       <div>
         <R i={0}>
           <div className="flex items-center gap-5">
@@ -404,208 +414,59 @@ function OMeni() {
           </div>
         </R>
         <R i={1}>
-          <p className="dk-lead mt-[3.4vh] max-w-[30em]">
-            Software engineer iz Sarajeva. Oko pet godina pravim web i mobilne proizvode — od arhitekture sistema do
-            zadnjeg piksela na ekranu.
+          <p className="dk-eyebrow mt-[3.6vh] flex flex-wrap items-center gap-x-3 gap-y-1 text-white/70">
+            <span>Sarajevo</span>
+            <span className="h-3 w-px bg-white/25" />
+            <span>Software engineer</span>
           </p>
         </R>
         <R i={2}>
-          <p className="dk-body mt-[1.6vh] max-w-[34em]">
-            HR, automotive, fitness, sport, obrazovanje, kreatorske platforme. Dobar inženjer ne piše samo kod —{' '}
-            <span className="italic text-[#E9D9B6]">razumije problem iza njega.</span>
-          </p>
+          <p className="dk-lead mt-[1.6vh] max-w-[26em]">5 godina iskustva u razvoju softverskih proizvoda.</p>
+          <p className="dk-small mt-[1vh]">Inženjer informacijskih tehnologija · FIT Mostar</p>
         </R>
         <R i={3}>
-          <div className="mt-[3.6vh] flex gap-[clamp(20px,3vw,56px)]">
-            {stats.map(([n, label]) => (
-              <div key={label}>
-                <p className="dk-serif tabular text-[clamp(30px,min(3.3vw,6vh),64px)] leading-none text-[#E9D9B6]">{n}</p>
-                <p className="dk-small mt-2">{label}</p>
-              </div>
-            ))}
-          </div>
-        </R>
-        <R i={4}>
-          <div className="mt-[3.6vh]">
-            <p className="dk-eyebrow mb-2.5 opacity-80">Dnevni PWA rituali — već objavljeni</p>
-            <div className="flex flex-wrap gap-2">
-              {daily.map((t, k) => (
-                <span
-                  key={t}
-                  className="dk-chip"
-                  style={k === 0 ? { borderColor: 'rgba(191,168,127,0.5)', color: '#F1E6CF' } : undefined}
-                >
+          <div className="mt-[3.4vh]">
+            <p className="dk-eyebrow mb-2.5 opacity-80">Industrije</p>
+            <div className="flex max-w-[34em] flex-wrap gap-2">
+              {industries.map((t) => (
+                <span key={t} className="dk-chip">
                   {t}
                 </span>
               ))}
             </div>
           </div>
         </R>
-        <R i={5}>
-          <a
-            href="https://harispandzic.dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="dk-btn-gold mt-[3.6vh]"
-          >
+        <R i={4}>
+          <a href="https://harispandzic.dev" target="_blank" rel="noopener noreferrer" className="dk-btn-gold mt-[3.6vh]">
             harispandzic.dev {Ico.external}
           </a>
         </R>
       </div>
-      <R i={2} className="hidden lg:block">
-        <CodeCard />
-      </R>
-    </div>
-  )
-}
-
-/* boje koda: ključ, tekst, interpunkcija */
-const K = ({ children }: { children: ReactNode }) => <span className="text-[#BFA87F]">{children}</span>
-const S = ({ children }: { children: ReactNode }) => <span className="text-[#E9D9B6]">&apos;{children}&apos;</span>
-const P = ({ children }: { children: ReactNode }) => <span className="text-white/35">{children}</span>
-
-/** Kartica koja se ispiše red po red — motiv s harispandzic.dev. */
-function CodeCard() {
-  const lines: ReactNode[] = [
-    <>
-      <span className="text-[#8DC9A3]">const</span> haris <P>=</P> <P>{'{'}</P>
-    </>,
-    <>
-      {'  '}
-      <K>uloga</K>
-      <P>:</P> <S>software engineer</S>
-      <P>,</P>
-    </>,
-    <>
-      {'  '}
-      <K>grad</K>
-      <P>:</P> <S>Sarajevo</S>
-      <P>,</P>
-    </>,
-    <>
-      {'  '}
-      <K>iskustvo</K>
-      <P>:</P> <S>~5 godina</S>
-      <P>,</P>
-    </>,
-    <>
-      {'  '}
-      <K>fokus</K>
-      <P>: [</P>
-      <S>arhitektura</S>
-      <P>, </P>
-      <S>brzina</S>
-      <P>, </P>
-      <S>detalji</S>
-      <P>],</P>
-    </>,
-    <>
-      {'  '}
-      <K>stack</K>
-      <P>: [</P>
-      <S>TypeScript</S>
-      <P>, </P>
-      <S>React</S>
-      <P>, </P>
-      <S>Node.js</S>
-      <P>],</P>
-    </>,
-    <>
-      {'  '}
-      <K>sada</K>
-      <P>:</P> <S>Stih dana</S>
-      <P>,</P>
-    </>,
-    <P key="zatvori">{'}'}</P>,
-    <span key="prazno"> </span>,
-    <>
-      <span className="text-[#8DC9A3]">while</span> <P>(</P>alive<P>) {'{'}</P> code<P>();</P> repeat<P>();</P> <P>{'}'}</P>
-    </>,
-  ]
-  return (
-    <div className="dk-card overflow-hidden" style={{ background: 'rgba(14,13,12,0.72)' }}>
-      <div className="flex items-center gap-2 border-b border-white/[0.07] px-4 py-3">
-        <i className="block h-2.5 w-2.5 rounded-full bg-[#ff5f57]/80" />
-        <i className="block h-2.5 w-2.5 rounded-full bg-[#febc2e]/80" />
-        <i className="block h-2.5 w-2.5 rounded-full bg-[#28c840]/80" />
-        <span className="ml-3 font-mono text-[12px] text-white/40">haris.ts</span>
-      </div>
-      <pre className="overflow-hidden px-[clamp(16px,1.6vw,28px)] py-[clamp(14px,2.2vh,28px)] font-mono text-[clamp(12px,min(0.95vw,1.75vh),17px)] leading-[1.75] text-white/85">
-        {lines.map((l, k) => (
-          <motion.span
-            key={k}
-            className="block whitespace-pre"
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.5 + k * 0.12, duration: 0.35, ease: 'easeOut' }}
-          >
-            <span className="mr-4 inline-block w-5 text-right text-white/20">{k + 1}</span>
-            {l}
-          </motion.span>
-        ))}
-        {/* kursor na kraju */}
-        <motion.span
-          className="ml-9 inline-block h-[1.1em] w-[0.55em] translate-y-[0.2em] bg-[#BFA87F]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 1, 1, 0] }}
-          transition={{ delay: 0.5 + lines.length * 0.12, duration: 1.1, repeat: Infinity, times: [0, 0.1, 0.6, 0.7] }}
-        />
-      </pre>
     </div>
   )
 }
 
 function Ideja() {
-  const steps = [
-    ['12:00', 'Stigne obavijest', 'Prvi red stiha, na zaključanom ekranu.'],
-    ['Dodir', 'Stih se ispiše', 'Riječ po riječ, u boji svog raspoloženja.'],
-    ['Srce', 'Sačuva ga', 'Bez naloga i bez prijave.'],
-    ['Podijeli', 'Pošalje dalje', 'Kao sliku — Instagram, WhatsApp, Viber.'],
-    ['Sutra', 'Novi stih', 'Isti za sve, istog dana.'],
-  ]
   return (
     <div>
       <R i={0}>
         <p className="dk-eyebrow">Ideja</p>
       </R>
       <R i={1}>
-        <h2 className="dk-h2 mt-[2.2vh] max-w-[17em]">
-          Jedan stih. Jedan trenutak. <em>Pa se aplikacija skloni do sutra.</em>
+        <h2 className="dk-h2 mt-[1.6vh]">
+          Zašto <em>Stih dana</em>?
         </h2>
       </R>
-      <Lead>
-        Telefon je pun feedova i buke. Stih dana je suprotnost: jednom dnevno, u isto vrijeme, na ekranu se riječ po
-        riječ ispiše stih koji su ljudi čuli sto puta — a sad izgleda kao da je napisan baš za njih.
-      </Lead>
-      <div className="relative mt-[5.5vh]">
-        {/* zlatna nit kroz cijeli dan */}
-        <motion.span
-          className="absolute left-0 right-0 top-[19px] hidden h-px origin-left md:block"
-          style={{ background: `linear-gradient(90deg, ${BRAND.gold}, ${BRAND.gold}33)` }}
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ duration: 1.4, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        />
-        <ol className="grid gap-6 md:grid-cols-5 md:gap-[2vw]">
-          {steps.map(([time, title, text], k) => (
-            <R key={title} i={3 + k}>
-              <li className="relative">
-                <span className="relative z-10 flex h-10 w-fit items-center rounded-full border border-[#BFA87F]/45 bg-[#0b0b0c] px-4 text-[13px] font-medium tracking-wide text-[#BFA87F]">
-                  {time}
-                </span>
-                <p className="dk-h3 mt-[2.2vh]">{title}</p>
-                <p className="dk-body mt-1.5">{text}</p>
-              </li>
-            </R>
-          ))}
-        </ol>
+      <div className="mt-[4vh] flex max-w-[30em] flex-col gap-[2.2vh]">
+        {PRICA.map((b, k) => (
+          <R key={b.id} i={2 + k}>
+            <p className="dk-lead flex gap-4" style={k === PRICA.length - 1 ? { color: '#FBF6EC' } : undefined}>
+              <Dot />
+              <span>{b.title}</span>
+            </p>
+          </R>
+        ))}
       </div>
-      <R i={9}>
-        <p className="dk-body mt-[5vh] max-w-[46em]">
-          Nije baza tekstova, ni plejer, ni društvena mreža — <span className="italic text-[#E9D9B6]">snaga je u ograničenju.</span>{' '}
-          A svaki podijeljeni stih je reklama u publici koja već voli Merlina.
-        </p>
-      </R>
     </div>
   )
 }
@@ -614,29 +475,788 @@ function Ideja() {
    APLIKACIJA — dijelovi opisa koji trebaju aplikaciju
    ═══════════════════════════════════════════════════════════════ */
 
-function Ispis() {
-  const { reloadPhone } = useDeck()
+/** Korak 1: link ili QR → uputstvo → „Pogledaj kako“. Telefon to odigra sam, iPhone pa Android. */
+function Instalacija() {
   return (
     <>
       <Text>
-        Riječ po riječ, s blagim izoštravanjem — kao da ga neko pjeva. Isti stih za sve, istog dana, po sarajevskom
-        vremenu. Bez menija i bez ičega što viče.
+        Kad se skenira QR kod ili otvori link, aplikacija se otvori s uputstvom za instalaciju. Na iPhoneu dva koraka
+        kroz Safari, uz animaciju „Pogledaj kako“. Na Androidu samo jedno dugme — „Dodaj na početni ekran“ — i
+        Chromeova potvrda. Stih dana je zatim na početnom ekranu, kao svaka druga aplikacija.
       </Text>
-      <Bullets items={['Fraunces za stih; Rubik, šampanj zlatna i potpis s dinomerlin.com za sve ostalo.']} />
-      <Acts>
-        <ActionChip onClick={reloadPhone}>{Ico.reload} Ispiši ponovo</ActionChip>
-      </Acts>
     </>
   )
 }
 
-function Obavijest() {
-  const { simulate } = useDeck()
+/** Korak 2: s početnog ekrana → aplikacija traži dozvolu → sistemski prozor. */
+function Dozvola() {
   return (
     <>
       <Text>
-        Jedna dnevno, s prvim redom stiha; dodir je otvara pravo na stih. Zvono u zaglavlju je pali i gasi — zeleno
-        stiže, crveno ne stiže.
+        Prvo otvaranje s početnog ekrana traži samo jedno: dozvolu za obavijesti. Prozor je sistemski — isti kao kod
+        svake aplikacije iz storea, na iPhoneu i na Androidu.
+      </Text>
+      <Bullets
+        items={[
+          'Bez dozvole aplikacija ne pušta dalje — stih koji sam dolazi joj je cijela svrha.',
+          'Ako se dozvola odbije, aplikacija pokaže put kroz Postavke.',
+        ]}
+      />
+    </>
+  )
+}
+
+/**
+ * Raspoloženja se smjenjuju na telefonu dok je korak otvoren — kroz /pregled,
+ * koji stih prima porukom: nema ponovnog učitavanja, pa nema ni treptaja;
+ * pozadina se lagano pretopi, a stih se ispiše iznova. Ručno: bira se karticom.
+ */
+function Atmosfera({ d }: { d: DeckData }) {
+  const { phone, manual } = useDeck()
+  const [k, setK] = useState(0)
+  const [round, setRound] = useState(0)
+
+  // pošalji stih telefonu — odmah, i kad god /pregled javi da je spreman
+  useEffect(() => {
+    const send = () =>
+      phone()?.contentWindow?.postMessage(
+        { type: 'stihdana:preview', verse: d.moods[k].verse, date: d.today },
+        window.location.origin,
+      )
+    send()
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === window.location.origin && e.data?.type === 'stihdana:preview-ready') send()
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [k, d, phone])
+
+  useEffect(() => {
+    if (manual) return
+    const t = setInterval(() => setK((i) => (i + 1) % d.moods.length), 3000)
+    return () => clearInterval(t)
+  }, [manual, d.moods.length, round])
+
+  return (
+    <>
+      <Text>
+        Raspoloženje stiha boji cijeli ekran: svjetlo koje pluta, note koje se dižu, zrno filma. Nikad dvije večeri
+        isti osjećaj.
+      </Text>
+      <Bullets
+        items={[
+          <>
+            <b>Svaka pjesma nosi svoj album</b> — omot je u pozadini, utopljen u ton raspoloženja, pa se mijenja zajedno
+            s njim.
+          </>,
+        ]}
+      />
+      <div className="mt-[1.8vh] grid max-w-[34em] grid-cols-2 gap-2 xl:grid-cols-4">
+        {d.moods.map(({ mood, verse }) => (
+          <MoodCard
+            key={mood}
+            mood={mood}
+            song={verse.song}
+            cover={albumOf(verse.album)?.cover}
+            on={d.moods[k]?.mood === mood}
+            onPick={() => {
+              setK(d.moods.findIndex((x) => x.mood === mood))
+              setRound((r) => r + 1)
+            }}
+          />
+        ))}
+      </div>
+    </>
+  )
+}
+
+/** Telefon pokaže gdje se dodirne. */
+/**
+ * Čisto stanje aplikacije u telefonu: bez sačuvanih stihova, bez zapamćenog
+ * formata slike, obavijesti uključene. Prezentacija i aplikacija dijele
+ * localStorage (ista adresa), a upis odavde aplikaciji stigne kao `storage`
+ * događaj — pa se njen ekran odmah osvježi, bez ponovnog učitavanja.
+ */
+export function cleanSlate() {
+  try {
+    localStorage.setItem('stihdana:favorites', '[]')
+    localStorage.removeItem('stihdana:share')
+    localStorage.setItem('stihdana:notify', 'true')
+  } catch {
+    /* privatni prozor */
+  }
+}
+
+type Scene = {
+  wait: (ms: number) => Promise<void>
+  /** element u aplikaciji, tek kad je stvarno vidljiv */
+  find: (sel: string, max?: number) => Promise<HTMLElement | null>
+  /** dodir iznad elementa, pa pravi klik */
+  press: (target: string | HTMLElement) => Promise<boolean>
+  /** sačekaj da je telefon na početnoj stranici aplikacije, učitan */
+  home: () => Promise<boolean>
+  alive: () => boolean
+}
+
+/**
+ * Korak koji sam odigra radnju u aplikaciji na telefonu. Odlaskom s koraka
+ * otvoreni prozor (sačuvani, dijeljenje) se zatvori, da sljedeći krene čist.
+ */
+function useScene(run: (s: Scene) => Promise<void>, always = false) {
+  const { phone, tapAt, manual } = useDeck()
+  useEffect(() => {
+    let alive = true
+    const timers: number[] = []
+    const wait = (ms: number) => new Promise<void>((r) => timers.push(window.setTimeout(r, ms)))
+    const q = (sel: string) => {
+      try {
+        return phone()?.contentDocument?.querySelector<HTMLElement>(sel) ?? null
+      } catch {
+        return null
+      }
+    }
+    const shown = (el: HTMLElement) => {
+      const win = el.ownerDocument.defaultView
+      if (!win || !el.getBoundingClientRect().width) return false
+      let o = 1
+      for (let n: HTMLElement | null = el; n; n = n.parentElement) o *= Number(win.getComputedStyle(n).opacity)
+      return o > 0.9
+    }
+    const find = async (sel: string, max = 8000) => {
+      const t0 = Date.now()
+      while (alive && Date.now() - t0 < max) {
+        const el = q(sel)
+        if (el && shown(el)) return el
+        await wait(120)
+      }
+      return null
+    }
+    const press = async (target: string | HTMLElement) => {
+      const el = typeof target === 'string' ? await find(target) : target
+      if (!el || !alive) return false
+      const r = el.getBoundingClientRect()
+      tapAt(r.left + r.width / 2, r.top + r.height / 2)
+      await wait(260)
+      if (!alive) return false
+      el.click()
+      await wait(380)
+      return true
+    }
+    // prozor koji je ostao otvoren s prošlog koraka
+    const home = async () => {
+      for (let t = 0; t < 80 && alive; t++) {
+        try {
+          const w = phone()?.contentWindow
+          if (w && w.location.pathname === '/' && !w.location.search && w.document.readyState === 'complete') return true
+        } catch {
+          /* tuđa adresa */
+        }
+        await wait(150)
+      }
+      return false
+    }
+    const close = () => {
+      if (q('[role="dialog"][aria-modal="true"]')) q('button[aria-label="Zatvori"]')?.click()
+    }
+    close()
+    // Ručno: prezenter sam klikće po telefonu
+    if (!manual || always) void run({ wait, find, press, home, alive: () => alive })
+    return () => {
+      alive = false
+      timers.forEach(clearTimeout)
+      close()
+    }
+    // scena se igra jednom po ulasku na korak (i ispočetka kad se promijeni Auto/Ručno)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manual])
+}
+
+/** Savjeti iz aplikacije: ekran se zatamni, u fokusu je jedno dugme. Auto ih lista sam, Ručno klikom. */
+function Savjeti() {
+  const { manual } = useDeck()
+  // savjeti se pokažu i u ručnom modu — listaš ih ti
+  return (
+    <>
+      <Text>
+        Odmah nakon dozvole, kratki savjeti preko pravog ekrana: ostatak se zatamni, a u fokusu je jedno dugme i
+        rečenica o njemu. Pokažu se samo jednom.
+      </Text>
+      <Bullets items={['Zvono i obavijest u podne', 'Sačuvaj stih i lista sačuvanih', 'Dijeljenje kao slika', 'Pjesma uz stih']} />
+      <SavjetiScene key={manual ? 'ručno' : 'auto'} manual={manual} />
+    </>
+  )
+}
+
+function SavjetiScene({ manual }: { manual: boolean }) {
+  const { phone } = useDeck()
+  useScene(async ({ wait, find, press, alive }) => {
+    // telefon tek dolazi na stih — savjeti kreću kad je zaglavlje na ekranu
+    let win: Window | null = null
+    for (let t = 0; t < 80 && alive() && !win; t++) {
+      try {
+        const w = phone()?.contentWindow
+        if (w && w.location.pathname === '/' && !w.location.search && w.document.readyState === 'complete') win = w
+      } catch {
+        /* tuđa adresa */
+      }
+      if (!win) await wait(150)
+    }
+    if (!win || !(await find('[data-tip="notify"]')) || !alive()) return
+    cleanSlate()
+    await wait(600)
+    win.dispatchEvent(new (win as Window & typeof globalThis).Event('stihdana:tips'))
+    if (manual) return
+    for (let i = 0; i < 6 && alive(); i++) {
+      const next = await find('[data-deck="tip-next"]', 5000)
+      if (!next) return
+      await wait(3000)
+      if (!alive()) return
+      await press(next)
+      await wait(400)
+    }
+  }, true)
+  return null
+}
+
+/* ── admin na računaru: scene s kursorom ─────────────────────── */
+
+type DeskScene = {
+  wait: (ms: number) => Promise<void>
+  /** element u adminu, tek kad je vidljiv */
+  find: (sel: string, max?: number) => Promise<HTMLElement | null>
+  all: (sel: string) => HTMLElement[]
+  /** kursor dođe do elementa i klikne */
+  click: (target: string | HTMLElement) => Promise<boolean>
+  /** klik u polje, pa kucanje slovo po slovo */
+  type: (target: string | HTMLElement, text: string, speed?: number) => Promise<boolean>
+  /** isprazni polje (kao da je obrisano) */
+  clear: (target: string | HTMLElement) => void
+  /** izbor s padajuće liste */
+  choose: (target: string, value: string) => Promise<boolean>
+  /** prevlačenje: kartica dana se podigne i odnese na drugi dan */
+  drag: (from: HTMLElement, to: HTMLElement) => Promise<void>
+  alive: () => boolean
+}
+
+/**
+ * Korak koji sam radi u adminu na računaru. Kursor (strelica miša) je nacrtan
+ * u samom adminu, pa prati sve što se tamo dešava. Ručno: ništa se ne radi samo.
+ */
+function useDeskScene(run: (s: DeskScene) => Promise<void>) {
+  const { desk, manual } = useDeck()
+  useEffect(() => {
+    if (manual) return
+    let alive = true
+    const timers: number[] = []
+    const wait = (ms: number) => new Promise<void>((r) => timers.push(window.setTimeout(r, ms)))
+    const doc = () => {
+      try {
+        const w = desk()?.contentWindow
+        return w && w.location.pathname === '/admin' && w.document.readyState === 'complete' ? w.document : null
+      } catch {
+        return null
+      }
+    }
+    const q = (sel: string) => doc()?.querySelector<HTMLElement>(sel) ?? null
+    const all = (sel: string) => Array.from(doc()?.querySelectorAll<HTMLElement>(sel) ?? [])
+    const shown = (el: HTMLElement) => {
+      const win = el.ownerDocument.defaultView
+      if (!win || !el.getBoundingClientRect().width) return false
+      let o = 1
+      for (let n: HTMLElement | null = el; n; n = n.parentElement) o *= Number(win.getComputedStyle(n).opacity)
+      return o > 0.9
+    }
+    const find = async (sel: string, max = 10000) => {
+      const t0 = Date.now()
+      while (alive && Date.now() - t0 < max) {
+        const el = q(sel)
+        if (el && shown(el)) return el
+        await wait(120)
+      }
+      return null
+    }
+
+    // sve što scena doda u admin — skloni se kad se ode s koraka
+    const added = new Set<HTMLElement>()
+    const keep = <T extends HTMLElement>(e: T) => {
+      added.add(e)
+      return e
+    }
+    // kursor: strelica miša, u adminu
+    let cursor: HTMLElement | null = null
+    let at = { x: 0, y: 0 }
+    const pointer = () => {
+      const d = doc()
+      if (!d) return null
+      if (cursor && cursor.ownerDocument === d && cursor.isConnected) return cursor
+      cursor = d.createElement('div')
+      cursor.setAttribute('aria-hidden', 'true')
+      at = { x: d.documentElement.clientWidth * 0.62, y: d.documentElement.clientHeight * 0.8 }
+      cursor.style.cssText = `position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none;transform:translate(${at.x}px,${at.y}px);filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))`
+      cursor.innerHTML =
+        '<svg width="20" height="24" viewBox="0 0 20 24"><path d="M2 1.5v18l4.6-4.3 3 6.8 3-1.3-3-6.6H16z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>'
+      d.body.appendChild(keep(cursor))
+      return cursor
+    }
+    const move = async (x: number, y: number, ms = 650) => {
+      const c = pointer()
+      if (!c) return
+      c.animate([{ transform: `translate(${at.x}px,${at.y}px)` }, { transform: `translate(${x}px,${y}px)` }], {
+        duration: ms,
+        easing: 'cubic-bezier(.22,1,.36,1)',
+        fill: 'forwards',
+      })
+      at = { x, y }
+      await wait(ms)
+    }
+    const ripple = (x: number, y: number) => {
+      const d = doc()
+      if (!d) return
+      const r = d.createElement('div')
+      r.style.cssText = `position:fixed;left:${x - 14}px;top:${y - 14}px;width:28px;height:28px;border-radius:50%;background:rgba(191,168,127,.45);z-index:2147483646;pointer-events:none`
+      d.body.appendChild(keep(r))
+      r.animate([{ transform: 'scale(.3)', opacity: 1 }, { transform: 'scale(1.4)', opacity: 0 }], { duration: 450, easing: 'ease-out' }).onfinish = () => r.remove()
+    }
+    const el = async (t: string | HTMLElement) => (typeof t === 'string' ? await find(t) : t)
+    const center = (e: HTMLElement) => {
+      const r = e.getBoundingClientRect()
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+    }
+    const click = async (t: string | HTMLElement) => {
+      const e = await el(t)
+      if (!e || !alive) return false
+      e.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      await wait(250)
+      const c = center(e)
+      await move(c.x, c.y)
+      if (!alive) return false
+      ripple(c.x, c.y)
+      await wait(90)
+      e.click()
+      await wait(300)
+      return true
+    }
+    const setValue = (e: HTMLElement, v: string) => {
+      const win = e.ownerDocument.defaultView as Window & typeof globalThis
+      const proto = e.tagName === 'TEXTAREA' ? win.HTMLTextAreaElement.prototype : win.HTMLInputElement.prototype
+      Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(e, v)
+      e.dispatchEvent(new win.Event('input', { bubbles: true }))
+    }
+    const type = async (t: string | HTMLElement, text: string, speed = 55) => {
+      const e = await el(t)
+      if (!e || !(await click(e))) return false
+      e.focus()
+      const chars = Array.from(text)
+      for (let i = 1; i <= chars.length && alive; i++) {
+        setValue(e, chars.slice(0, i).join(''))
+        await wait(speed + Math.random() * speed * 0.6)
+      }
+      // tastatura nazad prezentaciji — inače polje pojede strelice
+      e.blur()
+      window.focus()
+      return alive
+    }
+    const clear = (t: string | HTMLElement) => {
+      const e = typeof t === 'string' ? q(t) : t
+      if (e) setValue(e, '')
+    }
+    const choose = async (t: string, value: string) => {
+      const e = await find(t)
+      if (!e || !(await click(e))) return false
+      const win = e.ownerDocument.defaultView as Window & typeof globalThis
+      await wait(350)
+      Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, 'value')!.set!.call(e, value)
+      e.dispatchEvent(new win.Event('change', { bubbles: true }))
+      e.blur()
+      window.focus()
+      return alive
+    }
+    const drag = async (from: HTMLElement, to: HTMLElement) => {
+      const d = doc()
+      const win = d?.defaultView as (Window & typeof globalThis) | undefined
+      if (!d || !win || !alive) return
+      const a = center(from)
+      const b = center(to)
+      await move(a.x, a.y)
+      ripple(a.x, a.y)
+      const dt = new win.DataTransfer()
+      const fire = (node: HTMLElement, kind: string) =>
+        node.dispatchEvent(new win.DragEvent(kind, { bubbles: true, cancelable: true, dataTransfer: dt }))
+      fire(from, 'dragstart')
+      // kartica koja se nosi — kopija dana, ide zajedno s kursorom
+      const r = from.getBoundingClientRect()
+      const ghost = from.cloneNode(true) as HTMLElement
+      ghost.style.cssText += `;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;margin:0;z-index:2147483640;pointer-events:none;opacity:.95;box-shadow:0 18px 40px rgba(0,0,0,.6);border-color:#BFA87F`
+      d.body.appendChild(keep(ghost))
+      await wait(220)
+      if (!alive) return
+      const ms = 1000
+      ghost.animate(
+        [{ transform: 'translate(0,0) scale(1.05) rotate(-1.5deg)' }, { transform: `translate(${b.x - a.x}px,${b.y - a.y}px) scale(1.05) rotate(1deg)` }],
+        { duration: ms, easing: 'cubic-bezier(.45,0,.2,1)', fill: 'forwards' },
+      )
+      const going = move(b.x, b.y, ms)
+      await wait(ms * 0.6)
+      if (!alive) return
+      fire(to, 'dragenter')
+      fire(to, 'dragover')
+      await going
+      if (!alive) return
+      fire(to, 'dragover')
+      await wait(250)
+      if (!alive) return
+      fire(to, 'drop')
+      fire(from, 'dragend')
+      ghost.animate([{ opacity: 0.95 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }).onfinish = () => ghost.remove()
+      await wait(700)
+    }
+
+    ;(async () => {
+      // admin mora biti otvoren (poslije prijave)
+      for (let t = 0; t < 100 && alive && !doc(); t++) await wait(150)
+      if (!alive || !doc()) return
+      // prozor ostao otvoren s drugog koraka — zatvori ga
+      q('[role="dialog"]') && q('button[aria-label="Zatvori"]')?.click()
+      await run({ wait, find, all, click, type, clear, choose, drag, alive: () => alive })
+    })()
+    return () => {
+      alive = false
+      timers.forEach(clearTimeout)
+      added.forEach((e) => e.remove())
+      // prekinuto prevlačenje: dan ne smije ostati "podignut"
+      try {
+        const d = desk()?.contentDocument
+        const win = d?.defaultView as (Window & typeof globalThis) | undefined
+        d?.querySelectorAll('[data-cal]').forEach((c) => c.dispatchEvent(new win!.DragEvent('dragend', { bubbles: true })))
+      } catch {
+        /* tuđa adresa */
+      }
+    }
+  }, [desk, manual])
+}
+
+/** Kalendar: tri stiha se prevuku na druge dane, uživo. */
+function Kalendar() {
+  useDeskScene(async ({ wait, find, all, drag, alive }) => {
+    // pravi ekran odmah na ulasku — animacija ide preko njega
+    const tab = await find('[data-tab="calendar"]')
+    if (!tab) return
+    tab.click()
+    // prvi budući dan (prošli su blijedi, pa se "ne vide")
+    if (!(await find('[data-cal]:not([disabled])'))) return
+    await wait(700)
+    // budući dani (prošli su zaključani, današnji takođe)
+    const days = all('[data-cal]').filter((b) => !(b as HTMLButtonElement).disabled && !b.dataset.today)
+    const pairs: [number, number][] = [
+      [1, 4],
+      [7, 2],
+      [5, 10],
+    ]
+    for (const [i, j] of pairs) {
+      if (!alive()) return
+      const from = days[i]
+      const to = days[j]
+      if (!from || !to) continue
+      await drag(from, to)
+      await wait(900)
+    }
+  })
+  return (
+    <>
+      <Text>Koji stih izlazi kojeg dana, obojen raspoloženjem. Stih se prevuče na drugi dan, ili se za dan bira bilo koji.</Text>
+      <Bullets
+        items={[
+          'Današnji je zaključan — ono što je ljudima stiglo, ne mijenja se.',
+          'Upozorenje kad se stih vrati za manje od dvije sedmice.',
+        ]}
+      />
+    </>
+  )
+}
+
+/** Biblioteka: pretraga, filter po raspoloženju, arhiva. */
+function Biblioteka() {
+  useDeskScene(async ({ wait, find, click, type, clear, alive }) => {
+    // pravi ekran odmah na ulasku: lista stihova, bez starih filtera
+    const tab = await find('[data-tab="library"]')
+    if (!tab) return
+    tab.click()
+    const search = await find('[data-search]')
+    if (search) clear(search)
+    ;(await find('[data-scope="active"]', 1500))?.click()
+    await wait(1100)
+    // pretraga po riječi iz stiha ili naziva pjesme
+    await type('[data-search]', 'ljubav', 90)
+    await wait(1800)
+    if (!alive()) return
+    clear('[data-search]')
+    await wait(500)
+    await type('[data-search]', 'Svila', 90)
+    await wait(1800)
+    if (!alive()) return
+    clear('[data-search]')
+    await wait(700)
+    // filter po raspoloženju
+    await click('[data-filter="nostalgija"]')
+    await wait(1800)
+    await click('[data-filter="nostalgija"]')
+    await wait(700)
+    // arhiva: stih izvan rasporeda, a linkovi i sačuvani rade
+    await click('[data-scope="archive"]')
+    await wait(1900)
+    await click('[data-scope="active"]')
+  })
+  return (
+    <>
+      <Text>Pretraga, filter po raspoloženju, i za svaki stih — kad sljedeći put izlazi.</Text>
+      <Bullets items={['Arhiviran stih izlazi iz rasporeda, a linkovi i sačuvani i dalje rade.']} />
+    </>
+  )
+}
+
+/** Novi stih: forma se popuni sama, pregled se mijenja dok se kuca — telefon i računar. */
+function NoviStih() {
+  useDeskScene(async ({ wait, find, click, type, choose, alive }) => {
+    // forma za novi stih otvorena odmah na ulasku
+    const add = await find('[data-new]')
+    if (!add) return
+    add.click()
+    await find('textarea[name="text"]')
+    await wait(900)
+    await type('textarea[name="text"]', 'Kad sve saberem podijelim i oduzmem\nVolim te', 60)
+    await wait(500)
+    await type('input[name="song"]', 'U kandžama jastreba', 55)
+    // album s liste — godina se popuni sama
+    await choose('select[name="album"]', 'Kokuzna vremena')
+    await wait(700)
+    await type('input[name="youtube"]', 'https://www.youtube.com/watch?v=kquGKS-qhn8', 18)
+    await wait(400)
+    await click('[data-edit-mood="ljubav"]')
+    await wait(1400)
+    if (!alive()) return
+    // pregled: računar, pa nazad telefon
+    await click('[data-device="desktop"]')
+    await wait(2600)
+    await click('[data-device="phone"]')
+    await wait(1600)
+    if (!alive()) return
+    await click('form button[type="submit"]')
+  })
+  return (
+    <>
+      <Text>
+        Tekst, pjesma, album, godina, raspoloženje i YouTube. Pored je pravi ekran aplikacije, na telefonu ili
+        računaru, i mijenja se dok se kuca.
+      </Text>
+      <Bullets items={[<><b>Izmjena je na sajtu odmah</b>, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>]} />
+    </>
+  )
+}
+
+/**
+ * Prijava u admin: šifra se ukuca slovo po slovo (tačkice), pa "Uđi".
+ * Prava šifra nikad nije u prezentaciji — ulaz prolazi samo zato što je
+ * prezenter već prijavljen (kolačić važi 12 sati). Ako nije, forma traži
+ * pravu šifru i prezenter je upiše sam.
+ */
+function Pristup() {
+  const { desk, manual } = useDeck()
+  useEffect(() => {
+    if (manual) return
+    let alive = true
+    const timers: number[] = []
+    const wait = (ms: number) => new Promise<void>((r) => timers.push(window.setTimeout(r, ms)))
+    ;(async () => {
+      let form: HTMLFormElement | null = null
+      for (let t = 0; t < 80 && alive && !form; t++) {
+        try {
+          const w = desk()?.contentWindow
+          if (w && w.location.pathname === '/admin' && w.document.readyState === 'complete')
+            form = w.document.querySelector<HTMLFormElement>('form[data-signed-in]')
+        } catch {
+          /* tuđa adresa */
+        }
+        if (!form) await wait(150)
+      }
+      const input = form?.querySelector<HTMLInputElement>('input[type="password"]')
+      const button = form?.querySelector<HTMLButtonElement>('button[type="submit"]')
+      if (!form || !input || !button || !alive) return
+      await wait(900)
+      // React prati vrijednost polja — upis ide kroz izvorni setter + input događaj
+      const win = input.ownerDocument.defaultView as Window & typeof globalThis
+      const set = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!
+      input.focus()
+      const word = 'stihdana12'
+      for (let i = 1; i <= word.length && alive; i++) {
+        set.call(input, word.slice(0, i))
+        input.dispatchEvent(new win.Event('input', { bubbles: true }))
+        await wait(110 + Math.random() * 70)
+      }
+      await wait(650)
+      if (!alive) return
+      button.focus()
+      await wait(250)
+      if (alive) button.click()
+      // tastatura nazad prezentaciji — strelice inače pojede polje
+      await wait(300)
+      ;(input.ownerDocument.activeElement as HTMLElement | null)?.blur?.()
+      window.focus()
+    })()
+    return () => {
+      alive = false
+      timers.forEach(clearTimeout)
+    }
+  }, [desk, manual])
+  return (
+    <>
+      <Text>
+        Na /admin urednik bira i raspoređuje stihove — bez programera i bez čekanja. Jedna šifra, a prijava traje 12
+        sati.
+      </Text>
+      <Bullets items={[<><b>Preporuka: računar.</b> Radi i na telefonu.</>]} />
+    </>
+  )
+}
+
+/** Stih se sačuva, a broj u zaglavlju otvori listu sačuvanih. */
+function Sacuvano() {
+  // na ulasku ništa nije sačuvano — i u Ručno. Sačuvano odavde dalje ostaje
+  // kroz sve naredne korake; briše se tek kad se krene ispočetka.
+  useEffect(() => cleanSlate(), [])
+  useScene(async ({ wait, find, press, home, alive }) => {
+    if (!(await home())) return
+    await wait(300)
+    const save = await find('[data-tip="save"]')
+    if (!save || !alive()) return
+    await wait(500)
+    // prvo se vidi dodir na "Sačuvaj stih"...
+    await press(save)
+    // ...pa gore iskoči ikonica s brojem, i ona se dodirne
+    await find('[data-tip="saved"]', 3000)
+    await wait(1300)
+    if (alive()) await press('[data-tip="saved"]')
+  })
+  return (
+    <Text>
+      „Sačuvaj stih“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir otvara listu. Bez naloga i
+      prijave: sve ostaje na telefonu, server ne radi ništa.
+    </Text>
+  )
+}
+
+/** Dijeljenje: formati jedan za drugim, pa dugme za preuzimanje slike. */
+function Dijeljenje() {
+  const { tapAt } = useDeck()
+  useEffect(() => {
+    try {
+      localStorage.removeItem('stihdana:share')
+    } catch {
+      /* privatni prozor */
+    }
+  }, [])
+  useScene(async ({ wait, find, press, home, alive }) => {
+    if (!(await home())) return
+    await wait(300)
+    if (!(await press('[data-tip="share"]'))) return
+    await wait(1400)
+    for (const f of ['post', 'square', 'story']) {
+      if (!alive()) return
+      await press(`[data-format="${f}"]`)
+      await wait(1300)
+    }
+    // preuzimanje se samo pokaže — klik bi skinuo sliku na računar prezentera
+    const save = await find('[data-tip="download"]')
+    if (save && alive()) {
+      const r = save.getBoundingClientRect()
+      tapAt(r.left + r.width / 2, r.top + r.height / 2)
+    }
+  })
+  return (
+    <>
+      <Text>
+        Story 9:16, objava 4:5 ili kvadrat — istim fontovima i bojama kao na ekranu. Slika ide pravo u Instagram,
+        WhatsApp ili Viber, ili se preuzme na telefon. Crta se na samom telefonu, odmah.
+      </Text>
+      <Bullets items={[<>Diskretan potpis aplikacije na slici: <b>svako dijeljenje je preporuka.</b></>]} />
+    </>
+  )
+}
+
+/** Pjesma krene sama — dugme u aplikaciji se zaista pritisne; odlaskom s koraka stane. */
+function Slusanje() {
+  const { phone, manual } = useDeck()
+  useEffect(() => {
+    let alive = !manual // Ručno: pjesmu pušta prezenter — ali i tad stane na odlasku
+    let t = 0
+    const btn = () => {
+      try {
+        return phone()?.contentDocument?.querySelector<HTMLButtonElement>('[data-deck="play"]') ?? null
+      } catch {
+        return null
+      }
+    }
+    const play = (n: number) => {
+      if (!alive) return
+      const b = btn()
+      if (b && b.dataset.state !== 'playing' && b.dataset.state !== 'loading') b.click()
+      else if (!b && n < 40) t = window.setTimeout(() => play(n + 1), 150)
+    }
+    t = window.setTimeout(() => play(0), 700)
+    return () => {
+      alive = false
+      clearTimeout(t)
+      // pjesma stane i plejer se sklopi — sljedeći koraci ne vuku je sa sobom
+      try {
+        const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
+        w?.dispatchEvent(new w.Event('stihdana:stop-audio'))
+      } catch {
+        /* tuđa adresa */
+      }
+    }
+  }, [phone, manual])
+  return (
+    <Text>
+      Dodir na naziv pjesme pušta je odmah, u pozadini — bez videa i bez napuštanja stiha. Pauza, premotavanje i
+      kontrole sa zaključanog ekrana, kao u pravom plejeru.
+    </Text>
+  )
+}
+
+/**
+ * Zaključan ekran je odmah tu, budan u 11:59 — sat pređe na podne i obavijest
+ * stigne sama. Prvo na iPhoneu, a onda isto na Androidu (prekidač ide s njim).
+ */
+function Obavijest({ d }: { d: DeckData }) {
+  const { simulate, os, setOs, manual } = useDeck()
+  // sačuvano s ranijih koraka ostaje; ako se skočilo pravo ovamo, sačuva se
+  // današnji — kad se aplikacija otvori, gore stoji ikonica s brojem
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('stihdana:favorites') ?? '[]')
+      if (!Array.isArray(saved) || saved.length === 0)
+        localStorage.setItem('stihdana:favorites', JSON.stringify([d.todayVerse.id]))
+    } catch {
+      /* privatni prozor */
+    }
+  }, [d.todayVerse.id])
+  // "Ponovi" — obavijest stiže ispočetka na sistemu koji je upravo na telefonu
+  const [replay, setReplay] = useState(0)
+  useEffect(() => simulate('lock'), [simulate])
+  // cijeli tok na iPhoneu (obavijest → otključavanje → bedž → stih) traje
+  // ~12 s, pa stih da se ispiše — onda isto na Androidu
+  useEffect(() => {
+    if (os !== 'ios' || manual) return
+    const t = setTimeout(() => {
+      setOs('android')
+      simulate('lock')
+    }, 18500)
+    return () => clearTimeout(t)
+  }, [os, setOs, manual, replay, simulate])
+  return (
+    <>
+      <Text>
+        Svaki dan u podne stih stigne na zaključan ekran. Na početnom ekranu ikonica čeka s bedžom, a otvaranje vodi
+        pravo na današnji stih. Zvono u zaglavlju aplikacije obavijesti pali i gasi.
       </Text>
       <Bullets
         items={[
@@ -644,14 +1264,37 @@ function Obavijest() {
         ]}
       />
       <Acts>
-        <ActionChip onClick={() => simulate('notify')}>{Ico.bell} Stigla je obavijest</ActionChip>
+        <ActionChip
+          onClick={() => {
+            setReplay((r) => r + 1)
+            simulate('lock')
+          }}
+        >
+          {Ico.reload} Ponovi
+        </ActionChip>
       </Acts>
     </>
   )
 }
 
 function Azuriranje() {
-  const { simulate } = useDeck()
+  const { simulate, phone } = useDeck()
+  // ponuda nove verzije stigne tek kad je aplikacija učitana i na ekranu
+  useScene(async ({ wait, find, alive }) => {
+    for (let t = 0; t < 80 && alive(); t++) {
+      try {
+        const w = phone()?.contentWindow
+        if (w && w.location.pathname === '/' && !w.location.search && w.document.readyState === 'complete') break
+      } catch {
+        /* tuđa adresa */
+      }
+      await wait(150)
+    }
+    if (!(await find('[data-tip="song"]', 15000)) || !alive()) return
+    // na ulasku nema ničega — ponuda iskoči tek za 2 s, kao da je baš stigla
+    await wait(2000)
+    if (alive()) simulate('update')
+  }, true)
   return (
     <>
       <Text>
@@ -660,48 +1303,54 @@ function Azuriranje() {
       </Text>
       <Bullets items={['Bez mreže otvara zadnji viđeni stih; otvorena preko ponoći sama pređe na novi dan.']} />
       <Acts>
-        <ActionChip onClick={() => simulate('update')}>{Ico.reload} Stigla je nova verzija</ActionChip>
+        <ActionChip onClick={() => simulate('update')}>{Ico.reload} Ponovi</ActionChip>
       </Acts>
     </>
   )
 }
 
-/** Poruka kako je vidi primalac — link na stih postaje kartica sa slikom. */
-function LinkPreview({ d }: { d: DeckData }) {
-  const v = d.todayVerse
+/** WhatsApp na telefonu: poruka s linkom se ukuca i pošalje — u chatu postane kartica sa slikom stiha. */
+function LinkPreview() {
+  const { simulate } = useDeck()
+  useEffect(() => simulate('chat'), [simulate])
   return (
     <>
       <Text>
-        Svaki stih ima stalnu adresu. U WhatsAppu ili Viberu ne izgleda kao gola adresa, nego kao kartica sa slikom
-        stiha — i radi zauvijek.
+        Kad neko pošalje link na stih, prijatelj u WhatsAppu ili Viberu ne vidi niz slova, nego karticu: sliku sa
+        stihom, naziv pjesme i ime aplikacije. Dodir otvara baš taj stih — i sutra, i za godinu dana.
       </Text>
-      <div className="mt-[1.8vh] w-[min(100%,250px)] rounded-[16px] rounded-tl-[5px] bg-[#1F2C34] p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.45)]">
-        <div className="flex gap-2 overflow-hidden rounded-[11px] bg-[#111B21]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/og/${v.id}/post`} alt="" className="aspect-square w-[78px] shrink-0 object-cover" />
-          <div className="min-w-0 py-1.5 pr-2">
-            <p className="truncate text-[12px] font-medium text-white/90">{v.song}</p>
-            <p className="line-clamp-2 text-[11px] leading-snug text-white/55">{oneLine(withPeriod(v.text))}</p>
-            <p className="mt-0.5 truncate text-[10px] text-white/35">{d.host}</p>
-          </div>
-        </div>
-        <p className="truncate px-1.5 pt-1 text-[11px] text-[#53BDEB]">
-          {d.host}/stih/{v.id}
-        </p>
-      </div>
+      <Bullets
+        items={[
+          'Svaki stih ima svoju stalnu adresu, pa link nikad ne zastari.',
+          <>Svaki poslani link je mali poster: <b>vodi nove ljude pravo u aplikaciju.</b></>,
+        ]}
+      />
+      <Acts>
+        <ActionChip onClick={() => simulate('chat')}>{Ico.reload} Ponovi</ActionChip>
+      </Acts>
     </>
   )
 }
 
-function MoodCard({ mood, verseId, song }: { mood: keyof typeof MOODS; verseId: string; song: string }) {
-  const { phoneSrc, openPhone } = useDeck()
+function MoodCard({
+  mood,
+  song,
+  cover,
+  on,
+  onPick,
+}: {
+  mood: keyof typeof MOODS
+  song: string
+  /** omot albuma pjesme — blijed, u tonu raspoloženja, kao na ekranu */
+  cover?: string
+  on: boolean
+  onPick: () => void
+}) {
   const m = MOODS[mood]
-  const src = `/?verse=${verseId}`
-  const on = phoneSrc === src
   return (
     <motion.button
       type="button"
-      onClick={() => openPhone(src)}
+      onClick={onPick}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.97 }}
       className="relative overflow-hidden rounded-[14px] border p-2.5 text-left transition-colors"
@@ -712,13 +1361,29 @@ function MoodCard({ mood, verseId, song }: { mood: keyof typeof MOODS; verseId: 
       }}
       aria-pressed={on}
     >
-      <span className="flex items-center gap-1.5">
+      {cover && (
+        <>
+          <span
+            className="absolute inset-y-0 right-0 aspect-square bg-cover bg-center"
+            style={{
+              backgroundImage: `url(${cover})`,
+              opacity: on ? 0.55 : 0.32,
+              transition: 'opacity 0.5s',
+              maskImage: 'linear-gradient(to right, transparent, black 70%)',
+              WebkitMaskImage: 'linear-gradient(to right, transparent, black 70%)',
+            }}
+            aria-hidden
+          />
+          <span className="absolute inset-0" style={{ backgroundColor: m.gradient[1], mixBlendMode: 'color', opacity: 0.4 }} aria-hidden />
+        </>
+      )}
+      <span className="relative flex items-center gap-1.5">
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: m.accent, boxShadow: `0 0 10px ${m.accent}` }} />
         <span className="truncate text-[9.5px] font-semibold uppercase tracking-[0.18em]" style={{ color: m.accent }}>
           {m.label}
         </span>
       </span>
-      <span className="mt-4 block truncate text-[12px] text-white/75" style={{ fontFamily: 'var(--font-serif), serif' }}>
+      <span className="relative mt-4 block truncate text-[12px] text-white/75" style={{ fontFamily: 'var(--font-serif), serif' }}>
         {song}
       </span>
     </motion.button>
@@ -729,380 +1394,6 @@ function MoodCard({ mood, verseId, song }: { mood: keyof typeof MOODS; verseId: 
 /* ═══════════════════════════════════════════════════════════════
    PLAN ZA LAUNCH
    ═══════════════════════════════════════════════════════════════ */
-
-function Performanse() {
-  const stats: [string, string][] = [
-    ['0', 'upita bazi po posjeti'],
-    ['500 = 500.000', 'korisnika: isti trošak, ista brzina'],
-    ['8 ×', 'paralelnih slanja — desetine hiljada obavijesti za nekoliko sekundi'],
-    ['$0–20', 'mjesečno za hosting i bazu'],
-  ]
-  const flows: [string, string[], string][] = [
-    ['Posjeta', ['Telefon', 'CDN · gotova stranica'], 'bez servera i bez baze'],
-    ['Obavijest', [`Okidač ${SEND_TIME}`, 'Slanje u porcijama', 'Apple · Google'], 'niko je ne dobije dvaput'],
-    ['Urednik', ['/admin', 'Baza', 'Sajt osvježen'], 'odmah, bez deploya'],
-  ]
-  return (
-    <div>
-      <R i={0}>
-        <p className="dk-eyebrow">Ispod haube</p>
-      </R>
-      <R i={1}>
-        <h2 className="dk-h2 mt-[2.2vh] max-w-[18em]">
-          Napravljena da izdrži <em>Merlinovu objavu</em>
-        </h2>
-      </R>
-      <Lead>
-        Ako Dino podijeli link, desetine hiljada ljudi otvore aplikaciju u istom satu. Zato stih ne dolazi iz baze —
-        računa se iz datuma, a stranica se servira s CDN-a, gotova, kao slika.
-      </Lead>
-      <div className="mt-[4.5vh] grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map(([big, small], k) => (
-          <R key={big} i={3 + k}>
-            <div className="dk-card h-full p-[clamp(14px,1.4vw,24px)]">
-              <p className="dk-serif tabular text-[clamp(26px,min(2.8vw,5vh),54px)] leading-none text-[#E9D9B6]">{big}</p>
-              <p className="dk-small mt-2.5">{small}</p>
-            </div>
-          </R>
-        ))}
-      </div>
-      <R i={7}>
-        <div className="mt-[3.5vh] flex flex-col gap-2.5">
-          {flows.map(([label, nodes, note]) => (
-            <div key={label} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="dk-eyebrow w-[7.5em] shrink-0 opacity-80">{label}</span>
-              {nodes.map((n, k) => (
-                <span key={n} className="flex items-center gap-3">
-                  {k > 0 && <span className="text-[#BFA87F]/60">→</span>}
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[clamp(12px,0.85vw,15px)] text-white/80">
-                    {n}
-                  </span>
-                </span>
-              ))}
-              <span className="dk-small ml-1 italic">{note}</span>
-            </div>
-          ))}
-        </div>
-      </R>
-    </div>
-  )
-}
-
-function PwaNative() {
-  const pwa = {
-    plus: [
-      'Gotova — radi danas',
-      'QR ili link → početni ekran, za sekunde',
-      'Izmjene stižu odmah, bez storea',
-      'Jedan kod za iPhone, Android i računar',
-      'Trošak $0–20 mjesečno',
-    ],
-    minus: [
-      'iPhone: obavijesti tek s početnog ekrana',
-      'Nema widgeta ni stiha na zaključanom ekranu',
-      'Nema je u App Storeu i Google Playu',
-      'Instalacija na iPhoneu traži par koraka',
-    ],
-  }
-  const native = {
-    plus: [
-      'Pouzdane obavijesti na svakom uređaju',
-      'Widget sa stihom na početnom ekranu',
-      'App Store i Google Play — pretraga i legitimitet',
-      'Isječak pjesme u pozadini (uz licencu)',
-    ],
-    minus: [
-      'Pregled u storeu prije svake verzije',
-      'Apple $99 godišnje, Google $25 jednom',
-      'Duži razvoj i održavanje dvije platforme',
-      'Preuzimanje iz storea — veći prag za korisnika',
-    ],
-  }
-  return (
-    <div>
-      <R i={0}>
-        <p className="dk-eyebrow">Odluka</p>
-      </R>
-      <R i={1}>
-        <h2 className="dk-h2 mt-[2.2vh]">
-          PWA danas — <em>native kad brojke kažu</em>
-        </h2>
-      </R>
-      <div className="mt-[4vh] grid gap-3 md:grid-cols-2">
-        <R i={2}>
-          <ProsCons title="PWA" sub="ova aplikacija, iz preglednika na početni ekran" {...pwa} highlight />
-        </R>
-        <R i={3}>
-          <ProsCons title="Native" sub="iOS i Android aplikacija iz storea" {...native} />
-        </R>
-      </div>
-      <R i={5}>
-        <div
-          className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[clamp(16px,1.4vw,28px)] border px-[clamp(16px,1.6vw,28px)] py-[clamp(12px,1.6vh,20px)]"
-          style={{ borderColor: `${BRAND.gold}55`, background: `linear-gradient(90deg, ${BRAND.gold}1f, transparent 70%)` }}
-        >
-          <span className="dk-eyebrow">Preporuka</span>
-          <p className="dk-body min-w-0 flex-1 text-white/80">
-            Krenuti s PWA-om — gotova je i besplatna za korisnika. Kad brojke pokažu da ljudi ostaju, dodati native
-            omotač za widget i store — <b>isti stihovi, isti backend, bez bacanja posla.</b>
-          </p>
-        </div>
-      </R>
-    </div>
-  )
-}
-
-function ProsCons({
-  title,
-  sub,
-  plus,
-  minus,
-  highlight = false,
-}: {
-  title: string
-  sub: string
-  plus: string[]
-  minus: string[]
-  highlight?: boolean
-}) {
-  return (
-    <div className="dk-card h-full p-[clamp(16px,1.6vw,28px)]" style={highlight ? { borderColor: 'rgba(191,168,127,0.35)' } : undefined}>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="dk-h3">{title}</p>
-        <p className="dk-small truncate">{sub}</p>
-      </div>
-      <div className="mt-4 grid gap-5 sm:grid-cols-2">
-        <ul className="flex flex-col gap-2">
-          {plus.map((t) => (
-            <li key={t} className="dk-body flex gap-2.5 text-white/80">
-              <span className="mt-[0.1em] text-[#8DC9A3]">+</span>
-              {t}
-            </li>
-          ))}
-        </ul>
-        <ul className="flex flex-col gap-2">
-          {minus.map((t) => (
-            <li key={t} className="dk-body flex gap-2.5 text-white/50">
-              <span className="mt-[0.1em] text-[#D08C8C]">−</span>
-              {t}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
-}
-
-function Ostalo({ d }: { d: DeckData }) {
-  const done = [
-    'Aplikacija na početnom ekranu (iPhone i Android)',
-    'Stih dana, atmosfera, potpis',
-    'Sačuvani stihovi, dijeljenje, trajni link',
-    `Obavijest u ${SEND_TIME}`,
-    'Urednički panel s kalendarom',
-    'Plakat A3 i A4 s QR kodom, objava i story',
-  ]
-  const magaza: [string, ReactNode][] = [
-    [
-      'Lista stihova',
-      <>
-        Sada ih je {d.count}; za launch <b>90–120</b> — tri do četiri mjeseca bez ponavljanja. Magaza bira i
-        odobrava.
-      </>,
-    ],
-    [
-      'Grafika u visokoj rezoluciji',
-      <>
-        Potpis, portret i logotipi su sada preuzeti sa sajtova. Trebaju <b>originali</b> — vektor ili PNG visoke
-        rezolucije — za oštar ekran, ikone i štampu.
-      </>,
-    ],
-    ['Dozvola za tekstove', <>Dogovor s autorom i izdavačem (AMUS) prije javnog launcha.</>],
-  ]
-  const me = [
-    'Ikone i uvodni ekran s finalnom grafikom',
-    `Pouzdan okidač za ${SEND_TIME} i nadzor slanja`,
-    'Analitika: instalacije, obavijesti, dijeljenja, povratak',
-    'Domena — npr. stihdana.ba',
-    'Štampa plakata i dan launcha',
-  ]
-  return (
-    <div>
-      <R i={0}>
-        <p className="dk-eyebrow">Do launcha</p>
-      </R>
-      <R i={1}>
-        <h2 className="dk-h2 mt-[2.2vh]">
-          Šta je <em>ostalo</em>
-        </h2>
-      </R>
-      <div className="mt-[4vh] grid gap-3 lg:grid-cols-[1fr_1.35fr_1fr]">
-        <R i={2}>
-          <div className="dk-card h-full p-[clamp(16px,1.6vw,28px)]">
-            <p className="dk-eyebrow" style={{ color: '#8DC9A3' }}>
-              Gotovo
-            </p>
-            <ul className="mt-3 flex flex-col gap-2">
-              {done.map((t) => (
-                <li key={t} className="dk-body flex gap-2.5 text-white/70">
-                  <span className="mt-[0.2em] text-[#8DC9A3]">{Ico.check}</span>
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </R>
-        <R i={3}>
-          <div className="dk-card h-full p-[clamp(16px,1.6vw,28px)]" style={{ borderColor: `${BRAND.gold}55`, background: `${BRAND.gold}0d` }}>
-            <p className="dk-eyebrow">Od Magaze</p>
-            <ol className="mt-3 flex flex-col gap-[2vh]">
-              {magaza.map(([title, text], k) => (
-                <li key={title} className="flex gap-3">
-                  <span className="dk-num mt-0.5">{k + 1}</span>
-                  <span>
-                    <span className="dk-h3 block">{title}</span>
-                    <span className="dk-body mt-1 block">{text}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </R>
-        <R i={4}>
-          <div className="dk-card h-full p-[clamp(16px,1.6vw,28px)]">
-            <p className="dk-eyebrow" style={{ color: 'rgba(255,255,255,0.55)' }}>
-              Na meni
-            </p>
-            <ul className="mt-3 flex flex-col gap-2">
-              {me.map((t) => (
-                <li key={t} className="dk-body flex gap-2.5 text-white/70">
-                  <span className="mt-[0.72em] block h-px w-3 shrink-0 bg-white/30" />
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </R>
-      </div>
-    </div>
-  )
-}
-
-function Qr({ d }: { d: DeckData }) {
-  return (
-    <div className="grid h-full items-center gap-[4vw] lg:grid-cols-[1fr_auto]">
-      <div>
-        <R i={0}>
-          <p className="dk-eyebrow">Put do korisnika</p>
-        </R>
-        <R i={1}>
-          <h2 className="dk-h2 mt-[2.2vh] max-w-[14em]">
-            Od izloga <em>do početnog ekrana</em>
-          </h2>
-        </R>
-        <Lead>
-          Plakat stoji u Magazi. Kupac skenira kod, aplikacija se otvori i sama ga vodi do početnog ekrana — i od
-          sutra mu stih stiže svaki dan u podne. Na plakatu: iPhone sa stihom i Samsung s obaviješću.
-        </Lead>
-        <R i={3}>
-          <div className="mt-[4vh] flex items-center gap-5">
-            <div className="rounded-[18px] bg-[#F6F1E7] p-2.5 shadow-[0_0_0_2px_#BFA87F,0_20px_50px_rgba(0,0,0,0.5)]">
-              <QrCode qr={d.poster.qr} style={{ width: 'clamp(104px, 15vh, 170px)', height: 'auto', display: 'block' }} />
-            </div>
-            <div>
-              <p className="dk-h3">Skenirajte sad</p>
-              <p className="dk-small mt-1">Kod je pravi — vodi na {d.host}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <a href="/prezentacija/plakat" target="_blank" className="dk-btn-gold">
-                  Plakat A3 {Ico.external}
-                </a>
-                <a href="/prezentacija/plakat/a4" target="_blank" className="dk-chip">
-                  A4 položeno {Ico.external}
-                </a>
-              </div>
-            </div>
-          </div>
-        </R>
-      </div>
-      <R i={2} className="hidden justify-center lg:flex">
-        <PosterScene d={d} />
-      </R>
-    </div>
-  )
-}
-
-/** Plakat u ramu, pod svjetlom — kako stoji u Magazi. */
-function PosterScene({ d }: { d: DeckData }) {
-  const h = 'min(74vh, 900px)'
-  return (
-    <div className="relative" style={{ height: h }}>
-      <div
-        className="pointer-events-none absolute -inset-x-[40%] -top-[12%] h-[70%]"
-        style={{ background: 'radial-gradient(ellipse 50% 60% at 50% 0%, rgba(255,240,210,0.16), transparent 70%)' }}
-        aria-hidden
-      />
-      <div
-        className="relative rounded-[6px] p-[0.9vh]"
-        style={{
-          height: h,
-          background: 'linear-gradient(145deg, #3a3835, #1b1a19 40%, #2c2a27)',
-          boxShadow: '0 0 0 1px rgba(255,255,255,0.08), 0 40px 90px rgba(0,0,0,0.7), 0 6px 18px rgba(0,0,0,0.5)',
-        }}
-      >
-        <Poster data={d.poster} width={`calc((${h} - 1.8vh) / 1.4142)`} />
-      </div>
-      <div
-        className="pointer-events-none absolute -bottom-[5%] left-[8%] right-[8%] h-[5%] rounded-[50%] bg-black/60 blur-xl"
-        aria-hidden
-      />
-    </div>
-  )
-}
-
-function Mreze({ d }: { d: DeckData }) {
-  return (
-    <div className="grid h-full items-center gap-[4vw] lg:grid-cols-[1fr_auto]">
-      <div>
-        <R i={0}>
-          <p className="dk-eyebrow">Launch</p>
-        </R>
-        <R i={1}>
-          <h2 className="dk-h2 mt-[2.2vh] max-w-[13em]">
-            Jedna objava — <em>i publika je tu</em>
-          </h2>
-        </R>
-        <Lead>
-          Za Merlinov profil i za Magazu: objava 4:5 za feed i story 9:16, istim jezikom kao plakat. Na mreži niko ne
-          skenira kod — zato link: u opisu objave, ili kao link naljepnica u storyju.
-        </Lead>
-        <Points
-          items={[
-            <>
-              <b>Isti stihovi, isti telefoni</b> — plakat u radnji i objava na mreži se prepoznaju kao jedno.
-            </>,
-            <>
-              <b>Story ostavlja rubove prazne</b> — Instagramove kontrole ne pokrivaju ništa bitno.
-            </>,
-          ]}
-        />
-        <R i={6}>
-          <a href="/prezentacija/objava" target="_blank" className="dk-btn-gold mt-[3.4vh]">
-            Objava i story {Ico.external}
-          </a>
-        </R>
-      </div>
-      <R i={2} className="hidden items-end gap-[1.6vw] lg:flex">
-        <div style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08)' }}>
-          <SocialPost data={d.poster} width="min(27vw, 56vh)" />
-        </div>
-        <div style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08)' }}>
-          <SocialStory data={d.poster} width="min(19.7vw, 41vh)" />
-        </div>
-      </R>
-    </div>
-  )
-}
-
 
 /* ═══════════════════════════════════════════════════════════════
    PITANJA
@@ -1123,7 +1414,7 @@ function Pitanja({ d }: { d: DeckData }) {
         </R>
         <R i={3}>
           <p className="dk-lead mt-[2.6vh] max-w-[26em]">
-            Hvala. Aplikacija je živa — skenirajte i ponesite stih kući.
+            Hvala na pažnji. Skenirajte kod i probajte — od sutra vam stih stiže svaki dan u {SEND_TIME}.
           </p>
         </R>
         <R i={4}>

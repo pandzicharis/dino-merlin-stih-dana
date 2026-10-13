@@ -4,10 +4,18 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'motion/react'
 import { BRAND } from '@/lib/brand'
-import { PageShell } from '../PageShell'
 import { MagazaLogo } from '../MagazaLogo'
 
-export function AdminLogin({ configured }: { configured: boolean }) {
+export function AdminLogin({
+  configured,
+  signedIn = false,
+  shown = false,
+}: {
+  configured: boolean
+  signedIn?: boolean
+  /** prikaz u prezentaciji: polje ne uzima tastaturu samo (strelice pripadaju slajdovima) */
+  shown?: boolean
+}) {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -18,6 +26,12 @@ export function AdminLogin({ configured }: { configured: boolean }) {
     if (busy || !password) return
     setBusy(true)
     setError(null)
+    // prikaz prijave (prezentacija), a urednik je već prijavljen — samo dalje
+    if (signedIn) {
+      await new Promise((r) => setTimeout(r, 500))
+      router.replace('/admin')
+      return
+    }
     const res = await fetch('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -34,12 +48,17 @@ export function AdminLogin({ configured }: { configured: boolean }) {
   }
 
   return (
-    <PageShell eyebrow="Stih dana" title="Postavke" back={null}>
+    // samo kutija za šifru, na sredini ekrana — bez zaglavlja
+    <main
+      className="flex min-h-[100dvh] items-center justify-center px-5 py-10"
+      style={{ background: `radial-gradient(60% 45% at 50% 40%, ${BRAND.gold}14 0%, transparent 70%), #050505` }}
+    >
       <motion.form
         onSubmit={submit}
+        data-signed-in={signedIn || undefined}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mx-auto mt-10 max-w-sm rounded-[26px] border border-white/10 bg-white/[0.03] p-7 backdrop-blur-sm"
+        className="w-full max-w-sm rounded-[26px] border border-white/10 bg-white/[0.03] p-7 shadow-[0_30px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm"
       >
         <span className="mb-6 flex justify-center opacity-80">
           <MagazaLogo height={32} color="#F4F4F4" />
@@ -67,7 +86,7 @@ export function AdminLogin({ configured }: { configured: boolean }) {
             <input
               type="password"
               autoComplete="current-password"
-              autoFocus
+              autoFocus={!shown}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Šifra"
@@ -86,6 +105,6 @@ export function AdminLogin({ configured }: { configured: boolean }) {
           </>
         )}
       </motion.form>
-    </PageShell>
+    </main>
   )
 }

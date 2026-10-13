@@ -31,20 +31,23 @@ export async function deckData(): Promise<DeckData> {
     return pool.find((v) => v.mood === mood) ?? pool[0]
   }
   const host = PUBLIC_URL.replace(/^https?:\/\//, '')
+  // jedan stih kroz cijelu prezentaciju: ekran, zaključan ekran, plakati, objave
+  const todayVerse = await verseForDay(today)
 
   return {
     url: PUBLIC_URL,
     host,
     today,
-    todayVerse: await verseForDay(today),
+    todayVerse,
     count: active.length,
+    verses: pool,
     moods: MOOD_KEYS.map((mood) => ({ mood, verse: pool.find((v) => v.mood === mood) ?? pool[0] })),
     poster: {
       qr: qrMatrix(PUBLIC_URL),
       host,
-      // plakat visi mjesecima — stihovi koji ne stare, ne današnji
-      hero: pick('zove-se-prilika', 'nada'),
-      notify: pick('ruzo-moja', 'ljubav'),
+      // isti, današnji stih na ekranu i na zaključanom ekranu
+      hero: todayVerse,
+      notify: todayVerse,
       date: today,
     },
   }

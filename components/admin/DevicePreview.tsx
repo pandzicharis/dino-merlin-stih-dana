@@ -60,6 +60,7 @@ export function DevicePreview({ verse, date, maxHeight = 460 }: { verse: Verse; 
           <button
             key={d}
             type="button"
+            data-device={d}
             onClick={() => setDevice(d)}
             className="relative h-8 rounded-full text-[11px] font-medium transition-colors"
             style={{ color: d === device ? '#14100A' : 'rgba(255,255,255,0.6)' }}

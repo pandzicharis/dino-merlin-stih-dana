@@ -55,16 +55,9 @@ export function FeatureSlide({
         <ol className="mt-[3vh] max-w-[min(100%,52rem)]">
           {features.map((f, k) => {
             const on = k === step
+            const done = k < step
             return (
-              <li key={f.id} className="relative border-t border-white/[0.08] last:border-b">
-                {on && (
-                  <motion.span
-                    layoutId="feature-rail"
-                    className="absolute -top-px left-0 h-px w-full"
-                    style={{ background: 'linear-gradient(90deg, #BFA87F, rgba(191,168,127,0.15))' }}
-                    transition={{ type: 'spring', stiffness: 380, damping: 36 }}
-                  />
-                )}
+              <li key={f.id} className="relative">
                 <button
                   type="button"
                   onClick={() => setStep(k)}
@@ -72,15 +65,22 @@ export function FeatureSlide({
                   className="group flex w-full items-center gap-[1.1em] py-[1.15vh] text-left"
                   style={{ fontSize: 'var(--fs-body)' }}
                 >
+                  {/* odrađeni koraci: zlatna kvačica, naslov u zlatnom tonu */}
                   <span
                     className="dk-num transition-colors duration-300"
-                    style={on ? { background: 'linear-gradient(180deg, #E2CFA6, #BFA87F)', color: '#14100A', borderColor: 'transparent' } : undefined}
+                    style={
+                      on
+                        ? { background: 'linear-gradient(180deg, #E2CFA6, #BFA87F)', color: '#14100A', borderColor: 'transparent' }
+                        : done
+                          ? { background: 'rgba(191,168,127,0.14)', color: '#E2CFA6', borderColor: 'rgba(191,168,127,0.55)' }
+                          : undefined
+                    }
                   >
-                    {k + 1}
+                    {done ? Ico.check : k + 1}
                   </span>
                   <span
                     className="dk-h3 transition-colors duration-300 group-hover:text-white/85"
-                    style={{ color: on ? '#FBF6EC' : 'rgba(255,255,255,0.42)' }}
+                    style={{ color: on ? '#FBF6EC' : done ? 'rgba(226,207,166,0.72)' : 'rgba(255,255,255,0.42)' }}
                   >
                     {f.title}
                   </span>
@@ -110,6 +110,16 @@ export function FeatureSlide({
 
 /* ── sitni dijelovi opisa funkcionalnosti ───────────────────── */
 
+/** Zlatna tačka ispred stavke — poravnata s prvim redom teksta. */
+export function Dot() {
+  return (
+    <span
+      aria-hidden
+      className="mt-[0.62em] block h-[0.34em] w-[0.34em] shrink-0 rotate-45 bg-[#BFA87F] shadow-[0_0_10px_rgba(191,168,127,0.6)]"
+    />
+  )
+}
+
 export function Text({ children }: { children: ReactNode }) {
   return <p className="dk-body max-w-[38em] text-white/70">{children}</p>
 }
@@ -119,7 +129,7 @@ export function Bullets({ items }: { items: ReactNode[] }) {
     <ul className="mt-[1.4vh] flex max-w-[34em] flex-col gap-[0.9vh]">
       {items.map((t, k) => (
         <li key={k} className="dk-small flex gap-2.5 text-white/55">
-          <span className="mt-[0.72em] block h-px w-2.5 shrink-0 bg-[#BFA87F]" aria-hidden />
+          <Dot />
           <span>{t}</span>
         </li>
       ))}
@@ -136,10 +146,7 @@ export function Acts({ children }: { children: ReactNode }) {
 export function Try({ steps }: { steps: string[] }) {
   return (
     <p className="dk-small mt-[1.6vh] flex flex-wrap items-center gap-x-2 gap-y-1 text-white/55">
-      <span className="flex items-center gap-1.5 text-[0.85em] font-medium uppercase tracking-[0.22em] text-[#8DC9A3]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#8DC9A3]" />
-        Uživo
-      </span>
+      <span className="text-[0.85em] font-medium uppercase tracking-[0.22em] text-[#BFA87F]">Probaj</span>
       {steps.map((s, k) => (
         <span key={s} className="flex items-center gap-2">
           {k > 0 && <span className="text-[#BFA87F]/60">→</span>}
@@ -192,7 +199,7 @@ export function Points({ i = 3, items }: { i?: number; items: ReactNode[] }) {
       {items.map((item, k) => (
         <R key={k} i={i + k}>
           <li className="dk-body flex gap-3">
-            <span className="mt-[0.72em] block h-px w-3 shrink-0 bg-[#BFA87F]" aria-hidden />
+            <Dot />
             <span>{item}</span>
           </li>
         </R>
@@ -258,6 +265,64 @@ export function PhoneChip({ src, frame, children }: { src: string; frame?: Devic
     <button type="button" className="dk-chip" aria-pressed={on} onClick={() => openPhone(src, frame)}>
       {children}
     </button>
+  )
+}
+
+/**
+ * iPhone / Android — jedan prekidač ispod telefona za cijelu prezentaciju.
+ * Zlatna podloga klizi na izabrani sistem.
+ */
+export function OsToggle() {
+  const { os, setOs } = useDeck()
+  return (
+    <div className="dk-os dk-os--wide" role="radiogroup" aria-label="Sistem telefona">
+      {(
+        [
+          ['ios', Ico.apple, 'iPhone'],
+          ['android', Ico.android, 'Android'],
+        ] as const
+      ).map(([o, icon, label]) => (
+        <button key={o} type="button" role="radio" aria-checked={os === o} onClick={() => setOs(o)}>
+          {os === o && (
+            <motion.span
+              layoutId="dk-os-pill"
+              className="dk-os-pill"
+              transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+            />
+          )}
+          <span className="relative flex items-center gap-[0.5em]">
+            {icon}
+            {label}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Auto / Ručno — režirana scena ide sama, ili je prezenter klikće na telefonu. */
+export function DemoToggle({ small }: { small?: boolean }) {
+  const { manual, setManual } = useDeck()
+  return (
+    <div className={small ? 'dk-os dk-os--sm' : 'dk-os'} role="radiogroup" aria-label="Demo" title="Demo na telefonu">
+      {(
+        [
+          [false, 'Auto'],
+          [true, 'Ručno'],
+        ] as const
+      ).map(([m, label]) => (
+        <button key={label} type="button" role="radio" aria-checked={manual === m} onClick={() => setManual(m)}>
+          {manual === m && (
+            <motion.span
+              layoutId="dk-demo-pill"
+              className="dk-os-pill"
+              transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+            />
+          )}
+          <span className="relative">{label}</span>
+        </button>
+      ))}
+    </div>
   )
 }
 

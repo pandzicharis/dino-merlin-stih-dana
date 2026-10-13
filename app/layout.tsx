@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Fraunces, Rubik } from 'next/font/google'
+import { Fraunces, Roboto, Rubik } from 'next/font/google'
 import { SITE_URL } from '@/lib/site'
 import './globals.css'
 
@@ -17,6 +17,25 @@ const sans = Rubik({
   variable: '--font-sans',
   display: 'swap',
 })
+
+// Roboto samo za modale na Androidu (data-os) — bez preloada, preuzme se
+// tek kad ga neko zaista prikaže
+const roboto = Roboto({
+  subsets: ['latin-ext'],
+  weight: ['400', '500', '700'],
+  variable: '--font-roboto',
+  display: 'swap',
+  preload: false,
+})
+
+/**
+ * Sistem telefona na <html data-os>, prije prvog crtanja — modali se po
+ * njemu oblikuju kao na iPhoneu ili Androidu. U prezentaciji izbor stiže
+ * iz prekidača ispod telefona (sessionStorage), inače iz preglednika —
+ * a kad se ne prepozna (računar), podrazumijeva se iPhone.
+ * `data-deck`: aplikacija je u telefonu prezentacije — bez dev trake.
+ */
+const OS_SCRIPT = `try{if(!/^\\/(prezentacija|admin)/.test(location.pathname)){var u=navigator.userAgent,o=sessionStorage.getItem('stihdana:os')||(/iPhone|iPad|iPod/.test(u)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'ios':/Android/.test(u)?'android':'ios');document.documentElement.dataset.os=o}}catch(e){}try{if(self!==top&&top.location.pathname.indexOf('/prezentacija')===0)document.documentElement.dataset.deck=''}catch(e){}`
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -40,7 +59,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="bs" className={`${serif.variable} ${sans.variable}`}>
+    <html lang="bs" className={`${serif.variable} ${sans.variable} ${roboto.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: OS_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   )

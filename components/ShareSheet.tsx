@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { Verse } from '@/data/verses'
 
@@ -24,6 +24,11 @@ export function ShareButton({ verse, accent, date }: { verse: Verse; accent: str
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
+  // panel se preuzme u tišini kad se ekran smiri — prvi dodir ga otvara odmah
+  useEffect(() => {
+    const t = setTimeout(load, 3000)
+    return () => clearTimeout(t)
+  }, [])
 
   return (
     <>
@@ -36,6 +41,7 @@ export function ShareButton({ verse, accent, date }: { verse: Verse; accent: str
           setOpen(true)
         }}
         aria-label="Podijeli stih"
+        data-tip="share"
         className="-m-2 p-2 text-white/40 transition-all hover:text-white/70 active:scale-90"
         style={open ? { color: accent } : undefined}
       >

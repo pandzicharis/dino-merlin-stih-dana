@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
-import { recordVisit, setLastSeen } from '@/lib/storage'
-import { addDays, todayInTz } from '@/lib/date'
+import { setLastSeen } from '@/lib/storage'
 import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
 import { DevDateBar } from './DevDateBar'
 import { Onboarding } from './Onboarding'
+import { Tips } from './Tips'
 import { UpdatePrompt } from './UpdatePrompt'
 
 /**
@@ -57,16 +57,12 @@ export function DailyVerse({ serverDate, days }: { serverDate: string; days: Rec
     return () => document.removeEventListener('visibilitychange', clear)
   }, [])
 
-  // Niz dana broji STVARNE dane u Sarajevu — dev pomjeranje datuma ga ne dira.
-  useEffect(() => {
-    const today = todayInTz()
-    recordVisit(today, addDays(today, -1))
-  }, [date])
 
   return (
     <>
       <Onboarding mood={mood ?? verse.mood} seed={verse.id} />
       <VerseScreen verse={verse} date={date} mood={mood} />
+      <Tips />
       <UpdatePrompt accent={MOODS[mood ?? verse.mood].accent} />
       <DevDateBar date={date} verseId={verse.id} mood={mood ?? verse.mood} />
     </>

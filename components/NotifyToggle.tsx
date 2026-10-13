@@ -144,6 +144,7 @@ export function NotifyToggle() {
         onClick={onClick}
         aria-pressed={on}
         aria-label={ARIA[state]}
+        data-tip="notify"
         disabled={state === 'busy'}
         className="-m-2 p-2 transition-all duration-500 active:scale-90 disabled:opacity-40"
         style={{ color: mark }}

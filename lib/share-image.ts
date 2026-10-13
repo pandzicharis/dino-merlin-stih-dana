@@ -10,6 +10,7 @@
  */
 
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
+import { albumOf } from '@/data/albums'
 import type { Verse } from '@/data/verses'
 import { BRAND } from './brand'
 import { formatFullDateBs } from './date'
@@ -40,7 +41,8 @@ type Palette = {
   figureMode: 'screen' | 'gild'
   bloom: number
   grain: number
-  vignette: string
+  /** jačina vinjete (0 … 1) */
+  vignette: number
   /** svijetla podloga traži tamnu sjenu teksta, ne crnu auru */
   light: boolean
 }
@@ -61,7 +63,7 @@ function palette(mood: Mood): Palette {
     figureMode: 'screen',
     bloom: m.bloom,
     grain: m.grain,
-    vignette: `rgba(0,0,0,${m.vignette})`,
+    vignette: m.vignette,
     light: false,
   }
 }
@@ -193,12 +195,16 @@ export async function drawShareImage(target: HTMLCanvasElement, input: ShareInpu
   const text = withPeriod(verse.text)
   const ratio = H / W
 
-  const [figure, signature, label] = await Promise.all([
-    p.figure > 0 ? loadImage(FIGURE_SRC) : Promise.resolve(null),
+  const album = albumOf(verse.album)
+  const coverSrc = album?.cover
+  const [figure, signature, label, , , cover] = await Promise.all([
+    // s albumom portreta nema — isto kao na ekranu
+    p.figure > 0 && !coverSrc ? loadImage(FIGURE_SRC) : Promise.resolve(null),
     loadImage('/brand/signature.webp'),
     loadImage('/brand/magaza.svg'),
     document.fonts?.load(`400 100px ${fonts.serif}`, text).catch(() => null),
     document.fonts?.load(`500 40px ${fonts.sans}`).catch(() => null),
+    coverSrc ? loadImage(coverSrc) : Promise.resolve(null),
   ])
 
   // Crta se van ekrana pa se prebaci odjednom — pregled ne trepće pri
@@ -265,11 +271,99 @@ export async function drawShareImage(target: HTMLCanvasElement, input: ShareInpu
     ctx.restore()
   }
 
-  /* 3 — vinjeta */
+  /* 2b — album stiha, kao na ekranu: zamućena atmosfera, jasan omot gore
+     koji nestaje u strane i prema stihu, nijansa raspoloženja, tama odozdo */
+  if (cover) {
+    // Atmosfera: boje albuma razlivene preko cijele slike. Zamućuje se
+    // smanjivanjem pa uvećavanjem, ne `ctx.filter` — Safari ga ne zna, pa je
+    // na iPhoneu umjesto magle preko slike ležao oštar, uvećan omot.
+    const s = Math.max(W, H) * 1.3
+    const tiny = document.createElement('canvas')
+    tiny.width = tiny.height = 12
+    const tc = tiny.getContext('2d')!
+    tc.imageSmoothingQuality = 'high'
+    tc.drawImage(cover, 0, 0, 12, 12)
+    // Koliko je omot svijetao (0 … 1). Svijetao omot (bijeli papir) se crta
+    // tiše — inače bijeli potpis i stih nestanu na njemu.
+    const px = tc.getImageData(0, 0, 12, 12).data
+    let lum = 0
+    for (let i = 0; i < px.length; i += 4) lum += (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255
+    const bright = Math.min(1, Math.max(0, lum / (px.length / 4) - 0.45) * 2.5)
+    const soft = document.createElement('canvas')
+    soft.width = soft.height = 96
+    const sc = soft.getContext('2d')!
+    sc.imageSmoothingQuality = 'high'
+    sc.drawImage(tiny, 0, 0, 96, 96)
+    ctx.save()
+    ctx.imageSmoothingQuality = 'high'
+    // tiho: jače podigne tamne dijelove i cijela slika ode u mlijeko
+    ctx.globalAlpha = 0.2 - 0.08 * bright
+    ctx.drawImage(soft, (W - s) / 2, (H - s) / 2, s, s)
+    ctx.restore()
+
+    // Kao na telefonu: omot preko cijele širine, gore. Kod nižih formata
+    // (objava, kvadrat) podignut je, da utapanje stigne prije stiha.
+    const art = W
+    // spušten od vrha i utopljen i gore — kao na telefonu
+    const ay = (format === 'story' ? H * 0.06 : format === 'post' ? -W * 0.02 : -W * 0.16) - art * (album?.lift ?? 0)
+    const layer = document.createElement('canvas')
+    layer.width = W
+    layer.height = H
+    const l = layer.getContext('2d')!
+    const ax = 0
+    l.drawImage(cover, ax, ay, art, art)
+    l.globalCompositeOperation = 'destination-in'
+    const down = l.createLinearGradient(0, ay, 0, ay + art)
+    down.addColorStop(0, 'rgba(0,0,0,0)')
+    down.addColorStop(0.18, 'rgba(0,0,0,1)')
+    down.addColorStop(0.4, 'rgba(0,0,0,1)')
+    down.addColorStop(0.64, 'rgba(0,0,0,0.35)')
+    down.addColorStop(0.86, 'rgba(0,0,0,0)')
+    l.fillStyle = down
+    l.fillRect(0, 0, W, H)
+    const side = l.createLinearGradient(ax, 0, ax + art, 0)
+    side.addColorStop(0, 'rgba(0,0,0,0)')
+    side.addColorStop(0.2, 'rgba(0,0,0,1)')
+    side.addColorStop(0.8, 'rgba(0,0,0,1)')
+    side.addColorStop(1, 'rgba(0,0,0,0)')
+    l.fillStyle = side
+    l.fillRect(0, 0, W, H)
+    // Jače nego na ekranu: slika miruje i Instagram je još sabije, pa
+    // prozirniji omot ispadne magla, a ne album.
+    ctx.save()
+    ctx.globalAlpha = 0.62 - 0.24 * bright
+    ctx.drawImage(layer, 0, 0)
+    ctx.restore()
+
+    // nijansa raspoloženja — blaža nego na ekranu, da album zadrži svoje boje
+    ctx.save()
+    ctx.globalCompositeOperation = 'color'
+    ctx.globalAlpha = 0.28
+    ctx.fillStyle = MOODS[verse.mood].gradient[1]
+    ctx.fillRect(0, 0, W, H)
+    ctx.restore()
+
+    // tama odozdo u dubokoj boji raspoloženja, ne crna — dno ostaje u boji
+    const deep = MOODS[verse.mood].gradient[0]
+    const shade = ctx.createLinearGradient(0, 0, 0, H)
+    shade.addColorStop(0, rgba(deep, 0.22))
+    shade.addColorStop(0.22, rgba(deep, 0.06))
+    shade.addColorStop(0.5, rgba(deep, 0.3))
+    shade.addColorStop(0.78, rgba(deep, 0.5))
+    shade.addColorStop(1, rgba(deep, 0.62))
+    ctx.fillStyle = shade
+    ctx.fillRect(0, 0, W, H)
+
+    // dno ne smije biti prazna tama: blagi sjaj raspoloženja iza pjesme
+    blob(W * 0.5, H * 1.02, W * 0.95, p.blobs[1], 0.5)
+  }
+
+  /* 3 — vinjeta; uz album blaža, inače rubovi i dno odu u crno */
   {
     const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.78)
-    g.addColorStop(0, p.vignette.replace(/[\d.]+\)$/, '0)'))
-    g.addColorStop(1, p.vignette)
+    const v = cover ? 0.6 : 1
+    g.addColorStop(0, 'rgba(0,0,0,0)')
+    g.addColorStop(1, `rgba(0,0,0,${p.vignette * v})`)
     ctx.fillStyle = g
     ctx.fillRect(0, 0, W, H)
   }

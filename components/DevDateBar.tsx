@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { MOOD_KEYS } from '@/data/moods'
+import { startTips } from './Tips'
 import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
 
 /**
@@ -58,7 +59,7 @@ export function DevDateBar({
   const day = daysSinceEpoch(date)
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 bg-black/85 px-3 py-2 font-mono text-[11px] text-white/80 backdrop-blur">
+    <div className="dev-bar fixed inset-x-0 bottom-0 z-50 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 bg-black/85 px-3 py-2 font-mono text-[11px] text-white/80 backdrop-blur">
       <button onClick={() => move(-1)} className="px-1 hover:text-white" title="[">
         ◀
       </button>
@@ -75,6 +76,23 @@ export function DevDateBar({
       <a href="/admin" className="px-1.5 text-white/50 hover:text-white">
         admin
       </a>
+      <button onClick={() => startTips(true)} className="px-1.5 text-white/50 hover:text-white">
+        tips
+      </button>
+      {(['ios', 'android'] as const).map((o) => (
+        <button
+          key={o}
+          onClick={() => {
+            try {
+              sessionStorage.setItem('stihdana:os', o)
+            } catch {}
+            document.documentElement.dataset.os = o
+          }}
+          className="px-1.5 text-white/50 hover:text-white"
+        >
+          {o}
+        </button>
+      ))}
       <span className="ml-auto text-white/40">
         dan {day}
       </span>
