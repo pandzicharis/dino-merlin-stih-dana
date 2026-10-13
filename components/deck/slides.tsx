@@ -686,9 +686,17 @@ function Savjeti() {
     <>
       <Text>
         Odmah nakon dozvole, kratki savjeti preko pravog ekrana: ostatak se zatamni, a u fokusu je jedno dugme i
-        rečenica o njemu. Pokažu se samo jednom.
+        rečenica o njemu. Pokažu se samo jednom — a na kraju stiže prva obavijest, dobrodošlica.
       </Text>
-      <Bullets items={['Zvono i obavijest u podne', 'Sačuvaj stih i lista sačuvanih', 'Dijeljenje kao slika', 'Pjesma uz stih']} />
+      <Bullets
+        items={[
+          'Zvono i obavijest u podne',
+          'Sačuvaj stih i lista sačuvanih',
+          'Dijeljenje kao slika',
+          'Pjesma uz stih',
+          'Dobrodošlica: „Mir svim dobrim ljudima“',
+        ]}
+      />
       <SavjetiScene key={manual ? 'ručno' : 'auto'} manual={manual} />
     </>
   )
