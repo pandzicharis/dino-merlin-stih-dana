@@ -42,6 +42,21 @@ export function DailyVerse({ serverDate, days }: { serverDate: string; days: Rec
 
   useEffect(() => setLastSeen(date), [date])
 
+  // Otvorena aplikacija = stih je viđen: makni tačku s ikonice i obavijest
+  // iz centra obavijesti. Isto i kad se vrati iz pozadine.
+  useEffect(() => {
+    const clear = () => {
+      if (document.visibilityState !== 'visible') return
+      navigator.clearAppBadge?.().catch(() => {})
+      navigator.serviceWorker?.getRegistration().then((reg) =>
+        reg?.getNotifications().then((list) => list.forEach((n) => n.close())),
+      )
+    }
+    clear()
+    document.addEventListener('visibilitychange', clear)
+    return () => document.removeEventListener('visibilitychange', clear)
+  }, [])
+
   // Niz dana broji STVARNE dane u Sarajevu — dev pomjeranje datuma ga ne dira.
   useEffect(() => {
     const today = todayInTz()

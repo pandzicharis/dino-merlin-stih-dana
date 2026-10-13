@@ -17,6 +17,7 @@ import {
 } from '@/lib/push-client'
 import { SEND_HOUR, SEND_TIME } from '@/lib/date'
 import { setNotifyIntent } from '@/lib/storage'
+import { deckParam, inDeck } from '@/lib/deck'
 import { BrandLockup } from './BrandLockup'
 
 type Platform = 'ios' | 'android' | 'desktop'
@@ -53,6 +54,16 @@ function subscribeInstalled(cb: () => void) {
 }
 
 /**
+ * U prezentaciji kapiju bira prezenter, kroz `?uvod=ios|android|desktop|dozvola`;
+ * bez parametra je nema. Prazno = nismo u prezentaciji.
+ */
+function deckGate(): string {
+  if (!inDeck()) return ''
+  return deckParam('uvod') ?? 'none'
+}
+const still = () => () => {}
+
+/**
  * Kapija ispred aplikacije — stoji dok stih nije na početnom ekranu.
  *
  * Ovo nije splash koji se sam ugasi: Web Push na iPhoneu radi ISKLJUČIVO iz
@@ -75,7 +86,11 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
     permissionSnapshot,
     () => 'unsupported',
   )
-  const [platform, setPlatform] = useState<Platform>(detect)
+  const [detected, setPlatform] = useState<Platform>(detect)
+  const deck = useSyncExternalStore(still, deckGate, () => '')
+  const platform: Platform = deck === 'ios' || deck === 'android' || deck === 'desktop' ? deck : detected
+  // dev traka ne ide u okvir prezentacije
+  const devBar = isLocal && deck === ''
   const [devStage, setDevStage] = useState<Stage | 'auto'>('auto')
   const [skipped, setSkipped] = useState(false)
   const [prompt, setPrompt] = useState<InstallPrompt | null>(null)
@@ -136,7 +151,9 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
       : null
 
   // Na localhostu se obje faze moraju moći pogledati bez pravog telefona.
-  const stage: Stage = isLocal && devStage !== 'auto' ? devStage : real
+  const deckStage: Stage | undefined =
+    deck === '' ? undefined : deck === 'none' ? null : deck === 'dozvola' ? 'permission' : 'install'
+  const stage: Stage = deckStage !== undefined ? deckStage : isLocal && devStage !== 'auto' ? devStage : real
 
   // Kapija postoji već u HTML-u sa servera — inače stih bljesne prije nje.
   // Sadržaj čeka montažu (ovisi o platformi), pa je prvi frejm samo crno:
@@ -161,7 +178,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
 
               <div
                 className={`relative flex min-h-[100dvh] flex-col items-center px-8 pt-[max(4rem,calc(env(safe-area-inset-top)+2rem))] ${
-                  isLocal ? 'pb-20' : 'pb-[max(3rem,env(safe-area-inset-bottom))]'
+                  devBar ? 'pb-20' : 'pb-[max(3rem,env(safe-area-inset-bottom))]'
                 }`}
               >
                 <motion.div
@@ -221,7 +238,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
 
               {/* Dev komande — ista traka kao DevDateBar, da localhost ima
                   jedan jezik umjesto dva. */}
-              {isLocal && (
+              {devBar && (
                 <div className="fixed inset-x-0 bottom-0 z-50 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 bg-black/85 px-3 py-2 font-mono text-[11px] text-white/80 backdrop-blur">
                   <span className="text-white/40">uvod</span>
                   {(['ios', 'android', 'desktop'] as Platform[]).map((p) => (

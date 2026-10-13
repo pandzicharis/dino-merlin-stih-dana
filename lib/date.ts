@@ -5,6 +5,8 @@
  * vidjeti isti stih istog dana, inače share i razgovor o stihu nemaju smisla.
  */
 
+import { deckParam, inDeck } from './deck'
+
 export const TZ = 'Europe/Sarajevo'
 export const EPOCH = '2026-01-01'
 
@@ -120,10 +122,16 @@ export type DevParams = {
   mood: string | null
 }
 
-/** Pročitaj sve dev override-e iz URL-a i localStorage-a. Prazno u produkciji. */
+/**
+ * Pročitaj sve dev override-e iz URL-a i localStorage-a. Prazno u produkciji —
+ * osim u prezentaciji, gdje se smiju birati stih i paleta (datum ne).
+ */
 export function readDevParams(): DevParams {
   const empty: DevParams = { date: null, verseId: null, mood: null }
-  if (!OVERRIDE_ON || typeof window === 'undefined') return empty
+  if (typeof window === 'undefined') return empty
+  if (!OVERRIDE_ON) {
+    return inDeck() ? { date: null, verseId: deckParam('verse'), mood: deckParam('mood') } : empty
+  }
 
   const q = new URLSearchParams(window.location.search)
 

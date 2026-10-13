@@ -59,20 +59,26 @@ self.addEventListener('push', (e) => {
     d = { body: e.data ? e.data.text() : '' }
   }
 
+  // Tačka na ikonici aplikacije dok stih nije pročitan (iOS 16.4+ u PWA-u,
+  // Chrome/Edge). Briše je sama aplikacija kad se otvori.
+  const badge =
+    'setAppBadge' in self.navigator ? self.navigator.setAppBadge(1).catch(() => {}) : Promise.resolve()
+
   e.waitUntil(
-    self.registration.showNotification(d.title || 'Stih dana', {
+    badge.then(() => self.registration.showNotification(d.title || 'Stih dana', {
       body: d.body || '',
       tag: d.tag || 'stih-dana',
       renotify: true,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
       data: { url: d.url || '/' },
-    }),
+    })),
   )
 })
 
 self.addEventListener('notificationclick', (e) => {
   e.notification.close()
+  if ('clearAppBadge' in self.navigator) self.navigator.clearAppBadge().catch(() => {})
   const url = (e.notification.data && e.notification.data.url) || '/'
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {

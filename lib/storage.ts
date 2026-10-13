@@ -79,6 +79,16 @@ export function toggleFavorite(id: string): boolean {
   return on
 }
 
+/** Izbaci sačuvane id-eve kojih više nema (obrisan stih, stari test). */
+export function pruneFavorites(valid: Set<string>) {
+  const list = getFavorites()
+  const kept = list.filter((id) => valid.has(id))
+  if (kept.length !== list.length) {
+    write(FAVORITES, kept)
+    window.dispatchEvent(new Event('favchange'))
+  }
+}
+
 /* ── niz dana zaredom ────────────────────────────────────────── */
 
 const STREAK = 'stihdana:streak'

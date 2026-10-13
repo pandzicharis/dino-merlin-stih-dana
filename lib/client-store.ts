@@ -3,6 +3,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { MOOD_KEYS, type Mood } from '@/data/moods'
 import { OVERRIDE_ON, addDays, msUntilNextDay, readDevParams, todayInTz } from './date'
+import { deckParam } from './deck'
 
 /**
  * URL i localStorage su vanjski store-ovi — čitaju se kroz useSyncExternalStore,
@@ -65,7 +66,7 @@ export function useToday(serverDate: string): string {
 const subscribeDev = subscribeTo(['devdatechange', 'popstate'])
 
 function devSnapshot(): string {
-  if (!OVERRIDE_ON) return ''
+  // van dev moda vraća prazno — osim u prezentaciji (lib/deck.ts)
   const p = readDevParams()
   return `${p.date ?? ''}|${p.verseId ?? ''}|${p.mood ?? ''}`
 }
@@ -144,11 +145,9 @@ export function useFavorites(): string[] {
 const subscribeStreak = subscribeTo(['streakchange', 'storage', 'popstate'])
 
 function streakSnapshot(): string {
-  // dev: ?streak=12 — da se na prezentaciji vidi kako izgleda niz
-  if (OVERRIDE_ON) {
-    const forced = new URLSearchParams(window.location.search).get('streak')
-    if (forced && Number(forced) > 0) return forced
-  }
+  // ?streak=12 — da se na prezentaciji vidi kako izgleda niz
+  const forced = OVERRIDE_ON ? new URLSearchParams(window.location.search).get('streak') : deckParam('streak')
+  if (forced && Number(forced) > 0) return forced
   try {
     const raw = localStorage.getItem('stihdana:streak')
     const s = raw ? (JSON.parse(raw) as { last?: string; count?: number }) : null

@@ -741,8 +741,12 @@ function Library({
                   {label}
                   {n > 0 && (
                     <span
-                      className="tabular inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none"
-                      style={on ? { background: '#14100A', color: BRAND.gold } : { background: BRAND.gold, color: '#14100A' }}
+                      className="tabular inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full px-[3px] text-[8.5px] font-semibold leading-none"
+                      style={
+                        on
+                          ? { background: 'rgba(20,16,10,0.85)', color: BRAND.gold }
+                          : { background: `${BRAND.gold}33`, color: BRAND.gold, boxShadow: `inset 0 0 0 1px ${BRAND.gold}55` }
+                      }
                     >
                       {n}
                     </span>

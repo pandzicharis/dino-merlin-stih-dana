@@ -6,18 +6,7 @@ import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { SavedVerses } from './SavedVerses'
-
-/** Lista stihova se povuče jednom i drži do zatvaranja stranice. */
-let cache: Promise<Verse[]> | null = null
-function loadVerses() {
-  cache ??= fetch('/api/verses')
-    .then((r) => (r.ok ? (r.json() as Promise<Verse[]>) : []))
-    .catch(() => {
-      cache = null
-      return []
-    })
-  return cache
-}
+import { loadVerses } from '@/lib/verses-client'
 
 /** Sačuvani stihovi kao donji panel — isti kao panel za dijeljenje. */
 export default function SavedPanel({ open, onClose }: { open: boolean; onClose: () => void }) {

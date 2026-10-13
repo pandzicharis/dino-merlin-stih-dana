@@ -1,21 +1,45 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites } from '@/lib/client-store'
+import { pruneFavorites } from '@/lib/storage'
+import { loadVerses } from '@/lib/verses-client'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
 const load = () => import('./SavedPanel')
 const SavedPanel = dynamic(load, { ssr: false })
 
 /**
- * Sačuvani stihovi — tiha ikonica u zaglavlju, bez brojke (brojka izgleda
- * kao obavijest, a ovo nije obavijest). Otvara donji panel s listom.
+ * Sačuvani stihovi — tiha ikonica u zaglavlju s malim brojačem u tonu
+ * ikonice (ne crvena "obavijest"). Otvara donji panel s listom.
  * Pojavi se tek kad postoji bar jedan sačuvan stih.
  */
 export function SavedLink() {
-  const count = useFavorites().length
+  const ids = useFavorites()
+  const [known, setKnown] = useState<Set<string> | null>(null)
+
+  // Broj mora biti isti kao lista u panelu: broje se samo stihovi koji
+  // postoje. Lista stihova se povuče kad je stranica mirna (s CDN-a), a
+  // nevažeći zapisi se usput očiste iz localStorage-a.
+  useEffect(() => {
+    if (!ids.length || known) return
+    const run = () =>
+      loadVerses().then((v) => {
+        if (!v.length) return
+        const set = new Set(v.map((x) => x.id))
+        setKnown(set)
+        pruneFavorites(set)
+      })
+    const idle = window.requestIdleCallback?.(run, { timeout: 3000 }) ?? window.setTimeout(run, 1200)
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idle)
+      else clearTimeout(idle)
+    }
+  }, [ids.length, known])
+
+  const count = known ? ids.filter((id) => known.has(id)).length : ids.length
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
@@ -42,7 +66,7 @@ export function SavedLink() {
               }}
               aria-label={`Sačuvani stihovi (${count})`}
               title="Sačuvani stihovi"
-              className="-m-2 p-2 text-white/40 transition-all hover:text-white/70 active:scale-90"
+              className="relative -m-2 p-2 text-white/40 transition-all hover:text-white/70 active:scale-90"
             >
               {/* dvije kartice jedna iza druge, srce na prednjoj */}
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -50,6 +74,19 @@ export function SavedLink() {
                 <rect x="4" y="6.5" width="13" height="14" rx="2.5" />
                 <path d="M10.5 16.8s-3-1.8-3-4a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 2.2-3 4-3 4z" fill="currentColor" stroke="none" />
               </svg>
+              {/* mali, tihi brojač — u tonu ikonice, ne kao crvena obavijest */}
+              <span
+                className="tabular absolute right-0 top-0.5 inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full px-[3px] text-[8.5px] font-semibold leading-none"
+                style={{
+                  background: 'rgba(191,168,127,0.22)',
+                  color: '#D9C49C',
+                  boxShadow: 'inset 0 0 0 1px rgba(191,168,127,0.45)',
+                  backdropFilter: 'blur(6px)',
+                }}
+                aria-hidden
+              >
+                {count}
+              </span>
             </button>
           </motion.span>
         )}

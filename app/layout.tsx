@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Fraunces, Rubik } from 'next/font/google'
+import { SITE_URL } from '@/lib/site'
 import './globals.css'
 
 const serif = Fraunces({
@@ -17,15 +18,8 @@ const sans = Rubik({
   display: 'swap',
 })
 
-// Prazna varijabla okoline je realnost (dodaš je u Vercelu pa zaboraviš
-// vrijednost), a `new URL('')` ruši cijelu stranicu — zato provjera na istinitost,
-// ne na null.
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3111')
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: { default: 'Stih dana — Dino Merlin', template: '%s — Stih dana' },
   description: 'Jedan stih Dine Merlina, svaki dan u isto vrijeme.',
   manifest: '/manifest.webmanifest',

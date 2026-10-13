@@ -2,11 +2,14 @@ import type { NextConfig } from 'next'
 
 /**
  * Zaglavlja koja ne koštaju ništa a rješavaju cijelu klasu problema.
- * Aplikacija se nigdje ne ugrađuje u okvir i ne prima tuđi sadržaj.
+ *
+ * Okvir je dozvoljen samo istom sajtu: admin u njemu pokazuje pregled
+ * stiha, a prezentacija (`/prezentacija`) cijelu aplikaciju. Tuđi sajt je
+ * i dalje ne može ugraditi.
  */
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
@@ -27,12 +30,6 @@ const nextConfig: NextConfig = {
         // Ikone i logotip se mijenjaju samo uz novi deploy.
         source: '/:path(icons|brand)/:file*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
-      },
-      {
-        // Pregled stiha u adminu je iframe na ISTOM sajtu. Zadnje pravilo za
-        // isti ključ pobjeđuje, pa ovo popušta DENY samo ovdje i samo za nas.
-        source: '/pregled',
-        headers: [{ key: 'X-Frame-Options', value: 'SAMEORIGIN' }],
       },
       {
         /**
