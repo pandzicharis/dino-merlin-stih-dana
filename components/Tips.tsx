@@ -60,16 +60,23 @@ export const WELCOME = { title: 'Mir svim dobrim ljudima', body: 'Dobro došli n
 
 function welcome() {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
+  const tag = 'stih-dana-dobrodoslica'
   navigator.serviceWorker?.ready
-    .then((reg) =>
-      reg.showNotification(WELCOME.title, {
+    .then(async (reg) => {
+      await reg.showNotification(WELCOME.title, {
         body: WELCOME.body,
-        tag: 'stih-dana-dobrodoslica',
+        tag,
         icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
+        badge: '/icons/badge-96.png',
         data: { url: '/' },
-      }),
-    )
+      })
+      // Dobrodošlica se pročita i ode — ne ostaje u traci, pa launcher
+      // (Samsung, Pixel) ne drži tačku/broj na ikonici aplikacije.
+      setTimeout(() => {
+        reg.getNotifications({ tag }).then((list) => list.forEach((n) => n.close()))
+        navigator.clearAppBadge?.().catch(() => {})
+      }, 8000)
+    })
     .catch(() => {})
 }
 
