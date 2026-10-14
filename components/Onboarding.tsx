@@ -37,6 +37,19 @@ type InstallPrompt = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+/**
+ * Samsung Internet instalira PWA kao paket za stari Android, pa ga Android 14+
+ * blokira ("nesigurna aplikacija… starija verzija Androida"). Manifest to ne
+ * može promijeniti — zato se na njemu nudi instalacija kroz Chrome.
+ */
+const isSamsungBrowser = () => typeof navigator !== 'undefined' && /SamsungBrowser/i.test(navigator.userAgent)
+
+/** Ista adresa, otvorena u Chromeu; bez Chromea ostaje ovdje. */
+function chromeIntent(): string {
+  const { host, pathname, search, href } = window.location
+  return `intent://${host}${pathname}${search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(href)};end`
+}
+
 function detect(): Platform {
   if (typeof navigator === 'undefined') return 'desktop'
   if (isIOS()) return 'ios'
@@ -183,6 +196,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
   // ne koristi. Android u prezentaciji ipak izgleda kao pravi Android u
   // Chromeu: jedno dugme, a Chromeov dijalog nacrta prezentacija.
   const canPrompt = (Boolean(prompt) && deck === '') || deck === 'android'
+  const samsung = deck === '' && platform === 'android' && isSamsungBrowser()
 
   /**
    * Prvo instalacija, pa dozvola. Ako uređaj uopšte ne zna za Web Push
@@ -206,7 +220,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
 
   // "Pogledaj kako" postoji samo uz korake (bez Chromeovog dijaloga), pa se
   // tad unaprijed i preuzme — da se na dodir otvori odmah.
-  const steps = platform === 'ios' ? IOS_STEPS : platform === 'android' && !canPrompt ? ANDROID_STEPS : null
+  const steps = platform === 'ios' ? IOS_STEPS : platform === 'android' && !canPrompt && !samsung ? ANDROID_STEPS : null
   const canShowHow = show && stage === 'install' && !waiting && steps !== null
   useEffect(() => {
     if (!canShowHow) return
@@ -280,7 +294,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
                       <div className="w-full">
                         {platform === 'ios' && <Steps steps={IOS_STEPS} />}
                         {platform === 'android' && (
-                          <AndroidSteps canPrompt={canPrompt} busy={busy} onInstall={install} />
+                          <AndroidSteps canPrompt={canPrompt} samsung={samsung} busy={busy} onInstall={install} />
                         )}
                         {platform === 'desktop' && <DesktopSteps />}
                         {steps && (
@@ -547,13 +561,39 @@ function HowToButton({ onClick }: { onClick: () => void }) {
 
 function AndroidSteps({
   canPrompt,
+  samsung,
   busy,
   onInstall,
 }: {
   canPrompt: boolean
+  samsung: boolean
   busy: boolean
   onInstall: () => void
 }) {
+  // Samsung Internet — instalacija iz njega završi na upozorenju Androida,
+  // pa se otvara Chrome; bez Chromea ostaje prečica na početnom ekranu.
+  if (samsung) {
+    return (
+      <div className="flex flex-col items-center">
+        <a
+          href={chromeIntent()}
+          className="w-full rounded-full px-6 py-3.5 text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-black no-underline transition-opacity active:opacity-80"
+          style={{ backgroundColor: BRAND.gold }}
+        >
+          Otvori u Chromeu
+        </a>
+        <p className="mt-4 text-[12px] leading-relaxed text-white/60">
+          U Chromeu se aplikacija instalira jednim dodirom, bez upozorenja.
+        </p>
+        <p className="mt-3 text-[12px] leading-relaxed text-white/45">
+          Nemaš Chrome? Ovdje: meni <b className="font-medium text-white/80">≡</b> →{' '}
+          <b className="font-medium text-white/80">Dodaj stranicu na</b> →{' '}
+          <b className="font-medium text-white/80">Početni ekran</b>
+        </p>
+      </div>
+    )
+  }
+
   // Chrome nudi vlastiti dijalog — jedan dodir umjesto tri koraka.
   if (canPrompt) {
     return (

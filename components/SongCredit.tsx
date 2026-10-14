@@ -113,7 +113,6 @@ function audioSlug(song: string): string {
     .replace(/^-|-$/g, '')
 }
 
-const RING = 2 * Math.PI * 28.5
 const ICON = { initial: { scale: 0.5, opacity: 0 }, animate: { scale: 1, opacity: 1 }, exit: { scale: 0.5, opacity: 0 } }
 /** Svira jedna pjesma u isto vrijeme: kad krene nova, ostale stanu. */
 const SOLO = 'stihdana:solo'
@@ -302,21 +301,9 @@ function Vinyl({
         style={{ background: `radial-gradient(circle, ${BRAND.gold}4d 0%, ${BRAND.gold}1f 40%, transparent 70%)`, opacity: playing ? undefined : 0.35 }}
         aria-hidden
       />
-      {/* prsten napretka oko ploče */}
-      <svg width={size} height={size} viewBox="0 0 60 60" className="absolute inset-0 -rotate-90" aria-hidden>
+      {/* tanak zlatni prsten oko ploče — napredak pokazuju traka i igla */}
+      <svg width={size} height={size} viewBox="0 0 60 60" className="absolute inset-0" aria-hidden>
         <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}47`} strokeWidth="1.5" />
-        <circle
-          cx="30"
-          cy="30"
-          r="28.5"
-          fill="none"
-          stroke={BRAND.gold}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeDasharray={RING}
-          strokeDashoffset={RING * (1 - progress)}
-          style={{ transition: 'stroke-dashoffset 0.25s linear' }}
-        />
       </svg>
       {/* ploča — vrti se i stane tačno gdje je pauzirana */}
       <svg
