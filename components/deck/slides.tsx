@@ -1211,7 +1211,7 @@ function Slusanje() {
     return () => {
       alive = false
       clearTimeout(t)
-      // pjesma stane i plejer se sklopi — sljedeći koraci ne vuku je sa sobom
+      // pjesma stane i vrati se na početak — sljedeći koraci ne vuku je sa sobom
       try {
         const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
         w?.dispatchEvent(new w.Event('stihdana:stop-audio'))
@@ -1222,8 +1222,8 @@ function Slusanje() {
   }, [phone, manual])
   return (
     <Text>
-      Dodir na naziv pjesme pušta je odmah, u pozadini — bez videa i bez napuštanja stiha. Pauza, premotavanje i
-      kontrole sa zaključanog ekrana, kao u pravom plejeru.
+      Plejer je odmah ispod stiha — jedan dodir i pjesma svira u pozadini, bez videa i bez napuštanja stiha. Pauza,
+      premotavanje i kontrole sa zaključanog ekrana, kao u pravom plejeru.
     </Text>
   )
 }

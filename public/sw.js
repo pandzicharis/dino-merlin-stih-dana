@@ -70,7 +70,8 @@ self.addEventListener('push', (e) => {
       tag: d.tag || 'stih-dana',
       renotify: true,
       icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      // Android: mali znak u statusnoj traci mora biti jednobojan i proziran
+      badge: '/icons/badge-96.png',
       data: { url: d.url || '/' },
     })),
   )

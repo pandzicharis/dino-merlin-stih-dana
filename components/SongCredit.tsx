@@ -10,8 +10,8 @@ import { BRAND } from '@/lib/brand'
  * Potpis pjesme ispod stiha.
  *
  * Naziv je u zlatnoj, verzalom — jedina zlatna stvar na ekranu osim
- * zaglavlja. Dodir na naziv pusti zvuk pjesme u pozadini — play/pauza,
- * prsten napretka, ekvilajzer, bez plejera i bez iframea.
+ * zaglavlja. Ispod je odmah otvoren plejer u tonu aplikacije — zvuk
+ * pjesme u pozadini, bez videa i bez iframea.
  *
  * Zvuk se traži redom: `public/audio/<pjesma>.m4a` sa CDN-a, pa /api/audio
  * (lokalno ga izvuče s YouTubea). Ako ni jedno ne stigne, ostaje YouTube znak.
@@ -23,17 +23,20 @@ export function SongCredit({ verse }: { verse: Verse }) {
   const [failedId, setFailedId] = useState<string | null>(null)
   const failed = failedId === id
 
+  if (id && !failed)
+    return (
+      <AudioSong
+        key={id}
+        verse={verse}
+        src={`/audio/${audioSlug(verse.song)}.m4a`}
+        fallback={`/api/audio/${id}?s=${audioSlug(verse.song)}`}
+        onFail={() => setFailedId(id)}
+      />
+    )
+
   return (
     <div className="flex w-full flex-col items-center">
-      {id && !failed ? (
-        <AudioSong
-          key={id}
-          verse={verse}
-          src={`/audio/${audioSlug(verse.song)}.m4a`}
-          fallback={`/api/audio/${id}?s=${audioSlug(verse.song)}`}
-          onFail={() => setFailedId(id)}
-        />
-      ) : id ? (
+      {id ? (
         /* Naziv i znak su JEDAN link: hover i dodir zumiraju oboje zajedno,
            a prst pogodi bilo koji od njih. */
         <motion.a
@@ -114,29 +117,31 @@ function audioSlug(song: string): string {
     .replace(/^-|-$/g, '')
 }
 
-const RING = 2 * Math.PI * 17
+const RING = 2 * Math.PI * 21
 const ICON = { initial: { scale: 0.5, opacity: 0 }, animate: { scale: 1, opacity: 1 }, exit: { scale: 0.5, opacity: 0 } }
 
 type State = 'idle' | 'loading' | 'playing' | 'paused'
 
 /**
- * Naziv + okrugli play/pauza s prstenom napretka. Kad pjesma krene, ispod
- * se razvuče traka: ekvilajzer, vrijeme i premotavanje prstom. Kontrole
- * rade i sa zaključanog ekrana (Media Session).
+ * Plejer je odmah otvoren: staklena kartica u tonu aplikacije — zlatno
+ * play/pauza dugme s prstenom napretka, naziv i album, ekvilajzer i traka
+ * za premotavanje prstom. Kontrole rade i sa zaključanog ekrana (Media Session).
  */
 function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string; fallback: string; onFail: () => void }) {
   const audio = useRef<HTMLAudioElement | null>(null)
+  const want = useRef(false)
   const [state, setState] = useState<State>('idle')
   const [cur, setCur] = useState(0)
   const [dur, setDur] = useState(0)
 
-  // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
-  // Na Vercelu nema yt-dlp-a, pa tamo svira samo statični fajl i ovo ne treba.
   useEffect(() => {
+    // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
+    // Na Vercelu nema yt-dlp-a, pa tamo svira samo statični fajl i ovo ne treba.
     if (process.env.NODE_ENV === 'development') fetch(`${fallback}&warm=1`).catch(() => {})
-    // prezentacija: odlaskom s koraka pjesma stane i plejer se sklopi
+    // prezentacija: odlaskom s koraka pjesma stane i vrati se na početak
     const stop = () => {
       const a = audio.current
+      want.current = false
       if (a) {
         a.pause()
         a.currentTime = 0
@@ -155,7 +160,7 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
   function player(): HTMLAudioElement {
     if (audio.current) return audio.current
     const a = new Audio(src)
-    a.preload = 'auto'
+    a.preload = 'metadata'
     const time = () => {
       setCur(a.currentTime)
       if (Number.isFinite(a.duration)) setDur(a.duration)
@@ -170,10 +175,11 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
       setState('paused')
     })
     a.addEventListener('error', () => {
+      if (audio.current !== a) return // stari plejer, već ugašen
       // statičnog fajla nema (nova pjesma iz admina) → pokušaj preko servera
       if (a.src.endsWith(src)) {
         a.src = fallback
-        a.play().catch(() => {})
+        if (want.current) a.play().catch(() => {})
         return
       }
       setState('idle')
@@ -196,48 +202,66 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
     return a
   }
 
+  // trajanje pjesme se vidi i prije prvog dodira (samo zaglavlje fajla)
+  useEffect(() => {
+    player()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function toggle() {
     const a = player()
     if (a.paused) {
+      want.current = true
       setState('loading')
       a.play().catch(() => setState('paused'))
-    } else a.pause()
+    } else {
+      want.current = false
+      a.pause()
+    }
   }
 
   const playing = state === 'playing'
   const progress = dur ? cur / dur : 0
+  const time = !dur ? '--:--' : cur > 0 ? `-${clock(dur - cur)}` : clock(dur)
 
   return (
-    <div className="flex flex-col items-center">
-      <motion.button
-        type="button"
-        onClick={toggle}
-        aria-label={playing ? `Pauziraj "${verse.song}"` : `Pusti "${verse.song}"`}
-        aria-pressed={playing}
-        data-deck="play"
-        data-tip="song"
-        data-state={state}
-        className="group flex cursor-pointer items-center gap-3"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.94 }}
-        transition={{ type: 'spring', stiffness: 460, damping: 20 }}
-      >
-        <SongTitle song={verse.song} withIcon />
-        <span className="relative flex h-[38px] w-[38px] items-center justify-center">
+    <div
+      data-tip="song"
+      className="relative w-[min(86vw,340px)] overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.045] p-3.5 pr-4 text-left shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-md"
+    >
+      {/* zlatna nit po gornjem rubu */}
+      <span
+        className="absolute inset-x-6 top-0 h-px"
+        style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)` }}
+        aria-hidden
+      />
+      <div className="flex items-center gap-3.5">
+        <motion.button
+          type="button"
+          onClick={toggle}
+          aria-label={playing ? `Pauziraj "${verse.song}"` : `Pusti "${verse.song}"`}
+          aria-pressed={playing}
+          data-deck="play"
+          data-state={state}
+          className="relative flex h-[48px] w-[48px] shrink-0 cursor-pointer items-center justify-center"
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.92 }}
+          transition={{ type: 'spring', stiffness: 460, damping: 20 }}
+        >
           {/* sjaj — diše dok pjesma svira */}
           <motion.span
-            className="absolute -inset-3 rounded-full blur-md"
+            className="absolute -inset-2 rounded-full blur-md"
             style={{ background: `radial-gradient(circle, ${BRAND.gold}66 0%, transparent 70%)` }}
-            animate={playing ? { opacity: [0.5, 1, 0.5], scale: [0.95, 1.15, 0.95] } : { opacity: 0.45, scale: 1 }}
+            animate={playing ? { opacity: [0.4, 0.9, 0.4], scale: [0.95, 1.12, 0.95] } : { opacity: 0.3, scale: 1 }}
             transition={playing ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
             aria-hidden
           />
-          <svg width="38" height="38" viewBox="0 0 38 38" className="absolute inset-0 -rotate-90" aria-hidden>
-            <circle cx="19" cy="19" r="17" fill="none" stroke={`${BRAND.gold}40`} strokeWidth="1.5" />
+          <svg width="48" height="48" viewBox="0 0 48 48" className="absolute inset-0 -rotate-90" aria-hidden>
+            <circle cx="24" cy="24" r="21" fill="none" stroke={`${BRAND.gold}33`} strokeWidth="1.5" />
             <circle
-              cx="19"
-              cy="19"
-              r="17"
+              cx="24"
+              cy="24"
+              r="21"
               fill="none"
               stroke={BRAND.gold}
               strokeWidth="1.5"
@@ -248,63 +272,62 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
             />
           </svg>
           <span
-            className="relative flex h-[30px] w-[30px] items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+            className="relative flex h-[38px] w-[38px] items-center justify-center rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
             style={{ background: `linear-gradient(135deg, #F1E2BF, ${BRAND.gold} 45%, #8A7148)` }}
           >
             <AnimatePresence mode="wait" initial={false}>
               {state === 'loading' ? (
                 <motion.span
                   key="load"
-                  className="h-3 w-3 rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
+                  className="h-3.5 w-3.5 rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1, rotate: 360 }}
                   exit={{ opacity: 0 }}
                   transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
                 />
               ) : playing ? (
-                <motion.svg key="pause" width="12" height="12" viewBox="0 0 12 12" {...ICON} aria-hidden>
+                <motion.svg key="pause" width="14" height="14" viewBox="0 0 12 12" {...ICON} aria-hidden>
                   <rect x="2" y="1" width="3" height="10" rx="1" fill="#16110A" />
                   <rect x="7" y="1" width="3" height="10" rx="1" fill="#16110A" />
                 </motion.svg>
               ) : (
-                <motion.svg key="play" width="12" height="12" viewBox="0 0 12 12" className="ml-[2px]" {...ICON} aria-hidden>
+                <motion.svg key="play" width="14" height="14" viewBox="0 0 12 12" className="ml-[2px]" {...ICON} aria-hidden>
                   <path d="M2 1v10l9-5z" fill="#16110A" />
                 </motion.svg>
               )}
             </AnimatePresence>
           </span>
-        </span>
-      </motion.button>
+        </motion.button>
 
-      <AnimatePresence initial={false}>
-        {state !== 'idle' && (
-          <motion.div
-            className="overflow-hidden"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="flex w-[min(76vw,300px)] items-center gap-3 pt-5">
-              <Equalizer playing={playing} />
-              <span className="tabular w-8 text-[10px] tracking-[0.08em] text-white/65">{clock(cur)}</span>
-              <Seek
-                value={progress}
-                onSeek={(f) => {
-                  const a = audio.current
-                  if (a && dur) {
-                    a.currentTime = f * dur
-                    setCur(a.currentTime)
-                  }
-                }}
-              />
-              <span className="tabular w-9 text-right text-[10px] tracking-[0.08em] text-white/40">
-                {dur ? `-${clock(dur - cur)}` : '--:--'}
-              </span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <div className="min-w-0 flex-1">
+          {/* dodir na naziv radi isto što i dugme */}
+          <div className="flex cursor-pointer items-center gap-2" onClick={toggle} aria-hidden>
+            <span
+              className="min-w-0 flex-1 truncate font-semibold uppercase leading-none tracking-[0.16em]"
+              style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song) }}
+            >
+              {verse.song}
+            </span>
+            <Equalizer playing={playing} />
+          </div>
+          <p className="mt-1.5 truncate text-[9.5px] uppercase leading-none tracking-[0.22em] text-white/50">
+            {verse.album} &middot; {verse.year}
+          </p>
+          <div className="mt-1 flex items-center gap-2.5">
+            <Seek
+              value={progress}
+              onSeek={(f) => {
+                const a = audio.current
+                if (a && dur) {
+                  a.currentTime = f * dur
+                  setCur(a.currentTime)
+                }
+              }}
+            />
+            <span className="tabular w-9 text-right text-[10px] tracking-[0.06em] text-white/55">{time}</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -364,6 +387,12 @@ function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => 
       />
     </div>
   )
+}
+
+/** Naziv u kartici: staje u jedan red pored dugmeta i ekvilajzera, nikad preko 13px. */
+function cardSongSize(song: string): string {
+  const em = Math.max(song.length, 1) * 0.86 + 0.16
+  return `min(13px, calc((min(86vw, 340px) - 124px) / ${em.toFixed(2)}))`
 }
 
 function clock(s: number): string {
