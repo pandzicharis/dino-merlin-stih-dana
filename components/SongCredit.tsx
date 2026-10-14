@@ -296,11 +296,10 @@ function Vinyl({
       transition={{ type: 'spring', stiffness: 460, damping: 20 }}
     >
       {/* sjaj — diše dok pjesma svira */}
-      <motion.span
-        className="absolute -inset-2 rounded-full blur-lg"
-        style={{ background: `radial-gradient(circle, ${BRAND.gold}55 0%, transparent 70%)` }}
-        animate={playing ? { opacity: [0.45, 0.9, 0.45], scale: [0.95, 1.1, 0.95] } : { opacity: 0.35, scale: 1 }}
-        transition={playing ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
+      {/* mekan gradijent umjesto blur filtera; disanje je CSS (globals.css) */}
+      <span
+        className={`absolute -inset-3 rounded-full transition-opacity duration-500 ${playing ? 'vinyl-glow' : ''}`}
+        style={{ background: `radial-gradient(circle, ${BRAND.gold}4d 0%, ${BRAND.gold}1f 40%, transparent 70%)`, opacity: playing ? undefined : 0.35 }}
         aria-hidden
       />
       {/* prsten napretka oko ploče */}
@@ -535,13 +534,15 @@ function Equalizer({ playing }: { playing: boolean }) {
   return (
     <span className="flex h-3.5 w-[18px] shrink-0 items-end gap-[2px]" aria-hidden>
       {[0.9, 0.65, 1.05, 0.75].map((d, i) => (
-        <motion.span
+        // CSS animacija (globals.css) — titra i dok je JavaScript zauzet
+        <span
           key={i}
-          className="h-full w-[3px] origin-bottom rounded-full"
-          style={{ background: `linear-gradient(to top, #8A7148, ${BRAND.gold}, #F1E2BF)` }}
-          initial={{ scaleY: 0.2 }}
-          animate={playing ? { scaleY: [0.25, 1, 0.4, 0.85, 0.25] } : { scaleY: 0.2 }}
-          transition={playing ? { duration: d, repeat: Infinity, ease: 'easeInOut', delay: i * 0.1 } : { duration: 0.3 }}
+          className={`eq-bar h-full w-[3px] origin-bottom rounded-full ${playing ? 'eq-on' : ''}`}
+          style={{
+            background: `linear-gradient(to top, #8A7148, ${BRAND.gold}, #F1E2BF)`,
+            animationDuration: `${d}s`,
+            animationDelay: `${i * 0.1}s`,
+          }}
         />
       ))}
     </span>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, type CSSProperties } from 'react'
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, useSpring } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import { FloatingNotes } from './FloatingNotes'
@@ -71,33 +71,25 @@ export function MoodBackground({
         >
           {/* 2 — mrlje */}
           {m.gradient.map((color, i) => (
-            <motion.div
+            // Bez `filter: blur` — gradijent koji se gasi do 70% je već mekan, a
+            // blur preko pola ekrana iPhone preračunava i guši. Kretanje je CSS
+            // animacija (globals.css): vrti je grafički procesor, ne JavaScript.
+            <div
               key={color + i}
-              className="absolute rounded-full"
-              style={{
-                width: '85vmax',
-                height: '85vmax',
-                background: `radial-gradient(circle at center, ${color} 0%, transparent 68%)`,
-                filter: 'blur(60px)',
-                left: `${[-15, 35, 5][i]}%`,
-                top: `${[-10, 20, 55][i]}%`,
-                willChange: 'transform',
-              }}
-              animate={
-                reduced
-                  ? undefined
-                  : {
-                      x: [0, m.drift, -m.drift * 0.6, 0],
-                      y: [0, -m.drift * 0.75, m.drift * 0.6, 0],
-                      scale: [1, 1.12, 0.94, 1],
-                    }
+              className="bg-blob absolute rounded-full"
+              style={
+                {
+                  width: '85vmax',
+                  height: '85vmax',
+                  background: `radial-gradient(circle at center, ${color} 0%, ${color}b0 22%, ${color}38 46%, transparent 70%)`,
+                  left: `${[-15, 35, 5][i]}%`,
+                  top: `${[-10, 20, 55][i]}%`,
+                  '--drift': `${m.drift}px`,
+                  animationDuration: `${dur(20 + i * 4)}s`,
+                  animationDelay: `${i * 1.5}s`,
+                  animationPlayState: reduced ? 'paused' : undefined,
+                } as CSSProperties
               }
-              transition={{
-                duration: dur(20 + i * 4),
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: i * 1.5,
-              }}
             />
           ))}
 
@@ -137,41 +129,44 @@ export function MoodBackground({
           {/* 3 — portret: krupan, u gornjem desnom uglu, da stih u sredini
                  ostane na čistoj podlozi a lice ne bude iza teksta */}
           {!cover && (
+          // paralaksa za mišem (motion) je spolja, disanje (CSS) unutra —
+          // dvije animacije ne smiju dijeliti isti transform
           <motion.div
-            className="absolute inset-0 bg-no-repeat"
-            style={{
-              backgroundImage: `url(${FIGURE_SRC})`,
-              // visinom, ne "cover" — na širokom ekranu inače proguta sve
-              backgroundSize: 'auto 118%',
-              // Lice je na ~45% širine slike, a slika je široka 0.885 visine
-              // ekrana (118% × 3/4). Zato se lijevi rub računa tako da lice
-              // uvijek padne na 70% širine — isto na telefonu i na monitoru.
-              backgroundPosition: 'calc(70vw - 40dvh) -2dvh',
-              mixBlendMode: m.blend,
-              opacity: m.figure,
-              x: px,
-              y: py,
-              // utapa se prije nego dođe do stiha
-              maskImage: 'radial-gradient(ellipse 80% 62% at 78% 22%, black 30%, transparent 80%)',
-              WebkitMaskImage: 'radial-gradient(ellipse 80% 62% at 78% 22%, black 30%, transparent 80%)',
-              willChange: 'transform',
-            }}
-            animate={reduced || still ? undefined : { scale: [1, 1.045, 1] }}
-            transition={{ duration: dur(34), repeat: Infinity, ease: 'easeInOut' }}
-          />
+            className="absolute inset-0"
+            style={{ mixBlendMode: m.blend, opacity: m.figure, x: px, y: py }}
+          >
+            <div
+              className={`absolute inset-0 bg-no-repeat ${reduced || still ? '' : 'bg-breathe'}`}
+              style={{
+                backgroundImage: `url(${FIGURE_SRC})`,
+                animationDuration: `${dur(34)}s`,
+                // visinom, ne "cover" — na širokom ekranu inače proguta sve
+                backgroundSize: 'auto 118%',
+                // Lice je na ~45% širine slike, a slika je široka 0.885 visine
+                // ekrana (118% × 3/4). Zato se lijevi rub računa tako da lice
+                // uvijek padne na 70% širine — isto na telefonu i na monitoru.
+                backgroundPosition: 'calc(70vw - 40dvh) -2dvh',
+                // utapa se prije nego dođe do stiha
+                maskImage: 'radial-gradient(ellipse 80% 62% at 78% 22%, black 30%, transparent 80%)',
+                WebkitMaskImage: 'radial-gradient(ellipse 80% 62% at 78% 22%, black 30%, transparent 80%)',
+              }}
+            />
+          </motion.div>
           )}
 
           {/* 4 — sjaj iza stiha */}
           {m.bloom > 0 && (
-            <motion.div
-              className="absolute inset-0"
-              style={{
-                background: `radial-gradient(ellipse 70% 40% at 50% 50%, ${m.accent} 0%, transparent 70%)`,
-                opacity: m.bloom * 0.14,
-                willChange: 'opacity',
-              }}
-              animate={reduced ? undefined : { opacity: [m.bloom * 0.09, m.bloom * 0.17, m.bloom * 0.09] }}
-              transition={{ duration: dur(11), repeat: Infinity, ease: 'easeInOut' }}
+            <div
+              className={`absolute inset-0 ${reduced ? '' : 'bg-bloom'}`}
+              style={
+                {
+                  background: `radial-gradient(ellipse 70% 40% at 50% 50%, ${m.accent} 0%, transparent 70%)`,
+                  opacity: m.bloom * 0.14,
+                  '--lo': m.bloom * 0.09,
+                  '--hi': m.bloom * 0.17,
+                  animationDuration: `${dur(11)}s`,
+                } as CSSProperties
+              }
             />
           )}
 
@@ -180,24 +175,12 @@ export function MoodBackground({
                  pa nema trzaja na rubovima ekrana. Prije je bio uzak i brz
                  i čitao se kao efekat, a ne kao svjetlo. */}
           {m.sweep && !reduced && (
-            <motion.div
-              className="absolute -inset-y-1/3 w-[90%]"
+            <div
+              className="bg-sweep absolute -inset-y-1/3 w-[90%]"
               style={{
-                background: `linear-gradient(105deg, transparent 0%, ${m.accent}0d 36%, ${m.accent}1a 50%, ${m.accent}0d 64%, transparent 100%)`,
-                filter: 'blur(90px)',
-                willChange: 'transform, opacity',
-              }}
-              initial={{ opacity: 0 }}
-              animate={{ x: ['-100vw', '160vw'], opacity: [0, 1, 1, 0] }}
-              transition={{
-                x: { duration: dur(38), repeat: Infinity, repeatDelay: 12, ease: 'linear' },
-                opacity: {
-                  duration: dur(38),
-                  repeat: Infinity,
-                  repeatDelay: 12,
-                  ease: 'linear',
-                  times: [0, 0.28, 0.72, 1],
-                },
+                // gradijent je već širok i mekan — bez blur filtera
+                background: `linear-gradient(105deg, transparent 0%, ${m.accent}08 30%, ${m.accent}14 42%, ${m.accent}1a 50%, ${m.accent}14 58%, ${m.accent}08 70%, transparent 100%)`,
+                animationDuration: `${dur(38) + 12}s`,
               }}
             />
           )}
@@ -208,17 +191,14 @@ export function MoodBackground({
       <FloatingNotes count={m.notes} accent={m.accent} speed={m.speed} seed={seed} />
 
       {/* 6 — zrnatost */}
-      <motion.div
-        className="absolute -inset-4"
+      <div
+        className={`absolute -inset-4 ${m.grain > 0.5 && !reduced ? 'bg-grain' : ''}`}
         style={{
           opacity: m.grain * 0.4,
           mixBlendMode: 'overlay',
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-          willChange: m.grain > 0.5 ? 'transform' : undefined,
         }}
         // filmsko podrhtavanje samo tamo gdje je zrno ionako izraženo
-        animate={m.grain > 0.5 && !reduced ? { x: [0, -7, 5, -3, 7, 0], y: [0, 5, -7, 3, -5, 0] } : undefined}
-        transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }}
       />
 
       {/* 7 — vinjeta */}

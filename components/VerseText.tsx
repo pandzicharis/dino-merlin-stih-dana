@@ -5,11 +5,11 @@ import { motion, useReducedMotion } from 'motion/react'
 import { withPeriod } from '@/lib/text'
 
 /** Ispis počinje ovoliko sekundi nakon učitavanja. */
-export const VERSE_START = 0.4
+export const VERSE_START = 0.25
 /** Razmak između riječi. */
-export const VERSE_STEP = 0.07
+export const VERSE_STEP = 0.06
 /** Trajanje po riječi. */
-export const VERSE_WORD = 0.6
+export const VERSE_WORD = 0.55
 
 /** Kad zadnja riječ sjedne — po tome se ravna sve ostalo na ekranu. */
 export function verseTail(text: string): number {
@@ -83,8 +83,9 @@ export function VerseText({ text, color, glow }: { text: string; color: string; 
                 <Fragment key={`${li}-${i}`}>
                   <motion.span
                     className="inline-block"
-                    initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    // bez blur filtera — po riječi je na iPhoneu preskup i koči ispis
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{
                       delay: VERSE_START + i * VERSE_STEP,
                       duration: VERSE_WORD,

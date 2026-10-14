@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo } from 'react'
-import { motion, useReducedMotion } from 'motion/react'
+import { useMemo, type CSSProperties } from 'react'
+import { useReducedMotion } from 'motion/react'
 
 const GLYPHS = ['♪', '♫', '♩', '♬']
 
@@ -56,36 +56,28 @@ export function FloatingNotes({
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       {notes.map((n, i) => (
-        <motion.span
+        // CSS animacija (globals.css) — vrti je grafički procesor, ne JavaScript
+        <span
           key={i}
-          className="absolute select-none leading-none"
-          style={{
-            left: `${n.left}%`,
-            bottom: -40,
-            fontSize: n.size,
-            color: accent,
-            // tihi sjaj u boji naglaska — nota tako ima težinu, a ne izgleda
-            // kao znak nalijepljen preko pozadine
-            textShadow: `0 0 14px ${accent}73`,
-            willChange: 'transform, opacity',
-          }}
-          initial={{ opacity: 0 }}
-          animate={{
-            y: ['0vh', '-115vh'],
-            x: [0, n.drift, 0],
-            opacity: [0, 0.55, 0.55, 0],
-            rotate: [0, n.drift > 0 ? 16 : -16, 0],
-          }}
-          transition={{
-            duration: n.duration,
-            delay: n.delay,
-            repeat: Infinity,
-            ease: 'linear',
-            times: [0, 0.15, 0.8, 1],
-          }}
+          className="note-float absolute select-none leading-none"
+          style={
+            {
+              left: `${n.left}%`,
+              bottom: -40,
+              fontSize: n.size,
+              color: accent,
+              // tihi sjaj u boji naglaska — nota tako ima težinu, a ne izgleda
+              // kao znak nalijepljen preko pozadine
+              textShadow: `0 0 14px ${accent}73`,
+              '--drift': `${n.drift}px`,
+              '--rot': `${n.drift > 0 ? 16 : -16}deg`,
+              animationDuration: `${n.duration}s`,
+              animationDelay: `${n.delay}s`,
+            } as CSSProperties
+          }
         >
           {n.glyph}
-        </motion.span>
+        </span>
       ))}
     </div>
   )

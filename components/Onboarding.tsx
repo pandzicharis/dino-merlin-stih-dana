@@ -249,7 +249,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
                   className="flex w-full max-w-[19rem] flex-1 flex-col items-center justify-center text-center"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.9, delay: 1.5, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.8, delay: 0.8, ease: [0.22, 1, 0.36, 1] }}
                 >
                   {stage === 'permission' ? (
                     <PermissionStage

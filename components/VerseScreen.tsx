@@ -88,7 +88,7 @@ export function VerseScreen({
               className="flex items-center gap-5"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 1.35, ease: 'easeOut' }}
+              transition={{ duration: 0.7, delay: 0.7, ease: 'easeOut' }}
             >
               <NotifyToggle />
               <SavedLink />
