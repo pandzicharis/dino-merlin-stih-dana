@@ -184,7 +184,7 @@ function verseSize(text: string, width: number) {
 /** Naziv pored ploče — kao `cardSongSize` u SongCredit. */
 function cardSongSize(song: string, width: number) {
   const em = Math.max(song.length, 1) * 0.9 + 0.18
-  return Math.min(15, (width - 96) / em)
+  return Math.min(15, (width - 122) / em)
 }
 
 export function VerseMock({
@@ -544,7 +544,7 @@ function Shortcut({ d }: { d: string }) {
 function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
   const width = Math.min(w * 0.84, 320)
   return (
-    <div style={{ width: 'fit-content', maxWidth: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
+    <div style={{ width: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
       <span style={{ position: 'relative', width: '76em', height: '76em', flexShrink: 0 }}>
         <svg viewBox="0 0 60 60" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-hidden>
           <defs>
@@ -569,22 +569,31 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
           <path d="M28 25.5v9l7.5-4.5z" fill="#16110A" />
         </svg>
       </span>
-      <span style={{ minWidth: 0, display: 'grid' }}>
-        <span
-          style={{
-            display: 'block',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontSize: `${cardSongSize(verse.song, width).toFixed(2)}em`,
-            fontWeight: 600,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            lineHeight: 1,
-            color: BRAND.gold,
-          }}
-        >
-          {verse.song}
+      <span style={{ flex: 1, minWidth: 0, display: 'block' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8em' }}>
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontSize: `${cardSongSize(verse.song, width).toFixed(2)}em`,
+              fontWeight: 600,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              lineHeight: 1,
+              color: BRAND.gold,
+            }}
+          >
+            {verse.song}
+          </span>
+          {/* ekvilajzer, miran */}
+          <span style={{ display: 'flex', alignItems: 'flex-end', gap: '2em', height: '14em' }}>
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} style={{ width: '3em', height: '3em', borderRadius: '2em', background: BRAND.gold }} />
+            ))}
+          </span>
         </span>
         <span
           style={{
@@ -612,7 +621,6 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
                 width: '10em',
                 height: '10em',
                 marginTop: '-5em',
-                marginLeft: '-5em',
                 borderRadius: '50%',
                 background: '#F1E2BF',
               }}

@@ -363,8 +363,8 @@ function Vinyl({
 }
 
 /**
- * Plejer ispod stiha — odmah otvoren, bez kutije: ploča, pored nje naziv i
- * album, a ispod traka za premotavanje tačno široka koliko i tekst iznad.
+ * Plejer ispod stiha — odmah otvoren, bez kutije: ploča, pored nje naziv
+ * (desno titra ekvilajzer dok svira), album i traka za premotavanje.
  * Kontrole rade i sa zaključanog ekrana (Media Session).
  */
 function AudioSong(props: Source) {
@@ -378,18 +378,19 @@ function AudioSong(props: Source) {
   }, [fallback])
 
   return (
-    <div data-tip="song" className="flex w-fit max-w-[min(84vw,320px)] items-center gap-4 text-left">
+    <div data-tip="song" className="flex w-[min(84vw,320px)] items-center gap-4 text-left">
       <Vinyl size={76} state={state} progress={progress} song={verse.song} onClick={toggle} deck />
-      {/* grid: kolona je široka koliko najduži red teksta — traka se ravna po njemu */}
-      <div className="grid min-w-0">
+      <div className="min-w-0 flex-1">
         {/* dodir na naziv radi isto što i ploča */}
-        <p
-          className="cursor-pointer truncate font-semibold uppercase leading-none tracking-[0.18em]"
-          style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song) }}
-          onClick={toggle}
-        >
-          {verse.song}
-        </p>
+        <div className="flex cursor-pointer items-center gap-2" onClick={toggle}>
+          <p
+            className="min-w-0 flex-1 truncate font-semibold uppercase leading-none tracking-[0.18em]"
+            style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song) }}
+          >
+            {verse.song}
+          </p>
+          <Equalizer playing={state === 'playing'} />
+        </div>
         <p className="mt-2 truncate text-[10.5px] uppercase leading-none tracking-[0.22em] text-white/60">
           {verse.album} &middot; {verse.year}
         </p>
@@ -403,8 +404,8 @@ function AudioSong(props: Source) {
 }
 
 /**
- * Pjesma u kartici sačuvanog stiha: mala ploča je pusti, a dok svira ispod
- * naziva se razvuče traka za premotavanje. Bez zvuka ostaje tačka raspoloženja.
+ * Pjesma u kartici sačuvanog stiha: mala ploča je pusti, desno titra
+ * ekvilajzer, ispod je traka za premotavanje. Bez zvuka ostaje tačka raspoloženja.
  */
 export function SongRow({ verse, accent }: { verse: Verse; accent: string }) {
   const id = youtubeId(verse.youtube)
@@ -429,23 +430,16 @@ function AudioRow(props: Source) {
     <>
       <Vinyl size={46} state={state} progress={progress} song={verse.song} onClick={toggle} />
       <div className="min-w-0 flex-1">
-        <RowText verse={verse} onClick={toggle} />
-        <AnimatePresence initial={false}>
-          {state !== 'idle' && (
-            <motion.div
-              className="overflow-hidden"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="flex items-center gap-2.5">
-                <Seek value={progress} onSeek={seek} />
-                <span className="tabular w-9 text-right text-[10px] tracking-[0.06em] text-white/60">{time}</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <RowText verse={verse} onClick={toggle} />
+          </div>
+          <Equalizer playing={state === 'playing'} />
+        </div>
+        <div className="flex items-center gap-2.5">
+          <Seek value={progress} onSeek={seek} />
+          <span className="tabular w-9 text-right text-[10px] tracking-[0.06em] text-white/60">{time}</span>
+        </div>
       </div>
     </>
   )
@@ -461,6 +455,24 @@ function RowText({ verse, onClick }: { verse: Verse; onClick?: () => void }) {
         {verse.album} &middot; {verse.year}
       </p>
     </div>
+  )
+}
+
+/** Četiri zlatne trake — titraju dok svira, spuste se na pauzi. */
+function Equalizer({ playing }: { playing: boolean }) {
+  return (
+    <span className="flex h-3.5 w-[18px] shrink-0 items-end gap-[2px]" aria-hidden>
+      {[0.9, 0.65, 1.05, 0.75].map((d, i) => (
+        <motion.span
+          key={i}
+          className="h-full w-[3px] origin-bottom rounded-full"
+          style={{ background: `linear-gradient(to top, #8A7148, ${BRAND.gold}, #F1E2BF)` }}
+          initial={{ scaleY: 0.2 }}
+          animate={playing ? { scaleY: [0.25, 1, 0.4, 0.85, 0.25] } : { scaleY: 0.2 }}
+          transition={playing ? { duration: d, repeat: Infinity, ease: 'easeInOut', delay: i * 0.1 } : { duration: 0.3 }}
+        />
+      ))}
+    </span>
   )
 }
 
@@ -494,11 +506,12 @@ function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => 
       <span className="absolute inset-x-0 h-[2px] rounded-full bg-white/15" />
       <span
         className="absolute left-0 h-[2px] rounded-full"
-        style={{ width: `${shown * 100}%`, background: `linear-gradient(90deg, #8A7148, ${BRAND.gold})` }}
+        style={{ width: `calc(${shown} * (100% - 10px) + 5px)`, background: `linear-gradient(90deg, #8A7148, ${BRAND.gold})` }}
       />
       <span
-        className="absolute h-2.5 w-2.5 -translate-x-1/2 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.6)] transition-transform group-active:scale-125"
-        style={{ left: `${shown * 100}%`, background: '#F1E2BF' }}
+        className="absolute h-2.5 w-2.5 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.6)] transition-transform group-active:scale-125"
+        // kružić ostaje unutar trake — na početku se ne odsiječe
+        style={{ left: `calc(${shown} * (100% - 10px))`, background: '#F1E2BF' }}
       />
     </div>
   )
@@ -507,7 +520,7 @@ function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => 
 /** Naziv pored ploče: uvijek u jednom redu, nikad preko 15px. */
 function cardSongSize(song: string): string {
   const em = Math.max(song.length, 1) * 0.9 + 0.18
-  return `min(15px, calc((min(84vw, 320px) - 96px) / ${em.toFixed(2)}))`
+  return `min(15px, calc((min(84vw, 320px) - 122px) / ${em.toFixed(2)}))`
 }
 
 function clock(s: number): string {
