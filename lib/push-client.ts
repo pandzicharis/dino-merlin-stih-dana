@@ -77,12 +77,18 @@ async function freshSubscription(
   reg: ServiceWorkerRegistration,
   key: string,
 ): Promise<PushSubscription> {
-  const existing = await reg.pushManager.getSubscription()
-  if (existing) return existing
-
   const opts = {
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
+  }
+
+  // Postojeća pretplata važi samo ako je napravljena ISTIM ključem. Stara
+  // (npr. iz testiranja, s drugim VAPID ključem) izgleda ispravno, ali push
+  // servis odbije svako slanje na nju — Android tako tiho ostane bez stiha.
+  const existing = await reg.pushManager.getSubscription()
+  if (existing) {
+    if (sameKey(existing.options.applicationServerKey, opts.applicationServerKey as Uint8Array)) return existing
+    await existing.unsubscribe().catch(() => {})
   }
 
   try {
@@ -93,6 +99,12 @@ async function freshSubscription(
     await new Promise((r) => setTimeout(r, 300))
     return reg.pushManager.subscribe(opts)
   }
+}
+
+function sameKey(a: ArrayBuffer | null, b: Uint8Array): boolean {
+  if (!a) return false
+  const x = new Uint8Array(a)
+  return x.length === b.length && x.every((v, i) => v === b[i])
 }
 
 export async function subscribeToPush(

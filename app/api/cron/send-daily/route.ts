@@ -159,7 +159,9 @@ async function sendBatch(rows: Row[], payload: string, stamp: string | null): Pr
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         payload,
-        { TTL: 12 * 3600, agent, urgency: 'normal' },
+        // `high`: Android (posebno Samsung) inače drži obavijest dok telefon
+        // miruje i isporuči je tek kad se probudi — stih stigne sat-dva kasnije
+        { TTL: 12 * 3600, agent, urgency: 'high' },
       )
       ok.push(s.endpoint)
     } catch (e) {
