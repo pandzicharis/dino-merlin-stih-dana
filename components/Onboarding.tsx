@@ -274,7 +274,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
                       onAllow={allow}
                     />
                   ) : waiting ? (
-                    <Done openApp={deck === '' && platform === 'android'} />
+                    <Done />
                   ) : (
                     <>
                       <p
@@ -466,17 +466,7 @@ function PermissionStage({
 }
 
 /** Instalirano, ali smo još u tabu — aplikacija se sad otvara s ikone. */
-/**
- * Instalirana aplikacija, otvorena iz Chromea: Android ovaj link preda
- * aplikaciji (njen opseg je registrovan na sistemu), pa se ona sama otvori.
- * Ako još nije gotova, ostaje se ovdje.
- */
-function appIntent(): string {
-  const { host, href } = window.location
-  return `intent://${host}/#Intent;scheme=https;S.browser_fallback_url=${encodeURIComponent(href)};end`
-}
-
-function Done({ openApp }: { openApp: boolean }) {
+function Done() {
   return (
     <>
       <motion.span
@@ -506,25 +496,9 @@ function Done({ openApp }: { openApp: boolean }) {
       >
         Stih je na tvom ekranu
       </p>
-      {openApp ? (
-        <>
-          {/* preglednik se ne može zatvoriti iz stranice — ali aplikacija se može otvoriti */}
-          <a
-            href={appIntent()}
-            className="mt-7 w-full rounded-full px-6 py-3.5 text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-black no-underline transition-opacity active:opacity-80"
-            style={{ backgroundColor: BRAND.gold }}
-          >
-            Otvori aplikaciju
-          </a>
-          <p className="mt-4 text-[12px] leading-relaxed text-white/45">
-            Ako se ne otvori, sačekaj par sekundi da se instalacija završi, ili je otvori s početnog ekrana.
-          </p>
-        </>
-      ) : (
-        <p className="mt-4 text-[13px] leading-relaxed text-white/45">
-          Zatvori browser i otvori aplikaciju s početnog ekrana.
-        </p>
-      )}
+      <p className="mt-4 text-[13px] leading-relaxed text-white/45">
+        Zatvori browser i otvori aplikaciju s početnog ekrana.
+      </p>
     </>
   )
 }
