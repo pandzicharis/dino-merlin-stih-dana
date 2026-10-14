@@ -3,13 +3,13 @@
 import { albumOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
-import { BRAND } from '@/lib/brand'
 import { oneLine, withPeriod } from '@/lib/text'
+import { SongRow } from './SongCredit'
 
 /**
  * Kartice stihova: stih gore, ispod tanke linije pjesma i album, a desno
- * u istom redu akcija (npr. ukloni iz sačuvanih). Kao ekran stiha, samo
- * tiše: omot albuma desno, rastopljen prema tekstu, pod nijansom
+ * u istom redu akcija (npr. ukloni iz sačuvanih); mala ploča pusti pjesmu.
+ * Kao ekran stiha, samo tiše: omot albuma desno, rastopljen prema tekstu, pod nijansom
  * raspoloženja — a stih ostaje na tamnom i čitak.
  */
 export function VerseList({
@@ -71,15 +71,7 @@ export function VerseList({
             </p>
 
             <div className="mt-3 flex items-center gap-3 border-t border-white/[0.08] pt-3">
-              <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: m.accent }} title={m.label} aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: BRAND.gold }}>
-                  {verse.song}
-                </p>
-                <p className="mt-1 truncate text-[10px] uppercase tracking-[0.16em] text-white/45">
-                  {verse.album} &middot; {verse.year}
-                </p>
-              </div>
+              <SongRow verse={verse} accent={m.accent} />
               {action?.(verse)}
             </div>
           </li>

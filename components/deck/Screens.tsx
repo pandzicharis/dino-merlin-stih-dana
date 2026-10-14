@@ -544,7 +544,7 @@ function Shortcut({ d }: { d: string }) {
 function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
   const width = Math.min(w * 0.84, 320)
   return (
-    <div style={{ width: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
+    <div style={{ width: 'fit-content', maxWidth: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
       <span style={{ position: 'relative', width: '76em', height: '76em', flexShrink: 0 }}>
         <svg viewBox="0 0 60 60" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-hidden>
           <defs>
@@ -569,7 +569,7 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
           <path d="M28 25.5v9l7.5-4.5z" fill="#16110A" />
         </svg>
       </span>
-      <span style={{ flex: 1, minWidth: 0, display: 'block' }}>
+      <span style={{ minWidth: 0, display: 'grid' }}>
         <span
           style={{
             display: 'block',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { youtubeId } from '@/lib/text'
@@ -26,13 +26,7 @@ export function SongCredit({ verse }: { verse: Verse }) {
 
   if (id && !failed)
     return (
-      <AudioSong
-        key={id}
-        verse={verse}
-        src={`/audio/${audioSlug(verse.song)}.m4a`}
-        fallback={`/api/audio/${id}?s=${audioSlug(verse.song)}`}
-        onFail={() => setFailedId(id)}
-      />
+      <AudioSong key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} />
     )
 
   return (
@@ -120,16 +114,23 @@ function audioSlug(song: string): string {
 
 const RING = 2 * Math.PI * 28.5
 const ICON = { initial: { scale: 0.5, opacity: 0 }, animate: { scale: 1, opacity: 1 }, exit: { scale: 0.5, opacity: 0 } }
+/** Svira jedna pjesma u isto vrijeme: kad krene nova, ostale stanu. */
+const SOLO = 'stihdana:solo'
 
 type State = 'idle' | 'loading' | 'playing' | 'paused'
 
+type Source = { verse: Verse; src: string; fallback: string; onFail: () => void }
+
+const sourceOf = (verse: Verse, id: string) => ({
+  src: `/audio/${audioSlug(verse.song)}.m4a`,
+  fallback: `/api/audio/${id}?s=${audioSlug(verse.song)}`,
+})
+
 /**
- * Plejer je odmah otvoren, bez kutije: gramofonska ploča sa zlatnom
- * etiketom (play/pauza) i prstenom napretka — vrti se dok pjesma svira i
- * stane gdje je pauzirana. Pored nje naziv, album i traka za premotavanje
- * prstom. Kontrole rade i sa zaključanog ekrana (Media Session).
+ * Zvuk jedne pjesme: statični fajl, pa server; stanje, vrijeme, premotavanje.
+ * `preload` odmah povuče zaglavlje fajla, da se trajanje vidi prije dodira.
  */
-function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string; fallback: string; onFail: () => void }) {
+function useSong({ verse, src, fallback, onFail, preload }: Source & { preload: boolean }) {
   const audio = useRef<HTMLAudioElement | null>(null)
   const want = useRef(false)
   const [state, setState] = useState<State>('idle')
@@ -137,9 +138,6 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
   const [dur, setDur] = useState(0)
 
   useEffect(() => {
-    // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
-    // Na Vercelu nema yt-dlp-a, pa tamo svira samo statični fajl i ovo ne treba.
-    if (process.env.NODE_ENV === 'development') fetch(`${fallback}&warm=1`).catch(() => {})
     // prezentacija: odlaskom s koraka pjesma stane i vrati se na početak
     const stop = () => {
       const a = audio.current
@@ -151,18 +149,27 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
       setCur(0)
       setState('idle')
     }
+    const solo = (e: Event) => {
+      if ((e as CustomEvent).detail === audio.current) return
+      want.current = false
+      audio.current?.pause()
+    }
     window.addEventListener('stihdana:stop-audio', stop)
+    window.addEventListener(SOLO, solo)
+    if (preload) player()
     return () => {
       window.removeEventListener('stihdana:stop-audio', stop)
+      window.removeEventListener(SOLO, solo)
       audio.current?.pause()
       audio.current = null
     }
-  }, [fallback])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function player(): HTMLAudioElement {
     if (audio.current) return audio.current
     const a = new Audio(src)
-    a.preload = 'metadata'
+    a.preload = preload ? 'metadata' : 'none'
     const time = () => {
       setCur(a.currentTime)
       if (Number.isFinite(a.duration)) setDur(a.duration)
@@ -188,33 +195,31 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
       onFail()
     })
     audio.current = a
-
-    if ('mediaSession' in navigator) {
-      const ms = navigator.mediaSession
-      ms.metadata = new MediaMetadata({
-        title: verse.song,
-        artist: BRAND.name,
-        album: verse.album,
-        artwork: [{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }],
-      })
-      ms.setActionHandler('play', () => a.play())
-      ms.setActionHandler('pause', () => a.pause())
-      ms.setActionHandler('seekto', (d) => d.seekTime != null && (a.currentTime = d.seekTime))
-    }
     return a
   }
 
-  // trajanje pjesme se vidi i prije prvog dodira (samo zaglavlje fajla)
-  useEffect(() => {
-    player()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  /** kontrole sa zaključanog ekrana — za pjesmu koja upravo svira */
+  function session(a: HTMLAudioElement) {
+    if (!('mediaSession' in navigator)) return
+    const ms = navigator.mediaSession
+    ms.metadata = new MediaMetadata({
+      title: verse.song,
+      artist: BRAND.name,
+      album: verse.album,
+      artwork: [{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }],
+    })
+    ms.setActionHandler('play', () => a.play())
+    ms.setActionHandler('pause', () => a.pause())
+    ms.setActionHandler('seekto', (d) => d.seekTime != null && (a.currentTime = d.seekTime))
+  }
 
   function toggle() {
     haptic(6)
     const a = player()
     if (a.paused) {
       want.current = true
+      window.dispatchEvent(new CustomEvent(SOLO, { detail: a }))
+      session(a)
       setState('loading')
       a.play().catch(() => setState('paused'))
     } else {
@@ -223,105 +228,160 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
     }
   }
 
-  const playing = state === 'playing'
+  function seek(f: number) {
+    const a = audio.current
+    if (a && dur) {
+      a.currentTime = f * dur
+      setCur(a.currentTime)
+    }
+  }
+
   const progress = dur ? cur / dur : 0
   const time = !dur ? '--:--' : cur > 0 ? `-${clock(dur - cur)}` : clock(dur)
+  return { state, progress, time, toggle, seek }
+}
+
+/**
+ * Gramofonska ploča sa zlatnom etiketom (play/pauza) i prstenom napretka —
+ * vrti se dok pjesma svira i stane tačno gdje je pauzirana.
+ */
+function Vinyl({
+  size,
+  state,
+  progress,
+  song,
+  onClick,
+  deck = false,
+}: {
+  size: number
+  state: State
+  progress: number
+  song: string
+  onClick: () => void
+  /** dugme koje prezentacija sama pritisne */
+  deck?: boolean
+}) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
+  const playing = state === 'playing'
+  const disc = Math.round((size * 66) / 76)
+  const icon = Math.max(10, Math.round((size * 14) / 76))
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-label={playing ? `Pauziraj "${song}"` : `Pusti "${song}"`}
+      aria-pressed={playing}
+      data-deck={deck ? 'play' : undefined}
+      data-state={state}
+      className="relative flex shrink-0 cursor-pointer items-center justify-center"
+      style={{ width: size, height: size }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.93 }}
+      transition={{ type: 'spring', stiffness: 460, damping: 20 }}
+    >
+      {/* sjaj — diše dok pjesma svira */}
+      <motion.span
+        className="absolute -inset-2 rounded-full blur-lg"
+        style={{ background: `radial-gradient(circle, ${BRAND.gold}55 0%, transparent 70%)` }}
+        animate={playing ? { opacity: [0.35, 0.8, 0.35], scale: [0.95, 1.1, 0.95] } : { opacity: 0.2, scale: 1 }}
+        transition={playing ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
+        aria-hidden
+      />
+      {/* prsten napretka oko ploče */}
+      <svg width={size} height={size} viewBox="0 0 60 60" className="absolute inset-0 -rotate-90" aria-hidden>
+        <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}2E`} strokeWidth="1.5" />
+        <circle
+          cx="30"
+          cy="30"
+          r="28.5"
+          fill="none"
+          stroke={BRAND.gold}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeDasharray={RING}
+          strokeDashoffset={RING * (1 - progress)}
+          style={{ transition: 'stroke-dashoffset 0.25s linear' }}
+        />
+      </svg>
+      {/* ploča — vrti se i stane tačno gdje je pauzirana */}
+      <svg
+        width={disc}
+        height={disc}
+        viewBox="0 0 52 52"
+        className="relative drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]"
+        style={{ animation: 'vinyl-spin 3.6s linear infinite', animationPlayState: playing ? 'running' : 'paused' }}
+        aria-hidden
+      >
+        <defs>
+          <radialGradient id={`${uid}d`} cx="50%" cy="50%" r="50%">
+            <stop offset="0.4" stopColor="#1C1A18" />
+            <stop offset="1" stopColor="#060606" />
+          </radialGradient>
+          <linearGradient id={`${uid}l`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#F1E2BF" />
+            <stop offset="0.45" stopColor={BRAND.gold} />
+            <stop offset="1" stopColor="#8A7148" />
+          </linearGradient>
+        </defs>
+        <circle cx="26" cy="26" r="26" fill={`url(#${uid}d)`} />
+        {[23.5, 21, 18.5, 16].map((r) => (
+          <circle key={r} cx="26" cy="26" r={r} fill="none" stroke="#fff" strokeOpacity="0.06" strokeWidth="0.6" />
+        ))}
+        {/* odsjaj na brazdama — vrti se s pločom, pa se vidi da svira */}
+        <path d="M26 2.5A23.5 23.5 0 0 1 46.4 14.3L26 26z" fill="#fff" fillOpacity="0.07" />
+        <path d="M26 49.5A23.5 23.5 0 0 1 5.6 37.7L26 26z" fill="#fff" fillOpacity="0.045" />
+        <circle cx="26" cy="26" r="12" fill={`url(#${uid}l)`} />
+        <circle cx="26" cy="26" r="9.5" fill="none" stroke="#16110A" strokeOpacity="0.18" strokeWidth="0.6" />
+      </svg>
+      {/* znak na etiketi — ne vrti se */}
+      <span className="absolute inset-0 flex items-center justify-center">
+        <AnimatePresence mode="wait" initial={false}>
+          {state === 'loading' ? (
+            <motion.span
+              key="load"
+              className="rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
+              style={{ width: icon, height: icon }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, rotate: 360 }}
+              exit={{ opacity: 0 }}
+              transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
+            />
+          ) : playing ? (
+            <motion.svg key="pause" width={icon} height={icon} viewBox="0 0 12 12" {...ICON} aria-hidden>
+              <rect x="2" y="1" width="3" height="10" rx="1" fill="#16110A" />
+              <rect x="7" y="1" width="3" height="10" rx="1" fill="#16110A" />
+            </motion.svg>
+          ) : (
+            <motion.svg key="play" width={icon} height={icon} viewBox="0 0 12 12" className="ml-[2px]" {...ICON} aria-hidden>
+              <path d="M2 1v10l9-5z" fill="#16110A" />
+            </motion.svg>
+          )}
+        </AnimatePresence>
+      </span>
+    </motion.button>
+  )
+}
+
+/**
+ * Plejer ispod stiha — odmah otvoren, bez kutije: ploča, pored nje naziv i
+ * album, a ispod traka za premotavanje tačno široka koliko i tekst iznad.
+ * Kontrole rade i sa zaključanog ekrana (Media Session).
+ */
+function AudioSong(props: Source) {
+  const { state, progress, time, toggle, seek } = useSong({ ...props, preload: true })
+  const { verse, fallback } = props
+
+  // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
+  // Na Vercelu nema yt-dlp-a, pa tamo svira samo statični fajl i ovo ne treba.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') fetch(`${fallback}&warm=1`).catch(() => {})
+  }, [fallback])
 
   return (
-    <div data-tip="song" className="flex w-[min(84vw,320px)] items-center gap-4 text-left">
-      <motion.button
-        type="button"
-        onClick={toggle}
-        aria-label={playing ? `Pauziraj "${verse.song}"` : `Pusti "${verse.song}"`}
-        aria-pressed={playing}
-        data-deck="play"
-        data-state={state}
-        className="relative flex h-[76px] w-[76px] shrink-0 cursor-pointer items-center justify-center"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.93 }}
-        transition={{ type: 'spring', stiffness: 460, damping: 20 }}
-      >
-        {/* sjaj — diše dok pjesma svira */}
-        <motion.span
-          className="absolute -inset-2 rounded-full blur-lg"
-          style={{ background: `radial-gradient(circle, ${BRAND.gold}55 0%, transparent 70%)` }}
-          animate={playing ? { opacity: [0.35, 0.8, 0.35], scale: [0.95, 1.1, 0.95] } : { opacity: 0.2, scale: 1 }}
-          transition={playing ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
-          aria-hidden
-        />
-        {/* prsten napretka oko ploče */}
-        <svg width="76" height="76" viewBox="0 0 60 60" className="absolute inset-0 -rotate-90" aria-hidden>
-          <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}2E`} strokeWidth="1.5" />
-          <circle
-            cx="30"
-            cy="30"
-            r="28.5"
-            fill="none"
-            stroke={BRAND.gold}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeDasharray={RING}
-            strokeDashoffset={RING * (1 - progress)}
-            style={{ transition: 'stroke-dashoffset 0.25s linear' }}
-          />
-        </svg>
-        {/* ploča — vrti se i stane tačno gdje je pauzirana */}
-        <svg
-          width="66"
-          height="66"
-          viewBox="0 0 52 52"
-          className="relative drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]"
-          style={{ animation: 'vinyl-spin 3.6s linear infinite', animationPlayState: playing ? 'running' : 'paused' }}
-          aria-hidden
-        >
-          <defs>
-            <radialGradient id="vinyl" cx="50%" cy="50%" r="50%">
-              <stop offset="0.4" stopColor="#1C1A18" />
-              <stop offset="1" stopColor="#060606" />
-            </radialGradient>
-            <linearGradient id="vinyl-label" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#F1E2BF" />
-              <stop offset="0.45" stopColor={BRAND.gold} />
-              <stop offset="1" stopColor="#8A7148" />
-            </linearGradient>
-          </defs>
-          <circle cx="26" cy="26" r="26" fill="url(#vinyl)" />
-          {[23.5, 21, 18.5, 16].map((r) => (
-            <circle key={r} cx="26" cy="26" r={r} fill="none" stroke="#fff" strokeOpacity="0.06" strokeWidth="0.6" />
-          ))}
-          {/* odsjaj na brazdama — vrti se s pločom, pa se vidi da svira */}
-          <path d="M26 2.5A23.5 23.5 0 0 1 46.4 14.3L26 26z" fill="#fff" fillOpacity="0.07" />
-          <path d="M26 49.5A23.5 23.5 0 0 1 5.6 37.7L26 26z" fill="#fff" fillOpacity="0.045" />
-          <circle cx="26" cy="26" r="12" fill="url(#vinyl-label)" />
-          <circle cx="26" cy="26" r="9.5" fill="none" stroke="#16110A" strokeOpacity="0.18" strokeWidth="0.6" />
-        </svg>
-        {/* znak na etiketi — ne vrti se */}
-        <span className="absolute inset-0 flex items-center justify-center">
-          <AnimatePresence mode="wait" initial={false}>
-            {state === 'loading' ? (
-              <motion.span
-                key="load"
-                className="h-3.5 w-3.5 rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, rotate: 360 }}
-                exit={{ opacity: 0 }}
-                transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
-              />
-            ) : playing ? (
-              <motion.svg key="pause" width="14" height="14" viewBox="0 0 12 12" {...ICON} aria-hidden>
-                <rect x="2" y="1" width="3" height="10" rx="1" fill="#16110A" />
-                <rect x="7" y="1" width="3" height="10" rx="1" fill="#16110A" />
-              </motion.svg>
-            ) : (
-              <motion.svg key="play" width="14" height="14" viewBox="0 0 12 12" className="ml-[2px]" {...ICON} aria-hidden>
-                <path d="M2 1v10l9-5z" fill="#16110A" />
-              </motion.svg>
-            )}
-          </AnimatePresence>
-        </span>
-      </motion.button>
-
-      <div className="min-w-0 flex-1">
+    <div data-tip="song" className="flex w-fit max-w-[min(84vw,320px)] items-center gap-4 text-left">
+      <Vinyl size={76} state={state} progress={progress} song={verse.song} onClick={toggle} deck />
+      {/* grid: kolona je široka koliko najduži red teksta — traka se ravna po njemu */}
+      <div className="grid min-w-0">
         {/* dodir na naziv radi isto što i ploča */}
         <p
           className="cursor-pointer truncate font-semibold uppercase leading-none tracking-[0.18em]"
@@ -334,19 +394,72 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
           {verse.album} &middot; {verse.year}
         </p>
         <div className="mt-1 flex items-center gap-2.5">
-          <Seek
-            value={progress}
-            onSeek={(f) => {
-              const a = audio.current
-              if (a && dur) {
-                a.currentTime = f * dur
-                setCur(a.currentTime)
-              }
-            }}
-          />
+          <Seek value={progress} onSeek={seek} />
           <span className="tabular w-9 text-right text-[10.5px] tracking-[0.06em] text-white/60">{time}</span>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Pjesma u kartici sačuvanog stiha: mala ploča je pusti, a dok svira ispod
+ * naziva se razvuče traka za premotavanje. Bez zvuka ostaje tačka raspoloženja.
+ */
+export function SongRow({ verse, accent }: { verse: Verse; accent: string }) {
+  const id = youtubeId(verse.youtube)
+  const [failedId, setFailedId] = useState<string | null>(null)
+
+  if (!id || failedId === id)
+    return (
+      <>
+        <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} aria-hidden />
+        <div className="min-w-0 flex-1">
+          <RowText verse={verse} />
+        </div>
+      </>
+    )
+  return <AudioRow key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} />
+}
+
+function AudioRow(props: Source) {
+  const { state, progress, time, toggle, seek } = useSong({ ...props, preload: false })
+  const { verse } = props
+  return (
+    <>
+      <Vinyl size={46} state={state} progress={progress} song={verse.song} onClick={toggle} />
+      <div className="min-w-0 flex-1">
+        <RowText verse={verse} onClick={toggle} />
+        <AnimatePresence initial={false}>
+          {state !== 'idle' && (
+            <motion.div
+              className="overflow-hidden"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="flex items-center gap-2.5">
+                <Seek value={progress} onSeek={seek} />
+                <span className="tabular w-9 text-right text-[10px] tracking-[0.06em] text-white/60">{time}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </>
+  )
+}
+
+function RowText({ verse, onClick }: { verse: Verse; onClick?: () => void }) {
+  return (
+    <div className={onClick ? 'cursor-pointer' : undefined} onClick={onClick}>
+      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: BRAND.gold }}>
+        {verse.song}
+      </p>
+      <p className="mt-1 truncate text-[10px] uppercase tracking-[0.16em] text-white/55">
+        {verse.album} &middot; {verse.year}
+      </p>
     </div>
   )
 }
