@@ -379,7 +379,8 @@ function AudioSong(props: Source) {
 
   return (
     <div data-tip="song" className="flex w-[min(84vw,320px)] items-center gap-4 text-left">
-      <Vinyl size={76} state={state} progress={progress} song={verse.song} onClick={toggle} deck />
+      {/* ploča visoka koliko i tekst s trakom desno */}
+      <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} deck />
       <div className="min-w-0 flex-1">
         {/* dodir na naziv radi isto što i ploča */}
         <div className="flex cursor-pointer items-center gap-2" onClick={toggle}>
@@ -428,7 +429,7 @@ function AudioRow(props: Source) {
   const { verse } = props
   return (
     <>
-      <Vinyl size={46} state={state} progress={progress} song={verse.song} onClick={toggle} />
+      <Vinyl size={60} state={state} progress={progress} song={verse.song} onClick={toggle} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
@@ -520,7 +521,7 @@ function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => 
 /** Naziv pored ploče: uvijek u jednom redu, nikad preko 15px. */
 function cardSongSize(song: string): string {
   const em = Math.max(song.length, 1) * 0.9 + 0.18
-  return `min(15px, calc((min(84vw, 320px) - 122px) / ${em.toFixed(2)}))`
+  return `min(15px, calc((min(84vw, 320px) - 108px) / ${em.toFixed(2)}))`
 }
 
 function clock(s: number): string {

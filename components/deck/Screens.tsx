@@ -184,7 +184,7 @@ function verseSize(text: string, width: number) {
 /** Naziv pored ploče — kao `cardSongSize` u SongCredit. */
 function cardSongSize(song: string, width: number) {
   const em = Math.max(song.length, 1) * 0.9 + 0.18
-  return Math.min(15, (width - 122) / em)
+  return Math.min(15, (width - 108) / em)
 }
 
 export function VerseMock({
@@ -545,7 +545,7 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
   const width = Math.min(w * 0.84, 320)
   return (
     <div style={{ width: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
-      <span style={{ position: 'relative', width: '76em', height: '76em', flexShrink: 0 }}>
+      <span style={{ position: 'relative', width: '62em', height: '62em', flexShrink: 0 }}>
         <svg viewBox="0 0 60 60" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-hidden>
           <defs>
             <radialGradient id="vm-disc" cx="50%" cy="50%" r="50%">
