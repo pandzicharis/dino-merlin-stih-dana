@@ -5,10 +5,10 @@ import { motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 
 /** Jarke boje papirića kakvi se dijele u Magazi. */
-const COLORS = ['#F28C38', '#E8473B', '#F6D23A', '#3FA2E0', '#4BB86A', '#E9B8E6', '#8EDBE8', '#F7A35C', '#D7E87C']
+export const COLORS = ['#F28C38', '#E8473B', '#F6D23A', '#3FA2E0', '#4BB86A', '#E9B8E6', '#8EDBE8', '#F7A35C', '#D7E87C']
 
 /** Mali deterministički PRNG — gomila izgleda isto pri svakom otvaranju. */
-function rng(seed: number) {
+export function rng(seed: number) {
   return () => {
     seed = (seed + 0x6d2b79f5) | 0
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
@@ -226,7 +226,7 @@ const GOLD = '#E9D2A0'
  * Trenutak kad papir postane stih na ekranu: bljesak zlatnog svjetla, talas
  * koji se raširi, iskre i par nota koje odlete — kratko, pa nestane.
  */
-function Burst({ x, y }: { x: number; y: number }) {
+export function Burst({ x, y }: { x: number; y: number }) {
   const sparks = useMemo(() => {
     const r = rng(Math.round(x * 7 + y))
     return Array.from({ length: 26 }, () => {

@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { MOOD_KEYS } from '@/data/moods'
 import { startTips } from './Tips'
+import { playIntro } from './IntroSplash'
 import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
 
 /**
@@ -78,6 +79,9 @@ export function DevDateBar({
       </a>
       <button onClick={() => startTips(true)} className="px-1.5 text-white/50 hover:text-white">
         tips
+      </button>
+      <button onClick={() => playIntro(true)} className="px-1.5 text-white/50 hover:text-white">
+        splash
       </button>
       {(['ios', 'android'] as const).map((o) => (
         <button

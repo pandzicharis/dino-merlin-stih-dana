@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
 import { setLastSeen } from '@/lib/storage'
@@ -10,6 +10,7 @@ import { DevDateBar } from './DevDateBar'
 import { Onboarding } from './Onboarding'
 import { Tips } from './Tips'
 import { UpdatePrompt } from './UpdatePrompt'
+import { IntroHost } from './IntroSplash'
 
 /**
  * Rješava KOJI stih se prikazuje.
@@ -24,6 +25,9 @@ export function DailyVerse({ serverDate, days }: { serverDate: string; days: Rec
   const known = verseId ? undefined : days[date]
   const key = verseId ? `id=${encodeURIComponent(verseId)}` : `d=${date}`
   const [fetched, setFetched] = useState<{ key: string; verse: Verse } | null>(null)
+  // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka
+  const [replay, setReplay] = useState(0)
+  const land = useCallback(() => setReplay((r) => r + 1), [])
 
   useEffect(() => {
     if (known) return
@@ -61,7 +65,12 @@ export function DailyVerse({ serverDate, days }: { serverDate: string; days: Rec
   return (
     <>
       <Onboarding mood={mood ?? verse.mood} seed={verse.id} />
-      <VerseScreen verse={verse} date={date} mood={mood} />
+      <VerseScreen verse={verse} date={date} mood={mood} replay={replay} />
+      <IntroHost
+        lines={[verse, ...Object.values(days).filter((v) => v.id !== verse.id)].map((v) => v.text)}
+        bg={MOODS[mood ?? verse.mood].gradient[0]}
+        onLand={land}
+      />
       <Tips />
       <UpdatePrompt accent={MOODS[mood ?? verse.mood].accent} />
       <DevDateBar date={date} verseId={verse.id} mood={mood ?? verse.mood} />

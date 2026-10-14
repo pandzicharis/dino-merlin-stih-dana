@@ -546,7 +546,7 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
   return (
     <div style={{ width: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
       <span style={{ position: 'relative', width: '62em', height: '62em', flexShrink: 0 }}>
-        <svg viewBox="0 0 60 60" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-hidden>
+        <svg viewBox="0 0 60 60" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }} aria-hidden>
           <defs>
             <radialGradient id="vm-disc" cx="50%" cy="50%" r="50%">
               <stop offset="0.3" stopColor="#36312B" />
@@ -574,6 +574,14 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
           <path d="M30 53.5A23.5 23.5 0 0 1 9.6 41.7L30 30z" fill="#fff" fillOpacity="0.08" />
           <circle cx="30" cy="30" r="12" fill="url(#vm-label)" />
           <circle cx="30" cy="30" r="12" fill="none" stroke="#5E4C30" strokeWidth="0.6" />
+          {/* ručica gramofona u mirovanju, lijevo od ploče */}
+          <g transform="rotate(14 2 4)">
+            <rect x="-1" y="-6.5" width="6" height="6.5" rx="1.4" fill="#2A2622" stroke={BRAND.gold} strokeOpacity="0.6" strokeWidth="0.5" />
+            <path d="M2 4V37Q2 41.5 4.8 44.6" fill="none" stroke="#DCCBA4" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M6.8 42.6l-4.4 2.8 2.6 4.1 4.4-2.8z" fill={BRAND.gold} stroke="#5E4C30" strokeWidth="0.4" />
+            <circle cx="2" cy="4" r="4.6" fill="#2A2622" stroke={BRAND.gold} strokeOpacity="0.7" strokeWidth="0.7" />
+            <circle cx="2" cy="4" r="1.6" fill={BRAND.gold} />
+          </g>
           <path d="M28 25.5v9l7.5-4.5z" fill="#16110A" />
         </svg>
       </span>

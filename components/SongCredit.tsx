@@ -6,6 +6,7 @@ import type { Verse } from '@/data/verses'
 import { youtubeId } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
+import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
 
 /**
  * Potpis pjesme ispod stiha.
@@ -166,6 +167,15 @@ function useSong({ verse, src, fallback, onFail, preload }: Source & { preload: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // pucketanje ploče dok pjesma svira
+  useEffect(() => {
+    const a = audio.current
+    if (!a) return
+    if (state === 'playing') startCrackle(a)
+    else stopCrackle(a)
+    return () => stopCrackle(a)
+  }, [state])
+
   function player(): HTMLAudioElement {
     if (audio.current) return audio.current
     const a = new Audio(src)
@@ -218,6 +228,9 @@ function useSong({ verse, src, fallback, onFail, preload }: Source & { preload: 
     const a = player()
     if (a.paused) {
       want.current = true
+      // zvuk gramofona: kontekst se otvara iz dodira, tup kad igla legne
+      unlockVinyl()
+      dropNeedle(0.3)
       window.dispatchEvent(new CustomEvent(SOLO, { detail: a }))
       session(a)
       setState('loading')
@@ -252,6 +265,7 @@ function Vinyl({
   song,
   onClick,
   deck = false,
+  arm = false,
 }: {
   size: number
   state: State
@@ -260,6 +274,8 @@ function Vinyl({
   onClick: () => void
   /** dugme koje prezentacija sama pritisne */
   deck?: boolean
+  /** ručica gramofona koja se spusti na ploču */
+  arm?: boolean
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
   const playing = state === 'playing'
@@ -367,7 +383,53 @@ function Vinyl({
           )}
         </AnimatePresence>
       </span>
+      {arm && <Tonearm size={size} down={playing || state === 'loading'} progress={progress} />}
     </motion.button>
+  )
+}
+
+/**
+ * Ručica gramofona, s lijeve strane ploče: na play se igla spusti na vanjske
+ * brazde i kako pjesma ide klizi prema etiketi; na pauzu se podigne.
+ * Okreće se oko osovine u gornjem lijevom uglu.
+ */
+function Tonearm({ size, down, progress }: { size: number; down: boolean; progress: number }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
+  // -8° = vanjska brazda, -21° = tik do etikete; 14° = sa strane, van ploče
+  const angle = down ? -8 - 13 * Math.min(1, Math.max(0, progress)) : 14
+  return (
+    <motion.span
+      className="pointer-events-none absolute inset-0 drop-shadow-[0_3px_4px_rgba(0,0,0,0.65)]"
+      style={{ transformOrigin: `${(2 / 62) * 100}% ${(4 / 62) * 100}%` }}
+      initial={false}
+      animate={{ rotate: angle }}
+      transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+      aria-hidden
+    >
+      <svg width={size} height={size} viewBox="0 0 62 62" className="block overflow-visible">
+        <defs>
+          <linearGradient id={`${uid}m`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#F1E2BF" />
+            <stop offset="0.5" stopColor={BRAND.gold} />
+            <stop offset="1" stopColor="#8A7148" />
+          </linearGradient>
+          <radialGradient id={`${uid}b`} cx="40%" cy="35%" r="70%">
+            <stop offset="0" stopColor="#4A443C" />
+            <stop offset="1" stopColor="#14120F" />
+          </radialGradient>
+        </defs>
+        {/* protuteg iza osovine */}
+        <rect x="-1" y="-6.5" width="6" height="6.5" rx="1.4" fill={`url(#${uid}b)`} stroke={BRAND.gold} strokeOpacity="0.6" strokeWidth="0.5" />
+        {/* cijev ručice, na kraju blago savijena prema glavi */}
+        <path d="M2 4V37Q2 41.5 4.8 44.6" fill="none" stroke="#DCCBA4" strokeWidth="1.8" strokeLinecap="round" />
+        {/* glava s iglom */}
+        <path d="M6.8 42.6l-4.4 2.8 2.6 4.1 4.4-2.8z" fill={`url(#${uid}m)`} stroke="#5E4C30" strokeWidth="0.4" />
+        <circle cx="8.2" cy="48.6" r="0.8" fill="#16110A" />
+        {/* osovina */}
+        <circle cx="2" cy="4" r="4.6" fill={`url(#${uid}b)`} stroke={BRAND.gold} strokeOpacity="0.7" strokeWidth="0.7" />
+        <circle cx="2" cy="4" r="1.6" fill={BRAND.gold} />
+      </svg>
+    </motion.span>
   )
 }
 
@@ -389,7 +451,7 @@ function AudioSong(props: Source) {
   return (
     <div data-tip="song" className="flex w-[min(84vw,320px)] items-center gap-4 text-left">
       {/* ploča visoka koliko i tekst s trakom desno */}
-      <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} deck />
+      <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} deck arm />
       <div className="min-w-0 flex-1">
         {/* dodir na naziv radi isto što i ploča */}
         <div className="flex cursor-pointer items-center gap-2" onClick={toggle}>
@@ -438,7 +500,7 @@ function AudioRow(props: Source) {
   const { verse } = props
   return (
     <>
-      <Vinyl size={60} state={state} progress={progress} song={verse.song} onClick={toggle} />
+      <Vinyl size={60} state={state} progress={progress} song={verse.song} onClick={toggle} arm />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">

@@ -29,7 +29,7 @@ export function SavedVerses({ verses, onClose }: { verses: Verse[]; onClose?: ()
             onClick={() => toggleFavorite(v.id)}
             aria-label="Ukloni iz sačuvanih"
             title="Ukloni iz sačuvanih"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#F2A7B8] transition-all hover:bg-white/10 active:scale-90"
+            className="-mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#F2A7B8] transition-all hover:bg-white/10 active:scale-90"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               <path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z" />

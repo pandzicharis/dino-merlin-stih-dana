@@ -144,7 +144,8 @@ export function PhoneScript({
     }
     const afterAllow = async () => {
       await allowedP
-      await wait(2600)
+      // splash poslije dozvole (gomila → stih se podigne → slova odu na ekran) traje ~5.5 s
+      await wait(6500)
     }
 
     // Android: dijalog iskoči kad aplikacija zatraži instalaciju

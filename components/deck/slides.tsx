@@ -507,6 +507,7 @@ function Dozvola() {
         items={[
           'Bez dozvole aplikacija ne pušta dalje — stih koji sam dolazi joj je cijela svrha.',
           'Ako se dozvola odbije, aplikacija pokaže put kroz Postavke.',
+          'Odmah zatim: gomila papirića kao na pultu Magaze — današnji stih odleti na ekran i postane digitalni.',
         ]}
       />
     </>
@@ -1222,8 +1223,9 @@ function Slusanje() {
   }, [phone, manual])
   return (
     <Text>
-      Plejer je odmah ispod stiha — jedan dodir i pjesma svira u pozadini, bez videa i bez napuštanja stiha. Pauza,
-      premotavanje i kontrole sa zaključanog ekrana, kao u pravom plejeru.
+      Plejer je gramofon ispod stiha: dodir na ploču spusti iglu, ploča se zavrti i pjesma svira uz tiho pucketanje
+      starog vinila — bez videa i bez napuštanja stiha. Igla klizi prema sredini kako pjesma ide; pauza, premotavanje i
+      kontrole sa zaključanog ekrana, kao u pravom plejeru.
     </Text>
   )
 }

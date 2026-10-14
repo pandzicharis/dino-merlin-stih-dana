@@ -20,7 +20,7 @@ import { SEND_HOUR, SEND_TIME } from '@/lib/date'
 import { setNotifyIntent } from '@/lib/storage'
 import { deckParam, inDeck } from '@/lib/deck'
 import { BrandLockup } from './BrandLockup'
-import { startTips } from './Tips'
+import { playIntro } from './IntroSplash'
 
 type Platform = 'ios' | 'android' | 'desktop'
 
@@ -157,7 +157,8 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
     // ide u pozadini, a zvono na stihu je tiho popravi ako padne.
     setNotifyIntent(true)
     void subscribeToPush(SEND_HOUR)
-    startTips()
+    // papirići → današnji stih sleti na ekran → savjeti
+    playIntro()
   }, [deck])
 
   // Odgovor na sistemski prozor iz prezentacije.
@@ -166,7 +167,11 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return
       // savjeti u prezentaciji imaju svoj korak, odmah poslije ovog
-      if (e.data?.type === 'stihdana:permission-granted') setSkipped(true)
+      if (e.data?.type === 'stihdana:permission-granted') {
+        setSkipped(true)
+        // isto prvo otvaranje kao na pravom telefonu: papirići → stih sleti
+        playIntro(true)
+      }
       if (e.data?.type === 'stihdana:installed') setWaiting(true)
       if (e.data?.type === 'stihdana:permission-denied') setAsked(true)
     }

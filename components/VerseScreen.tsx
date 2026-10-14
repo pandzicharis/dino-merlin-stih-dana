@@ -28,12 +28,15 @@ export function VerseScreen({
   date,
   mood,
   compact = false,
+  replay = 0,
 }: {
   verse: Verse
   date: string
   /** override palete (dev); default je mood samog stiha */
   mood?: Mood
   compact?: boolean
+  /** promjena ponovo ispiše stih i podnožje — kad papirić iz splasha sleti */
+  replay?: number
 }) {
   const m = MOODS[mood ?? verse.mood]
 
@@ -114,13 +117,13 @@ export function VerseScreen({
             </motion.p>
           )}
 
-          <VerseText key={verse.id} text={verse.text} color={m.text} glow={m.accent} />
+          <VerseText key={`${verse.id}-${replay}`} text={verse.text} color={m.text} glow={m.accent} />
 
 
           {/* odmah ispod stiha — sačuvati se želi baš ono što se upravo pročitalo */}
           {!compact && (
             <motion.div
-              key={`s-${verse.id}`}
+              key={`s-${verse.id}-${replay}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: tail + 0.1, ease: [0.22, 1, 0.36, 1] }}
@@ -132,7 +135,7 @@ export function VerseScreen({
 
         {/* podnožje — uvijek prisutno, samo se stiša */}
         <motion.footer
-          key={`f-${verse.id}`}
+          key={`f-${verse.id}-${replay}`}
           className="flex flex-col items-center gap-6 text-center"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
