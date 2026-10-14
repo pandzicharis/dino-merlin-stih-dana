@@ -549,23 +549,31 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
         <svg viewBox="0 0 60 60" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-hidden>
           <defs>
             <radialGradient id="vm-disc" cx="50%" cy="50%" r="50%">
-              <stop offset="0.4" stopColor="#1C1A18" />
-              <stop offset="1" stopColor="#060606" />
+              <stop offset="0.3" stopColor="#36312B" />
+              <stop offset="0.7" stopColor="#1B1917" />
+              <stop offset="1" stopColor="#0B0A09" />
             </radialGradient>
+            <linearGradient id="vm-rim" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#F1E2BF" stopOpacity="0.95" />
+              <stop offset="0.5" stopColor={BRAND.gold} stopOpacity="0.35" />
+              <stop offset="1" stopColor="#8A7148" stopOpacity="0.8" />
+            </linearGradient>
             <linearGradient id="vm-label" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0" stopColor="#F1E2BF" />
               <stop offset="0.45" stopColor={BRAND.gold} />
               <stop offset="1" stopColor="#8A7148" />
             </linearGradient>
           </defs>
-          <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}2E`} strokeWidth="1.5" />
+          <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}47`} strokeWidth="1.5" />
           <circle cx="30" cy="30" r="26" fill="url(#vm-disc)" />
-          {[23.5, 21, 18.5, 16].map((r) => (
-            <circle key={r} cx="30" cy="30" r={r} fill="none" stroke="#fff" strokeOpacity="0.06" strokeWidth="0.6" />
+          <circle cx="30" cy="30" r="25.4" fill="none" stroke="url(#vm-rim)" strokeWidth="1.1" />
+          {[23.5, 22, 20.5, 19, 17.5, 16, 14.5].map((r, i) => (
+            <circle key={r} cx="30" cy="30" r={r} fill="none" stroke="#fff" strokeOpacity={i % 2 ? 0.05 : 0.1} strokeWidth="0.5" />
           ))}
-          <path d="M30 6.5A23.5 23.5 0 0 1 50.4 18.3L30 30z" fill="#fff" fillOpacity="0.07" />
-          <path d="M30 53.5A23.5 23.5 0 0 1 9.6 41.7L30 30z" fill="#fff" fillOpacity="0.045" />
+          <path d="M30 6.5A23.5 23.5 0 0 1 50.4 18.3L30 30z" fill="#fff" fillOpacity="0.13" />
+          <path d="M30 53.5A23.5 23.5 0 0 1 9.6 41.7L30 30z" fill="#fff" fillOpacity="0.08" />
           <circle cx="30" cy="30" r="12" fill="url(#vm-label)" />
+          <circle cx="30" cy="30" r="12" fill="none" stroke="#5E4C30" strokeWidth="0.6" />
           <path d="M28 25.5v9l7.5-4.5z" fill="#16110A" />
         </svg>
       </span>

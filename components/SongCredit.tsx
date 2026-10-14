@@ -283,13 +283,13 @@ function Vinyl({
       <motion.span
         className="absolute -inset-2 rounded-full blur-lg"
         style={{ background: `radial-gradient(circle, ${BRAND.gold}55 0%, transparent 70%)` }}
-        animate={playing ? { opacity: [0.35, 0.8, 0.35], scale: [0.95, 1.1, 0.95] } : { opacity: 0.2, scale: 1 }}
+        animate={playing ? { opacity: [0.45, 0.9, 0.45], scale: [0.95, 1.1, 0.95] } : { opacity: 0.35, scale: 1 }}
         transition={playing ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
         aria-hidden
       />
       {/* prsten napretka oko ploče */}
       <svg width={size} height={size} viewBox="0 0 60 60" className="absolute inset-0 -rotate-90" aria-hidden>
-        <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}2E`} strokeWidth="1.5" />
+        <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}47`} strokeWidth="1.5" />
         <circle
           cx="30"
           cy="30"
@@ -308,15 +308,21 @@ function Vinyl({
         width={disc}
         height={disc}
         viewBox="0 0 52 52"
-        className="relative drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]"
+        className="relative drop-shadow-[0_4px_12px_rgba(0,0,0,0.7)]"
         style={{ animation: 'vinyl-spin 3.6s linear infinite', animationPlayState: playing ? 'running' : 'paused' }}
         aria-hidden
       >
         <defs>
           <radialGradient id={`${uid}d`} cx="50%" cy="50%" r="50%">
-            <stop offset="0.4" stopColor="#1C1A18" />
-            <stop offset="1" stopColor="#060606" />
+            <stop offset="0.3" stopColor="#36312B" />
+            <stop offset="0.7" stopColor="#1B1917" />
+            <stop offset="1" stopColor="#0B0A09" />
           </radialGradient>
+          <linearGradient id={`${uid}r`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#F1E2BF" stopOpacity="0.95" />
+            <stop offset="0.5" stopColor={BRAND.gold} stopOpacity="0.35" />
+            <stop offset="1" stopColor="#8A7148" stopOpacity="0.8" />
+          </linearGradient>
           <linearGradient id={`${uid}l`} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stopColor="#F1E2BF" />
             <stop offset="0.45" stopColor={BRAND.gold} />
@@ -324,14 +330,17 @@ function Vinyl({
           </linearGradient>
         </defs>
         <circle cx="26" cy="26" r="26" fill={`url(#${uid}d)`} />
-        {[23.5, 21, 18.5, 16].map((r) => (
-          <circle key={r} cx="26" cy="26" r={r} fill="none" stroke="#fff" strokeOpacity="0.06" strokeWidth="0.6" />
+        {/* zlatni rub — ploča se vidi i na crnoj pozadini */}
+        <circle cx="26" cy="26" r="25.4" fill="none" stroke={`url(#${uid}r)`} strokeWidth="1.1" />
+        {[23.5, 22, 20.5, 19, 17.5, 16, 14.5].map((r, i) => (
+          <circle key={r} cx="26" cy="26" r={r} fill="none" stroke="#fff" strokeOpacity={i % 2 ? 0.05 : 0.1} strokeWidth="0.5" />
         ))}
         {/* odsjaj na brazdama — vrti se s pločom, pa se vidi da svira */}
-        <path d="M26 2.5A23.5 23.5 0 0 1 46.4 14.3L26 26z" fill="#fff" fillOpacity="0.07" />
-        <path d="M26 49.5A23.5 23.5 0 0 1 5.6 37.7L26 26z" fill="#fff" fillOpacity="0.045" />
+        <path d="M26 2.5A23.5 23.5 0 0 1 46.4 14.3L26 26z" fill="#fff" fillOpacity="0.13" />
+        <path d="M26 49.5A23.5 23.5 0 0 1 5.6 37.7L26 26z" fill="#fff" fillOpacity="0.08" />
         <circle cx="26" cy="26" r="12" fill={`url(#${uid}l)`} />
-        <circle cx="26" cy="26" r="9.5" fill="none" stroke="#16110A" strokeOpacity="0.18" strokeWidth="0.6" />
+        <circle cx="26" cy="26" r="12" fill="none" stroke="#5E4C30" strokeWidth="0.6" />
+        <circle cx="26" cy="26" r="9.5" fill="none" stroke="#16110A" strokeOpacity="0.2" strokeWidth="0.5" />
       </svg>
       {/* znak na etiketi — ne vrti se */}
       <span className="absolute inset-0 flex items-center justify-center">
