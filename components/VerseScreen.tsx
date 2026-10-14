@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { motion } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
@@ -41,6 +42,20 @@ export function VerseScreen({
   // između stiha i potpisa; sada nota i podnožje ulaze dok stih još sjeda.
   const tail = compact ? 0 : verseTail(verse.text)
 
+  // Statusna traka (Android, Chrome) preuzme gornju boju pozadine stiha,
+  // pa se stopi s ekranom; odlaskom se vrati crna iz layouta.
+  const top = m.gradient[0]
+  useEffect(() => {
+    if (compact) return
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    if (!meta) return
+    const prev = meta.content
+    meta.content = top
+    return () => {
+      meta.content = prev
+    }
+  }, [top, compact])
+
   return (
     <div className={compact ? 'relative isolate overflow-hidden rounded-2xl' : ''}>
       <div className={compact ? 'absolute inset-0 -z-10' : ''}>
@@ -67,7 +82,7 @@ export function VerseScreen({
           )}
           {!compact && (
             <motion.div
-              className="flex items-center gap-4"
+              className="flex items-center gap-5"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 1.35, ease: 'easeOut' }}
@@ -131,7 +146,7 @@ export function VerseScreen({
               >
                 {verse.song}
               </p>
-              <p className="mt-1.5 text-[9px] uppercase tracking-[0.22em] text-white/28">
+              <p className="mt-1.5 text-[10px] uppercase tracking-[0.22em] text-white/50">
                 {verse.album} &middot; {verse.year}
               </p>
             </div>

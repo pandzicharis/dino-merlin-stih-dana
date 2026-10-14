@@ -160,3 +160,10 @@ html[data-deck] .dev-pad {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* gramofonska ploča u plejeru — CSS animacija, pa pauza zadrži ugao */
+@keyframes vinyl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { Verse } from '@/data/verses'
 import { getSharePrefs } from '@/lib/storage'
+import { haptic } from '@/lib/haptic'
 
 /**
  * Panel, pregled i crtanje slike (~15 KB) ne idu uz prvo učitavanje — stih
@@ -50,13 +51,13 @@ export function ShareButton({ verse, accent, date }: { verse: Verse; accent: str
         onPointerEnter={load}
         onTouchStart={load}
         onClick={() => {
-          navigator.vibrate?.(8)
+          haptic(8)
           setUsed(true)
           setOpen(true)
         }}
         aria-label="Podijeli stih"
         data-tip="share"
-        className="-m-2 p-2 text-white/40 transition-all hover:text-white/70 active:scale-90"
+        className="-m-[10.5px] p-[10.5px] text-white/60 transition-all hover:text-white/85 active:scale-90"
         style={open ? { color: accent } : undefined}
       >
         <ShareIcon />

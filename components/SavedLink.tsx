@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites } from '@/lib/client-store'
 import { pruneFavorites } from '@/lib/storage'
 import { loadVerses } from '@/lib/verses-client'
+import { haptic } from '@/lib/haptic'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
 const load = () => import('./SavedPanel')
@@ -65,14 +66,14 @@ export function SavedLink() {
               onPointerEnter={load}
               onTouchStart={load}
               onClick={() => {
-                navigator.vibrate?.(8)
+                haptic(8)
                 setUsed(true)
                 setOpen(true)
               }}
               aria-label={`Sačuvani stihovi (${count})`}
               title="Sačuvani stihovi"
               data-tip="saved"
-              className="relative -m-2 p-2 text-white/40 transition-all hover:text-white/70 active:scale-90"
+              className="relative -m-[10.5px] p-[10.5px] text-white/60 transition-all hover:text-white/85 active:scale-90"
             >
               {/* dvije kartice jedna iza druge, srce na prednjoj */}
               <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

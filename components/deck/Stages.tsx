@@ -26,6 +26,7 @@ import { formatDateBs, formatDayBs } from '@/lib/date'
 import { PhoneScript, type Script } from './PhoneScript'
 import { ChatDemo } from './ChatDemo'
 import { WELCOME } from '../Tips'
+import { haptic } from '@/lib/haptic'
 
 /** Veličina kutije u kojoj uređaj stoji — uređaj se upiše u nju. */
 function useBox<T extends HTMLElement>() {
@@ -485,7 +486,7 @@ function LockNotify({
     after(1400, () => setNoon(true))
     after(2000, () => {
       setArrived(true)
-      navigator.vibrate?.([12, 60, 12])
+      haptic([12, 60, 12])
     })
     if (!manual) {
       after(6000, unlock)

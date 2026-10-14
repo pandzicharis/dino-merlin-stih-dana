@@ -13,6 +13,7 @@ import { PaperToPhone } from './PaperToPhone'
 import { SLIDES, cleanSlate } from './slides'
 import { deviceOuter, type DeviceKind } from './Devices'
 import type { DeckApi, DeckData, FeatureDef, Section, Simulation, SlideDef } from './types'
+import { haptic } from '@/lib/haptic'
 
 /* ── gdje smo: adresa (#stih/atmosfera) je jedini izvor istine ───── */
 
@@ -232,7 +233,7 @@ export function Deck({ data }: { data: DeckData }) {
   stopRef.current = stop.id
   const simulate = useCallback((kind: Simulation) => {
     setSim({ kind, stop: stopRef.current, n: Date.now() })
-    navigator.vibrate?.(8)
+    haptic(8)
   }, [])
 
   // Savjeti na telefonu su prošli → dobrodošlica kao obavijest, pa se skloni

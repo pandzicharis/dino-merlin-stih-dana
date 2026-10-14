@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { youtubeId } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
+import { haptic } from '@/lib/haptic'
 
 /**
  * Potpis pjesme ispod stiha.
@@ -117,15 +118,16 @@ function audioSlug(song: string): string {
     .replace(/^-|-$/g, '')
 }
 
-const RING = 2 * Math.PI * 21
+const RING = 2 * Math.PI * 28.5
 const ICON = { initial: { scale: 0.5, opacity: 0 }, animate: { scale: 1, opacity: 1 }, exit: { scale: 0.5, opacity: 0 } }
 
 type State = 'idle' | 'loading' | 'playing' | 'paused'
 
 /**
- * Plejer je odmah otvoren: staklena kartica u tonu aplikacije — zlatno
- * play/pauza dugme s prstenom napretka, naziv i album, ekvilajzer i traka
- * za premotavanje prstom. Kontrole rade i sa zaključanog ekrana (Media Session).
+ * Plejer je odmah otvoren, bez kutije: gramofonska ploča sa zlatnom
+ * etiketom (play/pauza) i prstenom napretka — vrti se dok pjesma svira i
+ * stane gdje je pauzirana. Pored nje naziv, album i traka za premotavanje
+ * prstom. Kontrole rade i sa zaključanog ekrana (Media Session).
  */
 function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string; fallback: string; onFail: () => void }) {
   const audio = useRef<HTMLAudioElement | null>(null)
@@ -209,6 +211,7 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
   }, [])
 
   function toggle() {
+    haptic(6)
     const a = player()
     if (a.paused) {
       want.current = true
@@ -225,127 +228,126 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
   const time = !dur ? '--:--' : cur > 0 ? `-${clock(dur - cur)}` : clock(dur)
 
   return (
-    <div
-      data-tip="song"
-      className="relative w-[min(86vw,340px)] overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.045] p-3.5 pr-4 text-left shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-md"
-    >
-      {/* zlatna nit po gornjem rubu */}
-      <span
-        className="absolute inset-x-6 top-0 h-px"
-        style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)` }}
-        aria-hidden
-      />
-      <div className="flex items-center gap-3.5">
-        <motion.button
-          type="button"
-          onClick={toggle}
-          aria-label={playing ? `Pauziraj "${verse.song}"` : `Pusti "${verse.song}"`}
-          aria-pressed={playing}
-          data-deck="play"
-          data-state={state}
-          className="relative flex h-[48px] w-[48px] shrink-0 cursor-pointer items-center justify-center"
-          whileHover={{ scale: 1.06 }}
-          whileTap={{ scale: 0.92 }}
-          transition={{ type: 'spring', stiffness: 460, damping: 20 }}
-        >
-          {/* sjaj — diše dok pjesma svira */}
-          <motion.span
-            className="absolute -inset-2 rounded-full blur-md"
-            style={{ background: `radial-gradient(circle, ${BRAND.gold}66 0%, transparent 70%)` }}
-            animate={playing ? { opacity: [0.4, 0.9, 0.4], scale: [0.95, 1.12, 0.95] } : { opacity: 0.3, scale: 1 }}
-            transition={playing ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
-            aria-hidden
+    <div data-tip="song" className="flex w-[min(84vw,320px)] items-center gap-4 text-left">
+      <motion.button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? `Pauziraj "${verse.song}"` : `Pusti "${verse.song}"`}
+        aria-pressed={playing}
+        data-deck="play"
+        data-state={state}
+        className="relative flex h-[60px] w-[60px] shrink-0 cursor-pointer items-center justify-center"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.93 }}
+        transition={{ type: 'spring', stiffness: 460, damping: 20 }}
+      >
+        {/* sjaj — diše dok pjesma svira */}
+        <motion.span
+          className="absolute -inset-2 rounded-full blur-lg"
+          style={{ background: `radial-gradient(circle, ${BRAND.gold}55 0%, transparent 70%)` }}
+          animate={playing ? { opacity: [0.35, 0.8, 0.35], scale: [0.95, 1.1, 0.95] } : { opacity: 0.2, scale: 1 }}
+          transition={playing ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
+          aria-hidden
+        />
+        {/* prsten napretka oko ploče */}
+        <svg width="60" height="60" viewBox="0 0 60 60" className="absolute inset-0 -rotate-90" aria-hidden>
+          <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}2E`} strokeWidth="1.5" />
+          <circle
+            cx="30"
+            cy="30"
+            r="28.5"
+            fill="none"
+            stroke={BRAND.gold}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeDasharray={RING}
+            strokeDashoffset={RING * (1 - progress)}
+            style={{ transition: 'stroke-dashoffset 0.25s linear' }}
           />
-          <svg width="48" height="48" viewBox="0 0 48 48" className="absolute inset-0 -rotate-90" aria-hidden>
-            <circle cx="24" cy="24" r="21" fill="none" stroke={`${BRAND.gold}33`} strokeWidth="1.5" />
-            <circle
-              cx="24"
-              cy="24"
-              r="21"
-              fill="none"
-              stroke={BRAND.gold}
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeDasharray={RING}
-              strokeDashoffset={RING * (1 - progress)}
-              style={{ transition: 'stroke-dashoffset 0.25s linear' }}
-            />
-          </svg>
-          <span
-            className="relative flex h-[38px] w-[38px] items-center justify-center rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
-            style={{ background: `linear-gradient(135deg, #F1E2BF, ${BRAND.gold} 45%, #8A7148)` }}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {state === 'loading' ? (
-                <motion.span
-                  key="load"
-                  className="h-3.5 w-3.5 rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, rotate: 360 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
-                />
-              ) : playing ? (
-                <motion.svg key="pause" width="14" height="14" viewBox="0 0 12 12" {...ICON} aria-hidden>
-                  <rect x="2" y="1" width="3" height="10" rx="1" fill="#16110A" />
-                  <rect x="7" y="1" width="3" height="10" rx="1" fill="#16110A" />
-                </motion.svg>
-              ) : (
-                <motion.svg key="play" width="14" height="14" viewBox="0 0 12 12" className="ml-[2px]" {...ICON} aria-hidden>
-                  <path d="M2 1v10l9-5z" fill="#16110A" />
-                </motion.svg>
-              )}
-            </AnimatePresence>
-          </span>
-        </motion.button>
+        </svg>
+        {/* ploča — vrti se i stane tačno gdje je pauzirana */}
+        <svg
+          width="52"
+          height="52"
+          viewBox="0 0 52 52"
+          className="relative drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]"
+          style={{ animation: 'vinyl-spin 3.6s linear infinite', animationPlayState: playing ? 'running' : 'paused' }}
+          aria-hidden
+        >
+          <defs>
+            <radialGradient id="vinyl" cx="50%" cy="50%" r="50%">
+              <stop offset="0.4" stopColor="#1C1A18" />
+              <stop offset="1" stopColor="#060606" />
+            </radialGradient>
+            <linearGradient id="vinyl-label" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#F1E2BF" />
+              <stop offset="0.45" stopColor={BRAND.gold} />
+              <stop offset="1" stopColor="#8A7148" />
+            </linearGradient>
+          </defs>
+          <circle cx="26" cy="26" r="26" fill="url(#vinyl)" />
+          {[23.5, 21, 18.5, 16].map((r) => (
+            <circle key={r} cx="26" cy="26" r={r} fill="none" stroke="#fff" strokeOpacity="0.06" strokeWidth="0.6" />
+          ))}
+          {/* odsjaj na brazdama — vrti se s pločom, pa se vidi da svira */}
+          <path d="M26 2.5A23.5 23.5 0 0 1 46.4 14.3L26 26z" fill="#fff" fillOpacity="0.07" />
+          <path d="M26 49.5A23.5 23.5 0 0 1 5.6 37.7L26 26z" fill="#fff" fillOpacity="0.045" />
+          <circle cx="26" cy="26" r="12" fill="url(#vinyl-label)" />
+          <circle cx="26" cy="26" r="9.5" fill="none" stroke="#16110A" strokeOpacity="0.18" strokeWidth="0.6" />
+        </svg>
+        {/* znak na etiketi — ne vrti se */}
+        <span className="absolute inset-0 flex items-center justify-center">
+          <AnimatePresence mode="wait" initial={false}>
+            {state === 'loading' ? (
+              <motion.span
+                key="load"
+                className="h-3 w-3 rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, rotate: 360 }}
+                exit={{ opacity: 0 }}
+                transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
+              />
+            ) : playing ? (
+              <motion.svg key="pause" width="11" height="11" viewBox="0 0 12 12" {...ICON} aria-hidden>
+                <rect x="2" y="1" width="3" height="10" rx="1" fill="#16110A" />
+                <rect x="7" y="1" width="3" height="10" rx="1" fill="#16110A" />
+              </motion.svg>
+            ) : (
+              <motion.svg key="play" width="11" height="11" viewBox="0 0 12 12" className="ml-[2px]" {...ICON} aria-hidden>
+                <path d="M2 1v10l9-5z" fill="#16110A" />
+              </motion.svg>
+            )}
+          </AnimatePresence>
+        </span>
+      </motion.button>
 
-        <div className="min-w-0 flex-1">
-          {/* dodir na naziv radi isto što i dugme */}
-          <div className="flex cursor-pointer items-center gap-2" onClick={toggle} aria-hidden>
-            <span
-              className="min-w-0 flex-1 truncate font-semibold uppercase leading-none tracking-[0.16em]"
-              style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song) }}
-            >
-              {verse.song}
-            </span>
-            <Equalizer playing={playing} />
-          </div>
-          <p className="mt-1.5 truncate text-[9.5px] uppercase leading-none tracking-[0.22em] text-white/50">
-            {verse.album} &middot; {verse.year}
-          </p>
-          <div className="mt-1 flex items-center gap-2.5">
-            <Seek
-              value={progress}
-              onSeek={(f) => {
-                const a = audio.current
-                if (a && dur) {
-                  a.currentTime = f * dur
-                  setCur(a.currentTime)
-                }
-              }}
-            />
-            <span className="tabular w-9 text-right text-[10px] tracking-[0.06em] text-white/55">{time}</span>
-          </div>
+      <div className="min-w-0 flex-1">
+        {/* dodir na naziv radi isto što i ploča */}
+        <p
+          className="cursor-pointer truncate font-semibold uppercase leading-none tracking-[0.18em]"
+          style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song) }}
+          onClick={toggle}
+        >
+          {verse.song}
+        </p>
+        <p className="mt-2 truncate text-[10.5px] uppercase leading-none tracking-[0.22em] text-white/60">
+          {verse.album} &middot; {verse.year}
+        </p>
+        <div className="mt-1 flex items-center gap-2.5">
+          <Seek
+            value={progress}
+            onSeek={(f) => {
+              const a = audio.current
+              if (a && dur) {
+                a.currentTime = f * dur
+                setCur(a.currentTime)
+              }
+            }}
+          />
+          <span className="tabular w-9 text-right text-[10.5px] tracking-[0.06em] text-white/60">{time}</span>
         </div>
       </div>
     </div>
-  )
-}
-
-/** Četiri zlatne trake — skaču dok svira, spuste se na pauzi. */
-function Equalizer({ playing }: { playing: boolean }) {
-  return (
-    <span className="flex h-3.5 w-[18px] items-end gap-[2px]" aria-hidden>
-      {[0.9, 0.65, 1.05, 0.75].map((d, i) => (
-        <motion.span
-          key={i}
-          className="h-full w-[3px] origin-bottom rounded-full"
-          style={{ background: `linear-gradient(to top, #8A7148, ${BRAND.gold}, #F1E2BF)` }}
-          animate={playing ? { scaleY: [0.25, 1, 0.4, 0.85, 0.25] } : { scaleY: 0.2 }}
-          transition={playing ? { duration: d, repeat: Infinity, ease: 'easeInOut', delay: i * 0.1 } : { duration: 0.3 }}
-        />
-      ))}
-    </span>
   )
 }
 
@@ -376,23 +378,23 @@ function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => 
       }}
       onPointerCancel={() => setDrag(null)}
     >
-      <span className="absolute inset-x-0 h-[3px] rounded-full bg-white/12" />
+      <span className="absolute inset-x-0 h-[2px] rounded-full bg-white/15" />
       <span
-        className="absolute left-0 h-[3px] rounded-full"
+        className="absolute left-0 h-[2px] rounded-full"
         style={{ width: `${shown * 100}%`, background: `linear-gradient(90deg, #8A7148, ${BRAND.gold})` }}
       />
       <span
-        className="absolute h-3 w-3 -translate-x-1/2 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.6)] transition-transform group-active:scale-125"
+        className="absolute h-2.5 w-2.5 -translate-x-1/2 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.6)] transition-transform group-active:scale-125"
         style={{ left: `${shown * 100}%`, background: '#F1E2BF' }}
       />
     </div>
   )
 }
 
-/** Naziv u kartici: staje u jedan red pored dugmeta i ekvilajzera, nikad preko 13px. */
+/** Naziv pored ploče: uvijek u jednom redu, nikad preko 15px. */
 function cardSongSize(song: string): string {
-  const em = Math.max(song.length, 1) * 0.86 + 0.16
-  return `min(13px, calc((min(86vw, 340px) - 124px) / ${em.toFixed(2)}))`
+  const em = Math.max(song.length, 1) * 0.9 + 0.18
+  return `min(15px, calc((min(84vw, 320px) - 80px) / ${em.toFixed(2)}))`
 }
 
 function clock(s: number): string {

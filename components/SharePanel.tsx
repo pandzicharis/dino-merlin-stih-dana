@@ -13,6 +13,7 @@ import {
   type ShareFormat,
 } from '@/lib/share-image'
 import { getSharePrefs, setSharePrefs } from '@/lib/storage'
+import { haptic } from '@/lib/haptic'
 
 type Target = 'share' | 'save'
 
@@ -69,7 +70,7 @@ export default function SharePanel({
   }, [])
 
   const choose = (f: ShareFormat) => {
-    navigator.vibrate?.(5)
+    haptic(5)
     setFormat(f)
     setSharePrefs({ format: f })
   }
@@ -104,7 +105,7 @@ export default function SharePanel({
   const run = async (t: Target) => {
     if (busy) return
     setBusy(t)
-    navigator.vibrate?.(6)
+    haptic(6)
     try {
       switch (t) {
         case 'share': {

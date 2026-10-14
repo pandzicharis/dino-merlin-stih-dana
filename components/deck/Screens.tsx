@@ -181,10 +181,10 @@ function verseSize(text: string, width: number) {
   return Math.min(76, Math.max(28, (vw * width) / 100))
 }
 
-/** Naziv u kartici plejera — kao `cardSongSize` u SongCredit. */
+/** Naziv pored ploče — kao `cardSongSize` u SongCredit. */
 function cardSongSize(song: string, width: number) {
-  const em = Math.max(song.length, 1) * 0.86 + 0.16
-  return Math.min(13, (Math.min(width * 0.86, 340) - 124) / em)
+  const em = Math.max(song.length, 1) * 0.9 + 0.18
+  return Math.min(15, (width - 80) / em)
 }
 
 export function VerseMock({
@@ -540,123 +540,85 @@ function Shortcut({ d }: { d: string }) {
   )
 }
 
-/** Plejer ispod stiha — ista kartica kao u SongCredit, mirna, na početku pjesme. */
+/** Plejer ispod stiha — ista ploča kao u SongCredit, mirna, na početku pjesme. */
 function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
+  const width = Math.min(w * 0.84, 320)
   return (
-    <div
-      style={{
-        position: 'relative',
-        width: `${Math.min(w * 0.86, 340)}em`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14em',
-        padding: '14em 16em 14em 14em',
-        borderRadius: '22em',
-        border: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(255,255,255,0.045)',
-        boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-        textAlign: 'left',
-        overflow: 'hidden',
-      }}
-    >
-      <span
-        style={{
-          position: 'absolute',
-          left: '24em',
-          right: '24em',
-          top: 0,
-          height: '1px',
-          background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)`,
-        }}
-      />
-      <span
-        style={{
-          position: 'relative',
-          width: '48em',
-          height: '48em',
-          flexShrink: 0,
-          borderRadius: '50%',
-          border: `1.5px solid ${BRAND.gold}33`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <span
-          style={{
-            width: '38em',
-            height: '38em',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: `linear-gradient(135deg, #F1E2BF, ${BRAND.gold} 45%, #8A7148)`,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
-          }}
-        >
-          <svg viewBox="0 0 12 12" style={{ width: '14em', height: '14em', marginLeft: '2em' }} aria-hidden>
-            <path d="M2 1v10l9-5z" fill="#16110A" />
-          </svg>
-        </span>
+    <div style={{ width: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
+      <span style={{ position: 'relative', width: '60em', height: '60em', flexShrink: 0 }}>
+        <svg viewBox="0 0 60 60" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} aria-hidden>
+          <defs>
+            <radialGradient id="vm-disc" cx="50%" cy="50%" r="50%">
+              <stop offset="0.4" stopColor="#1C1A18" />
+              <stop offset="1" stopColor="#060606" />
+            </radialGradient>
+            <linearGradient id="vm-label" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#F1E2BF" />
+              <stop offset="0.45" stopColor={BRAND.gold} />
+              <stop offset="1" stopColor="#8A7148" />
+            </linearGradient>
+          </defs>
+          <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}2E`} strokeWidth="1.5" />
+          <circle cx="30" cy="30" r="26" fill="url(#vm-disc)" />
+          {[23.5, 21, 18.5, 16].map((r) => (
+            <circle key={r} cx="30" cy="30" r={r} fill="none" stroke="#fff" strokeOpacity="0.06" strokeWidth="0.6" />
+          ))}
+          <path d="M30 6.5A23.5 23.5 0 0 1 50.4 18.3L30 30z" fill="#fff" fillOpacity="0.07" />
+          <path d="M30 53.5A23.5 23.5 0 0 1 9.6 41.7L30 30z" fill="#fff" fillOpacity="0.045" />
+          <circle cx="30" cy="30" r="12" fill="url(#vm-label)" />
+          <path d="M28 25.5v9l7.5-4.5z" fill="#16110A" />
+        </svg>
       </span>
       <span style={{ flex: 1, minWidth: 0, display: 'block' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '8em' }}>
-          <span
-            style={{
-              flex: 1,
-              minWidth: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              fontSize: `${cardSongSize(verse.song, w).toFixed(2)}em`,
-              fontWeight: 600,
-              letterSpacing: '0.16em',
-              textTransform: 'uppercase',
-              lineHeight: 1,
-              color: BRAND.gold,
-            }}
-          >
-            {verse.song}
-          </span>
-          <span style={{ display: 'flex', alignItems: 'flex-end', gap: '2em', height: '14em' }}>
-            {[0, 1, 2, 3].map((i) => (
-              <span key={i} style={{ width: '3em', height: '3em', borderRadius: '2em', background: BRAND.gold }} />
-            ))}
-          </span>
+        <span
+          style={{
+            display: 'block',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontSize: `${cardSongSize(verse.song, width).toFixed(2)}em`,
+            fontWeight: 600,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            lineHeight: 1,
+            color: BRAND.gold,
+          }}
+        >
+          {verse.song}
         </span>
         <span
           style={{
             display: 'block',
-            marginTop: `${(6 / 9.5).toFixed(3)}em`,
-            fontSize: '9.5em',
+            marginTop: `${(8 / 10.5).toFixed(3)}em`,
+            fontSize: '10.5em',
             lineHeight: 1,
             letterSpacing: '0.22em',
             textTransform: 'uppercase',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            color: 'rgba(255,255,255,0.5)',
+            color: 'rgba(255,255,255,0.6)',
           }}
         >
           {verse.album} · {verse.year}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '10em', height: '24em', marginTop: '4em' }}>
-          <span style={{ position: 'relative', flex: 1, height: '3em', borderRadius: '2em', background: 'rgba(255,255,255,0.12)' }}>
+          <span style={{ position: 'relative', flex: 1, height: '2em', borderRadius: '2em', background: 'rgba(255,255,255,0.15)' }}>
             <span
               style={{
                 position: 'absolute',
                 left: 0,
                 top: '50%',
-                width: '12em',
-                height: '12em',
-                marginTop: '-6em',
-                marginLeft: '-6em',
+                width: '10em',
+                height: '10em',
+                marginTop: '-5em',
+                marginLeft: '-5em',
                 borderRadius: '50%',
                 background: '#F1E2BF',
               }}
             />
           </span>
-          <span style={{ width: '36em', textAlign: 'right', fontSize: '10em', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.55)' }}>
+          <span style={{ width: '36em', textAlign: 'right', fontSize: '10.5em', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.6)' }}>
             3:45
           </span>
         </span>

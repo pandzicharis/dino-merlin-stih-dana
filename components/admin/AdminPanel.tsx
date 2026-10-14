@@ -12,6 +12,7 @@ import { withPeriod } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview } from './DevicePreview'
+import { haptic } from '@/lib/haptic'
 
 type AdminVerse = Verse & { active: boolean }
 type Day = { date: string; verseId: string; manual: boolean; past: boolean; gap: number | null }
@@ -439,7 +440,7 @@ function CalendarView({
       timer: setTimeout(() => {
         state.on = true
         setDrag(date)
-        navigator.vibrate?.(15)
+        haptic(15)
       }, 400),
     }
     touch.current = state

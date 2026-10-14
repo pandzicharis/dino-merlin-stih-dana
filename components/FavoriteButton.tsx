@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites, useMounted } from '@/lib/client-store'
 import { toggleFavorite } from '@/lib/storage'
+import { haptic } from '@/lib/haptic'
 
 /**
  * Sačuvaj stih — dugme s tekstom ispod pjesme. Bez logina: lista živi u
@@ -20,13 +21,13 @@ export function FavoriteButton({ id, accent }: { id: string; accent: string }) {
     <motion.button
       onClick={() => {
         const now = toggleFavorite(id)
-        navigator.vibrate?.(now ? [10, 40, 10] : 6)
+        haptic(now ? [10, 40, 10] : 6)
       }}
       aria-pressed={on}
       data-tip="save"
-      className="relative flex h-9 min-w-[9.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[10px] font-medium uppercase tracking-[0.22em] backdrop-blur-sm transition-colors duration-300"
+      className="relative flex h-11 min-w-[10rem] items-center justify-center gap-2 rounded-full border px-4 text-[10px] font-medium uppercase tracking-[0.22em] backdrop-blur-sm transition-colors duration-300"
       style={{
-        color: on ? accent : 'rgba(255,255,255,0.6)',
+        color: on ? accent : 'rgba(255,255,255,0.75)',
         borderColor: on ? `${accent}66` : 'rgba(255,255,255,0.14)',
         background: on ? `${accent}14` : 'rgba(255,255,255,0.03)',
       }}

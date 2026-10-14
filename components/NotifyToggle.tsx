@@ -16,6 +16,7 @@ import {
 import { SEND_HOUR, SEND_TIME } from '@/lib/date'
 import { useNotifyIntent } from '@/lib/client-store'
 import { getNotifyIntent, setNotifyIntent } from '@/lib/storage'
+import { haptic } from '@/lib/haptic'
 
 type State = 'off' | 'on' | 'denied' | 'install' | 'unsupported' | 'busy'
 
@@ -118,7 +119,7 @@ export function NotifyToggle() {
     }
 
     setNotifyIntent(true)
-    navigator.vibrate?.([8, 40, 8])
+    haptic([8, 40, 8])
 
     // Prijava servera ide poslije; ako padne, prekidač se vraća.
     const r = await subscribeToPush(SEND_HOUR)
@@ -146,7 +147,7 @@ export function NotifyToggle() {
         aria-label={ARIA[state]}
         data-tip="notify"
         disabled={state === 'busy'}
-        className="-m-2 p-2 transition-all duration-500 active:scale-90 disabled:opacity-40"
+        className="-m-[10.5px] p-[10.5px] transition-all duration-500 active:scale-90 disabled:opacity-40"
         style={{ color: mark }}
       >
         <Bell on={on} muted={state === 'denied'} />
@@ -158,7 +159,7 @@ export function NotifyToggle() {
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="absolute right-0 top-full mt-2 w-[min(70vw,16rem)] text-right text-[10px] leading-relaxed text-white/45"
+            className="absolute right-0 top-full mt-2 w-[min(70vw,16rem)] text-right text-[11px] leading-relaxed text-white/65"
           >
             {hint}
           </motion.p>
