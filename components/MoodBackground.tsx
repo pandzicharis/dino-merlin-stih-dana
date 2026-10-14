@@ -9,11 +9,10 @@ import { FloatingNotes } from './FloatingNotes'
  * Atmosfera ekrana, u slojevima odozdo prema gore:
  *
  *   1. osnovna boja
- *   2. tri zamućene mrlje koje sporo plutaju
+ *   2. tri meke mrlje koje sporo plutaju
  *   3. portret — utopljen kroz mix-blend, jedva prisutan
  *   4. bloom: sjaj u boji naglaska iza stiha
- *   5. sweep: spori dijagonalni prelaz svjetla (samo neki moodovi)
- *   5b. note koje plutaju uvis
+ *   5. note koje plutaju uvis
  *   6. zrnatost, kod tamnijih moodova s filmskim podrhtavanjem
  *   7. vinjeta
  *
