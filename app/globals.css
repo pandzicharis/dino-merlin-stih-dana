@@ -197,19 +197,6 @@ html[data-deck] .dev-pad {
   animation: bg-bloom 11s ease-in-out infinite;
 }
 
-/* prelaz svjetla: prođe pa pauza (~23% trajanja) prije sljedećeg */
-@keyframes bg-sweep {
-  0% { transform: translateX(-100vw); opacity: 0; }
-  21% { opacity: 1; }
-  56% { opacity: 1; }
-  77% { transform: translateX(160vw); opacity: 0; }
-  100% { transform: translateX(160vw); opacity: 0; }
-}
-.bg-sweep {
-  animation: bg-sweep 50s linear infinite;
-  will-change: transform, opacity;
-}
-
 /* zrno: par skokova u sekundi, kao film — ne klizi u svakom frejmu */
 @keyframes bg-grain {
   0% { transform: translate(0, 0); }
@@ -236,7 +223,7 @@ html[data-deck] .dev-pad {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bg-blob, .bg-breathe, .bg-bloom, .bg-sweep, .bg-grain, .note-float {
+  .bg-blob, .bg-breathe, .bg-bloom, .bg-grain, .note-float {
     animation: none;
   }
 }

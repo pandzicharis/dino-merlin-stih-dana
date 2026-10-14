@@ -170,20 +170,6 @@ export function MoodBackground({
             />
           )}
 
-          {/* 5 — prelaz svjetla
-                 Širok, jako zamućen i linearan: ulazi i izlazi kroz opacity,
-                 pa nema trzaja na rubovima ekrana. Prije je bio uzak i brz
-                 i čitao se kao efekat, a ne kao svjetlo. */}
-          {m.sweep && !reduced && (
-            <div
-              className="bg-sweep absolute -inset-y-1/3 w-[90%]"
-              style={{
-                // gradijent je već širok i mekan — bez blur filtera
-                background: `linear-gradient(105deg, transparent 0%, ${m.accent}08 30%, ${m.accent}14 42%, ${m.accent}1a 50%, ${m.accent}14 58%, ${m.accent}08 70%, transparent 100%)`,
-                animationDuration: `${dur(38) + 12}s`,
-              }}
-            />
-          )}
         </motion.div>
       </AnimatePresence>
 
