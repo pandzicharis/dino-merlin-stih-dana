@@ -236,7 +236,7 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
         aria-pressed={playing}
         data-deck="play"
         data-state={state}
-        className="relative flex h-[60px] w-[60px] shrink-0 cursor-pointer items-center justify-center"
+        className="relative flex h-[76px] w-[76px] shrink-0 cursor-pointer items-center justify-center"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.93 }}
         transition={{ type: 'spring', stiffness: 460, damping: 20 }}
@@ -250,7 +250,7 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
           aria-hidden
         />
         {/* prsten napretka oko ploče */}
-        <svg width="60" height="60" viewBox="0 0 60 60" className="absolute inset-0 -rotate-90" aria-hidden>
+        <svg width="76" height="76" viewBox="0 0 60 60" className="absolute inset-0 -rotate-90" aria-hidden>
           <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}2E`} strokeWidth="1.5" />
           <circle
             cx="30"
@@ -267,8 +267,8 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
         </svg>
         {/* ploča — vrti se i stane tačno gdje je pauzirana */}
         <svg
-          width="52"
-          height="52"
+          width="66"
+          height="66"
           viewBox="0 0 52 52"
           className="relative drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]"
           style={{ animation: 'vinyl-spin 3.6s linear infinite', animationPlayState: playing ? 'running' : 'paused' }}
@@ -301,19 +301,19 @@ function AudioSong({ verse, src, fallback, onFail }: { verse: Verse; src: string
             {state === 'loading' ? (
               <motion.span
                 key="load"
-                className="h-3 w-3 rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
+                className="h-3.5 w-3.5 rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1, rotate: 360 }}
                 exit={{ opacity: 0 }}
                 transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
               />
             ) : playing ? (
-              <motion.svg key="pause" width="11" height="11" viewBox="0 0 12 12" {...ICON} aria-hidden>
+              <motion.svg key="pause" width="14" height="14" viewBox="0 0 12 12" {...ICON} aria-hidden>
                 <rect x="2" y="1" width="3" height="10" rx="1" fill="#16110A" />
                 <rect x="7" y="1" width="3" height="10" rx="1" fill="#16110A" />
               </motion.svg>
             ) : (
-              <motion.svg key="play" width="11" height="11" viewBox="0 0 12 12" className="ml-[2px]" {...ICON} aria-hidden>
+              <motion.svg key="play" width="14" height="14" viewBox="0 0 12 12" className="ml-[2px]" {...ICON} aria-hidden>
                 <path d="M2 1v10l9-5z" fill="#16110A" />
               </motion.svg>
             )}
@@ -394,7 +394,7 @@ function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => 
 /** Naziv pored ploče: uvijek u jednom redu, nikad preko 15px. */
 function cardSongSize(song: string): string {
   const em = Math.max(song.length, 1) * 0.9 + 0.18
-  return `min(15px, calc((min(84vw, 320px) - 80px) / ${em.toFixed(2)}))`
+  return `min(15px, calc((min(84vw, 320px) - 96px) / ${em.toFixed(2)}))`
 }
 
 function clock(s: number): string {
