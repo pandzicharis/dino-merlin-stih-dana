@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { COLORS, rng } from './deck/PaperToPhone'
 import { startTips } from './Tips'
 import { inDeck } from '@/lib/deck'
+import { SPLASH_ARRIVE } from './VerseText'
+import { withPeriod } from '@/lib/text'
 import { VERSES } from '@/data/verses'
 
 const EVENT = 'stihdana:intro'
@@ -100,28 +102,17 @@ function IntroSplash({
   }, [onLand])
 
   // gdje stih stoji na ekranu — tamo papirić sleti
-  const [to, setTo] = useState<{ x: number; y: number; tx: number; ty: number; ts: number } | null>(null)
+  // pravi stih na ekranu — tekst s papira putuje tačno u njega
+  const [to, setTo] = useState<Transfer | null>(null)
 
   useEffect(() => {
     const t = [
       setTimeout(() => setPhase('lift'), AT.lift),
       setTimeout(() => {
-        const el = document.querySelector<HTMLElement>('.verse')
-        const r = el?.getBoundingClientRect()
-        const vw = window.innerWidth
-        const vh = window.innerHeight
-        const x = r ? r.left + r.width / 2 : vw / 2
-        const y = r ? r.top + r.height / 2 : vh * 0.45
-        // slova narastu do veličine digitalnog stiha
-        const paperFont = Math.min(vw * 0.025, 11.5)
-        const verseFont = el ? parseFloat(getComputedStyle(el).fontSize) : paperFont * 3
-        const ts = Math.min(6, Math.max(2, verseFont / paperFont))
-        // pomak slova u koordinatama podignutog papira (centar + podizanje, uvećan LIFT_S)
-        const cx = vw * (CX / 100)
-        const cy = vh * (CY / 100) - vh * 0.1
-        setTo({ x, y, tx: (x - cx) / LIFT_S, ty: (y - cy) / LIFT_S, ts: ts / LIFT_S })
+        setTo(measureTransfer())
         setPhase('fly')
-        // digitalni stih se počne ispisivati dok slova još putuju — pretope se jedno u drugo
+        // stih na ekranu se ne ispisuje — pojavi se u trenutku kad mu tekst s
+        // papira sjedne na mjesto (VerseScreen `replay`)
         land()
       }, AT.fly),
       setTimeout(onDone, AT.end),
@@ -324,32 +315,14 @@ function IntroSplash({
           }
           transition={phase === 'fly' ? { duration: 0.75, ease: [0.55, 0, 0.75, 0.4] } : { duration: 1.2 }}
         />
-        {/* slova — odvoje se od papira, posvijetle i odu na mjesto stiha */}
+        {/* slova na papiru — u trenutku polijetanja se (još sitna) pretope u
+            kopiju pravog stiha koja kreće s istog mjesta */}
         <motion.div
           className="absolute inset-0 flex flex-col items-center justify-center px-[0.6em] text-center"
-          style={paper}
-          initial={{ x: 0, y: 0, scale: 1, opacity: 1, color: '#1d1a16', filter: 'blur(0px)', textShadow: '0 0 0 rgba(255,244,214,0)' }}
-          animate={
-            phase === 'fly' && to
-              ? {
-                  x: to.tx,
-                  y: to.ty,
-                  scale: to.ts,
-                  color: '#FFF4F6',
-                  textShadow: '0 0 14px rgba(255,244,214,0.55)',
-                  opacity: [1, 1, 0],
-                  filter: ['blur(0px)', 'blur(0px)', 'blur(8px)'],
-                }
-              : {}
-          }
-          transition={{
-            duration: 1.3,
-            ease: [0.4, 0, 0.2, 1],
-            color: { duration: 0.5 },
-            textShadow: { duration: 0.5 },
-            opacity: { duration: 1.3, times: [0, 0.55, 1], ease: 'easeIn' },
-            filter: { duration: 1.3, times: [0, 0.55, 1], ease: 'easeIn' },
-          }}
+          style={{ ...paper, color: '#1d1a16' }}
+          initial={{ opacity: 1 }}
+          animate={phase === 'fly' && to ? { opacity: 0 } : {}}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
         >
           {(lines[0] ?? '').split('\n').map((l, j) => (
             <span key={j} className="block">
@@ -359,22 +332,42 @@ function IntroSplash({
         </motion.div>
       </motion.div>
 
-      {/* blag, topao sjaj tamo gdje se stih spusti */}
+      {/* Jedan pokret: tekst s papira (već u slovima stiha) putuje i raste do
+          stiha na ekranu. Na kraju je identičan stihu, pa ga stih zamijeni bez
+          skoka — kopija stoji na mjestu stiha, pomak je vraća na papir. */}
       {phase === 'fly' && to && (
-        <motion.span
-          className="pointer-events-none absolute rounded-full"
-          style={{
-            left: to.x - 220,
-            top: to.y - 160,
-            width: 440,
-            height: 320,
-            background: 'radial-gradient(closest-side, rgba(255,236,190,0.28), transparent)',
-            zIndex: 2,
+        <motion.p
+          className="verse pointer-events-none absolute m-0 text-center"
+          style={{ ...to.style, left: to.left, top: to.top, width: to.width, zIndex: 4, transformOrigin: '50% 50%', textShadow: 'none' }}
+          initial={{ x: to.dx, y: to.dy, scale: to.s0, opacity: 0 }}
+          animate={{ x: 0, y: 0, scale: 1, opacity: [0, 1, 1, 0] }}
+          transition={{
+            duration: SPLASH_ARRIVE,
+            ease: [0.4, 0, 0.2, 1],
+            // pojavi se preko slova papira, a nestane tek kad se stih pojavi ispod nje
+            opacity: { duration: SPLASH_ARRIVE + 0.06, times: [0, 0.2, 0.94, 1], ease: 'linear' },
           }}
-          initial={{ opacity: 0, scale: 0.7 }}
-          animate={{ opacity: [0, 1, 0], scale: [0.7, 1.05, 1.15] }}
-          transition={{ duration: 1.6, delay: 0.3, times: [0, 0.45, 1], ease: 'easeOut' }}
-        />
+        >
+          {/* tamna slova (kao na papiru) pa svijetla (kao na ekranu) — ista slova */}
+          <motion.span
+            className="block"
+            style={{ color: '#1d1a16' }}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 0.45, delay: 0.1 }}
+          >
+            <VerseLines text={lines[0] ?? ''} />
+          </motion.span>
+          <motion.span
+            className="absolute inset-0 block"
+            style={{ color: to.color, textShadow: to.shadow }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.45, delay: 0.1 }}
+          >
+            <VerseLines text={lines[0] ?? ''} />
+          </motion.span>
+        </motion.p>
       )}
     </motion.div>
   )
@@ -443,4 +436,70 @@ function fall(p: Strip, vh: number): Keyframe[] {
     { offset: 0.85, transform: t(-p.sway * 0.25, 0.012 * vh, p.rot - p.wobble * 0.12), easing: 'ease-in-out' },
     { offset: 1, transform: t(0, 0, p.rot) },
   ]
+}
+
+/** Pravi stih na ekranu i kako ga dovesti s papira: kopija stoji na mjestu
+ *  stiha, a pomak (dx, dy) i umanjenje (s0) je vrate na podignuti papir. */
+type Transfer = {
+  left: number
+  top: number
+  width: number
+  dx: number
+  dy: number
+  s0: number
+  style: React.CSSProperties
+  color: string
+  shadow: string
+}
+
+function measureTransfer(): Transfer | null {
+  const el = document.querySelector<HTMLElement>('main .verse')
+  const r = el?.getBoundingClientRect()
+  if (!el || !r || !r.width) return null
+  const cs = getComputedStyle(el)
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  // tekst na podignutom papiru: sredina papira, slova papira × LIFT_S
+  const paperFont = Math.min(vw * 0.025, 11.5) * LIFT_S
+  return {
+    left: r.left,
+    top: r.top,
+    width: r.width,
+    dx: vw * (CX / 100) - (r.left + r.width / 2),
+    dy: vh * (CY / 100) - vh * 0.1 - (r.top + r.height / 2),
+    s0: paperFont / parseFloat(cs.fontSize),
+    style: {
+      fontSize: cs.fontSize,
+      lineHeight: cs.lineHeight,
+      fontFamily: cs.fontFamily,
+      fontWeight: cs.fontWeight,
+      fontStyle: cs.fontStyle,
+      letterSpacing: cs.letterSpacing,
+      fontVariationSettings: cs.fontVariationSettings,
+    } as React.CSSProperties,
+    color: cs.color,
+    shadow: cs.textShadow,
+  }
+}
+
+/** Stih po redovima, riječi kao na ekranu (inline-block + razmak). */
+function VerseLines({ text }: { text: string }) {
+  return (
+    <>
+      {withPeriod(text)
+        .split('\n')
+        .map((l, j) => (
+          <span key={j} className="block">
+            {l
+              .trim()
+              .split(/\s+/)
+              .map((w, i) => (
+                <Fragment key={i}>
+                  <span className="inline-block">{w}</span>{' '}
+                </Fragment>
+              ))}
+          </span>
+        ))}
+    </>
+  )
 }

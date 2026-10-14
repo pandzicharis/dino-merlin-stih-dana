@@ -5,6 +5,9 @@ import { motion, useReducedMotion } from 'motion/react'
 import { withPeriod } from '@/lib/text'
 
 /** Ispis počinje ovoliko sekundi nakon učitavanja. */
+/** splash: koliko slova s papira putuju do mjesta stiha (s) — tad se stih pojavi */
+export const SPLASH_ARRIVE = 0.9
+
 export const VERSE_START = 0.25
 /** Razmak između riječi. */
 export const VERSE_STEP = 0.06
@@ -33,7 +36,19 @@ export function verseFontSize(text: string): string {
  * Stih se ispisuje riječ po riječ — osjećaj da neko pjeva,
  * a ne da si otvorio tekst fajl. Ovo je srce proizvoda.
  */
-export function VerseText({ text, color, glow }: { text: string; color: string; glow?: string }) {
+export function VerseText({
+  text,
+  color,
+  glow,
+  appearAt,
+}: {
+  text: string
+  color: string
+  glow?: string
+  /** splash: stih se ne ispisuje — cijeli se pojavi u ovom trenutku, kad mu
+   *  slova s papira stignu na mjesto, pa izgleda kao da su prenesena */
+  appearAt?: number
+}) {
   const reduced = useReducedMotion()
   // Tačka dolazi iz `withPeriod` — u podacima je stih bez nje.
   const full = withPeriod(text)
@@ -84,13 +99,13 @@ export function VerseText({ text, color, glow }: { text: string; color: string; 
                   <motion.span
                     className="inline-block"
                     // bez blur filtera — po riječi je na iPhoneu preskup i koči ispis
-                    initial={{ opacity: 0, y: 14 }}
+                    initial={appearAt != null ? { opacity: 0 } : { opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: VERSE_START + i * VERSE_STEP,
-                      duration: VERSE_WORD,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                    transition={
+                      appearAt != null
+                        ? { delay: appearAt, duration: 0 }
+                        : { delay: VERSE_START + i * VERSE_STEP, duration: VERSE_WORD, ease: [0.22, 1, 0.36, 1] }
+                    }
                   >
                     {word}
                   </motion.span>{' '}

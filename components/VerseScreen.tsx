@@ -8,7 +8,7 @@ import { OVERRIDE_ON, formatFullDateBs } from '@/lib/date'
 import { BRAND } from '@/lib/brand'
 import { MoodBackground } from './MoodBackground'
 import { albumOf } from '@/data/albums'
-import { VerseText, verseTail } from './VerseText'
+import { SPLASH_ARRIVE, VerseText, verseTail } from './VerseText'
 import { SongCredit } from './SongCredit'
 import { NotifyToggle } from './NotifyToggle'
 import { ShareButton } from './ShareSheet'
@@ -43,7 +43,10 @@ export function VerseScreen({
   // Sve na ekranu ide po JEDNOM rasporedu izvedenom iz dužine stiha.
   // Ranije se čekalo da zadnja riječ javi da je gotova, pa se osjećao zastoj
   // između stiha i potpisa; sada nota i podnožje ulaze dok stih još sjeda.
-  const tail = compact ? 0 : verseTail(verse.text)
+  // poslije splasha stih se ne ispisuje ponovo — pojavi se kad mu slova s
+  // papira stignu na mjesto (pretope se), pa izgleda kao da su prenesena
+  const arrive = replay > 0 ? SPLASH_ARRIVE : undefined
+  const tail = compact ? 0 : arrive != null ? arrive + 0.3 : verseTail(verse.text)
 
   // Statusna traka (Android, Chrome) preuzme gornju boju pozadine stiha,
   // pa se stopi s ekranom; odlaskom se vrati crna iz layouta.
@@ -117,7 +120,7 @@ export function VerseScreen({
             </motion.p>
           )}
 
-          <VerseText key={`${verse.id}-${replay}`} text={verse.text} color={m.text} glow={m.accent} />
+          <VerseText key={`${verse.id}-${replay}`} text={verse.text} color={m.text} glow={m.accent} appearAt={arrive} />
 
 
           {/* odmah ispod stiha — sačuvati se želi baš ono što se upravo pročitalo */}
