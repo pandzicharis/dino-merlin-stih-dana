@@ -267,7 +267,7 @@ export function VerseMock({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/signature.webp" alt="" style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
             <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
-            <MagazaMark height={22} style={{ opacity: 0.9 }} />
+            <MagazaMark height={22} style={{ opacity: 0.9, transform: 'translateY(2em)' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '18em', color: 'rgba(255,255,255,0.42)' }}>
             <Icon d={BELL} fill={bellOn ? 'rgba(141,201,163,0.22)' : 'none'} color={bellOn ? '#8DC9A3' : '#D08C8C'} />
@@ -358,18 +358,18 @@ export function VerseMock({
               background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`,
             }}
           />
-          {/* web, Instagram, Spotify, YouTube — samo ikonice, tanke i prigušene, kao ArtistLinks na telefonu */}
-          <span style={{ display: 'flex', justifyContent: 'center', gap: '23em', color: 'rgba(255,255,255,0.4)' }}>
+          {/* web, Instagram, Spotify, YouTube — samo ikonice, zlatne, kao ArtistLinks na telefonu */}
+          <span style={{ display: 'flex', justifyContent: 'center', gap: '30em', color: `${BRAND.gold}cc`, filter: `drop-shadow(0 0 6em ${BRAND.gold}4d)` }}>
             {ARTIST_LINKS.map((l) => (
               <svg
                 key={l.label}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.4"
+                strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ width: '17em', height: '17em' }}
+                style={{ width: '22em', height: '22em' }}
                 aria-hidden
               >
                 <path d={l.d} />

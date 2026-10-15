@@ -1,6 +1,6 @@
 /**
  * Službeni kanali Dine Merlina (adrese preuzete sa dinomerlin.com).
- * Ikone su obrisne i prigušene — diskretno, isto na telefonu i računaru.
+ * Ikone su obrisne, u prigušenoj zlatnoj — isto na telefonu i računaru.
  * Prezentacija (deck/Screens) crta iste putanje u `em`.
  */
 export const ARTIST_LINKS = [
@@ -38,7 +38,7 @@ export function ArtistLinks() {
   return (
     <nav
       aria-label="Dino Merlin na mreži"
-      // samo ikonice — tanke, prigušene, bez okvira; dodir 40 px; isto na telefonu i računaru
+      // samo ikonice — zlatne, bez okvira; dodir 44 px; isto na telefonu i računaru
       className="relative z-10 flex flex-nowrap justify-center gap-2 sm:gap-3"
     >
       {ARTIST_LINKS.map((l) => (
@@ -49,9 +49,9 @@ export function ArtistLinks() {
           rel="noopener noreferrer"
           aria-label={`${l.label}: ${l.handle}`}
           title={l.handle}
-          className="flex h-10 w-10 items-center justify-center rounded-full text-white/40 transition-colors duration-300 hover:text-white/80 active:text-white/80"
+          className="flex h-11 w-11 items-center justify-center rounded-full text-[#BFA87F]/80 drop-shadow-[0_0_6px_rgba(191,168,127,0.3)] transition-colors duration-300 hover:text-[#E2CFA6] active:text-[#E2CFA6]"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="h-[17px] w-[17px] shrink-0" aria-hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px] shrink-0" aria-hidden>
             <path d={l.d} />
           </svg>
         </a>

@@ -94,7 +94,7 @@ export function VerseScreen({
                 transition={{ duration: 0.7, delay: 0.6, ease: 'easeOut' }}
               >
                 <span className="h-6 w-px bg-white/20" aria-hidden />
-                <a href="https://magaza.com.ba" target="_blank" rel="noopener noreferrer" aria-label="Magaza" className="opacity-90">
+                <a href="https://magaza.com.ba" target="_blank" rel="noopener noreferrer" aria-label="Magaza" className="translate-y-0.5 opacity-90">
                   <MagazaLogo height={22} color="#FFFFFF" />
                 </a>
               </motion.span>
