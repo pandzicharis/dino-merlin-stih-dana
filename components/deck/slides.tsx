@@ -7,7 +7,7 @@ import { albumOf, ALBUMS } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
 import { useDeck } from './context'
 import { TIPS_ON } from '../Tips'
-import { Grafike, LANSIRANJE, LaunchPlan, Ostalo, PwaNative } from './launch'
+import { Grafike, LANSIRANJE, LaunchPlan, Ostalo, PwaNative, Video } from './launch'
 import { QrCode } from './QrCode'
 import {
   Dot,
@@ -251,6 +251,7 @@ export const SLIDES: SlideDef[] = [
   },
   { id: 'ostalo', section: 'Plan za launch', title: 'Šta je ostalo?', body: (d) => <Ostalo d={d} /> },
   { id: 'grafike', section: 'Plan za launch', title: 'Grafike', body: (d) => <Grafike d={d} /> },
+  { id: 'video', section: 'Plan za launch', title: 'Video za mreže', body: () => <Video /> },
   { id: 'pitanja', section: 'Pitanja', title: 'Pitanja', backdrop: 'nada', body: (d) => <Pitanja d={d} /> },
 ]
 

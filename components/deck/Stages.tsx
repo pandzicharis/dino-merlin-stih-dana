@@ -169,7 +169,7 @@ export function LivePhone({
           )}
           {tap && (
             <div className="pointer-events-none absolute inset-0" style={{ zIndex: 21 }}>
-              <Tap key={tap.n} platform={kind === 'galaxy' ? 'android' : 'ios'} x={tap.x} y={bar + tap.y} />
+              <Tap key={tap.n} platform={kind === 'galaxy' ? 'android' : 'ios'} x={tap.x} y={tap.y} />
             </div>
           )}
           {kind === 'iphone' ? <IosStatus time="12:00" /> : <AndroidStatus time="12:00" />}

@@ -9,6 +9,17 @@ const CACHE = 'stihdana-v2'
 const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png']
 
 /**
+ * Oznaka "stigla je obavijest" — aplikacija je pročita pri otvaranju i
+ * pokaže tombolu i kad je stih danas već viđen (npr. otvorena ujutro, ili
+ * prvi dan poslije instalacije). Zaseban keš, da ga nova verzija ne obriše.
+ * Ime i ključ moraju se slagati s lib/push-client.ts.
+ */
+const MARK = 'stihdana-izvuci'
+const MARK_KEY = '/__izvuci'
+const markDraw = () =>
+  caches.open(MARK).then((c) => c.put(MARK_KEY, new Response('1'))).catch(() => {})
+
+/**
  * NEMA `skipWaiting()` ovdje — nova verzija čeka.
  *
  * Aplikacija se otvara s početnog ekrana i zna stajati otvorena danima;
@@ -28,7 +39,7 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== MARK).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   )
 })
@@ -60,12 +71,12 @@ self.addEventListener('push', (e) => {
   }
 
   // Tačka na ikonici aplikacije dok stih nije pročitan (iOS 16.4+ u PWA-u,
-  // Chrome/Edge). Briše je sama aplikacija kad se otvori.
+  // Chrome/Edge). Briše je aplikacija kad se stih izvuče, zajedno s oznakom.
   const badge =
     'setAppBadge' in self.navigator ? self.navigator.setAppBadge(1).catch(() => {}) : Promise.resolve()
 
   e.waitUntil(
-    badge.then(() => self.registration.showNotification(d.title || 'Stih dana', {
+    Promise.all([badge, markDraw()]).then(() => self.registration.showNotification(d.title || 'Stih dana', {
       body: d.body || '',
       tag: d.tag || 'stih-dana',
       renotify: true,
@@ -78,18 +89,24 @@ self.addEventListener('push', (e) => {
 })
 
 self.addEventListener('notificationclick', (e) => {
+  // tačku na ikonici ne dira — briše je aplikacija kad se stih izvuče
   e.notification.close()
-  if ('clearAppBadge' in self.navigator) self.navigator.clearAppBadge().catch(() => {})
   const url = (e.notification.data && e.notification.data.url) || '/'
+  const path = new URL(url, self.location.origin).pathname
   e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const c of list) {
-        if (c.url.includes(self.location.origin) && 'focus' in c) {
-          c.navigate(url)
-          return c.focus()
+    markDraw()
+      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then((list) => {
+        for (const c of list) {
+          if (!c.url.startsWith(self.location.origin) || !('focus' in c)) continue
+          // već na stihu: bez ponovnog učitavanja — aplikacija sama pokrene tombolu
+          if (new URL(c.url).pathname === path) {
+            c.postMessage({ type: 'stihdana:izvuci' })
+            return c.focus()
+          }
+          return c.focus().then(() => c.navigate(url)).catch(() => self.clients.openWindow(url))
         }
-      }
-      return self.clients.openWindow(url)
-    }),
+        return self.clients.openWindow(url)
+      }),
   )
 })

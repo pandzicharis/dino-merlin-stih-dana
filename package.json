@@ -10,7 +10,8 @@
     "verses:check": "tsx scripts/check-verses.ts",
     "prebuild": "tsx scripts/check-verses.ts --strict",
     "brand:signature": "tsx scripts/make-signature.ts",
-    "brand:icons": "tsx scripts/make-icons.ts"
+    "brand:icons": "tsx scripts/make-icons.ts",
+    "promo:video": "node scripts/export-video.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

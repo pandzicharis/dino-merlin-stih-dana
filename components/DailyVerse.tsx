@@ -1,11 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
-import { useDraw, type ListVerse } from '@/lib/draw'
+import { unseat, useDraw, type ListVerse } from '@/lib/draw'
 import { setLastSeen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
+import { clearBadge, clearPushMark, hasPushMark } from '@/lib/push-client'
 import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
 import { DevDateBar } from './DevDateBar'
@@ -54,7 +56,12 @@ export function DailyVerse({
 
   // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka
   const [replay, setReplay] = useState(0)
-  const land = useCallback(() => setReplay((r) => r + 1), [])
+  // papirić otvoren = obavijest pročitana
+  const land = useCallback(() => {
+    setReplay((r) => r + 1)
+    clearPushMark()
+  }, [])
+  const reduced = useReducedMotion()
 
   // prvo otvaranje danas — stih se izvlači pred očima
   const fresh = Boolean(drawn?.fresh)
@@ -63,27 +70,44 @@ export function DailyVerse({
     if (fresh && drawnId) playDraw()
   }, [fresh, drawnId, date])
 
+  // PRAVILO: dok ima nepročitana obavijest (oznaka iz service workera,
+  // tačka na ikonici), svako otvaranje je tombola — i kad je stih danas već
+  // viđen. Briše se tek kad papirić sleti (`land`). Na dan instalacije stih
+  // iz uvoda je probni: obavijest ga zamijeni pravim izvlačenjem.
+  // Bez obavijesti — samo makni tačku i obavijesti, kao i prije.
+  useEffect(() => {
+    if (!drawnId || verseId) return
+    let busy = false
+    const check = async () => {
+      if (busy || document.visibilityState !== 'visible') return
+      busy = true
+      try {
+        if (!(await hasPushMark())) return clearBadge()
+        // probni stih: dan se izvuče ispočetka — novi stih sam pokrene tombolu
+        if (unseat(date)) return
+        if (reduced) return clearPushMark()
+        // ako se već izvlači (prvo otvaranje danas), IntroHost ovo preskoči
+        playDraw()
+      } finally {
+        busy = false
+      }
+    }
+    const onMessage = (e: MessageEvent) => e.data?.type === 'stihdana:izvuci' && check()
+    check()
+    document.addEventListener('visibilitychange', check)
+    navigator.serviceWorker?.addEventListener('message', onMessage)
+    return () => {
+      document.removeEventListener('visibilitychange', check)
+      navigator.serviceWorker?.removeEventListener('message', onMessage)
+    }
+  }, [drawnId, verseId, date, reduced])
+
   // panel sačuvanih ne mora ponovo po listu — stranica je već donijela
   useEffect(() => {
     primeVerses(verses)
   }, [verses])
 
   useEffect(() => setLastSeen(date), [date])
-
-  // Otvorena aplikacija = stih je viđen: makni tačku s ikonice i obavijest
-  // iz centra obavijesti. Isto i kad se vrati iz pozadine.
-  useEffect(() => {
-    const clear = () => {
-      if (document.visibilityState !== 'visible') return
-      navigator.clearAppBadge?.().catch(() => {})
-      navigator.serviceWorker?.getRegistration().then((reg) =>
-        reg?.getNotifications().then((list) => list.forEach((n) => n.close())),
-      )
-    }
-    clear()
-    document.addEventListener('visibilitychange', clear)
-    return () => document.removeEventListener('visibilitychange', clear)
-  }, [])
 
   const tone = mood ?? verse?.mood ?? 'nostalgija'
   // ostali aktivni stihovi — papirići u gomili na prvom otvaranju

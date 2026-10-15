@@ -104,7 +104,7 @@ function SongTitle({ song, withIcon }: { song: string; withIcon: boolean }) {
 }
 
 /** `Moj je život Švicarska` → `moj-je-zivot-svicarska` (ime fajla u public/audio, ako ga ima) */
-function audioSlug(song: string): string {
+export function audioSlug(song: string): string {
   return song
     .toLowerCase()
     .replace(/đ/g, 'dj')

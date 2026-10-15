@@ -32,6 +32,9 @@ type Entry = {
   r: number
   /** otvoren u aplikaciji — do tad je samo izvučen (plan ili obavijest) */
   seen?: 1
+  /** probni: prvi stih ikad (uvod poslije instalacije) — ne broji se za taj
+   *  dan; obavijest istog dana ga zamijeni pravim izvlačenjem (`unseat`) */
+  pre?: 1
 }
 type State = { days: Record<string, Entry> }
 
@@ -104,7 +107,7 @@ function rand(n: number): number {
 }
 
 /** Sljedeći stih poslije dana `past` (sortirani datumi, svi raniji). */
-function next(days: State['days'], past: string[], pool: string[]): Entry {
+function next(days: State['days'], past: string[], pool: string[], avoid?: string): Entry {
   const last = past.length ? days[past[past.length - 1]] : undefined
   let r = last?.r ?? 0
   // ovaj krug: od zadnjeg dana unazad, dok je krug isti
@@ -118,6 +121,8 @@ function next(days: State['days'], past: string[], pool: string[]): Entry {
     cand = pool.filter((id) => !recent.has(id))
     if (!cand.length) cand = pool
   }
+  // pravi stih poslije probnog — ne isti ponovo
+  if (avoid && cand.length > 1) cand = cand.filter((id) => id !== avoid)
   return { id: cand[rand(cand.length)], r }
 }
 
@@ -125,7 +130,7 @@ function next(days: State['days'], past: string[], pool: string[]): Entry {
  * Sredi stanje za `today`: današnji stih ostaje kakav je, a ako ga nema —
  * izvuče se. Istorija starija od KEEP dana se zaboravi.
  */
-function settle(s: State, today: string, pool: string[], known: Set<string>): State {
+function settle(s: State, today: string, pool: string[], known: Set<string>, avoid?: string): State {
   const days: State['days'] = {}
   const oldest = addDays(today, -KEEP)
   for (const [d, e] of Object.entries(s.days)) {
@@ -134,12 +139,18 @@ function settle(s: State, today: string, pool: string[], known: Set<string>): St
     if (d < oldest || d > today || !known.has(e.id)) continue
     days[d] = e
   }
-  if (!days[today]) days[today] = next(days, Object.keys(days).sort(), pool)
+  if (!days[today]) {
+    const e = next(days, Object.keys(days).sort(), pool, avoid)
+    // prvi stih ikad na ovom uređaju — uvod, probni
+    days[today] = Object.keys(s.days).length ? e : { ...e, pre: 1 }
+  }
   return { days }
 }
 
 /** Datumi za koje je izvlačenje u ovoj sesiji bilo novo — animacija ih prati. */
 const fresh = new Set<string>()
+/** Probni stih koji je upravo zamijenjen — pravo izvlačenje ga zaobiđe. */
+let avoid: string | undefined
 
 /**
  * Stih koji ovaj uređaj ima za `date`. `null` dok se ne zna (server, prvi
@@ -161,7 +172,7 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
   // novi dan (i "izvuci ponovo" u dev traci): izvuci današnji
   useEffect(() => {
     if (!on || !missing) return
-    save(settle(parse(snapshot()), date, pool, new Set(byId.keys())))
+    save(settle(parse(snapshot()), date, pool, new Set(byId.keys()), avoid))
   }, [on, missing, date, pool, byId])
 
   // otvoren = viđen; animacija ostaje upamćena za ovu sesiju
@@ -179,6 +190,21 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
 
   if (!on || !verse || !entry) return null
   return { verse, fresh: !entry.seen || fresh.has(date) }
+}
+
+/**
+ * Stigla obavijest na dan instalacije: probni stih iz uvoda se ne broji —
+ * dan se izvuče ispočetka (s tombolom). `false` ako stih za `date` nije probni.
+ */
+export function unseat(date: string): boolean {
+  const s = parse(snapshot())
+  const e = s.days[date]
+  if (!e?.pre) return false
+  delete s.days[date]
+  avoid = e.id
+  fresh.delete(date)
+  save(s)
+  return true
 }
 
 /** Dev: zaboravi stih za `date` i dalje — izvuče se ponovo, s animacijom. */

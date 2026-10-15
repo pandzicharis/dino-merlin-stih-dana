@@ -194,3 +194,35 @@ export async function ensurePermission(): Promise<NotificationPermission> {
   announcePushChange()
   return p
 }
+
+/* Mora se slagati s public/sw.js (MARK, MARK_KEY). */
+const MARK = 'stihdana-izvuci'
+const MARK_KEY = '/__izvuci'
+
+/**
+ * Ima li nepročitana obavijest? Oznaku ostavlja service worker kad stigne;
+ * stoji dok se stih ne izvuče (`clearPushMark`) — zatvoriš aplikaciju usred
+ * tombole, sljedeće otvaranje je opet tombola.
+ */
+export async function hasPushMark(): Promise<boolean> {
+  if (typeof caches === 'undefined') return false
+  try {
+    return Boolean(await (await caches.open(MARK)).match(MARK_KEY))
+  } catch {
+    return false
+  }
+}
+
+/** Stih izvučen — obavijest je pročitana: oznaka, tačka na ikonici, centar obavijesti. */
+export function clearPushMark() {
+  if (typeof caches !== 'undefined') caches.open(MARK).then((c) => c.delete(MARK_KEY)).catch(() => {})
+  clearBadge()
+}
+
+/** Tačka na ikonici i obavijesti iz centra obavijesti. */
+export function clearBadge() {
+  navigator.clearAppBadge?.().catch(() => {})
+  navigator.serviceWorker?.getRegistration().then((reg) =>
+    reg?.getNotifications().then((list) => list.forEach((n) => n.close())),
+  )
+}

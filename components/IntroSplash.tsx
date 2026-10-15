@@ -113,6 +113,10 @@ export function IntroHost({
     if (on) setHold(false)
   }, [on])
   const gate = useSyncExternalStore(subscribeGate, () => gateOpen, () => true)
+  const runningRef = useRef(false)
+  useEffect(() => {
+    runningRef.current = on !== null
+  }, [on])
 
   // prezentacija (`?intro`): aplikacija se otvori uvodom — gomila papirića,
   // kao poslije dozvole na pravom telefonu (telefon kod izloga, "Od izloga
@@ -152,6 +156,8 @@ export function IntroHost({
       if (!inDeck()) startTips()
     }
     const draw = () => {
+      // već se izvlači (npr. obavijest dodirnuta usred tombole) — ne ispočetka
+      if (runningRef.current) return
       if (!reduced) setPending(true)
       else setHold(false)
     }

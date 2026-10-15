@@ -30,7 +30,7 @@ export type PosterData = {
 
 const serif = "var(--font-serif), serif"
 
-function Sheet({
+export function Sheet({
   width,
   ratio,
   children,
@@ -492,7 +492,7 @@ function AndroidGlyph() {
 }
 
 /** Adresa kao dugme — za objave, gdje se kod ne skenira. */
-function LinkPill({ host, size, style }: { host: string; size: string; style?: CSSProperties }) {
+export function LinkPill({ host, size, style }: { host: string; size: string; style?: CSSProperties }) {
   return (
     <span
       style={{
@@ -552,7 +552,7 @@ function Fade({ top, span }: { top: string; span: number }) {
 }
 
 /** Tamna podloga s istim jezikom kao aplikacija: zlatni sjaj, tih portret, vinjeta. */
-function Backdrop({ portrait }: { portrait: CSSProperties }) {
+export function Backdrop({ portrait }: { portrait: CSSProperties }) {
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: -1 }}>
       <div

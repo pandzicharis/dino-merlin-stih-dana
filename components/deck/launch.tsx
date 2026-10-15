@@ -1336,6 +1336,71 @@ export function Grafike({ d }: { d: DeckData }) {
   )
 }
 
+/**
+ * Video za mreže — cijeli tok u pravom telefonu (obavijest → tombola → stih →
+ * sačuvaj → pjesma), snimljen iz /prezentacija/video (scripts/export-video.mjs).
+ */
+export function Video() {
+  const items = [
+    { title: 'Story i Reels 9:16', sub: 'Instagram story i reels', ratio: 16 / 9, size: '1080 × 1920', format: 'story' },
+    { title: 'Objava 4:5', sub: 'Instagram i Facebook objava', ratio: 1.25, size: '1080 × 1350', format: 'objava' },
+  ]
+  // pregled je mali — preuzima se u punoj veličini formata
+  const h = 'min(34vh, 380px)'
+  return (
+    <div>
+      <R i={0}>
+        <p className="dk-eyebrow">Video</p>
+      </R>
+      <R i={1}>
+        <h2 className="dk-h2 mt-[2.2vh]">
+          Cijeli tok, <em>za story i objavu</em>
+        </h2>
+      </R>
+      <R i={2}>
+        <p className="dk-lead mt-[1.8vh] max-w-[40em]">
+          Obavijest u podne, dodir, tombola, stih, sačuvaj i pjesma — u pravoj aplikaciji, uz natpise. Oko 34
+          sekunde, sa zvukom obavijesti i pjesmom, spremno za objavu.
+        </p>
+      </R>
+      <div className="mt-[4vh] flex items-start gap-[clamp(18px,3vw,56px)]">
+        {items.map((it, k) => (
+          <R key={it.format} i={3 + k}>
+            <div className="flex flex-col">
+              <video
+                src={`/promo/stih-dana-video-${it.format}.mp4`}
+                className="rounded-[4px] bg-black object-cover"
+                style={{ height: h, width: `calc(${h} / ${it.ratio})`, boxShadow: '0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08)' }}
+                autoPlay
+                muted
+                loop
+                playsInline
+                controls
+                preload="metadata"
+              />
+              <p className="dk-h3 mt-3">{it.title}</p>
+              <p className="dk-small">{it.sub}</p>
+              <p className="dk-small tabular text-white/35">{it.size} px · MP4</p>
+              <div className="mt-2.5 flex gap-2">
+                <a
+                  href={`/promo/stih-dana-video-${it.format}.mp4`}
+                  download
+                  className="dk-btn-gold !h-[2.3em] !px-[1em] text-[clamp(11px,0.8vw,14px)]"
+                >
+                  {DOWNLOAD} MP4
+                </a>
+                <a href={`/prezentacija/video?format=${it.format}`} target="_blank" rel="noreferrer" className="dk-chip !h-[2.3em]">
+                  Uživo
+                </a>
+              </div>
+            </div>
+          </R>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /** Grafika preko cijelog ekrana — strelice listaju, Esc zatvara. */
 function Lightbox({
   items,
