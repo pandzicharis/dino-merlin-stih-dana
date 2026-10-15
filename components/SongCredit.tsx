@@ -142,12 +142,12 @@ function playable(verse: Verse): boolean {
 
 /**
  * Zvuk jedne pjesme: statični fajl, pa server; stanje, vrijeme, premotavanje.
- * Trajanje se zna unaprijed (data/audio.json), pa se pri otvaranju ništa ne
- * preuzima — pjesma krene tek na dodir. `preload` (zaglavlje fajla) samo
- * kad trajanje nije poznato (nova pjesma iz admina, lokalno).
+ *
+ * Da dodir pusti pjesmu odmah, početak se preuzme unaprijed: plejer ispod
+ * stiha ga pripremi kad se ekran smiri (osim uz uštedu podataka), a svaki
+ * plejer i na sam pritisak prsta — pola sekunde prije nego dodir postane klik.
  */
-function useSong({ verse, src, fallback, dur: known, onFail, preload: wanted }: Source & { preload: boolean }) {
-  const preload = wanted && !known
+function useSong({ verse, src, fallback, dur: known, onFail, preload }: Source & { preload: boolean }) {
   const audio = useRef<HTMLAudioElement | null>(null)
   const want = useRef(false)
   const [state, setState] = useState<State>('idle')
@@ -173,8 +173,11 @@ function useSong({ verse, src, fallback, dur: known, onFail, preload: wanted }: 
     }
     window.addEventListener('stihdana:stop-audio', stop)
     window.addEventListener(SOLO, solo)
-    if (preload) player()
+    // plejer ispod stiha: početak pjesme se preuzme kad se ekran smiri
+    const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+    const t = preload && !conn?.saveData ? window.setTimeout(prime, 1500) : 0
     return () => {
+      clearTimeout(t)
       window.removeEventListener('stihdana:stop-audio', stop)
       window.removeEventListener(SOLO, solo)
       audio.current?.pause()
@@ -183,11 +186,11 @@ function useSong({ verse, src, fallback, dur: known, onFail, preload: wanted }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // pucketanje ploče dok pjesma svira
+  // pucketanje ploče od dodira — igla je spuštena i dok se pjesma tek učitava
   useEffect(() => {
     const a = audio.current
     if (!a) return
-    if (state === 'playing') startCrackle(a)
+    if (state === 'playing' || state === 'loading') startCrackle(a)
     else stopCrackle(a)
     return () => stopCrackle(a)
   }, [state])
@@ -195,7 +198,7 @@ function useSong({ verse, src, fallback, dur: known, onFail, preload: wanted }: 
   function player(): HTMLAudioElement {
     if (audio.current) return audio.current
     const a = new Audio(src)
-    a.preload = preload ? 'metadata' : 'none'
+    a.preload = 'none'
     const time = () => {
       setCur(a.currentTime)
       if (Number.isFinite(a.duration)) setDur(a.duration)
@@ -222,6 +225,14 @@ function useSong({ verse, src, fallback, dur: known, onFail, preload: wanted }: 
     })
     audio.current = a
     return a
+  }
+
+  /** Preuzmi početak pjesme unaprijed — dodir je onda trenutan. */
+  function prime() {
+    const a = player()
+    if (a.preload === 'auto' || !a.paused) return
+    a.preload = 'auto'
+    a.load()
   }
 
   /** kontrole sa zaključanog ekrana — za pjesmu koja upravo svira */
@@ -267,7 +278,7 @@ function useSong({ verse, src, fallback, dur: known, onFail, preload: wanted }: 
 
   const progress = dur ? cur / dur : 0
   const time = !dur ? '--:--' : cur > 0 ? `-${clock(dur - cur)}` : clock(dur)
-  return { state, progress, time, toggle, seek }
+  return { state, progress, time, toggle, seek, prime }
 }
 
 /**
@@ -280,6 +291,7 @@ function Vinyl({
   progress,
   song,
   onClick,
+  onPrime,
   deck = false,
   arm = false,
 }: {
@@ -288,6 +300,8 @@ function Vinyl({
   progress: number
   song: string
   onClick: () => void
+  /** prst je na ploči — pjesma se počne preuzimati prije klika */
+  onPrime?: () => void
   /** dugme koje prezentacija sama pritisne */
   deck?: boolean
   /** ručica gramofona koja se spusti na ploču */
@@ -295,12 +309,15 @@ function Vinyl({
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
   const playing = state === 'playing'
+  // ploča kreće odmah na dodir, kao gramofon — ne čeka prve tonove
+  const spinning = playing || state === 'loading'
   const disc = Math.round((size * 66) / 76)
   const icon = Math.max(10, Math.round((size * 14) / 76))
   return (
     <motion.button
       type="button"
       onClick={onClick}
+      onPointerDown={onPrime}
       aria-label={playing ? `Pauziraj "${song}"` : `Pusti "${song}"`}
       aria-pressed={playing}
       data-deck={deck ? 'play' : undefined}
@@ -328,7 +345,7 @@ function Vinyl({
         height={disc}
         viewBox="0 0 52 52"
         className="relative drop-shadow-[0_4px_12px_rgba(0,0,0,0.7)]"
-        style={{ animation: 'vinyl-spin 3.6s linear infinite', animationPlayState: playing ? 'running' : 'paused' }}
+        style={{ animation: 'vinyl-spin 3.6s linear infinite', animationPlayState: spinning ? 'running' : 'paused' }}
         aria-hidden
       >
         <defs>
@@ -442,7 +459,7 @@ function Tonearm({ size, down, progress }: { size: number; down: boolean; progre
  * Kontrole rade i sa zaključanog ekrana (Media Session).
  */
 function AudioSong(props: Source) {
-  const { state, progress, time, toggle, seek } = useSong({ ...props, preload: true })
+  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: true })
   const { verse, fallback } = props
 
   // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
@@ -454,10 +471,10 @@ function AudioSong(props: Source) {
   return (
     <div data-tip="song" className="flex w-[min(84vw,320px)] items-center gap-4 text-left">
       {/* ploča visoka koliko i tekst s trakom desno */}
-      <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} deck arm />
+      <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} deck arm />
       <div className="min-w-0 flex-1">
         {/* dodir na naziv radi isto što i ploča */}
-        <div className="flex cursor-pointer items-center gap-2" onClick={toggle}>
+        <div className="flex cursor-pointer items-center gap-2" onClick={toggle} onPointerDown={prime}>
           <p
             className="min-w-0 flex-1 truncate font-semibold uppercase leading-none tracking-[0.18em]"
             style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song) }}
@@ -499,11 +516,11 @@ export function SongRow({ verse, accent }: { verse: Verse; accent: string }) {
 }
 
 function AudioRow(props: Source) {
-  const { state, progress, time, toggle, seek } = useSong({ ...props, preload: false })
+  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: false })
   const { verse } = props
   return (
     <>
-      <Vinyl size={60} state={state} progress={progress} song={verse.song} onClick={toggle} arm />
+      <Vinyl size={60} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} arm />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">

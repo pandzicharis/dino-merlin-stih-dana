@@ -12,7 +12,8 @@
  */
 /**
  * Stih prezentacije — isti na slajdovima, plakatima, objavama i u telefonu
- * u prezentaciji (i na deployu i na localhostu), bez obzira na raspored.
+ * u prezentaciji (i na deployu i na localhostu) — telefon u prezentaciji
+ * ne izvlači nasumično.
  * `?verse=` na koraku ga i dalje može zamijeniti.
  */
 export const DECK_VERSE = 'koliko-mi-znacis'

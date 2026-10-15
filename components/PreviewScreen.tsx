@@ -27,8 +27,10 @@ export function PreviewScreen() {
   // `inert`: pregled je samo za gledanje — srce, zvono, dijeljenje i
   // YouTube ne rade. (Srce bi inače stvarno sačuvalo stih: pregled dijeli
   // localStorage sa sajtom jer je na istoj adresi.)
+  // `?top=` — statusna traka okvira u adminu, umjesto prave "safe area"
+  const top = Number(new URLSearchParams(location.search).get('top')) || 0
   return (
-    <div inert>
+    <div inert style={top ? ({ '--sat': `${top}px` } as React.CSSProperties) : undefined}>
       <VerseScreen verse={msg.verse} date={msg.date ?? todayInTz()} />
     </div>
   )

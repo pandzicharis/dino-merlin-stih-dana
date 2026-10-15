@@ -4,7 +4,8 @@ import type { Verse } from '@/data/verses'
 import { albumOf, ALBUMS } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
-import { oneLine, withPeriod } from '@/lib/text'
+import { withPeriod } from '@/lib/text'
+import { INVITE } from '@/lib/notify'
 import { ARTIST_LINKS } from '@/components/ArtistLinks'
 
 /**
@@ -397,7 +398,7 @@ export function LockScreenMock({
   date: string
   w: number
   h: number
-  /** kartica obavijesti sa stihom; bez nje samo sat i pozadina */
+  /** kartica dnevnog poziva (lib/notify.ts); bez nje samo sat i pozadina */
   notify?: boolean
 }) {
   const m = MOODS[verse.mood]
@@ -456,7 +457,7 @@ export function LockScreenMock({
             <span style={{ fontSize: '12.5em', opacity: 0.7 }}>· sada</span>
           </div>
           <p style={{ marginTop: `${(10 / 15).toFixed(3)}em`, fontSize: '15em', fontWeight: 600 }}>
-            Stih dana — Dino Merlin
+            {INVITE.title}
           </p>
           <p
             style={{
@@ -467,7 +468,8 @@ export function LockScreenMock({
               fontFamily: 'var(--font-serif), serif',
             }}
           >
-            {oneLine(withPeriod(verse.text))}
+            {/* poziv, ne stih — stih se otkriva tek kad se izvuče */}
+            {INVITE.body}
           </p>
         </div>
       )}

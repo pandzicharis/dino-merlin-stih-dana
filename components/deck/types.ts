@@ -10,9 +10,9 @@ export type DeckData = {
   host: string
   today: string
   todayVerse: Verse
-  /** stihova u rasporedu */
+  /** aktivnih stihova — iz njih svako izvlači svoj */
   count: number
-  /** stihovi u rasporedu — za papiriće na slajdu "Zašto Stih dana?" */
+  /** aktivni stihovi — za papiriće na slajdovima */
   verses: Verse[]
   /** po jedan stih za svako raspoloženje — za birač na slajdu */
   moods: { mood: Mood; verse: Verse }[]

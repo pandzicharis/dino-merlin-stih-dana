@@ -16,18 +16,38 @@ nvm use && npm install && npm run dev
 
 → http://localhost:3111
 
-## Stihovi i raspored — admin
+## Svakom svoj stih
 
-Stihove dodaje, uređuje, briše i raspoređuje urednik na **`/admin`**, uz
-šifru iz `ADMIN_PASSWORD`. Sve ide u Supabase (tabele `verses` i
-`verse_schedule` iz [`supabase/schema.sql`](supabase/schema.sql)).
+Nema jednog stiha za sve. Svako **izvlači svoj** — kao papirić s pulta u
+Magazi ([`lib/draw.ts`](lib/draw.ts)):
 
-- **Raspored:** narednih 60 dana; stih se prevlači na drugi dan, strelicama
-  mijenja sa susjednim, ili se za dan bira bilo koji stih iz biblioteke.
-- **Biblioteka:** dodaj / uredi / obriši, uz živi pregled i opcioni datum.
-- Svaka izmjena „zaključa“ narednih 60 dana, pa novi stih ne preslaže
-  raspored koji je već najavljen. Obrisan stih ostavlja dan koji dobije stih
-  kojeg nema u blizini.
+- stranica je i dalje ista za sve i dolazi s CDN-a, samo nosi listu stihova;
+  stih se izvlači na uređaju, pa server ne radi ništa više po korisniku
+- **bez ponavljanja**: dok ne prođeš kroz sve aktivne stihove, nijedan se ne
+  vrati; onda novi krug, a zadnjih nekoliko iz starog ne mogu odmah opet
+- izvučen stih se pamti za taj dan — isti je do ponoći, i izmjena u adminu
+  ga ne dira
+- **izvlačenje jednom dnevno**, pri prvom otvaranju, kao pult ispred Magaze:
+  „Tvoj stih te čeka“ i tombola — staklena kugla puna presavijenih šarenih
+  listića. Drži se prst — kugla se vrti; pusti se — jedan se digne na sredinu,
+  otvori se s pola na cijeli i stih izroni iznutra (`Tombola` u
+  `components/IntroSplash.tsx`). Prvo
+  otvaranje ikad (poslije dozvole) ostaje gomila koja padne sama. Ostala
+  otvaranja tog dana idu pravo na stih
+- **obavijest u podne je poziv, ne stih**: „Vrijeme je za stih dana! Uzmi svoj!“ (`lib/notify.ts`).
+  Dodir otvara aplikaciju i izvlačenje. Poruka je ista za sve, pa slanje ne
+  čita stihove, a obavijest i aplikacija se ne mogu razići
+
+## Stihovi — admin
+
+Stihove dodaje, uređuje, arhivira i vraća urednik na **`/admin`**, uz
+šifru iz `ADMIN_PASSWORD`. Sve ide u Supabase (tabela `verses` iz
+[`supabase/schema.sql`](supabase/schema.sql)). Kalendara ni rasporeda nema —
+svi aktivni stihovi su špil iz kojeg svako izvlači svoj.
+
+- **Lista:** dodaj / uredi / arhiviraj / vrati, uz živi pregled.
+- Novi stih ulazi u izvlačenje od sljedećeg dana; arhiviran se više ne
+  izvlači, a sačuvani stihovi i linkovi i dalje rade.
 - Sajt se osvježi odmah nakon izmjene (`revalidateTag`), a posjetioci i dalje
   dobijaju statičnu stranicu s CDN-a — baza se ne čita po posjeti
   ([`lib/catalog.ts`](lib/catalog.ts)).
@@ -67,7 +87,7 @@ Sve je aktivno samo u dev modu, ili uz `NEXT_PUBLIC_DATE_OVERRIDE=1` na stagingu
 
 | | |
 |---|---|
-| `/admin` | uređivanje stihova i rasporeda (šifra) |
+| `/admin` | uređivanje liste stihova (šifra) |
 | `/sacuvano` | stihovi sačuvani srcem (localStorage, bez naloga) |
 | `/stih/<id>` | trajni link na jedan stih |
 
@@ -174,9 +194,9 @@ ekranu, pa se tamo umjesto njega pokaže uputa (`NotifyPrompt`).
 
 ## Arhitektura ukratko
 
-Stih se **ne bira u bazi — računa se iz datuma** (`lib/pickVerse.ts`).
-Stranica je zato statična i servira se s CDN-a: 500 i 500.000 korisnika
-koštaju isto. Isto vrijedi za share slike — svih nekoliko desetina se
+Stih se **ne bira u bazi — izvlači ga uređaj** (`lib/draw.ts`), iz liste
+koju nosi stranica. Stranica je zato statična i servira se s CDN-a: 500 i
+500.000 korisnika koštaju isto. Isto vrijedi za share slike — svih nekoliko desetina se
 izgradi u buildu (`app/og/[id]/[format]`), pa u produkciji nema ni crtanja
 na zahtjev ni odlaska po font na Google Fonts.
 
@@ -187,8 +207,8 @@ uzima u porcijama, kroz `claim_due_subscriptions`:
 - porcija se **uzme i posudi u istoj transakciji** (`for update skip locked`,
   posudba traje dvije minute), pa dva paralelna workera ne mogu dobiti istog
   čovjeka, a ni dva cron prolaza koja se preklope
-- `last_sent_on` nosi **sarajevski datum stiha** — stih dana je jedan za sve,
-  pa je "dobio stih za 25.09." jedina činjenica koju treba pamtiti. Ponovljen
+- `last_sent_on` nosi **sarajevski datum** — svako dobija svoj stih, ali
+  jednom dnevno, pa je "dobio stih za 25.09." jedina činjenica koju treba pamtiti. Ponovljen
   poziv rute zato ne znači i ponovljenu obavijest, a iz vruće putanje ispada
   svako računanje s vremenskim zonama
 - **dan zatvara samo uspjeh**: oznaka se upisuje tek kad push servis primi

@@ -112,7 +112,8 @@ create trigger push_subscriptions_sanitize_trg
 --  rasporedom crona, na jednom mjestu, umjesto da se krije u uslovu upita.
 --
 --  Ključ za duplikate je zato SARAJEVSKI datum, ne korisnikov lokalni dan:
---  stih dana je jedan za sve (vidi lib/date.ts), pa je "dobio stih za 25.09."
+--  svako ima svoj stih, ali jedan dnevno, i dan se svima mijenja po
+--  sarajevskom satu (vidi lib/date.ts), pa je "dobio stih za 25.09."
 --  jedina činjenica koja se pamti. Time iz vruće putanje ispada svako
 --  računanje s vremenskim zonama.
 --
@@ -265,11 +266,12 @@ grant execute on function finish_push_batch(text[], text[], text[], text, date) 
 
 
 -- ─────────────────────────────────────────────────────────────────────
---  Stihovi i raspored — uređuje ih admin (/admin)
+--  Stihovi — uređuje ih admin (/admin)
 --
---  `verse_schedule` drži zapisane dane: prošlost i narednih 60 dana (složeno
---  nasumično, mijenja ga samo admin). Dalje od toga dani se računaju: svaki
---  dobije stih koji najduže nije bio. Novi stih ide na nasumičan dan.
+--  Svako izvlači svoj stih na uređaju (lib/draw.ts), iz aktivnih stihova.
+--  Rasporeda više nema: `verse_schedule` i `catalog_meta` aplikacija ne
+--  čita ni ne piše. Ostaju ovdje da ponovno pokretanje fajla ne obori
+--  postojeću bazu i da stari podaci ne nestanu; obrisati ih se smije.
 --
 --  Dok je `verses` prazna, sajt koristi početnu listu iz data/verses.ts, a
 --  prva izmjena u adminu je upiše ovdje.

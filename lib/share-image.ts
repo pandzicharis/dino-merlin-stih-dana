@@ -512,8 +512,8 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   }
   top += sigH
 
-  // podnožje
-  let bottom = H - pad - (ratio > 1.5 ? W * 0.05 : 0)
+  // podnožje — znak spušten bliže dnu, odvojen od pjesme i albuma
+  let bottom = H - pad * 0.75 - (ratio > 1.5 ? W * 0.04 : 0)
 
   // na dnu znak izdavača; bez njega tihi natpis aplikacije
   if (label) {
@@ -531,7 +531,8 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.globalAlpha = p.light ? 0.55 : 0.5
     ctx.drawImage(s, W / 2 - lw / 2, bottom - lh)
     ctx.restore()
-    bottom -= lh + W * 0.05
+    // sadržaj ide gore, znak ostaje dolje — jasan razmak između njih
+    bottom -= lh + W * (ratio > 1.5 ? 0.14 : 0.1)
   } else {
     const tagSize = W * 0.0165
     ctx.font = `500 ${tagSize}px ${fonts.sans}`

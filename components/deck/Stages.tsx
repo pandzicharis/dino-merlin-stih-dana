@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type Ref, type RefObject } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { oneLine, withPeriod } from '@/lib/text'
 import {
   AndroidStatus,
   GALAXY,
@@ -26,6 +25,7 @@ import { formatDateBs, formatDayBs } from '@/lib/date'
 import { PhoneScript, type Script } from './PhoneScript'
 import { ChatDemo } from './ChatDemo'
 import { WELCOME } from '../Tips'
+import { INVITE } from '@/lib/notify'
 import { haptic } from '@/lib/haptic'
 
 /** Veličina kutije u kojoj uređaj stoji — uređaj se upiše u nju. */
@@ -215,7 +215,7 @@ function Simulated({
   const ios = kind === 'iphone'
   return (
     <AnimatePresence>
-      {/* obavijest sa stihom, ili dobrodošlica kad savjeti prođu (ona se samo skloni) */}
+      {/* dnevni poziv (lib/notify.ts), ili dobrodošlica kad savjeti prođu (ona se samo skloni) */}
       {(sim === 'notify' || sim === 'welcome') && (
         <motion.button
           key="notify"
@@ -254,7 +254,7 @@ function Simulated({
           />
           <span style={{ minWidth: 0, flex: 1 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8em' }}>
-              <span style={{ fontSize: '14.5em', fontWeight: 600 }}>{sim === 'welcome' ? WELCOME.title : 'Stih dana — Dino Merlin'}</span>
+              <span style={{ fontSize: '14.5em', fontWeight: 600 }}>{sim === 'welcome' ? WELCOME.title : INVITE.title}</span>
               <span style={{ fontSize: '12.5em', color: 'rgba(255,255,255,0.5)' }}>sada</span>
             </span>
             <span
@@ -269,7 +269,7 @@ function Simulated({
                 color: 'rgba(255,255,255,0.85)',
               }}
             >
-              {sim === 'welcome' ? WELCOME.body : oneLine(withPeriod(verse.text))}
+              {sim === 'welcome' ? WELCOME.body : INVITE.body}
             </span>
           </span>
         </motion.button>
@@ -437,6 +437,33 @@ export function LiveDesktop({
 
 const SF_DISPLAY = '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", var(--font-sans), sans-serif'
 
+/** Zvuk obavijesti — dva kratka tona (Web Audio, bez datoteke). */
+function chime() {
+  try {
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new AC()
+    const t = ctx.currentTime
+    ;[
+      [1318.5, 0],
+      [1760, 0.13],
+    ].forEach(([f, d]) => {
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.type = 'sine'
+      o.frequency.value = f
+      g.gain.setValueAtTime(0, t + d)
+      g.gain.linearRampToValueAtTime(0.25, t + d + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.001, t + d + 0.5)
+      o.connect(g).connect(ctx.destination)
+      o.start(t + d)
+      o.stop(t + d + 0.55)
+    })
+    window.setTimeout(() => ctx.close(), 1000)
+  } catch {
+    /* bez zvuka — nije bitno */
+  }
+}
+
 /**
  * Zaključan ekran — budan, u 11:59. Sat pređe na 12:00 i obavijest sa
  * stihom stigne sama. iOS 18: operater gore, datum i veliki sat, obavijest
@@ -473,25 +500,31 @@ function LockNotify({
   const [tapIcon, setTapIcon] = useState(false)
   const timers = useRef<number[]>([])
   const after = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms))
-  const unlock = () => {
-    setSwipe(true)
-    after(650, () => setPhase('home'))
-  }
+  const opened = useRef(false)
   const openApp = () => {
+    if (opened.current) return
+    opened.current = true
     setTapIcon(true)
     after(380, () => setPhase('opening'))
     after(1300, onOpen)
+  }
+  // Dodir na obavijest — kao na pravom telefonu: otključa se i odmah
+  // otvori aplikacija, bez početnog ekrana.
+  const tapNotification = () => {
+    if (opened.current) return
+    opened.current = true
+    setSwipe(true)
+    after(450, onOpen)
   }
   useEffect(() => {
     after(1400, () => setNoon(true))
     after(2000, () => {
       setArrived(true)
       haptic([12, 60, 12])
+      chime()
     })
-    if (!manual) {
-      after(6000, unlock)
-      after(6000 + 650 + 4500, openApp)
-    }
+    // sam tok: obavijest se dodirne i aplikacija se odmah otvori
+    if (!manual) after(6000, tapNotification)
     const ts = timers.current
     return () => ts.forEach(clearTimeout)
     // tok se igra jednom po montaži
@@ -502,12 +535,13 @@ function LockNotify({
   const [d, mon] = formatDateBs(date).split(' ')
   const when = `${day[0].toUpperCase() + day.slice(1)}, ${d} ${mon}`
   const clock = noon ? '12:00' : '11:59'
-  const text = oneLine(withPeriod(verse.text))
+  // obavijest je poziv — stih se otkriva tek kad se izvuče u aplikaciji
+  const { title, body: text } = INVITE
 
   const card = ios ? (
     <motion.button
       type="button"
-      onClick={unlock}
+      onClick={tapNotification}
       initial={{ y: '90em', opacity: 0, scale: 0.9 }}
       animate={{ y: 0, opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 26 }}
@@ -534,7 +568,7 @@ function LockNotify({
       <img src="/icons/icon-192.png" alt="" style={{ width: '38em', height: '38em', borderRadius: '8.5em', flexShrink: 0 }} />
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8em' }}>
-          <span style={{ fontSize: '15em', fontWeight: 600, letterSpacing: '-0.01em' }}>Stih dana — Dino Merlin</span>
+          <span style={{ fontSize: '15em', fontWeight: 600, letterSpacing: '-0.01em' }}>{title}</span>
           <span style={{ fontSize: '13em', color: 'rgba(255,255,255,0.55)' }}>sada</span>
         </span>
         <span
@@ -557,7 +591,7 @@ function LockNotify({
   ) : (
     <motion.button
       type="button"
-      onClick={unlock}
+      onClick={tapNotification}
       initial={{ y: '-24em', opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 24 }}
@@ -587,7 +621,7 @@ function LockNotify({
           <span style={{ fontSize: '12.5em' }}>Stih dana</span>
           <span style={{ fontSize: '12.5em' }}>· sada</span>
         </span>
-        <span style={{ display: 'block', marginTop: '0.3em', fontSize: '15em', fontWeight: 600 }}>Stih dana — Dino Merlin</span>
+        <span style={{ display: 'block', marginTop: '0.3em', fontSize: '15em', fontWeight: 600 }}>{title}</span>
         <span
           style={{
             display: '-webkit-box',

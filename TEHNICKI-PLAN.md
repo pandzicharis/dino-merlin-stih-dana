@@ -76,6 +76,8 @@ public/
 
 ## 2. Srce sistema — izbor stiha
 
+> **Izmijenjeno (oktobar 2026):** jednog stiha za sve više nema. Svako izvlači svoj na uređaju, bez ponavljanja dok ne prođe sve — vidi [`lib/draw.ts`](lib/draw.ts) i README, „Svakom svoj stih“. `lib/pickVerse.ts` i admin raspored su uklonjeni; ostatak ovog odjeljka je izvorni plan.
+
 **Pravilo:** stih se **ne bira u bazi, računa se iz datuma.** Zato je stranica statična, CDN-cache-ana i identična za sve — 500 i 500.000 korisnika koštaju isto.
 
 **Timezone je fiksan na `Europe/Sarajevo`**, ne na uređaj korisnika. Razlog: svi moraju vidjeti isti stih istog dana, inače share i razgovor o stihu nemaju smisla.

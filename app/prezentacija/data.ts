@@ -9,7 +9,7 @@ import type { DeckData } from '@/components/deck/types'
 
 /**
  * Sve što prezentaciji i plakatu treba, iz istog kataloga kao aplikacija —
- * stih na slajdu je stih koji je stvarno u rasporedu.
+ * stihovi na slajdovima su stihovi koji su stvarno u katalogu.
  */
 export async function deckData(): Promise<DeckData> {
   const cat = await getCatalog()
@@ -21,7 +21,7 @@ export async function deckData(): Promise<DeckData> {
     return v
   })
   const today = todayInTz()
-  // plakat je izlog, ne raspored: odabrani stih vrijedi i kad je arhiviran
+  // plakat je izlog: odabrani stih vrijedi i kad je arhiviran
   const pick = (id: string, mood: Mood) => {
     const any = cat.verses.find((v) => v.id === id)
     if (any) {

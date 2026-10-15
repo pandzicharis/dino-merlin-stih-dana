@@ -1,8 +1,9 @@
 /**
  * Vrijeme i datum.
  *
- * Timezone je FIKSAN na Europe/Sarajevo — namjerno. Svi korisnici moraju
- * vidjeti isti stih istog dana, inače share i razgovor o stihu nemaju smisla.
+ * Timezone je FIKSAN na Europe/Sarajevo — namjerno. Svako izvlači svoj stih
+ * (lib/draw.ts), ali dan se svima mijenja u isto vrijeme: novi stih u ponoć,
+ * obavijest u podne, po sarajevskom satu.
  */
 
 import { deckParam, inDeck, DECK_VERSE } from './deck'

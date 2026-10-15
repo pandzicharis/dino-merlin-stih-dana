@@ -6,6 +6,7 @@ import { MOODS } from '@/data/moods'
 import { albumOf, ALBUMS } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
 import { useDeck } from './context'
+import { TIPS_ON } from '../Tips'
 import { Grafike, LANSIRANJE, LaunchPlan, Ostalo, PwaNative } from './launch'
 import { QrCode } from './QrCode'
 import {
@@ -46,11 +47,23 @@ const STIH: FeatureDef[] = [
     script: 'permission',
     body: () => <Dozvola />,
   },
+  // savjeti su za sada isključeni u aplikaciji (Tips.tsx) — korak se vraća s njima
+  ...(TIPS_ON
+    ? [
+        {
+          id: 'savjeti',
+          title: 'Savjeti pri prvom otvaranju',
+          enter: '/',
+          body: () => <Savjeti />,
+        },
+      ]
+    : []),
   {
-    id: 'savjeti',
-    title: 'Savjeti pri prvom otvaranju',
-    enter: '/',
-    body: () => <Savjeti />,
+    // podne: obavijest → dodir → aplikacija → vrtlog papirića; telefon se ne
+    // učitava ponovo, izvlačenje pokrene poruka (prelaz između koraka ne zastaje)
+    id: 'obavijest',
+    title: 'Vrijeme je za stih dana',
+    body: (d) => <Obavijest d={d} />,
   },
   {
     id: 'atmosfera',
@@ -74,11 +87,6 @@ const STIH: FeatureDef[] = [
     id: 'dijeljenje',
     title: 'Podijeli kao sliku',
     body: () => <Dijeljenje />,
-  },
-  {
-    id: 'obavijest',
-    title: `Obavijest u ${SEND_TIME}`,
-    body: (d) => <Obavijest d={d} />,
   },
 ]
 
@@ -109,15 +117,8 @@ const UREDNIK: FeatureDef[] = [
     body: () => <Pristup />,
   },
   {
-    id: 'kalendar',
-    title: 'Kalendar objave',
-    // poslije prijave admin je na /admin — ne vraćati na ekran za prijavu
-    enter: '/admin',
-    body: () => <Kalendar />,
-  },
-  {
     id: 'biblioteka',
-    title: 'Biblioteka stihova',
+    title: 'Lista stihova',
     // poslije prijave admin je na /admin — ne vraćati na ekran za prijavu
     enter: '/admin',
     body: () => <Biblioteka />,
@@ -500,7 +501,7 @@ function Dozvola() {
         items={[
           'Bez dozvole aplikacija ne pušta dalje — stih koji sam dolazi joj je cijela svrha.',
           'Ako se dozvola odbije, aplikacija pokaže put kroz Postavke.',
-          'Odmah zatim: gomila papirića kao na pultu Magaze — današnji stih odleti na ekran i postane digitalni.',
+          'Odmah zatim: gomila papirića kao na pultu Magaze — iz nje se izvuče tvoj prvi stih i postane digitalni.',
         ]}
       />
     </>
@@ -733,8 +734,6 @@ type DeskScene = {
   clear: (target: string | HTMLElement) => void
   /** izbor s padajuće liste */
   choose: (target: string, value: string) => Promise<boolean>
-  /** prevlačenje: kartica dana se podigne i odnese na drugi dan */
-  drag: (from: HTMLElement, to: HTMLElement) => Promise<void>
   alive: () => boolean
 }
 
@@ -871,118 +870,29 @@ function useDeskScene(run: (s: DeskScene) => Promise<void>) {
       window.focus()
       return alive
     }
-    const drag = async (from: HTMLElement, to: HTMLElement) => {
-      const d = doc()
-      const win = d?.defaultView as (Window & typeof globalThis) | undefined
-      if (!d || !win || !alive) return
-      const a = center(from)
-      const b = center(to)
-      await move(a.x, a.y)
-      ripple(a.x, a.y)
-      const dt = new win.DataTransfer()
-      const fire = (node: HTMLElement, kind: string) =>
-        node.dispatchEvent(new win.DragEvent(kind, { bubbles: true, cancelable: true, dataTransfer: dt }))
-      fire(from, 'dragstart')
-      // kartica koja se nosi — kopija dana, ide zajedno s kursorom
-      const r = from.getBoundingClientRect()
-      const ghost = from.cloneNode(true) as HTMLElement
-      ghost.style.cssText += `;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;margin:0;z-index:2147483640;pointer-events:none;opacity:.95;box-shadow:0 18px 40px rgba(0,0,0,.6);border-color:#BFA87F`
-      d.body.appendChild(keep(ghost))
-      await wait(220)
-      if (!alive) return
-      const ms = 1000
-      ghost.animate(
-        [{ transform: 'translate(0,0) scale(1.05) rotate(-1.5deg)' }, { transform: `translate(${b.x - a.x}px,${b.y - a.y}px) scale(1.05) rotate(1deg)` }],
-        { duration: ms, easing: 'cubic-bezier(.45,0,.2,1)', fill: 'forwards' },
-      )
-      const going = move(b.x, b.y, ms)
-      await wait(ms * 0.6)
-      if (!alive) return
-      fire(to, 'dragenter')
-      fire(to, 'dragover')
-      await going
-      if (!alive) return
-      fire(to, 'dragover')
-      await wait(250)
-      if (!alive) return
-      fire(to, 'drop')
-      fire(from, 'dragend')
-      ghost.animate([{ opacity: 0.95 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }).onfinish = () => ghost.remove()
-      await wait(700)
-    }
-
     ;(async () => {
       // admin mora biti otvoren (poslije prijave)
       for (let t = 0; t < 100 && alive && !doc(); t++) await wait(150)
       if (!alive || !doc()) return
       // prozor ostao otvoren s drugog koraka — zatvori ga
       q('[role="dialog"]') && q('button[aria-label="Zatvori"]')?.click()
-      await run({ wait, find, all, click, type, clear, choose, drag, alive: () => alive })
+      await run({ wait, find, all, click, type, clear, choose, alive: () => alive })
     })()
     return () => {
       alive = false
       timers.forEach(clearTimeout)
       added.forEach((e) => e.remove())
-      // prekinuto prevlačenje: dan ne smije ostati "podignut"
-      try {
-        const d = desk()?.contentDocument
-        const win = d?.defaultView as (Window & typeof globalThis) | undefined
-        d?.querySelectorAll('[data-cal]').forEach((c) => c.dispatchEvent(new win!.DragEvent('dragend', { bubbles: true })))
-      } catch {
-        /* tuđa adresa */
-      }
     }
   }, [desk, manual])
-}
-
-/** Kalendar: tri stiha se prevuku na druge dane, uživo. */
-function Kalendar() {
-  useDeskScene(async ({ wait, find, all, drag, alive }) => {
-    // pravi ekran odmah na ulasku — animacija ide preko njega
-    const tab = await find('[data-tab="calendar"]')
-    if (!tab) return
-    tab.click()
-    // prvi budući dan (prošli su blijedi, pa se "ne vide")
-    if (!(await find('[data-cal]:not([disabled])'))) return
-    await wait(700)
-    // budući dani (prošli su zaključani, današnji takođe)
-    const days = all('[data-cal]').filter((b) => !(b as HTMLButtonElement).disabled && !b.dataset.today)
-    const pairs: [number, number][] = [
-      [1, 4],
-      [7, 2],
-      [5, 10],
-    ]
-    for (const [i, j] of pairs) {
-      if (!alive()) return
-      const from = days[i]
-      const to = days[j]
-      if (!from || !to) continue
-      await drag(from, to)
-      await wait(900)
-    }
-  })
-  return (
-    <>
-      <Text>Koji stih izlazi kojeg dana, obojen raspoloženjem. Stih se prevuče na drugi dan, ili se za dan bira bilo koji.</Text>
-      <Bullets
-        items={[
-          'Današnji je zaključan — ono što je ljudima stiglo, ne mijenja se.',
-          'Upozorenje kad se stih vrati za manje od dvije sedmice.',
-        ]}
-      />
-    </>
-  )
 }
 
 /** Biblioteka: pretraga, filter po raspoloženju, arhiva. */
 function Biblioteka() {
   useDeskScene(async ({ wait, find, click, type, clear, alive }) => {
     // pravi ekran odmah na ulasku: lista stihova, bez starih filtera
-    const tab = await find('[data-tab="library"]')
-    if (!tab) return
-    tab.click()
     const search = await find('[data-search]')
-    if (search) clear(search)
+    if (!search) return
+    clear(search)
     ;(await find('[data-scope="active"]', 1500))?.click()
     await wait(1100)
     // pretraga po riječi iz stiha ili naziva pjesme
@@ -1001,15 +911,18 @@ function Biblioteka() {
     await wait(1800)
     await click('[data-filter="nostalgija"]')
     await wait(700)
-    // arhiva: stih izvan rasporeda, a linkovi i sačuvani rade
+    // arhiva: stih se više ne izvlači, a linkovi i sačuvani rade
     await click('[data-scope="archive"]')
     await wait(1900)
     await click('[data-scope="active"]')
   })
   return (
     <>
-      <Text>Pretraga, filter po raspoloženju, i za svaki stih — kad sljedeći put izlazi.</Text>
-      <Bullets items={['Arhiviran stih izlazi iz rasporeda, a linkovi i sačuvani i dalje rade.']} />
+      <Text>
+        Svi aktivni stihovi su špil iz kojeg svako izvlači svoj — nema kalendara ni rasporeda za održavanje. Pretraga i
+        filter po raspoloženju.
+      </Text>
+      <Bullets items={['Arhiviran stih se više ne izvlači, a linkovi i sačuvani i dalje rade.']} />
     </>
   )
 }
@@ -1048,7 +961,9 @@ function NoviStih() {
         Tekst, pjesma, album, godina, raspoloženje i YouTube. Pored je pravi ekran aplikacije, na telefonu ili
         računaru, i mijenja se dok se kuca.
       </Text>
-      <Bullets items={[<><b>Izmjena je na sajtu odmah</b>, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>]} />
+      <Bullets
+        items={[<><b>Novi stih je u špilu odmah</b> — izvlači se od sutra, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>]}
+      />
     </>
   )
 }
@@ -1109,7 +1024,7 @@ function Pristup() {
   return (
     <>
       <Text>
-        Na /admin urednik bira i raspoređuje stihove — bez programera i bez čekanja. Jedna šifra, a prijava traje 30
+        Na /admin urednik uređuje listu stihova — bez programera i bez čekanja. Jedna šifra, a prijava traje 30
         dana.
       </Text>
       <Bullets items={[<><b>Preporuka: računar.</b> Radi i na telefonu.</>]} />
@@ -1242,25 +1157,26 @@ function Obavijest({ d }: { d: DeckData }) {
   // "Ponovi" — obavijest stiže ispočetka na sistemu koji je upravo na telefonu
   const [replay, setReplay] = useState(0)
   useEffect(() => simulate('lock'), [simulate])
-  // cijeli tok na iPhoneu (obavijest → otključavanje → bedž → stih) traje
-  // ~12 s, pa stih da se ispiše — onda isto na Androidu
+  // cijeli tok na iPhoneu (obavijest → dodir → izvlačenje →
+  // stih) traje ~15 s — odmah zatim isto na Androidu
   useEffect(() => {
     if (os !== 'ios' || manual) return
     const t = setTimeout(() => {
       setOs('android')
       simulate('lock')
-    }, 18500)
+    }, 18000)
     return () => clearTimeout(t)
   }, [os, setOs, manual, replay, simulate])
   return (
     <>
       <Text>
-        Svaki dan u podne stih stigne na zaključan ekran. Na početnom ekranu ikonica čeka s bedžom, a otvaranje vodi
-        pravo na današnji stih. Zvono u zaglavlju aplikacije obavijesti pali i gasi.
+        U podne stigne obavijest: <b>„Vrijeme je za stih dana! Uzmi svoj!“</b> Dodir otvara aplikaciju — „Tvoj stih te
+        čeka“ i tombola puna šarenih listića, kao na pultu ispred Magaze. Držiš — vrti se; pustiš — jedan se izvuče i
+        otvori s tvojim stihom.
       </Text>
       <Bullets
         items={[
-          'Otporno slanje: ako nešto zapne, sljedeći pokušaj šalje samo onima koji stih još nisu dobili — niko ga ne dobije dvaput.',
+          'Izvlači se jednom dnevno — svako sljedeće otvaranje tog dana ide pravo na stih.',
         ]}
       />
       <Acts>

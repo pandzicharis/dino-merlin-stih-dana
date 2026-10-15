@@ -73,7 +73,7 @@ export function Poster({ data, width, style }: { data: PosterData; width: string
 
       <Headline top="6em" sig="9em" h1="10em" sub="2.05em" center />
 
-      <Phones data={data} top="53.5em" height="68em" iphone="32em" galaxy="30.5em" spread="72em" />
+      <Phones data={data} top="57em" height="64em" iphone="30em" galaxy="28.6em" spread="68em" />
 
       {/* telefoni tonu u donji panel */}
       <Fade top="92em" span={13.3} />
@@ -124,7 +124,7 @@ export function PosterLandscape({ data, width, style }: { data: PosterData; widt
       {/* lijevo: poruka, kod, koraci */}
       <div style={{ position: 'absolute', left: '5.5em', top: '6em', width: '45em', zIndex: 4 }}>
         <Headline sig="5.6em" h1="6.3em" sub="1.32em" />
-        <div style={{ marginTop: '4.2em', display: 'flex', alignItems: 'center', gap: '3.2em' }}>
+        <div style={{ marginTop: '3.4em', display: 'flex', alignItems: 'center', gap: '3.2em' }}>
           <QrCard qr={data.qr} width="18.5em" label="1em" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <Steps title="1.62em" sub="0.98em" gap="1.35em" />
@@ -153,15 +153,15 @@ export function SocialPost({ data, width, style }: { data: PosterData; width: st
   return (
     <Sheet width={width} ratio={1.25} style={style}>
       <Backdrop portrait={{ right: '-18em', top: '-4em', width: '86em', height: '115em' }} />
-      <Headline top="6em" sig="8.5em" h1="9.6em" sub="2.15em" center />
-      <Phones data={data} top="48em" height="66em" iphone="30em" galaxy="28.5em" spread="70em" />
-      <Fade top="84em" span={13} />
+      <Headline top="4.5em" sig="8.5em" h1="9.6em" sub="2.15em" center />
+      <Phones data={data} top="56em" height="56em" iphone="25em" galaxy="23.8em" spread="60em" />
+      <Fade top="86em" span={12} />
       <div
         style={{
           position: 'absolute',
           left: '7em',
           right: '7em',
-          bottom: '5.5em',
+          bottom: '11.5em',
           zIndex: 4,
           display: 'flex',
           flexDirection: 'column',
@@ -170,9 +170,14 @@ export function SocialPost({ data, width, style }: { data: PosterData; width: st
         }}
       >
         <Platforms size="1.6em" />
-        <LinkPill host={data.host} size="2.4em" style={{ marginTop: `${2.4 / 2.4}em` }} />
-        <MagazaMark height={3.6} color="rgba(255,255,255,0.85)" style={{ marginTop: '2.8em' }} />
+        <LinkPill host={data.host} size="2.4em" style={{ marginTop: '1.5em' }} />
       </div>
+      {/* znak sam pri dnu, odvojen od poziva */}
+      <MagazaMark
+        height={3.6}
+        color="rgba(255,255,255,0.85)"
+        style={{ position: 'absolute', left: 0, right: 0, bottom: '3.5em', margin: '0 auto', zIndex: 4 }}
+      />
     </Sheet>
   )
 }
@@ -185,15 +190,15 @@ export function SocialStory({ data, width, style }: { data: PosterData; width: s
   return (
     <Sheet width={width} ratio={16 / 9} style={style}>
       <Backdrop portrait={{ right: '-26em', top: '8em', width: '100em', height: '133em' }} />
-      <Headline top="21em" sig="10em" h1="11em" sub="2.55em" center />
-      <Phones data={data} top="70em" height="80em" iphone="36em" galaxy="34.3em" spread="84em" />
-      <Fade top="116em" span={14} />
+      <Headline top="17em" sig="10em" h1="11em" sub="2.55em" center />
+      <Phones data={data} top="78em" height="72em" iphone="32em" galaxy="30.5em" spread="76em" />
+      <Fade top="118em" span={13} />
       <div
         style={{
           position: 'absolute',
           left: '8em',
           right: '8em',
-          bottom: '26em',
+          bottom: '32em',
           zIndex: 4,
           display: 'flex',
           flexDirection: 'column',
@@ -202,9 +207,14 @@ export function SocialStory({ data, width, style }: { data: PosterData; width: s
         }}
       >
         <Platforms size="1.9em" />
-        <LinkPill host={data.host} size="2.7em" style={{ marginTop: '1em' }} />
-        <MagazaMark height={4.2} color="rgba(255,255,255,0.85)" style={{ marginTop: '3.4em' }} />
+        <LinkPill host={data.host} size="2.7em" style={{ marginTop: '1.5em' }} />
       </div>
+      {/* znak sam pri dnu, odvojen od poziva */}
+      <MagazaMark
+        height={4.2}
+        color="rgba(255,255,255,0.85)"
+        style={{ position: 'absolute', left: 0, right: 0, bottom: '15em', margin: '0 auto', zIndex: 4 }}
+      />
     </Sheet>
   )
 }
@@ -245,7 +255,7 @@ function Headline({
       <p
         style={{
           // razmaci su u em-u formata, pa se dijele veličinom vlastitog fonta
-          marginTop: `${(n(sig) * 0.34) / (n(h1) * 0.15)}em`,
+          marginTop: `${(n(sig) * 0.5) / (n(h1) * 0.15)}em`,
           fontSize: `${n(h1) * 0.15}em`,
           fontWeight: 500,
           letterSpacing: '0.42em',
@@ -257,7 +267,7 @@ function Headline({
       </p>
       <h1
         style={{
-          marginTop: '0.11em',
+          marginTop: '0.22em',
           fontFamily: serif,
           fontVariationSettings: "'opsz' 144, 'SOFT' 30, 'WONK' 0",
           fontWeight: 360,
@@ -271,7 +281,7 @@ function Headline({
         <br />
         <span style={{ fontStyle: 'italic', color: '#E9D9B6' }}>Svaki dan.</span>
       </h1>
-      <p style={{ marginTop: '0.95em', fontSize: sub, lineHeight: 1.4, color: 'rgba(255,255,255,0.66)' }}>
+      <p style={{ marginTop: '1.6em', fontSize: sub, lineHeight: 1.4, color: 'rgba(255,255,255,0.66)' }}>
         Stih Dine Merlina stiže na tvoj telefon — svaki dan u {SEND_TIME}.
       </p>
     </div>

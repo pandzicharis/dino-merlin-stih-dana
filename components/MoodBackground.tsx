@@ -117,14 +117,28 @@ export function MoodBackground({
                   style={{
                     background: coverFill,
                     opacity: 0.42,
-                    height: `calc(6dvh + min(100vw, 74dvh, 760px) * ${(0.3 - (coverLift ?? 0)).toFixed(3)})`,
+                    height: `calc(6dvh + min(100vw, 74dvh, 760px) * ${(0.3 + 0.02 - (coverLift ?? 0)).toFixed(3)})`,
                   }}
                 />
               )}
-              {/* omot gore — na telefonu preko cijele širine, nestaje u strane i prema
-                  stihu; na računaru veći i rastopljen ovalno na sve strane (globals.css) */}
+              {/* podloga omota — isti omot zamućen, a iznad njega odraz (preokrenut), pa
+                  se boje s gornjeg ruba nastave do vrha ekrana; ispod oštrog omota
+                  popuni njegov meki rub. Kutija: 0.35 širine iznad omota + omot. */}
               <div
-                className="album-art absolute inset-x-0 top-[6dvh] mx-auto aspect-square w-[min(100vw,74dvh,760px)] bg-cover bg-center md:top-[2dvh] md:w-[min(118dvh,1100px)]"
+                className="album-glow absolute inset-x-0 top-[calc(6dvh-min(100vw,74dvh,760px)*0.33)] mx-auto aspect-[1/1.35] w-[min(100vw,74dvh,760px)] md:top-[calc(2dvh-min(118dvh,1100px)*0.33)] md:w-[min(118dvh,1100px)]"
+                style={{ opacity: 0.3, transform: coverLift ? `translateY(-${((coverLift * 100) / 1.35).toFixed(2)}%)` : undefined }}
+              >
+                <div
+                  className="absolute inset-x-0 top-0 h-[25.93%]"
+                  style={{ backgroundImage: `url(${cover})`, backgroundSize: '100% auto', backgroundPosition: 'top', transform: 'scaleY(-1)' }}
+                />
+                <div className="absolute inset-x-0 bottom-0 h-[74.07%] bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
+              </div>
+              {/* omot gore — na telefonu preko cijele širine, nestaje u strane i prema
+                  stihu; na računaru veći i rastopljen ovalno na sve strane (globals.css).
+                  Spušten za malo (0.02 — i u visini boje iznad). */}
+              <div
+                className="album-art absolute inset-x-0 top-[calc(6dvh+min(100vw,74dvh,760px)*0.02)] mx-auto aspect-square w-[min(100vw,74dvh,760px)] bg-cover bg-center md:top-[calc(2dvh+min(118dvh,1100px)*0.02)] md:w-[min(118dvh,1100px)]"
                 style={{ backgroundImage: `url(${cover})`, opacity: 0.42, transform: coverLift ? `translateY(-${coverLift * 100}%)` : undefined }}
               />
               {/* nijansa raspoloženja preko albuma — ekran ostaje "njegov" */}

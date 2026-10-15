@@ -2,15 +2,16 @@
 
 import { useEffect } from 'react'
 import { MOOD_KEYS } from '@/data/moods'
-import { startTips } from './Tips'
+import { TIPS_ON, startTips } from './Tips'
 import { playIntro } from './IntroSplash'
 import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
+import { redraw } from '@/lib/draw'
 
 /**
  * Ručno pomjeranje datuma — samo u dev modu (ili uz NEXT_PUBLIC_DATE_OVERRIDE=1).
  *
  *   [  dan nazad      ]  dan naprijed      \  reset na danas
- *   m  sljedeći mood  0  ukloni override mooda
+ *   m  sljedeći mood  0  ukloni override mooda  i  izvuci ponovo
  */
 export function DevDateBar({
   date,
@@ -43,6 +44,7 @@ export function DevDateBar({
       else if (e.key === ']') move(1)
       else if (e.key === '\\') reset()
       else if (e.key === 'm') cycleMood()
+      else if (e.key === 'i') redraw(date)
       else if (e.key === '0') {
         const url = new URL(window.location.href)
         url.searchParams.delete('mood')
@@ -77,11 +79,17 @@ export function DevDateBar({
       <a href="/admin" className="px-1.5 text-white/50 hover:text-white">
         admin
       </a>
-      <button onClick={() => startTips(true)} className="px-1.5 text-white/50 hover:text-white">
-        tips
-      </button>
+      {TIPS_ON && (
+        <button onClick={() => startTips(true)} className="px-1.5 text-white/50 hover:text-white">
+          tips
+        </button>
+      )}
       <button onClick={() => playIntro(true)} className="px-1.5 text-white/50 hover:text-white">
         splash
+      </button>
+      {/* zaboravi današnji (i dalje) — izvuče se ponovo, s animacijom */}
+      <button onClick={() => redraw(date)} className="px-1.5 text-white/50 hover:text-white" title="i">
+        izvuci
       </button>
       {(['ios', 'android'] as const).map((o) => (
         <button

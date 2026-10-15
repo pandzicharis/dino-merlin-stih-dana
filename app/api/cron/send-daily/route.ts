@@ -4,11 +4,14 @@ import { NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { supabase } from '@/lib/supabase'
 import { todayInTz } from '@/lib/date'
-import { verseForDayFresh } from '@/lib/catalog'
-import { oneLine, withPeriod } from '@/lib/text'
+import { INVITE } from '@/lib/notify'
 
 /**
- * Šalje stih dana.
+ * Šalje dnevni poziv: "Vrijeme je za stih dana! Uzmi svoj!".
+ *
+ * Svako izvlači svoj stih u aplikaciji (lib/draw.ts), pa obavijest ne nosi
+ * stih nego poziv — ista poruka za sve, bez ijednog čitanja stihova
+ * (lib/notify.ts).
  *
  * O VREMENU ODLUČUJE OKIDAČ, NE RUTA. Kad god se pozove, šalje svima koji
  * još nisu dobili stih za taj dan. Raspored crona je jedino mjesto gdje se
@@ -273,13 +276,9 @@ export async function POST(req: Request) {
   const workerRun = q.get('worker')
 
   const today = todayInTz()
-  // isti izvor kao i sajt: admin raspored, pa automatska rotacija
-  const verse = await verseForDayFresh(today)
+  // poziv, ne stih — dodir otvara aplikaciju, a stih se tamo izvlači
   const payload = JSON.stringify({
-    title: 'Stih dana — Dino Merlin',
-    // Stih se prelama u više redova; u notifikaciji mora stati u jedan,
-    // inače se vidi samo prva polovina.
-    body: oneLine(withPeriod(verse.text)),
+    ...INVITE,
     url: '/',
     tag: `stih-${today}`,
   })
@@ -310,7 +309,6 @@ export async function POST(req: Request) {
     return NextResponse.json({
       dry: true,
       date: today,
-      verse: verse.id,
       subscribers: count ?? 0,
       due,
       workers: due <= INLINE_LIMIT ? (due ? 1 : 0) : Math.min(MAX_WORKERS, Math.ceil(due / PER_WORKER)),
@@ -322,7 +320,6 @@ export async function POST(req: Request) {
     // a najčešće znači da je stih za ovaj dan već otišao.
     return NextResponse.json({
       date: today,
-      verse: verse.id,
       due: 0,
       sent: 0,
       note: force
@@ -338,7 +335,6 @@ export async function POST(req: Request) {
     const out = await runWorker(run, today, force, payload, started + DISPATCH_BUDGET_MS)
     return NextResponse.json({
       date: today,
-      verse: verse.id,
       due,
       workers: 1,
       ...out,
@@ -380,7 +376,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     date: today,
-    verse: verse.id,
     due,
     workers,
     ...total,

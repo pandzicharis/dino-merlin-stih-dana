@@ -73,7 +73,7 @@ export function VerseScreen({
         className={
           compact
             ? 'flex min-h-[260px] flex-col justify-between p-5'
-            : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(3rem,calc(env(safe-area-inset-top)+1.75rem))] ${
+            : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(3rem,calc(var(--sat,env(safe-area-inset-top))+1.75rem))] ${
                 OVERRIDE_ON ? 'dev-pad pb-16' : 'pb-[max(2.25rem,env(safe-area-inset-bottom))]'
               }`
         }
@@ -124,10 +124,12 @@ export function VerseScreen({
         >
           {!compact && (
             <motion.p
+              data-tip="mine"
               className="tabular text-[11px] font-semibold uppercase tracking-[0.3em]"
-              style={{ color: m.accent, opacity: 0.75 }}
+              // čitljiv na svakoj pozadini (i preko svijetlog dijela omota): puna boja + tamni oreol
+              style={{ color: m.accent, textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.65)' }}
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.75 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.9, delay: 0.2, ease: 'easeOut' }}
             >
               {formatFullDateBs(date)}

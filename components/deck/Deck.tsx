@@ -194,6 +194,27 @@ export function Deck({ data }: { data: DeckData }) {
     phoneRef.current?.contentWindow?.location.reload()
   }, [])
 
+  // Dodir na obavijest "Vrijeme je za stih dana! Uzmi svoj!": aplikacija se otvori i
+  // papirići se zavrte — kao na telefonu. Kad je aplikacija već na stihu,
+  // samo poruka (bez ponovnog učitavanja, da ništa ne zastane); inače se
+  // čeka NOVI dokument sa stihom.
+  const drawInPhone = useCallback((before?: Document | null) => {
+    let left = 60
+    const tick = () => {
+      try {
+        const doc = phoneRef.current?.contentDocument
+        if (doc && doc !== before && doc.readyState === 'complete' && doc.querySelector('[data-tip="mine"]')) {
+          phoneRef.current?.contentWindow?.postMessage({ type: 'stihdana:izvuci' }, window.location.origin)
+          return
+        }
+      } catch {
+        /* tuđa adresa */
+      }
+      if (--left > 0) window.setTimeout(tick, 150)
+    }
+    tick()
+  }, [])
+
   const openDesktop = useCallback(
     (src: string) => {
       setDeskSrc(src)
@@ -412,10 +433,14 @@ export function Deck({ data }: { data: DeckData }) {
 
   useEffect(() => {
     keysRef.current = (e, inFrame) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return
       const k = e.key
+      const nav = ['ArrowRight', 'ArrowLeft', 'PageDown', 'PageUp'].includes(k)
+      // Polje u aplikaciji (šifra u adminu ima autofocus) ne smije pojesti
+      // daljinski i strelice — prezentacija ide dalje, a polje se skloni.
+      if (e.metaKey || e.ctrlKey || e.altKey || (typing(e.target) && !(inFrame && nav))) return
       // u aplikaciji samo strelice lijevo-desno i daljinski — ostalo pripada njoj
-      if (inFrame && !['ArrowRight', 'ArrowLeft', 'PageDown', 'PageUp'].includes(k)) return
+      if (inFrame && !nav) return
+      if (inFrame && typing(e.target)) (e.target as HTMLElement).blur()
       const onControl = (e.target as HTMLElement | null)?.closest?.('button, a')
       if (k === 'ArrowRight' || k === 'PageDown' || k === 'ArrowDown' || (k === ' ' && !onControl)) {
         e.preventDefault()
@@ -521,10 +546,18 @@ export function Deck({ data }: { data: DeckData }) {
                 host={data.host}
                 onSim={(a) => {
                   setSim(null)
-                  // dodir na obavijest otvara aplikaciju, na ponudu — novu verziju
+                  // dodir na ponudu otvara novu verziju, na obavijest — izvlačenje
                   if (a === 'open') {
-                    if (where(phoneRef.current) === '/') reloadPhone()
-                    else openPhone('/')
+                    const home = where(phoneRef.current) === '/'
+                    if (sim?.kind === 'update') {
+                      if (home) reloadPhone()
+                      else openPhone('/')
+                    } else if (home) drawInPhone()
+                    else {
+                      const before = phoneRef.current?.contentDocument
+                      openPhone('/')
+                      drawInPhone(before)
+                    }
                   }
                   // dodir na karticu linka u chatu otvara stih s linka
                   if (a === 'link') openPhone(`/stih/${heroVerse.id}`)

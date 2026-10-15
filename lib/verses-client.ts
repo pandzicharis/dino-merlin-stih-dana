@@ -9,6 +9,11 @@ import type { Verse } from '@/data/verses'
  */
 let cache: Promise<Verse[]> | null = null
 
+/** Glavna stranica već nosi listu — panel sačuvanih je ne traži ponovo. */
+export function primeVerses(list: Verse[]) {
+  if (list.length) cache ??= Promise.resolve(list)
+}
+
 export function loadVerses(): Promise<Verse[]> {
   cache ??= fetch('/api/verses')
     .then((r) => (r.ok ? (r.json() as Promise<Verse[]>) : Promise.reject(new Error(String(r.status)))))

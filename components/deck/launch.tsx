@@ -9,6 +9,7 @@ import { deviceOuter, IPhone, IPHONE, IosStatus } from './Devices'
 import { Poster, PosterLandscape, SocialPost, SocialStory } from './Poster'
 import { Ico, R } from './ui'
 import type { DeckData, FeatureDef } from './types'
+import { TIPS_ON } from '../Tips'
 
 /* ═══════════════════════════════════════════════════════════════
    PLAN ZA LAUNCH
@@ -1053,20 +1054,21 @@ export function Ostalo({ d }: { d: DeckData }) {
   const done = [
     'Instalacija bez storea — iPhone i Android',
     `Dozvola i obavijest u ${SEND_TIME}, zaključan ekran`,
-    'Savjeti pri prvom otvaranju',
+    ...(TIPS_ON ? ['Savjeti pri prvom otvaranju'] : []),
     'Atmosfera po raspoloženju, album u pozadini',
     'Pjesma uz stih, u pozadini',
     'Sačuvani stihovi i dijeljenje kao slika',
     'Link koji izgleda kao poster',
     'Nova verzija stiže sama',
-    'Urednički panel: kalendar, biblioteka, novi stih',
+    'Izvlačenje stiha: jednom dnevno, svakom svoj',
+    'Urednički panel: lista stihova, novi stih',
     'Plakat A3, A4 i objave za mreže',
   ]
   const todo: [string, ReactNode][] = [
     [
       'Lista stihova',
       <>
-        Sada ih je {d.count}; za launch <b>90–120</b> — tri do četiri mjeseca bez ponavljanja. Magaza bira i odobrava.
+        Sada ih je {d.count}; za launch <b>90–120</b> — svako ih izvlači tri do četiri mjeseca prije nego mu se ijedan ponovi. Magaza bira i odobrava.
       </>,
     ],
     ['Grafika i eventualna nadogradnja UI', <>Originali u visokoj rezoluciji — potpis, portret, logotipi.</>],

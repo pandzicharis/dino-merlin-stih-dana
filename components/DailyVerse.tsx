@@ -1,57 +1,72 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
+import { useDraw, type ListVerse } from '@/lib/draw'
 import { setLastSeen } from '@/lib/storage'
+import { primeVerses } from '@/lib/verses-client'
 import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
 import { DevDateBar } from './DevDateBar'
 import { Onboarding } from './Onboarding'
 import { Tips } from './Tips'
 import { UpdatePrompt } from './UpdatePrompt'
-import { IntroHost } from './IntroSplash'
+import { IntroHost, playDraw } from './IntroSplash'
 
 /**
  * Rješava KOJI stih se prikazuje.
  *
- * Server donese stihove za nekoliko dana oko danas, pa prelaz preko ponoći
- * ne treba mrežu. Tek kad je traženi dan van toga (aplikacija otvorena
- * danima, ili dev pomjeranje datuma), stih se dohvati s `/api/day` — a do
- * tad ostaje zadnji poznati, bez praznog ekrana.
+ * Svako izvlači svoj (lib/draw.ts): stranica nosi listu, a uređaj izvuče
+ * stih za danas i zapamti ga. Prvo otvaranje u danu ide uz animaciju
+ * izvlačenja. Prezentacija i dev `?verse=` i dalje pokazuju tačno zadani stih.
  */
 export function DailyVerse({
   serverDate,
-  days,
+  verses,
   deckVerse,
 }: {
   serverDate: string
-  days: Record<string, Verse>
+  /** svi stihovi s oznakom aktivnog — iz aktivnih se izvlači */
+  verses: ListVerse[]
   /** stih prezentacije (lib/deck.ts) — da ga telefon u prezentaciji ima odmah */
   deckVerse?: Verse
 }) {
   const { date, verseId, mood } = useDevParams(serverDate)
-  const known = verseId ? (deckVerse?.id === verseId ? deckVerse : undefined) : days[date]
-  const key = verseId ? `id=${encodeURIComponent(verseId)}` : `d=${date}`
-  const [fetched, setFetched] = useState<{ key: string; verse: Verse } | null>(null)
-  // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka
-  const [replay, setReplay] = useState(0)
-  const land = useCallback(() => setReplay((r) => r + 1), [])
+  const drawn = useDraw(date, verses, !verseId)
 
+  // zadani stih (prezentacija, dev): iz liste, ili s `/api/day` ako ga nema
+  const listed = verseId ? (verses.find((v) => v.id === verseId) ?? (deckVerse?.id === verseId ? deckVerse : undefined)) : undefined
+  const [fetched, setFetched] = useState<Verse | null>(null)
   useEffect(() => {
-    if (known) return
+    if (!verseId || listed) return
     let alive = true
-    fetch(`/api/day?${key}`)
+    fetch(`/api/day?id=${encodeURIComponent(verseId)}`)
       .then((r) => (r.ok ? (r.json() as Promise<Verse>) : null))
-      .then((v) => alive && v && setFetched({ key, verse: v }))
+      .then((v) => alive && v && setFetched(v))
       .catch(() => {})
     return () => {
       alive = false
     }
-  }, [known, key])
+  }, [verseId, listed])
 
-  const verse =
-    known ?? (fetched?.key === key ? fetched.verse : undefined) ?? fetched?.verse ?? days[serverDate] ?? Object.values(days)[0]
+  const verse = verseId ? (listed ?? (fetched?.id === verseId ? fetched : undefined)) : drawn?.verse
+
+  // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka
+  const [replay, setReplay] = useState(0)
+  const land = useCallback(() => setReplay((r) => r + 1), [])
+
+  // prvo otvaranje danas — stih se izvlači pred očima
+  const fresh = Boolean(drawn?.fresh)
+  const drawnId = drawn?.verse.id
+  useEffect(() => {
+    if (fresh && drawnId) playDraw()
+  }, [fresh, drawnId, date])
+
+  // panel sačuvanih ne mora ponovo po listu — stranica je već donijela
+  useEffect(() => {
+    primeVerses(verses)
+  }, [verses])
 
   useEffect(() => setLastSeen(date), [date])
 
@@ -70,19 +85,24 @@ export function DailyVerse({
     return () => document.removeEventListener('visibilitychange', clear)
   }, [])
 
+  const tone = mood ?? verse?.mood ?? 'nostalgija'
+  // ostali aktivni stihovi — papirići u gomili na prvom otvaranju
+  const others = useMemo(
+    () => verses.filter((v) => v.active !== false && v.id !== verse?.id).map((v) => v.text),
+    [verses, verse?.id],
+  )
 
   return (
     <>
-      <Onboarding mood={mood ?? verse.mood} seed={verse.id} />
-      <VerseScreen verse={verse} date={date} mood={mood} replay={replay} />
-      <IntroHost
-        lines={[verse, ...Object.values(days).filter((v) => v.id !== verse.id)].map((v) => v.text)}
-        bg={MOODS[mood ?? verse.mood].gradient[0]}
-        onLand={land}
-      />
+      {/* kapija postoji i dok se stih izvlači — inače bi ga sakrila tek kasnije */}
+      <Onboarding mood={tone} seed={verse?.id ?? 'stih-dana'} />
+      {/* dok uređaj ne izvuče stih (prvi frejm), ekran je prazan — pozadina
+          i stih uđu zajedno, kao i inače */}
+      {verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} />}
+      {verse && <IntroHost text={verse.text} others={others} mood={tone} date={date} onLand={land} fresh={fresh} />}
       <Tips />
-      <UpdatePrompt accent={MOODS[mood ?? verse.mood].accent} />
-      <DevDateBar date={date} verseId={verse.id} mood={mood ?? verse.mood} />
+      <UpdatePrompt accent={MOODS[tone].accent} />
+      {verse && <DevDateBar date={date} verseId={verse.id} mood={tone} />}
     </>
   )
 }

@@ -20,7 +20,7 @@ import { SEND_HOUR, SEND_TIME } from '@/lib/date'
 import { setNotifyIntent } from '@/lib/storage'
 import { deckParam, inDeck } from '@/lib/deck'
 import { BrandLockup } from './BrandLockup'
-import { playIntro } from './IntroSplash'
+import { playIntro, setGateOpen } from './IntroSplash'
 
 type Platform = 'ios' | 'android' | 'desktop'
 
@@ -217,6 +217,11 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
   // Sadržaj čeka montažu (ovisi o platformi), pa je prvi frejm samo crno:
   // instalirana aplikacija tako ne vidi ništa od uvoda dok se ne makne.
   const show = stage !== null && !skipped
+  // dok kapija stoji, izvlačenje dana čeka (IntroHost)
+  useEffect(() => {
+    setGateOpen(show)
+    return () => setGateOpen(false)
+  }, [show])
 
   // "Pogledaj kako" postoji samo uz korake (bez Chromeovog dijaloga), pa se
   // tad unaprijed i preuzme — da se na dodir otvori odmah.

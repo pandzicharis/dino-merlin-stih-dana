@@ -20,9 +20,20 @@ type Tip = { target: string[]; title: string; body: string; icon: ReactNode }
 
 const TIPS: Tip[] = [
   {
+    target: ['mine'],
+    title: 'Ovaj stih je samo tvoj',
+    body: 'Svaki dan izvlačiš svoj, kao papirić u Magazi — i nijedan se ne ponavlja.',
+    icon: (
+      <>
+        <path d="M5 8.5h14v7H5z" />
+        <path d="M8 11h8M8 13.2h5" />
+      </>
+    ),
+  },
+  {
     target: ['notify'],
-    title: 'Stih stiže u 12:00',
-    body: 'Jedna obavijest dnevno, s novim stihom. Zvono je pali i gasi — kad god poželiš.',
+    title: 'Obavijest u 12:00',
+    body: 'Svaki dan: „Vrijeme je za stih dana! Uzmi svoj!“ Zvono obavijesti pali i gasi, kad god poželiš.',
     icon: (
       <>
         <path d="M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5" />
@@ -80,6 +91,19 @@ function welcome() {
     .catch(() => {})
 }
 
+const STOP = 'stihdana:tips-stop'
+
+/** Skloni savjete bez traga — prezentacija na istom ekranu pokazuje nešto drugo. */
+export function stopTips() {
+  window.dispatchEvent(new Event(STOP))
+}
+
+/**
+ * Savjeti su za sada ISKLJUČENI — za ovako malu aplikaciju nisu potrebni.
+ * Kod ostaje: `true` ih vraća svuda (aplikacija, prezentacija, dev traka).
+ */
+export const TIPS_ON = false
+
 /** Pokreni savjete. `force` ih pokaže i ako su već viđeni (prezentacija). */
 export function startTips(force = false) {
   try {
@@ -88,18 +112,32 @@ export function startTips(force = false) {
   } catch {
     /* privatni prozor — savjeti se pokažu, samo se ne zapamte */
   }
+  // bez savjeta dobrodošlica stiže odmah — jednom, poslije prvog otvaranja
+  if (!TIPS_ON) {
+    if (window.parent === window) welcome()
+    return
+  }
   window.dispatchEvent(new Event(EVENT))
 }
 
-type Box = { x: number; y: number; w: number; h: number }
+/** Prozor oko dugmeta: `r` je zaobljenje — krug za okrugla dugmad, kapsula za šira. */
+type Box = { x: number; y: number; w: number; h: number; r: number }
 const PAD = 10
 
 function boxes(tip: Tip): Box[] {
   return tip.target.flatMap((t) => {
     const el = document.querySelector<HTMLElement>(`[data-tip="${t}"]`)
-    const r = el?.getBoundingClientRect()
-    if (!r || !r.width) return []
-    return [{ x: r.left - PAD, y: r.top - PAD, w: r.width + PAD * 2, h: r.height + PAD * 2 }]
+    const b = el?.getBoundingClientRect()
+    if (!b || !b.width) return []
+    const w = b.width + PAD * 2
+    const h = b.height + PAD * 2
+    // skoro kvadratno (ikonica, ploča) → pravilan krug oko središta
+    if (w / h < 1.6) {
+      const d = Math.max(w, h)
+      return [{ x: b.left + b.width / 2 - d / 2, y: b.top + b.height / 2 - d / 2, w: d, h: d, r: d / 2 }]
+    }
+    // šire (datum, dugme sa tekstom) → kapsula
+    return [{ x: b.left - PAD, y: b.top - PAD, w, h, r: h / 2 }]
   })
 }
 
@@ -110,14 +148,26 @@ export function Tips() {
 
   useEffect(() => {
     let t = 0
-    // gate se prvo skloni, a zaglavlje i potpis pjesme dođu na ekran
+    // gate se prvo skloni, a zaglavlje i potpis pjesme dođu na ekran; ako se
+    // stih upravo izvlači, savjeti čekaju da sleti
     const start = () => {
       clearTimeout(t)
-      t = window.setTimeout(() => setStep(0), 1100)
+      const go = () => {
+        if (document.querySelector('[data-izvlacenje]')) t = window.setTimeout(go, 300)
+        else t = window.setTimeout(() => setStep(0), 1100)
+      }
+      go()
+    }
+    const stop = () => {
+      clearTimeout(t)
+      setStep(null)
+      setHoles([])
     }
     window.addEventListener(EVENT, start)
+    window.addEventListener(STOP, stop)
     return () => {
       window.removeEventListener(EVENT, start)
+      window.removeEventListener(STOP, stop)
       clearTimeout(t)
     }
   }, [])
@@ -174,26 +224,20 @@ export function Tips() {
           transition={{ duration: 0.8, ease }}
           onClick={next}
         >
-          {/* tama s mekim prozorom oko dugmeta — bez okvira, ivice se utope */}
+          {/* tama s jasnim prozorom oko dugmeta — krug ili kapsula, zlatni obrub */}
           <svg className="absolute inset-0 h-full w-full" aria-hidden>
             <defs>
-              <filter id="tips-feather" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="5" />
-              </filter>
               <mask id="tips-mask">
                 <rect width="100%" height="100%" fill="white" />
-                <g filter="url(#tips-feather)">
-                  {holes.map((b, i) => (
-                    <motion.rect
-                      key={i}
-                      initial={false}
-                      animate={{ x: b.x, y: b.y, width: b.w, height: b.h }}
-                      transition={glide}
-                      rx={Math.min(b.h / 2, 24)}
-                      fill="black"
-                    />
-                  ))}
-                </g>
+                {holes.map((b, i) => (
+                  <motion.rect
+                    key={i}
+                    initial={false}
+                    animate={{ x: b.x, y: b.y, width: b.w, height: b.h, rx: b.r, ry: b.r }}
+                    transition={glide}
+                    fill="black"
+                  />
+                ))}
               </mask>
               <radialGradient id="tips-glow">
                 <stop offset="0" stopColor={BRAND.gold} stopOpacity="0.16" />
@@ -201,6 +245,36 @@ export function Tips() {
               </radialGradient>
             </defs>
             <rect width="100%" height="100%" fill="rgba(3,2,2,0.92)" mask="url(#tips-mask)" />
+            {/* obrub prozora — tanka zlatna linija; kad savjet stigne, jednom se raširi i nestane */}
+            {holes.map((b, i) => (
+              <g key={`o-${i}`}>
+                <motion.rect
+                  initial={false}
+                  animate={{ x: b.x, y: b.y, width: b.w, height: b.h, rx: b.r, ry: b.r }}
+                  transition={glide}
+                  fill="none"
+                  stroke={BRAND.gold}
+                  strokeOpacity="0.75"
+                  strokeWidth="1.5"
+                />
+                <motion.rect
+                  key={`p-${step}`}
+                  x={b.x}
+                  y={b.y}
+                  width={b.w}
+                  height={b.h}
+                  rx={b.r}
+                  ry={b.r}
+                  fill="none"
+                  stroke={BRAND.gold}
+                  strokeWidth="1.5"
+                  style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+                  initial={{ opacity: 0.6, scale: 1 }}
+                  animate={{ opacity: 0, scale: 1.25 }}
+                  transition={{ duration: 1.1, delay: 0.35, ease: 'easeOut' }}
+                />
+              </g>
+            ))}
             {/* tih zlatni sjaj iza dugmeta, kao na ostatku aplikacije */}
             {holes.map((b, i) => (
               <motion.ellipse
