@@ -170,8 +170,10 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
     // ide u pozadini, a zvono na stihu je tiho popravi ako padne.
     setNotifyIntent(true)
     void subscribeToPush(SEND_HOUR)
-    // papirići → današnji stih sleti na ekran → savjeti
-    playIntro()
+    // papirići → današnji stih sleti na ekran → savjeti. Uvijek uvod (force):
+    // prvo otvaranje poslije dozvole je splash, i kad je uređaj već nekad
+    // vidio uvod — tombola je tek za sljedeće dane.
+    playIntro(true)
   }, [deck])
 
   // Odgovor na sistemski prozor iz prezentacije.
@@ -216,7 +218,11 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
   // Kapija postoji već u HTML-u sa servera — inače stih bljesne prije nje.
   // Sadržaj čeka montažu (ovisi o platformi), pa je prvi frejm samo crno:
   // instalirana aplikacija tako ne vidi ništa od uvoda dok se ne makne.
-  const show = stage !== null && !skipped
+  // dok se čeka odgovor na dozvolu, kapija stoji — inače se zatvori čim sistem
+  // javi dozvolu, a izvlačenje dana (tombola) krene prije uvoda
+  // (i dalje se vidi korak dozvole)
+  const view: Stage = stage ?? (busy ? 'permission' : null)
+  const show = view !== null && !skipped
   // dok kapija stoji, izvlačenje dana čeka (IntroHost)
   useEffect(() => {
     setGateOpen(show)
@@ -270,7 +276,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8, delay: 0.8, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  {stage === 'permission' ? (
+                  {view === 'permission' ? (
                     <PermissionStage
                       denied={permission === 'denied'}
                       asked={asked}

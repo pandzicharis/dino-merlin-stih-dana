@@ -1,5 +1,6 @@
 'use client'
 
+import { haptic } from '@/lib/haptic'
 import { useEffect } from 'react'
 import { motion } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
@@ -30,6 +31,7 @@ export function VerseScreen({
   mood,
   compact = false,
   replay = 0,
+  onRedraw,
 }: {
   verse: Verse
   date: string
@@ -38,6 +40,8 @@ export function VerseScreen({
   compact?: boolean
   /** promjena ponovo ispiše stih i podnožje — kad papirić iz splasha sleti */
   replay?: number
+  /** "Izvuci ponovo" — drugi stih za danas, s tombolom */
+  onRedraw?: () => void
 }) {
   const m = MOODS[mood ?? verse.mood]
 
@@ -143,11 +147,48 @@ export function VerseScreen({
           {!compact && (
             <motion.div
               key={`s-${verse.id}-${replay}`}
+              className="flex flex-wrap items-center justify-center gap-2.5"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: Math.max(0.15, tail - 0.5), ease: [0.22, 1, 0.36, 1] }}
             >
               <FavoriteButton id={verse.id} accent={m.accent} />
+              {/* isto dugme kao "Sačuvaj"; strelica se okrene na dodir */}
+              {onRedraw && (
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    haptic(6)
+                    onRedraw()
+                  }}
+                  aria-label="Izvuci ponovo"
+                  title="Izvuci ponovo"
+                  className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-full border px-4 text-[10px] font-medium uppercase tracking-[0.22em] backdrop-blur-sm"
+                  style={{ color: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.03)' }}
+                  variants={{ hover: { scale: 1.06 }, tap: { scale: 0.94 } }}
+                  whileHover="hover"
+                  whileTap="tap"
+                  transition={{ type: 'spring', stiffness: 460, damping: 20 }}
+                >
+                  <motion.svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    variants={{ hover: { rotate: -30 }, tap: { rotate: -200 } }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+                    aria-hidden
+                  >
+                    <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+                    <path d="M20 4v7h-7" />
+                  </motion.svg>
+                  Zavrti opet
+                </motion.button>
+              )}
             </motion.div>
           )}
         </div>

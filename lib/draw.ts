@@ -181,6 +181,23 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
   return { verse, fresh: !entry.seen || fresh.has(date) }
 }
 
+/**
+ * "Izvuci ponovo" na ekranu stiha: današnji stih se zamijeni drugim (nikad
+ * istim), u istom potezu — ekran ne ostane prazan — i izvlačenje se odigra.
+ */
+export function drawAgain(date: string, verses: ListVerse[]) {
+  const active = verses.filter((v) => v.active !== false)
+  const pool = (active.length ? active : verses).map((v) => v.id)
+  const s = parse(snapshot())
+  const cur = s.days[date]?.id
+  delete s.days[date]
+  const out = settle(s, date, pool, new Set(verses.map((v) => v.id)))
+  const others = pool.filter((id) => id !== cur)
+  if (out.days[date].id === cur && others.length) out.days[date] = { ...out.days[date], id: others[rand(others.length)] }
+  fresh.delete(date)
+  save(out)
+}
+
 /** Dev: zaboravi stih za `date` i dalje — izvuče se ponovo, s animacijom. */
 export function redraw(date: string) {
   const s = parse(snapshot())
