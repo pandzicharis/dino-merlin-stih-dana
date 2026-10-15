@@ -250,7 +250,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
               <MoodBackground mood={mood} seed={seed} still />
 
               <div
-                className={`relative flex min-h-[100dvh] flex-col items-center px-8 pt-[max(4rem,calc(env(safe-area-inset-top)+2rem))] ${
+                className={`relative flex min-h-[100dvh] flex-col items-center px-8 pt-[max(4rem,calc(var(--sat)+2rem))] ${
                   devBar ? 'pb-20' : 'pb-[max(3rem,env(safe-area-inset-bottom))]'
                 }`}
               >

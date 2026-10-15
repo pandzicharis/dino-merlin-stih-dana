@@ -61,6 +61,21 @@ body {
 }
 
 /*
+ * Gornji rub ekrana (sat, ostrvo). Na telefonu "safe area"; u telefonu u
+ * prezentaciji (data-deck) aplikacija ide do vrha okvira, pa je to statusna
+ * traka okvira — pozadina aplikacije je i oko ostrva.
+ */
+:root {
+  --sat: env(safe-area-inset-top);
+}
+html[data-deck][data-os='ios'] {
+  --sat: 50px;
+}
+html[data-deck][data-os='android'] {
+  --sat: 34px;
+}
+
+/*
  * Sistem ispod aplikacije — data-os na <html> postavlja skripta u layoutu
  * (pravi telefon) ili prekidač u prezentaciji. Modali tad imaju font,
  * zaobljenje i ručku sistema: isto u prezentaciji kao na pravom telefonu.

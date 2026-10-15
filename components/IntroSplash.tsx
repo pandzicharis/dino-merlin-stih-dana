@@ -656,7 +656,7 @@ function Tombola({
       {/* naslov — ostaje i dok se listić otvara ("te čeka" → "za danas"), ode tek sa slovima */}
       <motion.div
         className="pointer-events-none absolute inset-x-0 px-8 text-center"
-        style={{ top: `max(10vh, calc(env(safe-area-inset-top) + 3rem))` }}
+        style={{ top: `max(10vh, calc(var(--sat) + 3rem))` }}
         initial={{ opacity: 0, y: 10 }}
         animate={phase === 'fly' ? { opacity: 0, y: -8 } : { opacity: 1, y: 0 }}
         transition={{ duration: phase === 'fly' ? 0.4 : 0.9, delay: phase === 'fly' ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}

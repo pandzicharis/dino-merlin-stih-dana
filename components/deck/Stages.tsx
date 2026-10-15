@@ -96,8 +96,8 @@ export function LivePhone({
   const width = Math.max(0, Math.min(size.w, (size.h * outer.w) / outer.h))
   const k = width / outer.w
   const inset = (D.rim + D.bezel) * k
-  // Aplikacija počinje ispod statusne trake. U okviru nema "safe area", pa bi
-  // se inače njeno zaglavlje (i dugme nazad) podvuklo pod sat i bateriju.
+  // Statusna traka okvira. Aplikacija ide do vrha (pozadina i oko ostrva), a
+  // sadržaj spusti za traku sama — `--sat` u globals.css (html[data-deck]).
   const bar = kind === 'iphone' ? 50 : 34
 
   return (
@@ -130,9 +130,9 @@ export function LivePhone({
             style={{
               position: 'absolute',
               left: 0,
-              top: bar * k,
+              top: 0,
               width: D.w,
-              height: D.h - bar,
+              height: D.h,
               border: 0,
               transform: `scale(${k})`,
               transformOrigin: '0 0',

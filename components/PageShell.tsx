@@ -31,7 +31,7 @@ export function PageShell({
 
       <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-black/40 backdrop-blur-xl">
         <div
-          className={`mx-auto flex items-center gap-4 px-5 pb-3 pt-[max(0.9rem,env(safe-area-inset-top))] ${wide ? 'max-w-5xl' : 'max-w-xl'}`}
+          className={`mx-auto flex items-center gap-4 px-5 pb-3 pt-[max(0.9rem,var(--sat))] ${wide ? 'max-w-5xl' : 'max-w-xl'}`}
         >
           {back !== null && (
             <Link

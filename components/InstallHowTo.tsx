@@ -74,7 +74,7 @@ export default function InstallHowTo({
       role="dialog"
       aria-modal="true"
       aria-label={`Kako dodati Stih dana na početni ekran — ${ios ? 'iPhone' : 'Android'}`}
-      className="fixed inset-0 z-10 flex flex-col items-center justify-center overflow-y-auto bg-black/75 px-8 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] backdrop-blur-md"
+      className="fixed inset-0 z-10 flex flex-col items-center justify-center overflow-y-auto bg-black/75 px-8 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,var(--sat))] backdrop-blur-md"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
