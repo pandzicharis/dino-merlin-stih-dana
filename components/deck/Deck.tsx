@@ -116,6 +116,9 @@ export function Deck({ data }: { data: DeckData }) {
 
   const [overview, setOverview] = useState(false)
   const go = useCallback((i: number) => {
+    // kliknuto dugme ostaje u fokusu, pa mu strelica upali plavi okvir
+    const el = document.activeElement
+    if (el instanceof HTMLElement && el.closest('button, a')) el.blur()
     setOverview(false)
     showStop(i)
   }, [])
