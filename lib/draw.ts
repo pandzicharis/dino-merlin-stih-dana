@@ -141,8 +141,9 @@ function settle(s: State, today: string, pool: string[], known: Set<string>, avo
   }
   if (!days[today]) {
     const e = next(days, Object.keys(days).sort(), pool, avoid)
-    // prvi stih ikad na ovom uređaju — uvod, probni
-    days[today] = Object.keys(s.days).length ? e : { ...e, pre: 1 }
+    // prvi stih ikad na ovom uređaju — uvod, probni. Zamjena probnog
+    // (`avoid`) je pravi stih — inače bi ga obavijest mijenjala u krug.
+    days[today] = Object.keys(s.days).length || avoid ? e : { ...e, pre: 1 }
   }
   return { days }
 }
@@ -196,14 +197,17 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
  * Stigla obavijest na dan instalacije: probni stih iz uvoda se ne broji —
  * dan se izvuče ispočetka (s tombolom). `false` ako stih za `date` nije probni.
  */
-export function unseat(date: string): boolean {
+export function unseat(date: string, verses: ListVerse[]): boolean {
   const s = parse(snapshot())
   const e = s.days[date]
   if (!e?.pre) return false
   delete s.days[date]
   avoid = e.id
   fresh.delete(date)
-  save(s)
+  // pravi stih odmah, u istom potezu — ekran ni na frejm ne ostane bez stiha
+  const active = verses.filter((v) => v.active !== false)
+  const pool = (active.length ? active : verses).map((v) => v.id)
+  save(settle(s, date, pool, new Set(verses.map((v) => v.id)), avoid))
   return true
 }
 

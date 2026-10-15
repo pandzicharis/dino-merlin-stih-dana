@@ -84,7 +84,7 @@ export function DailyVerse({
       try {
         if (!(await hasPushMark())) return clearBadge()
         // probni stih: dan se izvuče ispočetka — novi stih sam pokrene tombolu
-        if (unseat(date)) return
+        if (unseat(date, verses)) return
         if (reduced) return clearPushMark()
         // ako se već izvlači (prvo otvaranje danas), IntroHost ovo preskoči
         playDraw()
@@ -100,7 +100,7 @@ export function DailyVerse({
       document.removeEventListener('visibilitychange', check)
       navigator.serviceWorker?.removeEventListener('message', onMessage)
     }
-  }, [drawnId, verseId, date, reduced])
+  }, [drawnId, verseId, date, reduced, verses])
 
   // panel sačuvanih ne mora ponovo po listu — stranica je već donijela
   useEffect(() => {

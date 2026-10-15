@@ -108,10 +108,6 @@ export function IntroHost({
   // zastor od prvog frejma dok izvlačenje ne krene (ispod kapije i splasha);
   // u prezentaciji kad se aplikacija otvara uvodom (`?intro`)
   const [hold, setHold] = useState(() => (inDeck() ? deckParam('intro') !== null : fresh))
-  // splash ima svoju punu podlogu od prvog frejma — zastor više ne treba
-  useEffect(() => {
-    if (on) setHold(false)
-  }, [on])
   const gate = useSyncExternalStore(subscribeGate, () => gateOpen, () => true)
   const runningRef = useRef(false)
   useEffect(() => {
@@ -158,8 +154,11 @@ export function IntroHost({
     const draw = () => {
       // već se izvlači (npr. obavijest dodirnuta usred tombole) — ne ispočetka
       if (runningRef.current) return
-      if (!reduced) setPending(true)
-      else setHold(false)
+      if (reduced) return setHold(false)
+      // zastor odmah (i kad je stih danas već viđen — obavijest): stih se ne
+      // vidi dok tombola ne krene
+      setHold(true)
+      setPending(true)
     }
     window.addEventListener(EVENT, go)
     window.addEventListener(DRAW, draw)
@@ -193,7 +192,8 @@ export function IntroHost({
 
   return (
     <>
-    {hold && <div className="fixed inset-0 z-[59]" style={{ background: bg }} aria-hidden />}
+    {/* splash/tombola imaju svoju punu podlogu — zastor samo dok ne krenu (done ga skloni) */}
+    {hold && !on && <div className="fixed inset-0 z-[59]" style={{ background: bg }} aria-hidden />}
     <AnimatePresence>
       {on?.first && <IntroSplash key={`uvod-${run}`} lines={lines} bg={bg} onLand={onLand} onDone={done} />}
       {on && !on.first && (
