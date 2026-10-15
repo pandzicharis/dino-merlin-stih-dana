@@ -12,10 +12,11 @@ import { SPLASH_ARRIVE, VerseText, verseTail } from './VerseText'
 import { SongCredit } from './SongCredit'
 import { NotifyToggle } from './NotifyToggle'
 import { ShareButton } from './ShareSheet'
-import { BrandLockup } from './BrandLockup'
+import { Signature } from './Signature'
 import { FavoriteButton } from './FavoriteButton'
 import { SavedLink } from './SavedLink'
 import { MagazaLogo } from './MagazaLogo'
+import { ArtistLinks } from './ArtistLinks'
 
 /**
  * Čista prezentacija — datum i stih dolaze izvana.
@@ -77,14 +78,27 @@ export function VerseScreen({
               }`
         }
       >
-        {/* zaglavlje — brend stoji tiho gore lijevo */}
+        {/* zaglavlje — potpis | Magaza gore lijevo, isti znak kao u prezentaciji */}
         <header className="relative z-10 flex items-center justify-between">
           {compact ? (
             <p className="meta" style={{ color: m.accent }}>
               {m.label}
             </p>
           ) : (
-            <BrandLockup height={42} delay={0.15} />
+            <div className="flex items-center gap-3.5">
+              <Signature height={34} delay={0.15} duration={1.25} className="opacity-90" />
+              <motion.span
+                className="flex items-center gap-3.5"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.7, delay: 0.6, ease: 'easeOut' }}
+              >
+                <span className="h-5 w-px bg-white/20" aria-hidden />
+                <a href="https://magaza.com.ba" target="_blank" rel="noopener noreferrer" aria-label="Magaza" className="opacity-90">
+                  <MagazaLogo height={16} color="#FFFFFF" />
+                </a>
+              </motion.span>
+            </div>
           )}
           {!compact && (
             <motion.div
@@ -164,15 +178,7 @@ export function VerseScreen({
                 style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
                 aria-hidden
               />
-              <a
-                href="https://magaza.com.ba"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Magaza"
-                className="relative z-10 opacity-90"
-              >
-                <MagazaLogo height={22} color="#FFFFFF" />
-              </a>
+              <ArtistLinks accent={m.accent} />
             </>
           )}
         </motion.footer>

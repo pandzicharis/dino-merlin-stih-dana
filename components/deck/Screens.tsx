@@ -5,6 +5,7 @@ import { albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
 import { oneLine, withPeriod } from '@/lib/text'
+import { ARTIST_LINKS } from '@/components/ArtistLinks'
 
 /**
  * Mirni ekrani aplikacije za mockupe — plakat i slajdove.
@@ -239,8 +240,13 @@ export function VerseMock({
       >
         {/* zaglavlje */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/signature.webp" alt="" style={{ height: '40em', width: 'auto', opacity: 0.9 }} />
+          {/* potpis | Magaza — kao VerseScreen */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14em' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/signature.webp" alt="" style={{ height: '34em', width: 'auto', opacity: 0.9 }} />
+            <span style={{ width: '1em', height: '20em', background: 'rgba(255,255,255,0.2)' }} />
+            <MagazaMark height={16} style={{ opacity: 0.9 }} />
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '18em', color: 'rgba(255,255,255,0.42)' }}>
             <Icon d={BELL} fill={bellOn ? 'rgba(141,201,163,0.22)' : 'none'} color={bellOn ? '#8DC9A3' : '#D08C8C'} />
             {savedCount > 0 && <SavedIcon count={savedCount} />}
@@ -330,7 +336,24 @@ export function VerseMock({
               background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`,
             }}
           />
-          <MagazaMark height={22} style={{ marginTop: '22em', opacity: 0.9 }} />
+          {/* web, Instagram, Spotify, YouTube — samo ikonice, tanke i prigušene, kao ArtistLinks na telefonu */}
+          <span style={{ display: 'flex', justifyContent: 'center', gap: '23em', color: 'rgba(255,255,255,0.4)' }}>
+            {ARTIST_LINKS.map((l) => (
+              <svg
+                key={l.label}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ width: '17em', height: '17em' }}
+                aria-hidden
+              >
+                <path d={l.d} />
+              </svg>
+            ))}
+          </span>
         </div>
       </div>
     </div>
