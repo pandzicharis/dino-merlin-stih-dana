@@ -36,7 +36,8 @@ export function VerseList({
     <ul className="flex flex-col gap-3">
       {items.map(({ verse }) => {
         const m = MOODS[verse.mood]
-        const cover = albumOf(verse.album)?.cover
+        const album = albumOf(verse.album)
+        const cover = album?.cover
         return (
           <li
             key={verse.id}
@@ -58,7 +59,8 @@ export function VerseList({
                   loading="lazy"
                   decoding="async"
                   className="card-art absolute inset-y-0 right-0 h-full w-[72%] object-cover"
-                  style={{ opacity: 0.5, mixBlendMode: 'soft-light' }}
+                  // omot s punim gornjim rubom (bijeli papir) — spušten: vidi se vrh, iznad bijelo
+                  style={{ opacity: 0.5, mixBlendMode: 'soft-light', objectPosition: album?.fill ? '50% 0%' : undefined }}
                 />
               )}
               {/* nijansa raspoloženja preko omota, kao na ekranu stiha */}

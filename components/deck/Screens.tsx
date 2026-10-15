@@ -265,9 +265,9 @@ export function VerseMock({
           {/* potpis | Magaza — kao VerseScreen */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14em' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/signature.webp" alt="" style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
-            <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
-            <MagazaMark height={22} style={{ opacity: 0.9 }} />
+            <img src="/brand/signature.webp" alt="" style={{ height: '32em', width: 'auto', opacity: 0.9 }} />
+            <span style={{ width: '1em', height: '28em', background: 'rgba(255,255,255,0.2)' }} />
+            <MagazaMark height={32} style={{ opacity: 0.9 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '18em', color: 'rgba(255,255,255,0.42)' }}>
             <Icon d={BELL} fill={bellOn ? 'rgba(141,201,163,0.22)' : 'none'} color={bellOn ? '#8DC9A3' : '#D08C8C'} />

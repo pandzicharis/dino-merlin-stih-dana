@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { MOODS } from '@/data/moods'
-import { albumOf } from '@/data/albums'
+import { albumOf, ALBUMS } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
 import { useDeck } from './context'
 import { Grafike, LANSIRANJE, LaunchPlan, Ostalo, PwaNative } from './launch'
@@ -1347,6 +1347,7 @@ function MoodCard({
   onPick: () => void
 }) {
   const m = MOODS[mood]
+  const fill = cover ? ALBUMS.find((a) => a.cover === cover)?.fill : undefined
   return (
     <motion.button
       type="button"
@@ -1364,16 +1365,22 @@ function MoodCard({
       {cover && (
         <>
           <span
-            className="absolute inset-y-0 right-0 aspect-square bg-cover bg-center"
+            className="absolute inset-y-0 right-0 aspect-square overflow-hidden"
             style={{
-              backgroundImage: `url(${cover})`,
+              // omot s punim gornjim rubom (npr. bijeli papir): spušten, a iznad njegova boja
+              backgroundColor: fill,
               opacity: on ? 0.55 : 0.32,
               transition: 'opacity 0.5s',
               maskImage: 'linear-gradient(to right, transparent, black 70%)',
               WebkitMaskImage: 'linear-gradient(to right, transparent, black 70%)',
             }}
             aria-hidden
-          />
+          >
+            <span
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url(${cover})`, transform: fill ? 'translateY(12%)' : undefined }}
+            />
+          </span>
           <span className="absolute inset-0" style={{ backgroundColor: m.gradient[1], mixBlendMode: 'color', opacity: 0.4 }} aria-hidden />
         </>
       )}
