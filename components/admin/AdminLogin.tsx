@@ -38,6 +38,8 @@ export function AdminLogin({
       body: JSON.stringify({ password }),
     }).catch(() => null)
     if (res?.ok) {
+      // i s ekrana za prijavu u prezentaciji (`?prijava`) — ravno u panel
+      router.replace('/admin')
       router.refresh()
       return
     }

@@ -5,6 +5,7 @@ import { oneLine, withPeriod } from '@/lib/text'
 import { todayInTz } from '@/lib/date'
 import { VerseScreen } from '@/components/VerseScreen'
 import { BackLink } from '@/components/BackLink'
+import { OG_BASE } from '@/lib/og'
 
 /** Trajni link na jedan stih — meta za WhatsApp/IG preview. */
 
@@ -24,13 +25,15 @@ export async function generateMetadata({
   const v = await findVerse(id)
   if (!v) return { title: 'Stih dana' }
 
-  const image = { url: `/og/${id}/post`, width: 1080, height: 1080 }
   const text = oneLine(withPeriod(v.text))
+  const image = { url: `/og/${id}/post`, width: 1080, height: 1080, alt: text }
+  // naziv pjesme i ime umjetnika (bez " — Stih dana" iz šablona layouta)
+  const title = `${v.song} — Dino Merlin`
   return {
-    title: v.song,
+    title: { absolute: title },
     description: text,
-    openGraph: { title: v.song, description: text, images: [image] },
-    twitter: { card: 'summary_large_image', images: [image.url] },
+    openGraph: { ...OG_BASE, url: `/stih/${id}`, title, description: text, images: [image] },
+    twitter: { card: 'summary_large_image', title, description: text, images: [image.url] },
   }
 }
 

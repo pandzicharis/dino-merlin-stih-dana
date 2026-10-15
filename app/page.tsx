@@ -1,5 +1,6 @@
 import { DailyVerse } from '@/components/DailyVerse'
-import { dayWindow } from '@/lib/catalog'
+import { dayWindow, findVerse } from '@/lib/catalog'
+import { DECK_VERSE } from '@/lib/deck'
 import { todayInTz } from '@/lib/date'
 
 /**
@@ -15,5 +16,8 @@ export const revalidate = 3600
 
 export default async function Page() {
   const today = todayInTz()
-  return <DailyVerse serverDate={today} days={await dayWindow(today)} />
+  const [days, deck] = await Promise.all([dayWindow(today), findVerse(DECK_VERSE)])
+  // stih prezentacije ide uz stranicu — telefon u prezentaciji ga ima odmah,
+  // bez bljeska današnjeg stiha dok se ne dohvati
+  return <DailyVerse serverDate={today} days={days} deckVerse={deck} />
 }

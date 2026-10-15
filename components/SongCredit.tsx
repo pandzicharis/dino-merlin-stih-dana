@@ -6,6 +6,7 @@ import type { Verse } from '@/data/verses'
 import { youtubeId } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
+import AUDIO from '@/data/audio.json'
 import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
 
 /**
@@ -25,7 +26,7 @@ export function SongCredit({ verse }: { verse: Verse }) {
   const [failedId, setFailedId] = useState<string | null>(null)
   const failed = failedId === id
 
-  if (id && !failed)
+  if (id && !failed && playable(verse))
     return (
       <AudioSong key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} />
     )
@@ -119,23 +120,39 @@ const SOLO = 'stihdana:solo'
 
 type State = 'idle' | 'loading' | 'playing' | 'paused'
 
-type Source = { verse: Verse; src: string; fallback: string; onFail: () => void }
+/** trajanja pjesama iz public/audio — `sh scripts/encode-audio.sh` */
+const DURATIONS: Record<string, number> = AUDIO
+
+type Source = { verse: Verse; src: string; fallback: string; dur?: number; onFail: () => void }
 
 const sourceOf = (verse: Verse, id: string) => ({
   src: `/audio/${audioSlug(verse.song)}.m4a`,
   fallback: `/api/audio/${id}?s=${audioSlug(verse.song)}`,
+  dur: DURATIONS[audioSlug(verse.song)],
 })
 
 /**
- * Zvuk jedne pjesme: statični fajl, pa server; stanje, vrijeme, premotavanje.
- * `preload` odmah povuče zaglavlje fajla, da se trajanje vidi prije dodira.
+ * Ima li pjesma zvuk. Na produkciji samo ako je fajl u public/audio — inače
+ * odmah YouTube znak, bez zahtjeva prema /api/audio koji na Vercelu ionako
+ * pada (nema yt-dlp-a). Lokalno server zvuk izvuče sam.
  */
-function useSong({ verse, src, fallback, onFail, preload }: Source & { preload: boolean }) {
+function playable(verse: Verse): boolean {
+  return audioSlug(verse.song) in DURATIONS || process.env.NODE_ENV === 'development'
+}
+
+/**
+ * Zvuk jedne pjesme: statični fajl, pa server; stanje, vrijeme, premotavanje.
+ * Trajanje se zna unaprijed (data/audio.json), pa se pri otvaranju ništa ne
+ * preuzima — pjesma krene tek na dodir. `preload` (zaglavlje fajla) samo
+ * kad trajanje nije poznato (nova pjesma iz admina, lokalno).
+ */
+function useSong({ verse, src, fallback, dur: known, onFail, preload: wanted }: Source & { preload: boolean }) {
+  const preload = wanted && !known
   const audio = useRef<HTMLAudioElement | null>(null)
   const want = useRef(false)
   const [state, setState] = useState<State>('idle')
   const [cur, setCur] = useState(0)
-  const [dur, setDur] = useState(0)
+  const [dur, setDur] = useState(known ?? 0)
 
   useEffect(() => {
     // prezentacija: odlaskom s koraka pjesma stane i vrati se na početak
@@ -469,7 +486,7 @@ export function SongRow({ verse, accent }: { verse: Verse; accent: string }) {
   const id = youtubeId(verse.youtube)
   const [failedId, setFailedId] = useState<string | null>(null)
 
-  if (!id || failedId === id)
+  if (!id || failedId === id || !playable(verse))
     return (
       <>
         <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} aria-hidden />

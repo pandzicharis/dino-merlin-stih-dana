@@ -14,6 +14,7 @@ import {
 } from '@/lib/share-image'
 import { getSharePrefs, setSharePrefs } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
+import { DrawerIcon } from './DrawerIcon'
 
 type Target = 'share' | 'save'
 
@@ -182,13 +183,20 @@ export default function SharePanel({
             <span className="os-grabber mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
 
             <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
-                  Podijeli stih
-                </p>
-                <p className="text-[1.1rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                  {verse.song}
-                </p>
+              <div className="flex min-w-0 items-center gap-3">
+                {/* ista ikona kao dugme za dijeljenje */}
+                <DrawerIcon>
+                  <path d="M12 3v13M12 3 8 7M12 3l4 4" />
+                  <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                </DrawerIcon>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
+                    Podijeli stih
+                  </p>
+                  <p className="truncate text-[1.1rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
+                    {verse.song}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={onClose}

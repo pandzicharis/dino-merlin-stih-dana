@@ -20,9 +20,18 @@ import { IntroHost } from './IntroSplash'
  * danima, ili dev pomjeranje datuma), stih se dohvati s `/api/day` — a do
  * tad ostaje zadnji poznati, bez praznog ekrana.
  */
-export function DailyVerse({ serverDate, days }: { serverDate: string; days: Record<string, Verse> }) {
+export function DailyVerse({
+  serverDate,
+  days,
+  deckVerse,
+}: {
+  serverDate: string
+  days: Record<string, Verse>
+  /** stih prezentacije (lib/deck.ts) — da ga telefon u prezentaciji ima odmah */
+  deckVerse?: Verse
+}) {
   const { date, verseId, mood } = useDevParams(serverDate)
-  const known = verseId ? undefined : days[date]
+  const known = verseId ? (deckVerse?.id === verseId ? deckVerse : undefined) : days[date]
   const key = verseId ? `id=${encodeURIComponent(verseId)}` : `d=${date}`
   const [fetched, setFetched] = useState<{ key: string; verse: Verse } | null>(null)
   // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka

@@ -248,7 +248,7 @@ export const SLIDES: SlideDef[] = [
     center: true,
     body: (d) => <LaunchPlan d={d} />,
   },
-  { id: 'ostalo', section: 'Plan za launch', title: 'Šta je ostalo', body: (d) => <Ostalo d={d} /> },
+  { id: 'ostalo', section: 'Plan za launch', title: 'Šta je ostalo?', body: (d) => <Ostalo d={d} /> },
   { id: 'grafike', section: 'Plan za launch', title: 'Grafike', body: (d) => <Grafike d={d} /> },
   { id: 'pitanja', section: 'Pitanja', title: 'Pitanja', backdrop: 'nada', body: (d) => <Pitanja d={d} /> },
 ]
@@ -259,14 +259,6 @@ export const SLIDES: SlideDef[] = [
 
 /** Ime, logo i web — na prvom i zadnjem slajdu. */
 const SOCIALS: { label: string; href: string; handle: string; icon: React.ReactNode }[] = [
-  {
-    label: 'GitHub',
-    handle: 'pandzicharis',
-    href: 'https://github.com/pandzicharis',
-    icon: (
-      <path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 3 .8.1-.6.3-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c2-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.8V21c0 .3.2.6.7.5A10 10 0 0 0 12 2z" />
-    ),
-  },
   {
     label: 'LinkedIn',
     handle: 'Haris Pandžić',
@@ -288,6 +280,7 @@ const SOCIALS: { label: string; href: string; handle: string; icon: React.ReactN
   },
 ]
 
+/** Ime, web i dvije mreže — na naslovnoj i na zadnjem slajdu. */
 function Presenter() {
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -310,7 +303,7 @@ function Presenter() {
         </a>
       </div>
     </div>
-      {/* GitHub, LinkedIn, Instagram */}
+      {/* LinkedIn, Instagram */}
       <div className="flex flex-wrap items-center gap-2">
         {SOCIALS.map((x) => (
           <a
@@ -1061,10 +1054,8 @@ function NoviStih() {
 }
 
 /**
- * Prijava u admin: šifra se ukuca slovo po slovo (tačkice), pa "Uđi".
- * Prava šifra nikad nije u prezentaciji — ulaz prolazi samo zato što je
- * prezenter već prijavljen (kolačić važi 12 sati). Ako nije, forma traži
- * pravu šifru i prezenter je upiše sam.
+ * Prijava u admin: prava šifra se ukuca slovo po slovo (na ekranu samo
+ * tačkice), pa "Uđi" — i zaista prijavi, i na live i lokalno.
  */
 function Pristup() {
   const { desk, manual } = useDeck()
@@ -1079,7 +1070,8 @@ function Pristup() {
         try {
           const w = desk()?.contentWindow
           if (w && w.location.pathname === '/admin' && w.document.readyState === 'complete')
-            form = w.document.querySelector<HTMLFormElement>('form[data-signed-in]')
+            // ekran za prijavu (`?prijava`) — šifra se ukuca i prijava prođe
+            form = w.document.querySelector<HTMLFormElement>('form')
         } catch {
           /* tuđa adresa */
         }
@@ -1093,7 +1085,7 @@ function Pristup() {
       const win = input.ownerDocument.defaultView as Window & typeof globalThis
       const set = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!
       input.focus()
-      const word = 'stihdana12'
+      const word = 'dinomerlin'
       for (let i = 1; i <= word.length && alive; i++) {
         set.call(input, word.slice(0, i))
         input.dispatchEvent(new win.Event('input', { bubbles: true }))
@@ -1117,8 +1109,8 @@ function Pristup() {
   return (
     <>
       <Text>
-        Na /admin urednik bira i raspoređuje stihove — bez programera i bez čekanja. Jedna šifra, a prijava traje 12
-        sati.
+        Na /admin urednik bira i raspoređuje stihove — bez programera i bez čekanja. Jedna šifra, a prijava traje 30
+        dana.
       </Text>
       <Bullets items={[<><b>Preporuka: računar.</b> Radi i na telefonu.</>]} />
     </>

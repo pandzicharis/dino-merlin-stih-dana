@@ -3,15 +3,16 @@
  *
  * Šifra je u varijabli okoline `ADMIN_PASSWORD` i nikad ne ide klijentu.
  * Nakon prijave preglednik dobije potpisan, httpOnly kolačić koji važi
- * 12 sati. Potpis je HMAC nad rokom važenja, ključ je izveden iz šifre —
- * promjena šifre zato odmah poništi sve postojeće prijave.
+ * 30 dana — urednik ostaje prijavljen na svom računaru. Potpis je HMAC nad
+ * rokom važenja, ključ je izveden iz šifre — promjena šifre zato odmah
+ * poništi sve postojeće prijave.
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { cookies } from 'next/headers'
 
 export const ADMIN_COOKIE = 'sd_admin'
-export const SESSION_SECONDS = 12 * 60 * 60
+export const SESSION_SECONDS = 30 * 24 * 60 * 60
 
 function key(): string | null {
   const pw = process.env.ADMIN_PASSWORD

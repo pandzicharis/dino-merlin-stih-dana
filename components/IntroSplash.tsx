@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { COLORS, rng } from './deck/PaperToPhone'
 import { startTips } from './Tips'
-import { inDeck } from '@/lib/deck'
+import { deckParam, inDeck } from '@/lib/deck'
 import { SPLASH_ARRIVE } from './VerseText'
 import { withPeriod } from '@/lib/text'
 import { VERSES } from '@/data/verses'
@@ -39,6 +39,14 @@ function firstTime(): boolean {
 export function IntroHost({ lines, bg, onLand }: { lines: string[]; bg: string; onLand: () => void }) {
   const reduced = useReducedMotion()
   const [on, setOn] = useState(false)
+
+  // prezentacija (`?intro`): aplikacija se otvori splashom — kao poslije
+  // dozvole na pravom telefonu; telefon kod izloga tako pokazuje pravu animaciju
+  useEffect(() => {
+    if (!inDeck() || deckParam('intro') === null) return
+    const t = window.setTimeout(() => playIntro(true), 350)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     const go = (e: Event) => {

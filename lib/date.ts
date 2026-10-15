@@ -5,7 +5,7 @@
  * vidjeti isti stih istog dana, inače share i razgovor o stihu nemaju smisla.
  */
 
-import { deckParam, inDeck } from './deck'
+import { deckParam, inDeck, DECK_VERSE } from './deck'
 
 export const TZ = 'Europe/Sarajevo'
 export const EPOCH = '2026-01-01'
@@ -130,7 +130,7 @@ export function readDevParams(): DevParams {
   const empty: DevParams = { date: null, verseId: null, mood: null }
   if (typeof window === 'undefined') return empty
   if (!OVERRIDE_ON) {
-    return inDeck() ? { date: null, verseId: deckParam('verse'), mood: deckParam('mood') } : empty
+    return inDeck() ? { date: null, verseId: deckParam('verse') ?? DECK_VERSE, mood: deckParam('mood') } : empty
   }
 
   const q = new URLSearchParams(window.location.search)
@@ -147,7 +147,8 @@ export function readDevParams(): DevParams {
     if (stored && isValidISODate(stored)) date = stored
   }
 
-  return { date, verseId: q.get('verse'), mood: q.get('mood') }
+  // u prezentaciji (i lokalno) telefon nosi stih prezentacije
+  return { date, verseId: q.get('verse') ?? (inDeck() ? DECK_VERSE : null), mood: q.get('mood') }
 }
 
 /** Datum koji aplikacija smatra "danas" — jedini izvor istine u UI-ju. */

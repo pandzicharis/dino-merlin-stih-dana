@@ -10,6 +10,13 @@
  * pokazati na komandu, bez pravog telefona. Van prezentacije ne mijenjaju
  * ništa. Okvir s drugog sajta je ionako nemoguć (`X-Frame-Options`).
  */
+/**
+ * Stih prezentacije — isti na slajdovima, plakatima, objavama i u telefonu
+ * u prezentaciji (i na deployu i na localhostu), bez obzira na raspored.
+ * `?verse=` na koraku ga i dalje može zamijeniti.
+ */
+export const DECK_VERSE = 'koliko-mi-znacis'
+
 export function inDeck(): boolean {
   if (typeof window === 'undefined' || window.self === window.top) return false
   try {

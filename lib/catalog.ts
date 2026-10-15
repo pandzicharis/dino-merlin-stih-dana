@@ -378,6 +378,7 @@ export async function mutateCatalog(fn: (cat: Draft, today: string) => void): Pr
   revalidateTag(TAG, { expire: 0 })
   revalidatePath('/')
   revalidatePath('/sacuvano')
+  revalidatePath('/api/verses')
   revalidatePath('/stih/[id]', 'page')
 
   return { ...next, source: target }

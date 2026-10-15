@@ -8,7 +8,7 @@
  */
 
 /** Jačina pucketanja ispod pjesme — da se osjeti, a ne da smeta. */
-const VOLUME = 0.45
+const VOLUME = 0.55
 
 let ctx: AudioContext | null = null
 let crackle: AudioBuffer | null = null

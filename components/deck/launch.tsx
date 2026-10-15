@@ -7,7 +7,6 @@ import { SEND_TIME } from '@/lib/date'
 import { useDeck } from './context'
 import { deviceOuter, IPhone, IPHONE, IosStatus } from './Devices'
 import { Poster, PosterLandscape, SocialPost, SocialStory } from './Poster'
-import { VerseMock } from './Screens'
 import { Ico, R } from './ui'
 import type { DeckData, FeatureDef } from './types'
 
@@ -315,7 +314,8 @@ export function LaunchPlan({ d }: { d: DeckData }) {
 function Izlog({ d }: { d: DeckData }) {
   const [phase, setPhase] = useState(0)
   useEffect(() => {
-    const t = setTimeout(() => setPhase((p) => (p + 1) % 3), [2400, 2600, 4200][phase])
+    // ekran: papirići padnu, stih se podigne, pa aplikacija — kao pri prvom otvaranju
+    const t = setTimeout(() => setPhase((p) => (p + 1) % 3), [2400, 2600, 8200][phase])
     return () => clearTimeout(t)
   }, [phase])
   const W = 'min(44vw, 84vh)'
@@ -375,8 +375,8 @@ function Izlog({ d }: { d: DeckData }) {
                 <p className="absolute bottom-[90em] left-0 right-0 text-center text-[15em] text-white/70">Stih dana</p>
               </motion.div>
             ) : (
-              <motion.div key="app" className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-                <VerseMock verse={d.poster.hero} date={d.poster.date} w={IPHONE.w} h={IPHONE.h} top={70} />
+              <motion.div key="app" className="absolute inset-0 bg-black" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                <LiveApp />
               </motion.div>
             )}
           </AnimatePresence>
@@ -397,6 +397,48 @@ function Izlog({ d }: { d: DeckData }) {
           </span>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Prava aplikacija u telefonu kod izloga — ista kao na live: otvori se
+ * splashom (papirići → stih se podigne → stih na ekranu). Okvir je pravih
+ * dimenzija ekrana (402 px), umanjen da stane u telefon na slajdu.
+ */
+function LiveApp() {
+  const box = useRef<HTMLDivElement>(null)
+  const [k, setK] = useState(0)
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const fit = () => setK(el.clientWidth / IPHONE.w)
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  // aplikacija počinje ispod statusne trake (u okviru nema "safe area")
+  const bar = 50
+  return (
+    <div ref={box} className="absolute inset-0 overflow-hidden">
+      {k > 0 && (
+        <iframe
+          src="/?intro"
+          title="Stih dana — prvo otvaranje"
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: bar * k,
+            width: IPHONE.w,
+            height: IPHONE.h - bar,
+            border: 0,
+            transform: `scale(${k})`,
+            transformOrigin: '0 0',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1027,7 +1069,7 @@ export function Ostalo({ d }: { d: DeckData }) {
         Sada ih je {d.count}; za launch <b>90–120</b> — tri do četiri mjeseca bez ponavljanja. Magaza bira i odobrava.
       </>,
     ],
-    ['Grafika i eventualna nadogradnja UI', <>Originali u visokoj rezoluciji — potpis, portret, logotipi — i dorada izgleda po želji Magaze.</>],
+    ['Grafika i eventualna nadogradnja UI', <>Originali u visokoj rezoluciji — potpis, portret, logotipi.</>],
     [
       'Domena',
       <>
@@ -1043,7 +1085,7 @@ export function Ostalo({ d }: { d: DeckData }) {
       </R>
       <R i={1}>
         <h2 className="dk-h2 mt-[2.2vh]">
-          Šta je <em>ostalo</em>
+          Šta je <em>ostalo</em>?
         </h2>
       </R>
       <div className="mt-[4vh] grid gap-3 lg:grid-cols-[1fr_1.25fr]">
@@ -1211,6 +1253,29 @@ export function Grafike({ d }: { d: DeckData }) {
     },
   ]
   const [open, setOpen] = useState<number | null>(null)
+  // Auto: nakon 2.5 s grafike same idu preko cijelog ekrana, svaka 3.5 s, pa
+  // se pregled zatvori. Dodir prezentera (strelica, zatvaranje) ga zaustavi.
+  const { manual } = useDeck()
+  const [auto, setAuto] = useState(!manual)
+  useEffect(() => {
+    if (!auto) return
+    const t = window.setTimeout(
+      () => {
+        if (open === null) setOpen(0)
+        else if (open < items.length - 1) setOpen(open + 1)
+        else {
+          setOpen(null)
+          setAuto(false)
+        }
+      },
+      open === null ? 2500 : 3500,
+    )
+    return () => clearTimeout(t)
+  }, [auto, open, items.length])
+  const pick = (k: number | null) => {
+    setAuto(false)
+    setOpen(k)
+  }
   // svi pregledi iste visine; zbir širina je ~3.5 visine (+ razmaci)
   const h = 'min(32vh, calc((100vw - 220px) / 3.8), 360px)'
   return (
@@ -1235,7 +1300,7 @@ export function Grafike({ d }: { d: DeckData }) {
             <div className="flex flex-col">
               <button
                 type="button"
-                onClick={() => setOpen(k)}
+                onClick={() => pick(k)}
                 aria-label={`${it.title} preko cijelog ekrana`}
                 className="group relative overflow-hidden rounded-[4px] text-left"
                 style={{ height: h, width: `calc(${h} / ${it.ratio})`, boxShadow: '0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08)' }}
@@ -1263,7 +1328,7 @@ export function Grafike({ d }: { d: DeckData }) {
         ))}
       </div>
       <AnimatePresence>
-        {open !== null && <Lightbox items={items} at={open} date={d.today} onAt={setOpen} onClose={() => setOpen(null)} />}
+        {open !== null && <Lightbox items={items} at={open} date={d.today} onAt={pick} onClose={() => pick(null)} />}
       </AnimatePresence>
     </div>
   )

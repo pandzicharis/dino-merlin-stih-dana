@@ -79,7 +79,7 @@ export function VerseList({
             </p>
 
             <div className="mt-3 flex items-center gap-3 border-t border-white/[0.08] pt-3">
-              {SAVED_PLAYER ? <SongRow verse={verse} accent={m.accent} /> : <SongMeta verse={verse} accent={m.accent} />}
+              {SAVED_PLAYER ? <SongRow verse={verse} accent={m.accent} /> : <SongMeta verse={verse} />}
               {action?.(verse)}
             </div>
           </li>
@@ -89,15 +89,10 @@ export function VerseList({
   )
 }
 
-/** Pjesma u kartici, bez plejera: tačka raspoloženja, naziv i album · godina. */
-function SongMeta({ verse, accent }: { verse: Verse; accent: string }) {
+/** Pjesma u kartici, bez plejera: naziv i album · godina. */
+function SongMeta({ verse }: { verse: Verse }) {
   return (
     <>
-      <span
-        className="block h-2 w-2 shrink-0 rounded-full"
-        style={{ background: accent, boxShadow: `0 0 10px ${accent}80` }}
-        aria-hidden
-      />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[11.5px] font-semibold uppercase leading-tight tracking-[0.18em]" style={{ color: BRAND.gold }}>
           {verse.song}

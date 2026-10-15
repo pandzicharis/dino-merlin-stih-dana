@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Fraunces, Roboto, Rubik } from 'next/font/google'
 import { SITE_URL } from '@/lib/site'
 import './globals.css'
+import { HOME_IMAGE, OG_BASE } from '@/lib/og'
 
 const serif = Fraunces({
   subsets: ['latin-ext'],
@@ -46,6 +47,20 @@ export const metadata: Metadata = {
   icons: {
     icon: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
     apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
+  },
+  // pregled početnog linka — slika stiha umjesto golog teksta
+  openGraph: {
+    ...OG_BASE,
+    url: '/',
+    title: 'Stih dana — Dino Merlin',
+    description: 'Jedan stih Dine Merlina, svaki dan u isto vrijeme.',
+    images: [HOME_IMAGE],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Stih dana — Dino Merlin',
+    description: 'Jedan stih Dine Merlina, svaki dan u isto vrijeme.',
+    images: [HOME_IMAGE.url],
   },
   // Ostaje neindeksirano dok ne stigne dozvola za objavljivanje stihova.
   robots: { index: false, follow: false },

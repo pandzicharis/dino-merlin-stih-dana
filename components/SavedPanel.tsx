@@ -6,7 +6,9 @@ import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { SavedVerses } from './SavedVerses'
+import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
+import { pruneFavorites } from '@/lib/storage'
 
 /** Sačuvani stihovi kao donji panel — isti kao panel za dijeljenje. */
 export default function SavedPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -18,7 +20,12 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
   useEffect(() => {
     if (!open) return
     let alive = true
-    loadVerses().then((v) => alive && setVerses(v))
+    loadVerses().then((v) => {
+      if (!alive) return
+      setVerses(v)
+      // obrisani stihovi ispadnu iz sačuvanih — brojač na zaglavlju se ispravi
+      if (v.length) pruneFavorites(new Set(v.map((x) => x.id)))
+    })
     return () => {
       alive = false
     }
@@ -85,13 +92,21 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
             >
               <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
               <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
-                    Stih dana
-                  </p>
-                  <p className="text-[1.1rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                    Sačuvani stihovi
-                  </p>
+                <div className="flex items-center gap-3">
+                  {/* ista ikona kao dugme za sačuvano: dvije kartice, srce na prednjoj */}
+                  <DrawerIcon>
+                    <path d="M8 3.5h9.5A2.5 2.5 0 0 1 20 6v11" />
+                    <rect x="4" y="6.5" width="13" height="14" rx="2.5" />
+                    <path d="M10.5 16.8s-3-1.8-3-4a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 2.2-3 4-3 4z" fill="currentColor" stroke="none" />
+                  </DrawerIcon>
+                  <div>
+                    <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
+                      Stih dana
+                    </p>
+                    <p className="text-[1.1rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
+                      Sačuvani stihovi
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={onClose}

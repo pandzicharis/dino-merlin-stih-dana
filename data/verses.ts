@@ -191,6 +191,15 @@ export const VERSES: Verse[] = [
     mood: 'sloboda',
     youtube: 'https://www.youtube.com/watch?v=0plwQq2zeME',
   },
+  {
+    id: 'kad-sve-saberem',
+    text: 'Kad sve saberem podijelim i oduzmem\nVolim te',
+    song: 'U kandžama jastreba',
+    album: 'Kokuzna vremena',
+    year: 1985,
+    mood: 'ljubav',
+    youtube: 'https://www.youtube.com/watch?v=kquGKS-qhn8',
+  },
 ]
 
 /** Brz lookup po id-u (share linkovi, favoriti, ?verse=). */

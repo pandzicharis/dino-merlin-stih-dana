@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites } from '@/lib/client-store'
-import { pruneFavorites } from '@/lib/storage'
-import { loadVerses } from '@/lib/verses-client'
 import { haptic } from '@/lib/haptic'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
@@ -19,28 +17,10 @@ const SavedPanel = dynamic(load, { ssr: false })
  */
 export function SavedLink() {
   const ids = useFavorites()
-  const [known, setKnown] = useState<Set<string> | null>(null)
-
-  // Broj mora biti isti kao lista u panelu: broje se samo stihovi koji
-  // postoje. Lista stihova se povuče kad je stranica mirna (s CDN-a), a
-  // nevažeći zapisi se usput očiste iz localStorage-a.
-  useEffect(() => {
-    if (!ids.length || known) return
-    const run = () =>
-      loadVerses().then((v) => {
-        if (!v.length) return
-        const set = new Set(v.map((x) => x.id))
-        setKnown(set)
-        pruneFavorites(set)
-      })
-    const idle = window.requestIdleCallback?.(run, { timeout: 3000 }) ?? window.setTimeout(run, 1200)
-    return () => {
-      if (window.cancelIdleCallback) window.cancelIdleCallback(idle)
-      else clearTimeout(idle)
-    }
-  }, [ids.length, known])
-
-  const count = known ? ids.filter((id) => known.has(id)).length : ids.length
+  // Broj se ne provjerava listom stihova pri svakom otvaranju (jedan zahtjev
+  // manje po korisniku): nevažeći zapisi (obrisan stih) se očiste kad se
+  // panel otvori i stihovi stignu, pa se broj tad sam ispravi.
+  const count = ids.length
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)

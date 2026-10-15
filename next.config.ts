@@ -39,6 +39,11 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=2592000' }],
       },
       {
+        // Manifest se mijenja samo uz deploy — dan keša je jedan zahtjev manje po otvaranju.
+        source: '/manifest.webmanifest',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=86400' }],
+      },
+      {
         /**
          * Service worker se NE smije keširati: on je taj koji donosi novu
          * verziju aplikacije. Keširan `sw.js` znači da korisnik zaglavi na
