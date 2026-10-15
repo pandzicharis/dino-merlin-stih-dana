@@ -176,7 +176,7 @@ export function IntroHost({
       setPending(false)
       if (!introSeen()) return playIntro()
       setRun((r) => r + 1)
-      setOn({ first: false, demo: false })
+      setOn({ first: false, demo: inDeck() })
     }, 0)
     return () => clearTimeout(t)
   }, [pending, gate])
@@ -583,17 +583,14 @@ function Tombola({
     return () => clearTimeout(t)
   }, [phase, onDone])
 
-  // bez dodira se zavrti sama — prezentacija odmah, inače poslije pauze
+  // bez dodira se zavrti sama samo u prezentaciji — na telefonu čeka prst
   const later = useRef(0)
   useEffect(() => {
-    if (phase !== 'ready') return
-    const t = window.setTimeout(
-      () => {
-        hold()
-        later.current = window.setTimeout(release, 1700)
-      },
-      demo ? 500 : 10000,
-    )
+    if (phase !== 'ready' || !demo) return
+    const t = window.setTimeout(() => {
+      hold()
+      later.current = window.setTimeout(release, 1700)
+    }, 500)
     return () => clearTimeout(t)
   }, [phase, demo, hold, release])
   useEffect(() => () => clearTimeout(later.current), [])
@@ -792,15 +789,18 @@ function Tombola({
         <div
           className="absolute flex items-center justify-center"
           style={{
+            // malo ispod sredine, ravno
             left: cx - R * 0.31,
-            top: cy - R * 0.12 + R * 0.04,
+            top: cy + R * 0.1,
             width: R * 0.62,
             height: R * 0.24,
-            borderRadius: `${R * 0.07}px / ${R * 0.11}px`,
+            borderRadius: R * 0.045,
+            // papir: blaga oblina kugle (rubovi tamniji), topao ton, sitna zrnatost
             background:
-              'linear-gradient(90deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0) 20%, rgba(255,255,255,0.35) 42%, rgba(255,255,255,0) 62%, rgba(0,0,0,0.24) 100%), linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0) 35%, rgba(0,0,0,0.12)), #F2EBDD',
-            boxShadow: 'inset 0 0 0 0.5px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.5)',
-            opacity: 0.88,
+              'linear-gradient(90deg, rgba(0,0,0,0.14) 0%, rgba(0,0,0,0) 18%, rgba(255,255,255,0.22) 44%, rgba(255,255,255,0) 64%, rgba(0,0,0,0.16) 100%), radial-gradient(rgba(0,0,0,0.035) 0.6px, transparent 0.7px) 0 0 / 3px 3px, #EFE7D6',
+            // tanka sjena uz rub — leži na staklu; bijeli rub izreza naljepnice
+            boxShadow: '0 0.5px 1px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(255,255,255,0.55), inset 0 0 0 0.5px rgba(0,0,0,0.1)',
+            opacity: 0.92,
           }}
           aria-hidden
         >
