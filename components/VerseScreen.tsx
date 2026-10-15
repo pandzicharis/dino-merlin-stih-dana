@@ -178,7 +178,7 @@ export function VerseScreen({
                 style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
                 aria-hidden
               />
-              <ArtistLinks accent={m.accent} />
+              <ArtistLinks />
             </>
           )}
         </motion.footer>
