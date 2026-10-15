@@ -145,7 +145,7 @@ export function VerseScreen({
               key={`s-${verse.id}-${replay}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: tail + 0.1, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.7, delay: Math.max(0.15, tail - 0.5), ease: [0.22, 1, 0.36, 1] }}
             >
               <FavoriteButton id={verse.id} accent={m.accent} />
             </motion.div>
@@ -158,7 +158,8 @@ export function VerseScreen({
           className="flex flex-col items-center gap-6 text-center"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.75, delay: tail, ease: [0.22, 1, 0.36, 1] }}
+          // podnožje (gramofon, plejer) ne čeka da stih sjedne — ulazi dok se još ispisuje
+          transition={{ duration: 0.75, delay: compact ? 0 : Math.max(0.3, tail - 0.3), ease: [0.22, 1, 0.36, 1] }}
         >
           {compact ? (
             <div>
