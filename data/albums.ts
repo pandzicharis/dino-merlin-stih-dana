@@ -9,8 +9,10 @@ export type Album = {
   title: string
   year: number
   cover: string
-  /** omot podignut više od ostalih (dio visine omota) — kad mu je bitno gore */
+  /** pomak omota (dio njegove visine): + gore, − dole */
   lift?: number
+  /** boja iznad omota — kad je gornji rub omota pun (npr. bijeli papir), da se nastavi do vrha */
+  fill?: string
 }
 
 export const ALBUMS: Album[] = [
@@ -33,8 +35,8 @@ export const ALBUMS: Album[] = [
   { id: 'fotografija', title: 'Fotografija', year: 1995, cover: '/albumi/hq/fotografija.webp' },
   { id: 'sredinom', title: 'Sredinom', year: 2000, cover: '/albumi/hq/sredinom.webp' },
   { id: 'burek', title: 'Burek', year: 2004, cover: '/albumi/hq/burek.webp' },
-  // bijeli papir s rukopisom — podignut, da se bijelo ne slije sa stihom
-  { id: 'ispocetka', title: 'Ispočetka', year: 2008, cover: '/albumi/hq/ispocetka.webp', lift: 0.12 },
+  // bijeli papir s rukopisom — malo spušten, a iznad bijelo, kao da se papir nastavlja
+  { id: 'ispocetka', title: 'Ispočetka', year: 2008, cover: '/albumi/hq/ispocetka.webp', lift: -0.05, fill: '#ffffff' },
   { id: 'hotel-nacional', title: 'Hotel Nacional', year: 2014, cover: '/albumi/hq/hotel-nacional.webp' },
   { id: 'mi', title: 'Mi', year: 2025, cover: '/albumi/hq/mi.webp' },
 ]

@@ -3,6 +3,7 @@
 import { useEffect, type CSSProperties } from 'react'
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, useSpring } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
+import { ALBUMS } from '@/data/albums'
 import { FloatingNotes } from './FloatingNotes'
 
 /**
@@ -36,6 +37,7 @@ export function MoodBackground({
   coverLift?: number
 }) {
   const m = MOODS[mood]
+  const coverFill = cover ? ALBUMS.find((a) => a.cover === cover)?.fill : undefined
   const reduced = useReducedMotion()
   const dur = (base: number) => base / m.speed
 
@@ -107,6 +109,18 @@ export function MoodBackground({
                   opacity: 0.32,
                 }}
               />
+              {/* boja iznad omota (npr. bijeli papir) — nastavi omot do vrha ekrana,
+                  ispod njegovog mekog gornjeg ruba; samo na telefonu */}
+              {coverFill && (
+                <div
+                  className="album-fill absolute inset-x-0 top-0 mx-auto w-[min(100vw,74dvh,760px)] md:hidden"
+                  style={{
+                    background: coverFill,
+                    opacity: 0.42,
+                    height: `calc(6dvh + min(100vw, 74dvh, 760px) * ${(0.3 - (coverLift ?? 0)).toFixed(3)})`,
+                  }}
+                />
+              )}
               {/* omot gore — na telefonu preko cijele širine, nestaje u strane i prema
                   stihu; na računaru veći i rastopljen ovalno na sve strane (globals.css) */}
               <div

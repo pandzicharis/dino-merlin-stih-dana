@@ -374,6 +374,34 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     side.addColorStop(1, 'rgba(0,0,0,0)')
     l.fillStyle = side
     l.fillRect(0, 0, W, H)
+    // boja iznad omota (npr. bijeli papir) — nastavi ga do vrha, iza njegovog
+    // mekog gornjeg ruba, s istim stranama kao omot
+    if (album?.fill) {
+      const top = ay + art * 0.3
+      const f = document.createElement('canvas')
+      f.width = W
+      f.height = H
+      const fc = f.getContext('2d')!
+      fc.fillStyle = album.fill
+      fc.fillRect(ax, 0, art, top)
+      fc.globalCompositeOperation = 'destination-in'
+      const fade = fc.createLinearGradient(0, 0, 0, top)
+      fade.addColorStop(0, 'rgba(0,0,0,1)')
+      fade.addColorStop(0.62, 'rgba(0,0,0,1)')
+      fade.addColorStop(1, 'rgba(0,0,0,0)')
+      fc.fillStyle = fade
+      fc.fillRect(0, 0, W, H)
+      const fside = fc.createLinearGradient(ax, 0, ax + art, 0)
+      fside.addColorStop(0, 'rgba(0,0,0,0)')
+      fside.addColorStop(0.2, 'rgba(0,0,0,1)')
+      fside.addColorStop(0.8, 'rgba(0,0,0,1)')
+      fside.addColorStop(1, 'rgba(0,0,0,0)')
+      fc.fillStyle = fside
+      fc.fillRect(0, 0, W, H)
+      l.globalCompositeOperation = 'destination-over'
+      l.drawImage(f, 0, 0)
+      l.globalCompositeOperation = 'source-over'
+    }
     // Jače nego na ekranu: slika miruje i Instagram je još sabije, pa
     // prozirniji omot ispadne magla, a ne album.
     ctx.save()

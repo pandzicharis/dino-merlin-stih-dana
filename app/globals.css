@@ -117,6 +117,15 @@ html[data-os='android'] .os-grabber {
   mask-composite: intersect;
   -webkit-mask-composite: source-in;
 }
+/* boja iznad omota: puna do gornjeg ruba omota, pa se utopi u njega; strane kao omot */
+.album-fill {
+  mask-image: linear-gradient(to bottom, black 62%, transparent 100%),
+    linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 62%, transparent 100%),
+    linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
 @media (min-width: 768px) {
   .album-art {
     mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, black 0%, rgba(0, 0, 0, 0.6) 30%, rgba(0, 0, 0, 0.2) 52%, transparent 70%);

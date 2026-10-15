@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
-import { albumOf } from '@/data/albums'
+import { albumOf, ALBUMS } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
 import { oneLine, withPeriod } from '@/lib/text'
@@ -21,6 +21,9 @@ const fill: CSSProperties = { position: 'absolute', inset: 0 }
 // omot albuma: isto utapanje kao u aplikaciji (MoodBackground)
 const ART_MASK =
   'linear-gradient(to bottom, transparent 0%, black 18%, black 40%, rgba(0,0,0,0.35) 64%, transparent 86%), linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%)'
+/** boja iznad omota: puna do njegovog ruba, pa se utopi; strane kao omot */
+const FILL_MASK =
+  'linear-gradient(to bottom, black 62%, transparent 100%), linear-gradient(to right, transparent 0%, black 20%, black 80%, transparent 100%)'
 const ART_SHADE =
   'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.12) 22%, rgba(0,0,0,0.38) 50%, rgba(0,0,0,0.7) 78%, rgba(0,0,0,0.85) 100%)'
 
@@ -48,6 +51,7 @@ export function MoodStill({
   const m = MOODS[mood]
   const blob = Math.max(w, h) * 0.85
   const art = Math.min(w, h * 0.74)
+  const coverFill = cover ? ALBUMS.find((a) => a.cover === cover)?.fill : undefined
   return (
     <div aria-hidden style={{ ...fill, overflow: 'hidden', background: m.gradient[0] }}>
       {m.gradient.map((c, i) => (
@@ -79,6 +83,24 @@ export function MoodStill({
               transform: 'scale(1.1)',
             }}
           />
+          {/* boja iznad omota (npr. bijeli papir) — nastavi ga do vrha, kao u aplikaciji */}
+          {coverFill && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: `${((w - art) / 2).toFixed(1)}em`,
+                width: `${art.toFixed(1)}em`,
+                height: `${(h * 0.06 + art * (0.3 - lift)).toFixed(1)}em`,
+                background: coverFill,
+                opacity: 0.42,
+                maskImage: FILL_MASK,
+                WebkitMaskImage: FILL_MASK,
+                maskComposite: 'intersect',
+                WebkitMaskComposite: 'source-in',
+              }}
+            />
+          )}
           {/* omot gore, preko cijele širine — nestaje u strane i prema stihu */}
           <div
             style={{
