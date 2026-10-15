@@ -206,6 +206,9 @@ const CX = 50
 const CY = 47
 /** koliko se podignuti papir (uvod) uveća */
 const LIFT_S = 1.3
+/** tombola: izvučeni listić je veći i stoji između naslova i kugle (koja se spusti) */
+const DRAW_S = 1.6
+const DRAW_Y = 0.12
 /* ── tombola: zavrti i izvuci svoj ─────────────────────────── */
 
 type TombolaPhase = 'pour' | 'ready' | 'spin' | 'out' | 'fly'
@@ -562,7 +565,7 @@ function Tombola({
   useEffect(() => {
     if (phase !== 'out') return
     const t = window.setTimeout(() => {
-      setTo(measureTransfer())
+      setTo(measureTransfer(DRAW_Y, DRAW_S))
       setPhase('fly')
       land()
     }, (0.45 + RISE + 2.1) * 1000)
@@ -609,8 +612,12 @@ function Tombola({
   }, [phase, hold, release])
 
   const paper = {
+    // isti rez kao stih na ekranu (globals.css .verse) — slova koja polete
+    // s papira se pri prelazu ne smiju promijeniti
     fontFamily: 'var(--font-serif), Georgia, serif',
-    fontStyle: 'italic',
+    fontWeight: 400,
+    letterSpacing: '-0.02em',
+    fontVariationSettings: "'wght' 400, 'opsz' 144, 'SOFT' 30, 'WONK' 0",
     fontSize: 'min(2.5vw, 11.5px)',
     lineHeight: 1.18,
     color: '#1d1a16',
@@ -620,7 +627,7 @@ function Tombola({
   const exit = useMemo(() => {
     if (!chosen) return { animate: {}, transition: {} }
     return {
-      animate: { x: 0, y: -vh * 0.1, rotate: 0, scale: LIFT_S },
+      animate: { x: 0, y: -vh * DRAW_Y, rotate: 0, scale: DRAW_S },
       transition: { duration: RISE, ease: [0.33, 0, 0.2, 1] as Easing },
     }
   }, [chosen, vh])
@@ -743,12 +750,12 @@ function Tombola({
         </span>
       </motion.div>
 
-      {/* tombola — kad se listić izvuče, samo se stiša; ode sa slovima */}
+      {/* tombola — kad se listić izvuče, spusti se malo (iste vidljivosti); ode sa slovima */}
       <motion.div
         className="pointer-events-none absolute inset-0"
         style={{ transformOrigin: `50% ${cy}px` }}
         initial={{ opacity: 0, y: 30, scale: 0.94 }}
-        animate={phase === 'fly' ? { opacity: 0, y: 0, scale: 1 } : out ? { opacity: 0.25, y: 0, scale: 1 } : { opacity: 1, y: 0, scale: 1 }}
+        animate={phase === 'fly' ? { opacity: 0, y: vh * 0.18, scale: 1 } : out ? { opacity: 1, y: vh * 0.18, scale: 1 } : { opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: out ? 0.6 : 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
         <Globe cx={cx} cy={cy} R={R} vw={vw} accent={accent} layer="back" />
@@ -772,13 +779,42 @@ function Tombola({
               }}
             />
           ))}
-          {/* izabrani se diže — ostali potamne (sloj preko njih, ne filter: jeftinije) */}
-          <motion.div
-            className="absolute inset-0"
-            style={{ background: bg }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: chosen ? 0.55 : 0 }}
-            transition={{ duration: 0.6 }}
+        </div>
+        {/* naljepnica Magaze zalijepljena na staklo — ispod prednjeg sloja stakla,
+            pa odsjaji kugle prelaze preko nje; bez sjene (leži na staklu, ne visi),
+            rubovi prate oblinu */}
+        <div
+          className="absolute flex items-center justify-center"
+          style={{
+            left: cx - R * 0.31,
+            top: cy - R * 0.12 + R * 0.04,
+            width: R * 0.62,
+            height: R * 0.24,
+            borderRadius: `${R * 0.07}px / ${R * 0.11}px`,
+            background:
+              'linear-gradient(90deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0) 20%, rgba(255,255,255,0.35) 42%, rgba(255,255,255,0) 62%, rgba(0,0,0,0.24) 100%), linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0) 35%, rgba(0,0,0,0.12)), #F2EBDD',
+            boxShadow: 'inset 0 0 0 0.5px rgba(0,0,0,0.12), inset 0 1px 1px rgba(255,255,255,0.5)',
+            opacity: 0.88,
+          }}
+          aria-hidden
+        >
+          <span
+            className="block"
+            style={{
+              width: '78%',
+              aspectRatio: '316 / 87',
+              background: '#1d1a16',
+              mask: 'url(/brand/magaza.svg) center / contain no-repeat',
+              WebkitMask: 'url(/brand/magaza.svg) center / contain no-repeat',
+            }}
+          />
+          {/* odsjaj stakla preko naljepnice — koso, kao preko ostatka kugle */}
+          <span
+            className="pointer-events-none absolute inset-0"
+            style={{
+              borderRadius: 'inherit',
+              background: 'linear-gradient(115deg, rgba(255,255,255,0) 28%, rgba(255,255,255,0.32) 44%, rgba(255,255,255,0) 60%)',
+            }}
           />
         </div>
         <Globe cx={cx} cy={cy} R={R} vw={vw} accent={accent} layer="front" band={band} />
@@ -840,7 +876,7 @@ function Tombola({
             style={paper}
             initial={{ opacity: 0, clipPath: 'inset(0% 50% 0% 50%)', scale: 0.97 }}
             animate={phase === 'fly' && to ? { opacity: 0 } : { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)', scale: 1 }}
-            transition={phase === 'fly' ? { duration: 0.2, ease: 'easeOut' } : { delay: RISE + 0.3, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+            transition={phase === 'fly' ? { duration: 0 } : { delay: RISE + 0.3, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
           >
             {text.split('\n').map((l, j) => (
               <span key={j} className="block">
@@ -1096,8 +1132,12 @@ function IntroSplash({
   }, [phase, strips])
   const at = (x: number, y: number) => ({ left: `${x}vw`, top: `${y}vh`, translate: '-50% -50%' })
   const paper = {
+    // isti rez kao stih na ekranu (globals.css .verse) — slova koja polete
+    // s papira se pri prelazu ne smiju promijeniti
     fontFamily: 'var(--font-serif), Georgia, serif',
-    fontStyle: 'italic',
+    fontWeight: 400,
+    letterSpacing: '-0.02em',
+    fontVariationSettings: "'wght' 400, 'opsz' 144, 'SOFT' 30, 'WONK' 0",
     fontSize: 'min(2.5vw, 11.5px)',
     lineHeight: 1.18,
   } as const
@@ -1279,13 +1319,16 @@ function FlyText({ to, text }: { to: Transfer; text: string }) {
     <motion.p
       className="verse pointer-events-none absolute m-0 text-center"
       style={{ ...to.style, left: to.left, top: to.top, width: to.width, zIndex: 4, transformOrigin: '50% 50%', textShadow: 'none' }}
-      initial={{ x: to.dx, y: to.dy, scale: to.s0, opacity: 0 }}
-      animate={{ x: 0, y: 0, scale: 1, opacity: [0, 1, 1, 0] }}
+      // od prvog frejma puna, tačno preko slova papira (ona se tad sklone) —
+      // bez trenutka u kojem su oboje napola providni
+      initial={{ x: to.dx, y: to.dy, scale: to.s0, opacity: 1 }}
+      animate={{ x: 0, y: 0, scale: 1, opacity: [1, 1, 0] }}
       transition={{
         duration: SPLASH_ARRIVE,
-        ease: [0.4, 0, 0.2, 1],
-        // pojavi se preko slova papira, a nestane tek kad se stih pojavi ispod nje
-        opacity: { duration: SPLASH_ARRIVE + 0.06, times: [0, 0.2, 0.94, 1], ease: 'linear' },
+        ease: [0.45, 0, 0.15, 1],
+        // nestaje tek POSLIJE pojave stiha ispod nje (ista slova, isto mjesto) —
+        // i kad stih kasni koji frejm, nema praznog trenutka (treptaja)
+        opacity: { duration: SPLASH_ARRIVE + 0.3, times: [0, (SPLASH_ARRIVE + 0.05) / (SPLASH_ARRIVE + 0.3), 1], ease: 'linear' },
       }}
     >
       {/* tamna slova (kao na papiru) pa svijetla (kao na ekranu) — ista slova */}
@@ -1294,7 +1337,8 @@ function FlyText({ to, text }: { to: Transfer; text: string }) {
         style={{ color: '#1d1a16' }}
         initial={{ opacity: 1 }}
         animate={{ opacity: 0 }}
-        transition={{ duration: 0.45, delay: 0.1 }}
+        // tamna se skloni tek kad svijetla uđe — u prelazu slova ne izblijede
+        transition={{ duration: 0.3, delay: 0.4, ease: 'easeOut' }}
       >
         <VerseLines text={text} />
       </motion.span>
@@ -1303,7 +1347,7 @@ function FlyText({ to, text }: { to: Transfer; text: string }) {
         style={{ color: to.color, textShadow: to.shadow }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.45, delay: 0.1 }}
+        transition={{ duration: 0.5, delay: 0.05, ease: 'easeInOut' }}
       >
         <VerseLines text={text} />
       </motion.span>
@@ -1332,21 +1376,21 @@ type Transfer = {
   shadow: string
 }
 
-function measureTransfer(): Transfer | null {
+function measureTransfer(lift = 0.1, scale = LIFT_S): Transfer | null {
   const el = document.querySelector<HTMLElement>('main .verse')
   const r = el?.getBoundingClientRect()
   if (!el || !r || !r.width) return null
   const cs = getComputedStyle(el)
   const vw = window.innerWidth
   const vh = window.innerHeight
-  // tekst na podignutom papiru: sredina papira, slova papira × LIFT_S
-  const paperFont = Math.min(vw * 0.025, 11.5) * LIFT_S
+  // tekst na podignutom papiru: sredina papira, slova papira × uvećanje
+  const paperFont = Math.min(vw * 0.025, 11.5) * scale
   return {
     left: r.left,
     top: r.top,
     width: r.width,
     dx: vw * (CX / 100) - (r.left + r.width / 2),
-    dy: vh * (CY / 100) - vh * 0.1 - (r.top + r.height / 2),
+    dy: vh * (CY / 100) - vh * lift - (r.top + r.height / 2),
     s0: paperFont / parseFloat(cs.fontSize),
     style: {
       fontSize: cs.fontSize,

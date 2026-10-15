@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
-import { drawAgain, useDraw, type ListVerse } from '@/lib/draw'
+import { useDraw, type ListVerse } from '@/lib/draw'
 import { setLastSeen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
 import { MOODS } from '@/data/moods'
@@ -98,17 +98,8 @@ export function DailyVerse({
       <Onboarding mood={tone} seed={verse?.id ?? 'stih-dana'} />
       {/* dok uređaj ne izvuče stih (prvi frejm), ekran je prazan — pozadina
           i stih uđu zajedno, kao i inače */}
-      {verse && (
-        <VerseScreen
-          verse={verse}
-          date={date}
-          mood={mood}
-          replay={replay}
-          // samo izvučen stih (ne zadani iz prezentacije/dev-a) se može izvući ponovo
-          onRedraw={verseId ? undefined : () => drawAgain(date, verses)}
-        />
-      )}
-      {/* key: novi stih (i "izvuci ponovo") — zastor od prvog frejma, prije tombole */}
+      {verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} />}
+      {/* key: novi stih — zastor od prvog frejma, prije tombole */}
       {verse && <IntroHost key={verse.id} text={verse.text} others={others} mood={tone} date={date} onLand={land} fresh={fresh} />}
       <Tips />
       <UpdatePrompt accent={MOODS[tone].accent} />
