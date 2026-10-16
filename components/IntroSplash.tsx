@@ -245,7 +245,10 @@ const CY = 47
 const LIFT_S = 1.3
 /** tombola: izvučeni listić je veći i stoji između naslova i kugle (koja se spusti) */
 const DRAW_S = 1.6
+/** podrazumijevana visina listića (udio ekrana iznad CY) dok se naslov ne izmjeri */
 const DRAW_Y = 0.12
+/** koliko se kugla spusti kad se listić izvuče (udio visine ekrana) */
+const DROP = 0.18
 /* ── tombola: zavrti i izvuci svoj ─────────────────────────── */
 
 type TombolaPhase = 'pour' | 'ready' | 'spin' | 'out' | 'fly'
@@ -601,16 +604,6 @@ function Tombola({
     again.current = release
   }, [release])
 
-  // izvučeni se otvori i pročita, pa slova odlete na mjesto stiha
-  useEffect(() => {
-    if (phase !== 'out') return
-    const t = window.setTimeout(() => {
-      setTo(measureTransfer(DRAW_Y, DRAW_S))
-      setPhase('fly')
-      land()
-    }, (0.45 + RISE + 2.1) * 1000)
-    return () => clearTimeout(t)
-  }, [phase, land])
   useEffect(() => {
     if (phase !== 'fly') return
     const t = window.setTimeout(onDone, 1100)
@@ -661,13 +654,33 @@ function Tombola({
   } as const
   const out = phase === 'out' || phase === 'fly'
   // Izabrani listić se jednim mirnim pokretom digne na sredinu i legne ravno.
-  const exit = useMemo(() => {
-    if (!chosen) return { animate: {}, transition: {} }
-    return {
-      animate: { x: 0, y: -vh * DRAW_Y, rotate: 0, scale: DRAW_S },
-      transition: { duration: RISE, ease: [0.33, 0, 0.2, 1] as Easing },
-    }
-  }, [chosen, vh])
+  // listić tačno na sredini između naslova i vrha spuštene kugle (s držačem),
+  // na svakom ekranu — pa i slova s njega krenu odatle
+  const titleRef = useRef<HTMLDivElement>(null)
+  const [titleBottom, setTitleBottom] = useState<number | null>(null)
+  useEffect(() => {
+    const el = titleRef.current
+    if (!el) return
+    // offsetTop/Height ne prate pomak animacije — mjeri se stvarno mjesto naslova
+    const ro = new ResizeObserver(() => setTitleBottom(el.offsetTop + el.offsetHeight))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const liftY = titleBottom == null ? -vh * DRAW_Y : (titleBottom + cy + vh * DROP - R - 12) / 2 - vh * (CY / 100)
+  const exit = chosen
+    ? { animate: { x: 0, y: liftY, rotate: 0, scale: DRAW_S }, transition: { duration: RISE, ease: [0.33, 0, 0.2, 1] as Easing } }
+    : { animate: {}, transition: {} }
+
+  // izvučeni se otvori i pročita, pa slova odlete na mjesto stiha
+  useEffect(() => {
+    if (phase !== 'out') return
+    const t = window.setTimeout(() => {
+      setTo(measureTransfer(-liftY / vh, DRAW_S))
+      setPhase('fly')
+      land()
+    }, (0.45 + RISE + 2.1) * 1000)
+    return () => clearTimeout(t)
+  }, [phase, land, liftY, vh])
 
   return (
     <motion.div
@@ -699,6 +712,7 @@ function Tombola({
 
       {/* naslov — ostaje i dok se listić otvara ("te čeka" → "za danas"), ode tek sa slovima */}
       <motion.div
+        ref={titleRef}
         className="pointer-events-none absolute inset-x-0 px-8 text-center"
         style={{ top: `max(10vh, calc(var(--sat) + 3rem))` }}
         initial={{ opacity: 0, y: 10 }}
@@ -792,7 +806,7 @@ function Tombola({
         className="pointer-events-none absolute inset-0"
         style={{ transformOrigin: `50% ${cy}px` }}
         initial={{ opacity: 0, y: 30, scale: 0.94 }}
-        animate={phase === 'fly' ? { opacity: 0, y: vh * 0.18, scale: 1 } : out ? { opacity: 1, y: vh * 0.18, scale: 1 } : { opacity: 1, y: 0, scale: 1 }}
+        animate={phase === 'fly' ? { opacity: 0, y: vh * DROP, scale: 1 } : out ? { opacity: 1, y: vh * DROP, scale: 1 } : { opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: out ? 0.6 : 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
         <Globe cx={cx} cy={cy} R={R} vw={vw} accent={accent} layer="back" />
@@ -918,7 +932,7 @@ function Tombola({
             animate={phase === 'fly' && to ? { opacity: 0 } : { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)', scale: 1 }}
             transition={phase === 'fly' ? { duration: 0 } : { delay: RISE + 0.3, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
           >
-            <PaperVerse text={text} font={font} />
+            <PaperVerse text={text} />
           </motion.div>
         </motion.div>
       )}
@@ -1279,7 +1293,7 @@ function IntroSplash({
           // kopija koja leti je od prvog kadra tačno preko — zamjena odmah
           transition={{ duration: 0 }}
         >
-          <PaperVerse text={lines[0] ?? ''} font={font} />
+          <PaperVerse text={lines[0] ?? ''} />
         </motion.div>
       </motion.div>
 
@@ -1372,10 +1386,11 @@ function FlyText({ to, text, font }: { to: Transfer; text: string; font?: string
         style={{ color: '#1d1a16' }}
         initial={{ opacity: 1 }}
         animate={{ opacity: 0 }}
-        // tamna se skloni tek kad svijetla uđe — u prelazu slova ne izblijede
+        // tamna (papir, osnovni font) se skloni tek kad svijetla (ekran, fontovi
+        // stiha) uđe — boja i font se pretope u letu, slova ne izblijede
         transition={{ duration: 0.3, delay: 0.4, ease: 'easeOut' }}
       >
-        <VerseLines text={text} font={font} />
+        <VerseLines text={text} />
       </motion.span>
       <motion.span
         className="absolute inset-0 block"
@@ -1470,7 +1485,7 @@ function VerseLines({ text, font }: { text: string; font?: string }) {
   )
 }
 
-/** Stih na papiriću — isti fontovi po riječi kao na ekranu (bez tačke, kao do sada). */
+/** Stih na papiriću — uvijek osnovni font (fontovi stiha su samo na ekranu). */
 function PaperVerse({ text, font }: { text: string; font?: string }) {
   const map = parseFont(font)
   let n = 0

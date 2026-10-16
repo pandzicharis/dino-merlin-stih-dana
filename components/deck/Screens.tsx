@@ -1,4 +1,5 @@
-import type { CSSProperties } from 'react'
+import { parseFont, wordFont } from '@/lib/fonts'
+import { Fragment, type CSSProperties } from 'react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { albumOf, ALBUMS } from '@/data/albums'
@@ -309,11 +310,7 @@ export function VerseMock({
               textShadow: `0 0.07em 1em rgba(0,0,0,0.5), 0 0 1.6em ${m.accent}2e`,
             }}
           >
-            {text.split('\n').map((l, i) => (
-              <span key={i} style={{ display: 'block' }}>
-                {l}
-              </span>
-            ))}
+            <FontedLines text={text} font={verse.font} />
           </p>
           <span
             style={{
@@ -723,5 +720,30 @@ export function MagazaMark({
         ...style,
       }}
     />
+  )
+}
+
+/** Stih po redovima, svaka riječ u svom fontu (lib/fonts.ts) — kao na ekranu aplikacije. */
+export function FontedLines({ text, font }: { text: string; font?: string }) {
+  const map = parseFont(font)
+  let n = 0
+  return (
+    <>
+      {text.split('\n').map((l, i) => (
+        <span key={i} style={{ display: 'block' }}>
+          {l
+            .trim()
+            .split(/\s+/)
+            .map((w, j) => {
+              const k = n++
+              return (
+                <Fragment key={j}>
+                  <span style={wordFont(map, k)}>{w}</span>{' '}
+                </Fragment>
+              )
+            })}
+        </span>
+      ))}
+    </>
   )
 }

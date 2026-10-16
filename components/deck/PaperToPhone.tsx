@@ -1,5 +1,6 @@
 'use client'
 
+import { FontedLines } from './Screens'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
@@ -206,11 +207,8 @@ export function PaperToPhone({
               setCycle((c) => c + 1)
             }}
           >
-            {verse.text.split('\n').map((l, j) => (
-              <span key={j} className="block">
-                {l}
-              </span>
-            ))}
+            {/* papirić: uvijek osnovni font — fontovi stiha su samo na ekranu */}
+            <FontedLines text={verse.text} />
           </motion.div>
         )
       })}
