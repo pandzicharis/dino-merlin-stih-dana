@@ -78,6 +78,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#000000',
+  // tamno platno od prvog bajta — bez bijelog bljeska prije CSS-a
+  colorScheme: 'dark',
   viewportFit: 'cover',
   maximumScale: 1,
 }
@@ -86,6 +88,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="bs" className={`${serif.variable} ${sans.variable} ${roboto.variable} ${verseFonts}`} suppressHydrationWarning>
       <head>
+        {/* crno prije nego stigne globals.css — instalirana aplikacija inače trepne bijelo */}
+        <style dangerouslySetInnerHTML={{ __html: 'html{background:#000}' }} />
         <script dangerouslySetInnerHTML={{ __html: OS_SCRIPT }} />
       </head>
       <body>{children}</body>
