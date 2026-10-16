@@ -882,7 +882,9 @@ function Tombola({
       {chosen && (
         <motion.div
           className="pointer-events-none absolute"
-          style={{ left: `${CX}vw`, top: `${CY}vh`, translate: '-50% -50%', width: W, height: H, zIndex: 3, perspective: 700 }}
+          // u pikselima, kao kugla i naslov: na iPhoneu je CSS `vh` veći od
+          // window.innerHeight (Safari računa vh bez trake), pa bi listić sjeo niže od sredine
+          style={{ left: vw * (CX / 100), top: vh * (CY / 100), translate: '-50% -50%', width: W, height: H, zIndex: 3, perspective: 700 }}
           initial={{ x: chosen.x, y: chosen.y, rotate: chosen.rot, scale: chosen.k }}
           animate={exit.animate}
           transition={exit.transition}
@@ -1184,7 +1186,9 @@ function IntroSplash({
       }),
     )
   }, [phase, strips])
-  const at = (x: number, y: number) => ({ left: `${x}vw`, top: `${y}vh`, translate: '-50% -50%' })
+  // u pikselima kad se zna ekran — podizanje i let slova računaju s innerHeight, a CSS `vh` na iPhoneu nije isto
+  const at = (x: number, y: number) =>
+    VH ? { left: (window.innerWidth * x) / 100, top: (VH * y) / 100, translate: '-50% -50%' } : { left: `${x}vw`, top: `${y}vh`, translate: '-50% -50%' }
   const paper = {
     // isti rez kao stih na ekranu (globals.css .verse) — slova koja polete
     // s papira se pri prelazu ne smiju promijeniti
