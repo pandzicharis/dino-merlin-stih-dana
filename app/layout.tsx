@@ -3,6 +3,8 @@ import { Cormorant_Garamond, Dancing_Script, Fraunces, Great_Vibes, Parisienne, 
 import { SITE_URL } from '@/lib/site'
 import './globals.css'
 import { HOME_IMAGE, OG_BASE } from '@/lib/og'
+import { LOADER_CSS, LOADER_SCRIPT } from '@/lib/loader'
+import { AppLoader } from '@/components/AppLoader'
 
 const serif = Fraunces({
   subsets: ['latin-ext'],
@@ -88,11 +90,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="bs" className={`${serif.variable} ${sans.variable} ${roboto.variable} ${verseFonts}`} suppressHydrationWarning>
       <head>
-        {/* crno prije nego stigne globals.css — instalirana aplikacija inače trepne bijelo */}
-        <style dangerouslySetInnerHTML={{ __html: 'html{background:#000}' }} />
+        {/* crno prije nego stigne globals.css — instalirana aplikacija inače trepne bijelo;
+            uz to loader, prvi sloj (lib/loader.ts) */}
+        <style dangerouslySetInnerHTML={{ __html: 'html{background:#000}' + LOADER_CSS }} />
         <script dangerouslySetInnerHTML={{ __html: OS_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: LOADER_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <AppLoader />
+        {children}
+      </body>
     </html>
   )
 }
