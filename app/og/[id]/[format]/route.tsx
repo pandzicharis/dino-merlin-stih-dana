@@ -1,3 +1,4 @@
+import { VERSE_FONTS, parseFont, styleOf, verseWords, type WordStyle } from '@/lib/fonts'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
@@ -58,6 +59,27 @@ function wordmarkDataUri(): string {
  */
 const fontCache = new Map<string, Promise<ArrayBuffer | null>>()
 
+/** Google Fonts upit za stil riječi (lib/fonts.ts) — isti rez kao na ekranu. */
+function googleFamily(st: WordStyle): string {
+  const w = st.bold ? 700 : 400
+  const i = st.italic ? 1 : 0
+  switch (st.font) {
+    case 'fraunces':
+      return `Fraunces:ital,opsz,wght@${i},9..144,${st.bold ? 620 : 400}`
+    case 'playfair':
+      return `Playfair+Display:ital,wght@${i},${w}`
+    case 'cormorant':
+      return `Cormorant+Garamond:ital,wght@${i},${w}`
+    case 'dancing':
+      return `Dancing+Script:wght@${w}`
+    case 'greatvibes':
+      return 'Great+Vibes'
+    case 'parisienne':
+      return 'Parisienne'
+  }
+}
+const styleName = (st: WordStyle) => `V-${st.font}-${st.bold ? 'b' : ''}${st.italic ? 'i' : ''}`
+
 function loadFont(family: string, text: string): Promise<ArrayBuffer | null> {
   const key = `${family}|${text}`
   const hit = fontCache.get(key)
@@ -97,10 +119,28 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
     loadFont('Fraunces:opsz,wght@9..144,400', chars),
     loadFont('Rubik:wght@500', chars.toUpperCase() + chars),
   ])
+  // fontovi stiha po riječi — svaki stil jednom, sveden na znakove stiha
+  const map = parseFont(verse.font)
+  const rows = verseWords(text)
+  let n = 0
+  const styled = rows.map((r) => r.map((w) => ({ w, st: styleOf(map, n++) })))
+  const styles = new Map(styled.flat().map((x) => [styleName(x.st), x.st]))
+  const verseFonts = (
+    await Promise.all(
+      [...styles].map(async ([name, st]) => ({ name, st, data: await loadFont(googleFamily(st), text) })),
+    )
+  ).filter((f) => f.data)
+  const loaded = new Set(verseFonts.map((f) => f.name))
   const logo = wordmarkDataUri()
 
   const long = text.length > 70
-  const fontSize = Math.round((height === 1080 ? 82 : 92) * (long ? 0.82 : 1))
+  const pad = height === 1080 ? 96 : 120
+  // svaki red cio: procjena širine po znakovima × uvećanje fonta, pa smanji koliko treba
+  const est = Math.max(
+    ...styled.map((r) => r.reduce((a, x) => a + (x.w.length * 0.5 + 0.3) * VERSE_FONTS[x.st.font].scale, 0)),
+    1,
+  )
+  const fontSize = Math.round(Math.min((height === 1080 ? 82 : 92) * (long ? 0.82 : 1), (width - pad * 2) / est))
 
   return new ImageResponse(
     (
@@ -111,7 +151,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          padding: height === 1080 ? 96 : 120,
+          padding: pad,
           background: `radial-gradient(circle at 25% 20%, ${m.gradient[2]} 0%, transparent 62%), radial-gradient(circle at 78% 82%, ${m.gradient[1]} 0%, transparent 60%), ${m.gradient[0]}`,
           fontFamily: serif ? 'Serif' : 'Sans',
         }}
@@ -150,9 +190,26 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
             alignItems: 'center',
           }}
         >
-          {text.split('\n').map((line, i) => (
-            <div key={i} style={{ display: 'flex' }}>
-              {line}
+          {styled.map((r, i) => (
+            <div key={i} style={{ display: 'flex', whiteSpace: 'nowrap', gap: '0.26em' }}>
+              {r.map((x, j) => {
+                const name = styleName(x.st)
+                const f = VERSE_FONTS[x.st.font]
+                return (
+                  <span
+                    key={j}
+                    style={
+                      loaded.has(name) && x.st.font !== 'fraunces'
+                        ? { fontFamily: name, fontSize: `${f.scale}em`, lineHeight: f.lh }
+                        : loaded.has(name) && (x.st.bold || x.st.italic)
+                          ? { fontFamily: name }
+                          : {}
+                    }
+                  >
+                    {x.w}
+                  </span>
+                )
+              })}
             </div>
           ))}
         </div>
@@ -181,6 +238,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
       fonts: [
         ...(serif ? [{ name: 'Serif', data: serif, style: 'normal' as const, weight: 400 as const }] : []),
         ...(sans ? [{ name: 'Sans', data: sans, style: 'normal' as const, weight: 500 as const }] : []),
+        ...verseFonts.map((f) => ({
+          name: f.name,
+          data: f.data!,
+          style: (f.st.italic ? 'italic' : 'normal') as 'italic' | 'normal',
+          weight: (f.st.bold ? 700 : 400) as 400 | 700,
+        })),
       ],
       headers: {
         // Admin sada može ispraviti stih, pa slika više nije vječna: dan na

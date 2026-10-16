@@ -9,7 +9,7 @@ import { deckParam, inDeck } from '@/lib/deck'
 import { formatFullDateBs } from '@/lib/date'
 import { haptic } from '@/lib/haptic'
 import { SPLASH_ARRIVE } from './VerseText'
-import { withPeriod } from '@/lib/text'
+import { paperCase, withPeriod } from '@/lib/text'
 import { VERSES } from '@/data/verses'
 import { MOODS, type Mood } from '@/data/moods'
 
@@ -551,7 +551,7 @@ function Tombola({
       raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
-    const ready = window.setTimeout(() => setPhase((p) => (p === 'pour' ? 'ready' : p)), (balls[balls.length - 1].spawn + 1.2) * 1000)
+    const ready = window.setTimeout(() => setPhase((p) => (p === 'pour' ? 'ready' : p)), (balls[balls.length - 1].spawn + 0.5) * 1000)
     return () => {
       cancelAnimationFrame(raf)
       clearTimeout(ready)
@@ -625,7 +625,7 @@ function Tombola({
   // tastatura: razmak ili Enter — drži i pusti
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && phase === 'ready') {
+      if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && (phase === 'ready' || phase === 'pour')) {
         e.preventDefault()
         hold()
       }
@@ -690,7 +690,8 @@ function Tombola({
       data-izvlacenje
       onPointerDown={(e) => {
         e.preventDefault()
-        if (phase === 'ready') return hold()
+        // držanje radi i dok listići još padaju u kuglu
+        if (phase === 'ready' || phase === 'pour') return hold()
         // listić je izvučen — dodir preskače do stiha
         if (out) {
           land()
@@ -742,9 +743,10 @@ function Tombola({
         className="pointer-events-none absolute inset-x-0 flex flex-col items-center gap-2.5"
         // pri dnu ekrana, odvojeno od kugle — tu palac prirodno dođe
         style={{ bottom: 'max(5vh, calc(env(safe-area-inset-bottom) + 1.5rem))' }}
-        initial={{ opacity: 0, y: 8 }}
-        animate={phase === 'ready' || phase === 'spin' ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        // u isto vrijeme i istim mekim pokretom kao kugla — ne čeka da se napuni
+        initial={{ opacity: 0, y: 4 }}
+        animate={phase === 'pour' || phase === 'ready' || phase === 'spin' ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
         <span className="relative flex h-14 w-14 items-center justify-center">
           {/* sjaj kad je krug pun */}
@@ -837,9 +839,9 @@ function Tombola({
         <div
           className="absolute flex items-center justify-center"
           style={{
-            // malo ispod sredine, ravno
+            // na sredini kugle, blago iznad, ravno
             left: cx - R * 0.31,
-            top: cy + R * 0.1,
+            top: cy - R * 0.12 - R * 0.06,
             width: R * 0.62,
             height: R * 0.24,
             borderRadius: R * 0.045,
@@ -932,7 +934,7 @@ function Tombola({
             animate={phase === 'fly' && to ? { opacity: 0 } : { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)', scale: 1 }}
             transition={phase === 'fly' ? { duration: 0 } : { delay: RISE + 0.3, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
           >
-            <PaperVerse text={text} />
+            <PaperVerse text={paperCase(text)} />
           </motion.div>
         </motion.div>
       )}
@@ -1293,7 +1295,7 @@ function IntroSplash({
           // kopija koja leti je od prvog kadra tačno preko — zamjena odmah
           transition={{ duration: 0 }}
         >
-          <PaperVerse text={lines[0] ?? ''} />
+          <PaperVerse text={paperCase(lines[0] ?? '')} />
         </motion.div>
       </motion.div>
 
@@ -1340,7 +1342,7 @@ function Face({ p, paper }: { p: Strip; paper: React.CSSProperties }) {
         fontSize: Math.min(12.5, p.w * 0.07),
       }}
     >
-      {p.text?.split('\n').map((l, j) => (
+      {p.text && paperCase(p.text).split('\n').map((l, j) => (
         <span key={j} className="block">
           {l}
         </span>
@@ -1390,7 +1392,7 @@ function FlyText({ to, text, font }: { to: Transfer; text: string; font?: string
         // stiha) uđe — boja i font se pretope u letu, slova ne izblijede
         transition={{ duration: 0.3, delay: 0.4, ease: 'easeOut' }}
       >
-        <VerseLines text={text} />
+        <VerseLines text={paperCase(text)} />
       </motion.span>
       <motion.span
         className="absolute inset-0 block"

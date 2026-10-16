@@ -22,3 +22,13 @@ export function youtubeId(input?: string): string | null {
 export function oneLine(text: string): string {
   return text.replace(/\s*\n\s*/g, ' ')
 }
+
+/**
+ * Stih na papiriću: sve malim slovima, samo prvo slovo veliko — i kad je
+ * dio stiha napisan velikim (papirići na pultu tako izgledaju).
+ */
+export function paperCase(text: string): string {
+  const low = text.toLocaleLowerCase('bs')
+  const i = low.search(/\p{L}/u)
+  return i < 0 ? low : low.slice(0, i) + low.charAt(i).toLocaleUpperCase('bs') + low.slice(i + 1)
+}

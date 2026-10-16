@@ -1,5 +1,7 @@
 'use client'
 
+import { Fragment } from 'react'
+import { parseFont, verseWords, wordFont } from '@/lib/fonts'
 import { albumOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
@@ -77,7 +79,7 @@ export function VerseList({
               className="text-[1.08rem] leading-snug text-white/95 [text-shadow:0_1px_12px_rgba(0,0,0,0.45)]"
               style={{ fontFamily: 'var(--font-serif), serif', fontVariationSettings: "'opsz' 48, 'SOFT' 30" }}
             >
-              {oneLine(withPeriod(verse.text))}
+              <FontedOneLine text={withPeriod(verse.text)} font={verse.font} />
             </p>
 
             <div className="mt-3 flex items-center gap-3 border-t border-white/[0.08] pt-3">
@@ -103,6 +105,23 @@ function SongMeta({ verse }: { verse: Verse }) {
           {verse.album} &middot; {verse.year}
         </p>
       </div>
+    </>
+  )
+}
+
+/** Stih u jednom redu, svaka riječ u svom fontu (lib/fonts.ts) — kao na ekranu. */
+function FontedOneLine({ text, font }: { text: string; font?: string }) {
+  if (!font) return <>{oneLine(text)}</>
+  const map = parseFont(font)
+  return (
+    <>
+      {verseWords(text)
+        .flat()
+        .map((w, i) => (
+          <Fragment key={i}>
+            <span style={wordFont(map, i)}>{w}</span>{' '}
+          </Fragment>
+        ))}
     </>
   )
 }

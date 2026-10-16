@@ -1,5 +1,6 @@
 'use client'
 
+import { paperCase } from '@/lib/text'
 import { FontedLines } from './Screens'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { motion } from 'motion/react'
@@ -208,7 +209,7 @@ export function PaperToPhone({
             }}
           >
             {/* papirić: uvijek osnovni font — fontovi stiha su samo na ekranu */}
-            <FontedLines text={verse.text} />
+            <FontedLines text={paperCase(verse.text)} />
           </motion.div>
         )
       })}
