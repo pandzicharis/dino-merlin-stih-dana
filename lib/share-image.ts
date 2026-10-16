@@ -15,6 +15,7 @@ import type { Verse } from '@/data/verses'
 import { BRAND } from './brand'
 import { formatFullDateBs } from './date'
 import { withPeriod } from './text'
+import { VERSE_FONTS, parseFont, styleOf, type FontMap } from './fonts'
 
 /* ── formati i stilovi ──────────────────────────────────────── */
 
@@ -107,6 +108,83 @@ function fontFamilies() {
   }
 }
 
+/* ── stih po riječima, svaka u svom fontu (lib/fonts.ts) — kao na ekranu ── */
+
+type Run = { text: string; css: string; width: number; pad: number }
+type VLine = { runs: Run[]; width: number }
+
+/** CSS font riječi `i` za canvas — porodica iz next/font, veličina × `scale` fonta. */
+function runCss(map: FontMap, i: number, size: number, serif: string): string {
+  const st = styleOf(map, i)
+  const f = VERSE_FONTS[st.font]
+  const cs = getComputedStyle(document.documentElement)
+  const family =
+    st.font === 'fraunces'
+      ? (st.italic && cs.getPropertyValue('--font-serif-italic').trim()) || serif
+      : cs.getPropertyValue(f.family.slice(4, -1)).trim() || serif
+  const px = size * (st.font === 'fraunces' ? 1 : f.scale)
+  return `${st.italic ? 'italic ' : ''}${st.bold ? 700 : 400} ${px}px ${family}`
+}
+
+/** Redovi stiha (prelom kako se pjeva, pa po širini) — riječi s izmjerenim širinama u svom fontu. */
+function layoutVerse(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, map: FontMap, serif: string): VLine[] {
+  ctx.font = `400 ${size}px ${serif}`
+  const space = ctx.measureText(' ').width
+  const out: VLine[] = []
+  let n = 0
+  for (const raw of text.split('\n')) {
+    let cur: Run[] = []
+    let w = 0
+    for (const word of raw.trim().split(/\s+/).filter(Boolean)) {
+      const st = styleOf(map, n)
+      const css = runCss(map, n++, size, serif)
+      ctx.font = css
+      // pisani nemaju "zraka" sa strane — isto kao na ekranu (0.09em)
+      const pad = VERSE_FONTS[st.font].kind === 'pisani' ? size * VERSE_FONTS[st.font].scale * 0.09 : 0
+      const ww = ctx.measureText(word).width + pad * 2
+      if (cur.length && w + space + ww > maxW) {
+        out.push({ runs: cur, width: w })
+        cur = []
+        w = 0
+      }
+      w += (cur.length ? space : 0) + ww
+      cur.push({ text: word, css, width: ww, pad })
+    }
+    if (cur.length) out.push({ runs: cur, width: w })
+  }
+  return out
+}
+
+/**
+ * Najveća veličina (≤ `size`) na kojoj svaki red stiha stane cio u `maxW`.
+ * U koracima, ne jednim dijeljenjem: Fraunces na manjoj veličini crta šira
+ * slova (optička veličina), pa širina ne pada linearno.
+ */
+function fitWhole(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, min: number, map: FontMap, serif: string): number {
+  const widest = (s: number) => Math.max(...layoutVerse(ctx, text, Infinity, s, map, serif).map((l) => l.width))
+  const w0 = widest(size)
+  if (w0 <= maxW) return size
+  let s = Math.max(min, size * (maxW / w0) * 0.98)
+  for (let k = 0; k < 40 && s > min && widest(s) > maxW * 0.99; k++) s *= 0.97
+  return Math.max(min, s)
+}
+
+/** Nacrtaj redove centrirano; `y` je sredina prvog reda. */
+function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, y: number, lh: number, size: number, serif: string) {
+  ctx.font = `400 ${size}px ${serif}`
+  const space = ctx.measureText(' ').width
+  ctx.textAlign = 'left'
+  lines.forEach((l, i) => {
+    let x = cx - l.width / 2
+    for (const r of l.runs) {
+      ctx.font = r.css
+      ctx.fillText(r.text, x + r.pad, y + i * lh)
+      x += r.width + space
+    }
+  })
+  ctx.textAlign = 'center'
+}
+
 let grainTile: HTMLCanvasElement | null = null
 function grain(): HTMLCanvasElement {
   if (grainTile) return grainTile
@@ -165,21 +243,6 @@ function spacedWidth(ctx: CanvasRenderingContext2D, text: string, gap: number) {
 
 /** Red preširok za zadanu širinu → lomi se po riječima. Prelom iz podataka
  *  (kako se pjeva) uvijek ostaje. */
-function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
-  const out: string[] = []
-  for (const raw of text.split('\n')) {
-    let line = ''
-    for (const word of raw.trim().split(/\s+/)) {
-      const test = line ? `${line} ${word}` : word
-      if (ctx.measureText(test).width > maxW && line) {
-        out.push(line)
-        line = word
-      } else line = test
-    }
-    if (line) out.push(line)
-  }
-  return out
-}
 
 /* ── crtanje ────────────────────────────────────────────────── */
 
@@ -199,7 +262,7 @@ const drawn = new Map<string, HTMLCanvasElement>()
 const pending = new Map<string, Promise<HTMLCanvasElement>>()
 
 function key({ verse, date, format }: ShareInput) {
-  return [verse.id, verse.text, verse.mood, verse.song, verse.album, verse.year, date, format].join('|')
+  return [verse.id, verse.text, verse.mood, verse.song, verse.album, verse.year, verse.font ?? '', date, format].join('|')
 }
 
 function show(target: HTMLCanvasElement, c: HTMLCanvasElement) {
@@ -245,6 +308,11 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
 
   const album = albumOf(verse.album)
   const coverSrc = album?.cover
+  // fontovi stiha — učitani prije crtanja (canvas ne čeka sam)
+  const map = parseFont(verse.font)
+  const words = text.split(/\s+/).filter(Boolean).length
+  const runFonts = [...new Set(Array.from({ length: words }, (_, i) => runCss(map, i, 100, fonts.serif)))]
+  await Promise.all(runFonts.map((c) => document.fonts?.load(c, text).catch(() => null)))
   const [figure, signature, label, , , cover] = await Promise.all([
     // s albumom portreta nema — isto kao na ekranu
     p.figure > 0 && !coverSrc ? loadImage(FIGURE_SRC) : Promise.resolve(null),
@@ -262,19 +330,26 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   c.height = H
   const ctx = c.getContext('2d')!
 
-  /* 1 — podloga i mrlje */
+  /* 1 — podloga i mrlje — iste kao na ekranu (MoodBackground): tri kruga od
+     85vmax, na istim mjestima, s istim prelazom boje */
   ctx.fillStyle = p.base
   ctx.fillRect(0, 0, W, H)
-  const blob = (x: number, y: number, r: number, color: string, a: number) => {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-    g.addColorStop(0, rgba(color, a))
-    g.addColorStop(1, rgba(color, 0))
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, W, H)
+  {
+    const m = MOODS[verse.mood]
+    const side = Math.max(W, H) * 0.85
+    const r = (side / 2) * Math.SQRT2
+    m.gradient.forEach((color, i) => {
+      const x = W * [-0.15, 0.35, 0.05][i] + side / 2
+      const y = H * [-0.1, 0.2, 0.55][i] + side / 2
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+      g.addColorStop(0, rgba(color, 1))
+      g.addColorStop(0.22, rgba(color, 0xb0 / 255))
+      g.addColorStop(0.46, rgba(color, 0x38 / 255))
+      g.addColorStop(0.7, rgba(color, 0))
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, H)
+    })
   }
-  blob(W * 0.22, H * 0.16, Math.max(W, H) * 0.62, p.blobs[1], 0.95)
-  blob(W * 0.86, H * 0.84, Math.max(W, H) * 0.6, p.blobs[0], 0.9)
-  blob(W * 0.5, H * 0.5, W * 0.7, p.blobs[1], 0.25)
 
   /* 2 — portret, utopljen u gornji dio kao na ekranu */
   if (figure && p.figure > 0) {
@@ -319,131 +394,140 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.restore()
   }
 
-  /* 2b — album stiha, kao na ekranu: zamućena atmosfera, jasan omot gore
-     koji nestaje u strane i prema stihu, nijansa raspoloženja, tama odozdo */
+  /* 2b — album stiha, sloj po sloj kao na ekranu (MoodBackground + globals.css):
+     zamućena atmosfera, podloga s odrazom, jasan omot, nijansa, tama, vinjeta */
   if (cover) {
-    // Atmosfera: boje albuma razlivene preko cijele slike. Zamućuje se
-    // smanjivanjem pa uvećavanjem, ne `ctx.filter` — Safari ga ne zna, pa je
-    // na iPhoneu umjesto magle preko slike ležao oštar, uvećan omot.
-    const s = Math.max(W, H) * 1.3
-    const tiny = document.createElement('canvas')
-    tiny.width = tiny.height = 12
-    const tc = tiny.getContext('2d')!
-    tc.imageSmoothingQuality = 'high'
-    tc.drawImage(cover, 0, 0, 12, 12)
-    // Koliko je omot svijetao (0 … 1). Svijetao omot (bijeli papir) se crta
-    // tiše — inače bijeli potpis i stih nestanu na njemu.
-    const px = tc.getImageData(0, 0, 12, 12).data
-    let lum = 0
-    for (let i = 0; i < px.length; i += 4) lum += (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255
-    const bright = Math.min(1, Math.max(0, lum / (px.length / 4) - 0.45) * 2.5)
-    const soft = document.createElement('canvas')
-    soft.width = soft.height = 96
-    const sc = soft.getContext('2d')!
-    sc.imageSmoothingQuality = 'high'
-    sc.drawImage(tiny, 0, 0, 96, 96)
-    ctx.save()
-    ctx.imageSmoothingQuality = 'high'
-    // tiho: jače podigne tamne dijelove i cijela slika ode u mlijeko
-    ctx.globalAlpha = 0.2 - 0.08 * bright
-    ctx.drawImage(soft, (W - s) / 2, (H - s) / 2, s, s)
-    ctx.restore()
-
-    // Kao na telefonu: omot preko cijele širine, gore. Kod nižih formata
-    // (objava, kvadrat) podignut je, da utapanje stigne prije stiha.
-    const art = W
-    // spušten od vrha i utopljen i gore — kao na telefonu
-    const ay =
-      (format === 'story' ? H * 0.06 : format === 'pozadina' ? H * 0.1 : format === 'post' ? -W * 0.02 : -W * 0.16) -
-      art * (album?.lift ?? 0)
-    const layer = document.createElement('canvas')
-    layer.width = W
-    layer.height = H
-    const l = layer.getContext('2d')!
-    const ax = 0
-    l.drawImage(cover, ax, ay, art, art)
-    l.globalCompositeOperation = 'destination-in'
-    const down = l.createLinearGradient(0, ay, 0, ay + art)
-    down.addColorStop(0, 'rgba(0,0,0,0)')
-    down.addColorStop(0.18, 'rgba(0,0,0,1)')
-    down.addColorStop(0.4, 'rgba(0,0,0,1)')
-    down.addColorStop(0.64, 'rgba(0,0,0,0.35)')
-    down.addColorStop(0.86, 'rgba(0,0,0,0)')
-    l.fillStyle = down
-    l.fillRect(0, 0, W, H)
-    const side = l.createLinearGradient(ax, 0, ax + art, 0)
-    side.addColorStop(0, 'rgba(0,0,0,0)')
-    side.addColorStop(0.2, 'rgba(0,0,0,1)')
-    side.addColorStop(0.8, 'rgba(0,0,0,1)')
-    side.addColorStop(1, 'rgba(0,0,0,0)')
-    l.fillStyle = side
-    l.fillRect(0, 0, W, H)
-    // boja iznad omota (npr. bijeli papir) — nastavi ga do vrha, iza njegovog
-    // mekog gornjeg ruba, s istim stranama kao omot
-    if (album?.fill) {
-      const top = ay + art * 0.3
-      const f = document.createElement('canvas')
-      f.width = W
-      f.height = H
-      const fc = f.getContext('2d')!
-      fc.fillStyle = album.fill
-      fc.fillRect(ax, 0, art, top)
-      fc.globalCompositeOperation = 'destination-in'
-      const fade = fc.createLinearGradient(0, 0, 0, top)
-      fade.addColorStop(0, 'rgba(0,0,0,1)')
-      fade.addColorStop(0.62, 'rgba(0,0,0,1)')
-      fade.addColorStop(1, 'rgba(0,0,0,0)')
-      fc.fillStyle = fade
-      fc.fillRect(0, 0, W, H)
-      const fside = fc.createLinearGradient(ax, 0, ax + art, 0)
-      fside.addColorStop(0, 'rgba(0,0,0,0)')
-      fside.addColorStop(0.2, 'rgba(0,0,0,1)')
-      fside.addColorStop(0.8, 'rgba(0,0,0,1)')
-      fside.addColorStop(1, 'rgba(0,0,0,0)')
-      fc.fillStyle = fside
-      fc.fillRect(0, 0, W, H)
-      l.globalCompositeOperation = 'destination-over'
-      l.drawImage(f, 0, 0)
-      l.globalCompositeOperation = 'source-over'
+    // zamućenje smanjivanjem pa uvećavanjem (Safari ne zna `ctx.filter`)
+    const soft = (src: CanvasImageSource, w: number, h: number, k: number) => {
+      const t = document.createElement('canvas')
+      t.width = Math.max(2, Math.round(w / k))
+      t.height = Math.max(2, Math.round(h / k))
+      const tc = t.getContext('2d')!
+      tc.imageSmoothingQuality = 'high'
+      tc.drawImage(src, 0, 0, t.width, t.height)
+      return t
     }
-    // Jače nego na ekranu: slika miruje i Instagram je još sabije, pa
-    // prozirniji omot ispadne magla, a ne album.
-    ctx.save()
-    ctx.globalAlpha = 0.62 - 0.24 * bright
-    ctx.drawImage(layer, 0, 0)
-    ctx.restore()
+    const mask = (c: CanvasRenderingContext2D, w: number, h: number, stops: [number, number][], sides: [number, number][]) => {
+      c.globalCompositeOperation = 'destination-in'
+      const v = c.createLinearGradient(0, 0, 0, h)
+      for (const [o, a] of stops) v.addColorStop(o, `rgba(0,0,0,${a})`)
+      c.fillStyle = v
+      c.fillRect(0, 0, w, h)
+      const hz = c.createLinearGradient(0, 0, w, 0)
+      for (const [o, a] of sides) hz.addColorStop(o, `rgba(0,0,0,${a})`)
+      c.fillStyle = hz
+      c.fillRect(0, 0, w, h)
+      c.globalCompositeOperation = 'source-over'
+    }
+    const sides: [number, number][] = [[0, 0], [0.2, 1], [0.8, 1], [1, 0]]
 
-    // nijansa raspoloženja — blaža nego na ekranu, da album zadrži svoje boje
+    // atmosfera: omot preko cijelog ekrana (-15 %, ×1.1), jako zamućen, 0.32
+    {
+      const sq = Math.max(W, H) * 1.3 * 1.1
+      ctx.save()
+      ctx.globalAlpha = 0.32
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(soft(soft(cover, 64, 64, 1), 64, 64, 5.3), (W - sq) / 2, (H - sq) / 2, sq, sq)
+      ctx.restore()
+    }
+
+    // omot: kao na telefonu — širina min(ekran, 74 % visine), malo spušten
+    const art = Math.min(W, H * 0.74)
+    const ax = (W - art) / 2
+    const ay = (format === 'pozadina' ? H * 0.1 : H * 0.06 + art * 0.02) - art * (album?.lift ?? 0)
+
+    // podloga: isti omot zamućen + odraz iznad njega — boje s vrha se nastave
+    {
+      const gh = art * 1.35
+      const g = document.createElement('canvas')
+      g.width = Math.ceil(art)
+      g.height = Math.ceil(gh)
+      const gc = g.getContext('2d')!
+      gc.drawImage(cover, 0, art * 0.35, art, art)
+      gc.save()
+      gc.translate(0, art * 0.35)
+      gc.scale(1, -1)
+      gc.drawImage(cover, 0, 0, cover.width, cover.height * 0.35, 0, 0, art, art * 0.35)
+      gc.restore()
+      // isto zamućenje kao na ekranu (28px na omotu od ~390px ≈ 7 % širine) —
+      // slabije bi pokazalo odraz kao blijedu kopiju albuma
+      const blurred = soft(soft(g, art, gh, art / 48), art, gh, art / 14)
+      const out = document.createElement('canvas')
+      out.width = g.width
+      out.height = g.height
+      const oc = out.getContext('2d')!
+      oc.imageSmoothingQuality = 'high'
+      oc.drawImage(blurred, 0, 0, art, gh)
+      mask(oc, art, gh, [[0, 0], [0.2, 1], [0.52, 1], [0.72, 0.3], [0.9, 0]], [[0, 0], [0.18, 1], [0.82, 1], [1, 0]])
+      ctx.save()
+      ctx.globalAlpha = 0.3
+      ctx.drawImage(out, ax, ay - art * 0.35)
+      ctx.restore()
+    }
+
+    // jasan omot, utopljen gore, dole i u strane (globals.css .album-art)
+    {
+      const l = document.createElement('canvas')
+      l.width = Math.ceil(art)
+      l.height = Math.ceil(art)
+      const lc = l.getContext('2d')!
+      lc.drawImage(cover, 0, 0, art, art)
+      mask(
+        lc,
+        art,
+        art,
+        [[0, 0], [0.07, 0.12], [0.15, 0.4], [0.23, 0.75], [0.31, 1], [0.42, 1], [0.64, 0.35], [0.86, 0]],
+        sides,
+      )
+      ctx.save()
+      ctx.globalAlpha = 0.42
+      // boja iznad omota (npr. bijeli papir) — do vrha ekrana, iza mekog ruba
+      if (album?.fill) {
+        const top = ay + art * (0.3 + 0.02)
+        const f = document.createElement('canvas')
+        f.width = Math.ceil(art)
+        f.height = Math.max(1, Math.ceil(top))
+        const fc = f.getContext('2d')!
+        fc.fillStyle = album.fill
+        fc.fillRect(0, 0, art, top)
+        mask(fc, art, top, [[0, 1], [0.62, 1], [1, 0]], sides)
+        ctx.drawImage(f, ax, 0)
+      }
+      ctx.drawImage(l, ax, ay)
+      ctx.restore()
+    }
+
+    // nijansa raspoloženja preko albuma
     ctx.save()
     ctx.globalCompositeOperation = 'color'
-    ctx.globalAlpha = 0.28
+    ctx.globalAlpha = 0.4
     ctx.fillStyle = MOODS[verse.mood].gradient[1]
     ctx.fillRect(0, 0, W, H)
     ctx.restore()
 
-    // tama odozdo u dubokoj boji raspoloženja, ne crna — dno ostaje u boji
-    const deep = MOODS[verse.mood].gradient[0]
+    // tama odozdo — da stih ostane čitak
     const shade = ctx.createLinearGradient(0, 0, 0, H)
-    shade.addColorStop(0, rgba(deep, 0.22))
-    shade.addColorStop(0.22, rgba(deep, 0.06))
-    shade.addColorStop(0.5, rgba(deep, 0.3))
-    shade.addColorStop(0.78, rgba(deep, 0.5))
-    shade.addColorStop(1, rgba(deep, 0.62))
+    shade.addColorStop(0, 'rgba(0,0,0,0.25)')
+    shade.addColorStop(0.22, 'rgba(0,0,0,0.12)')
+    shade.addColorStop(0.5, 'rgba(0,0,0,0.38)')
+    shade.addColorStop(0.78, 'rgba(0,0,0,0.7)')
+    shade.addColorStop(1, 'rgba(0,0,0,0.85)')
     ctx.fillStyle = shade
     ctx.fillRect(0, 0, W, H)
-
-    // dno ne smije biti prazna tama: blagi sjaj raspoloženja iza pjesme
-    blob(W * 0.5, H * 1.02, W * 0.95, p.blobs[1], 0.5)
   }
 
-  /* 3 — vinjeta; uz album blaža, inače rubovi i dno odu u crno */
+  /* 3 — vinjeta, kao na ekranu: elipsa, prozirno do 35 %, pa tama rubova */
   {
-    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.78)
-    const v = cover ? 0.6 : 1
-    g.addColorStop(0, 'rgba(0,0,0,0)')
-    g.addColorStop(1, `rgba(0,0,0,${p.vignette * v})`)
+    ctx.save()
+    ctx.translate(W / 2, H / 2)
+    ctx.scale(1, H / W)
+    const R = (W / 2) * Math.SQRT2
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R)
+    g.addColorStop(0.35, 'rgba(0,0,0,0)')
+    g.addColorStop(1, `rgba(0,0,0,${MOODS[verse.mood].vignette})`)
     ctx.fillStyle = g
-    ctx.fillRect(0, 0, W, H)
+    ctx.fillRect(-W, -W, W * 2, W * 2)
+    ctx.restore()
   }
 
   /* 3b — atmosfera: čestice i note. Ekran je živ jer se
@@ -495,10 +579,11 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.textBaseline = 'middle'
     const maxW = W * 0.8
     let size = W * 0.086
-    let lines: string[] = []
+    // svaki red stiha cio (u jednom redu) — slova se smanje koliko treba
+    size = fitWhole(ctx, text, maxW, size, W * 0.035, map, fonts.serif)
+    let lines: VLine[] = []
     for (;;) {
-      ctx.font = `400 ${size}px ${fonts.serif}`
-      lines = wrap(ctx, text, maxW)
+      lines = layoutVerse(ctx, text, maxW, size, map, fonts.serif)
       if (lines.length * size * 1.18 <= H * 0.2 || size <= W * 0.05) break
       size *= 0.95
     }
@@ -526,7 +611,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
       ctx.shadowBlur = size * 0.4
       ctx.shadowOffsetY = size * 0.03
     }
-    lines.forEach((line, i) => ctx.fillText(line, W / 2, y + lh / 2 + i * lh))
+    drawVerse(ctx, lines, W / 2, y + lh / 2, lh, size, fonts.serif)
     ctx.restore()
     y += lines.length * lh + g1
 
@@ -668,21 +753,21 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   const air = W * (ratio > 1.5 ? 0.09 : ratio > 1.1 ? 0.06 : 0.045)
   const areaTop = top + air
   const areaBottom = bottom - air
-  const maxW = W - pad * 2.2
+  // širina stiha kao na telefonu (px-6 na ~390 px) — ~86 % slike
+  const maxW = W * 0.86
 
   // Prvo se font smanji da svaki red iz podataka stane CIJEO — prelom prati
   // kako se pjeva, pa jedna riječ sama u redu izgleda kao greška. Lomi se
   // tek ispod donje granice veličine.
-  let size = W * (ratio > 1.5 ? 0.115 : 0.1)
-  ctx.font = `400 ${size}px ${fonts.serif}`
-  const widest = Math.max(...text.split('\n').map((l) => ctx.measureText(l.trim()).width))
-  // 0.97: tačno na granici measureText zna izaći za dlaku preko i slomiti red
-  if (widest > maxW) size = Math.max(W * 0.062, ((size * maxW) / widest) * 0.97)
-  let lines: string[] = []
+  // početna veličina kao na ekranu (VerseText verseFontSize): po najdužem redu,
+  // 6.4–16 % širine; pa se smanji koliko treba da redovi stanu cijeli
+  const longest = Math.max(...text.split('\n').map((l) => l.trim().length), 1)
+  let size = W * Math.min(0.16, Math.max(0.072, 1.74 / longest))
+  size = fitWhole(ctx, text, maxW, size, W * 0.04, map, fonts.serif)
+  let lines: VLine[] = []
   let lh = 0
   for (;;) {
-    ctx.font = `400 ${size}px ${fonts.serif}`
-    lines = wrap(ctx, text, maxW)
+    lines = layoutVerse(ctx, text, maxW, size, map, fonts.serif)
     lh = size * 1.18
     const group = dateSize + size * GAP + lines.length * lh
     if (group <= areaBottom - areaTop || size <= W * 0.045) break
@@ -697,7 +782,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   const firstY = groupTop + dateSize + gap + lh / 2
 
   ctx.font = `600 ${dateSize}px ${fonts.sans}`
-  ctx.fillStyle = rgba(p.accent, 0.82)
+  ctx.fillStyle = p.accent
   spaced(ctx, formatFullDateBs(date).toUpperCase(), W / 2, groupTop + dateSize / 2, W * 0.0062)
 
   if (p.bloom > 0) {
@@ -716,7 +801,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.shadowBlur = size * 0.4
     ctx.shadowOffsetY = size * 0.03
   }
-  lines.forEach((line, i) => ctx.fillText(line, W / 2, firstY + i * lh))
+  drawVerse(ctx, lines, W / 2, firstY, lh, size, fonts.serif)
   ctx.restore()
 
 

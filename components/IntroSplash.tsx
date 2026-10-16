@@ -1431,6 +1431,9 @@ function measureTransfer(lift = 0.1, scale = LIFT_S): Transfer | null {
   const r = el?.getBoundingClientRect()
   if (!el || !r || !r.width) return null
   const cs = getComputedStyle(el)
+  // stvarna veličina slova poslije prilagođavanja širini (VerseText useFit)
+  const fit = el.querySelector<HTMLElement>('[data-fit]')
+  const fontSize = fit ? getComputedStyle(fit).fontSize : cs.fontSize
   const vw = window.innerWidth
   const vh = window.innerHeight
   // tekst na podignutom papiru: sredina papira, slova papira × uvećanje
@@ -1441,9 +1444,10 @@ function measureTransfer(lift = 0.1, scale = LIFT_S): Transfer | null {
     width: r.width,
     dx: vw * (CX / 100) - (r.left + r.width / 2),
     dy: vh * (CY / 100) - vh * lift - (r.top + r.height / 2),
-    s0: paperFont / parseFloat(cs.fontSize),
+    s0: paperFont / parseFloat(fontSize),
     style: {
-      fontSize: cs.fontSize,
+      fontSize,
+      whiteSpace: 'nowrap',
       lineHeight: cs.lineHeight,
       fontFamily: cs.fontFamily,
       fontWeight: cs.fontWeight,

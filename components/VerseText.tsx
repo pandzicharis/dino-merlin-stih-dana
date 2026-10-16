@@ -1,9 +1,54 @@
 'use client'
 
 import { parseFont, wordFont } from '@/lib/fonts'
-import { Fragment } from 'react'
+import { Fragment, useEffect, useRef, useState, type RefObject } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { withPeriod } from '@/lib/text'
+
+/** Red stiha se ne lomi — veličinu slova sredi useFit. */
+const NOWRAP = { whiteSpace: 'nowrap' } as const
+
+/**
+ * Koliko treba smanjiti slova (0…1) da najduži red stane u širinu stiha.
+ * Mjeri se stvarni tekst (Range), pa vrijedi za svaki font i kombinaciju;
+ * ponovo kad se promijeni širina ili se učita font.
+ */
+function useFit(box: RefObject<HTMLElement | null>, key: string): number {
+  const [fit, setFit] = useState(1)
+  useEffect(() => {
+    const p = box.current
+    const inner = p?.querySelector<HTMLElement>('[data-fit]')
+    if (!p || !inner) return
+    let raf = 0
+    const measure = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const avail = p.clientWidth
+        if (!avail) return
+        const cur = parseFloat(inner.style.fontSize) || 1
+        const range = document.createRange()
+        let widest = 0
+        for (const line of Array.from(inner.children)) {
+          range.selectNodeContents(line)
+          widest = Math.max(widest, range.getBoundingClientRect().width)
+        }
+        if (!widest) return
+        const next = Math.min(1, (avail * 0.98 * cur) / widest)
+        setFit((f) => (Math.abs(f - next) > 0.004 ? next : f))
+      })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(p)
+    document.fonts?.addEventListener('loadingdone', measure)
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+      document.fonts?.removeEventListener('loadingdone', measure)
+    }
+  }, [box, key])
+  return fit
+}
 
 /** Ispis počinje ovoliko sekundi nakon učitavanja. */
 /** splash: koliko slova s papira putuju do mjesta stiha (s) — tad se stih pojavi */
@@ -58,6 +103,9 @@ export function VerseText({
   const full = withPeriod(text)
   const lines = full.split('\n')
   const fonts = parseFont(font)
+  // svaki red stiha u jednom redu — slova se smanje koliko treba (i za pisane fontove)
+  const box = useRef<HTMLParagraphElement>(null)
+  const fit = useFit(box, `${full}|${font ?? ''}`)
   const style = {
     color,
     fontSize: verseFontSize(full),
@@ -75,11 +123,13 @@ export function VerseText({
         transition={{ duration: 0.3 }}
         className="verse"
         style={style}
+        ref={box}
       >
+        <span data-fit className="block" style={{ fontSize: `${fit}em` }}>
         {(() => {
           let n = 0
           return lines.map((l, i) => (
-            <span key={i} className="block">
+            <span key={i} className="block" style={NOWRAP}>
               {l
                 .trim()
                 .split(/\s+/)
@@ -94,6 +144,7 @@ export function VerseText({
             </span>
           ))
         })()}
+        </span>
       </motion.p>
     )
   }
@@ -102,9 +153,10 @@ export function VerseText({
   let w = 0
 
   return (
-    <p className="verse" style={style}>
+    <p className="verse" style={style} ref={box}>
+      <span data-fit className="block" style={{ fontSize: `${fit}em` }}>
       {lines.map((line, li) => (
-        <span key={li} className="block">
+        <span key={li} className="block" style={NOWRAP}>
           {line
             .trim()
             .split(/\s+/)
@@ -133,6 +185,7 @@ export function VerseText({
             })}
         </span>
       ))}
+      </span>
     </p>
   )
 }
