@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { FIGURE_SRC } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
+import { DrawerIcon } from './DrawerIcon'
 
 /**
  * Okvir za sporedne stranice (sačuvano, admin).
@@ -16,9 +17,12 @@ export function PageShell({
   right,
   children,
   wide = false,
+  icon,
 }: {
   eyebrow: string
   title: string
+  /** znak ispred naslova, kao na drawerima (putanje za DrawerIcon) */
+  icon?: React.ReactNode
   back?: string | null
   right?: React.ReactNode
   children: React.ReactNode
@@ -44,6 +48,7 @@ export function PageShell({
               </svg>
             </Link>
           )}
+          {icon && <DrawerIcon>{icon}</DrawerIcon>}
           <div className="min-w-0 flex-1">
             <p className="truncate text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
               {eyebrow}

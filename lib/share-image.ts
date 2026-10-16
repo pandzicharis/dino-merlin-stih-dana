@@ -22,6 +22,8 @@ export const SHARE_FORMATS = {
   story: { label: 'Story', hint: '9:16', w: 1080, h: 1920 },
   post: { label: 'Objava', hint: '4:5', w: 1080, h: 1350 },
   square: { label: 'Kvadrat', hint: '1:1', w: 1080, h: 1080 },
+  // zaključan ekran (iPhone 1290 × 2796; Android ga samo malo obreže)
+  pozadina: { label: 'Pozadina', hint: '', w: 1290, h: 2796 },
 } as const
 
 export type ShareFormat = keyof typeof SHARE_FORMATS
@@ -351,7 +353,9 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     // (objava, kvadrat) podignut je, da utapanje stigne prije stiha.
     const art = W
     // spušten od vrha i utopljen i gore — kao na telefonu
-    const ay = (format === 'story' ? H * 0.06 : format === 'post' ? -W * 0.02 : -W * 0.16) - art * (album?.lift ?? 0)
+    const ay =
+      (format === 'story' ? H * 0.06 : format === 'pozadina' ? H * 0.1 : format === 'post' ? -W * 0.02 : -W * 0.16) -
+      art * (album?.lift ?? 0)
     const layer = document.createElement('canvas')
     layer.width = W
     layer.height = H
@@ -483,6 +487,101 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.restore()
   }
 
+  /** Pozadina: gore sat i datum — stih na sredini, ispod pjesma i album;
+   *  na dnu, na sredini, potpis i znak Magaze jedan do drugog (kao zaglavlje
+   *  aplikacije). Ništa u gornjih ~33 %. */
+  function wallpaperText() {
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const maxW = W * 0.8
+    let size = W * 0.086
+    let lines: string[] = []
+    for (;;) {
+      ctx.font = `400 ${size}px ${fonts.serif}`
+      lines = wrap(ctx, text, maxW)
+      if (lines.length * size * 1.18 <= H * 0.2 || size <= W * 0.05) break
+      size *= 0.95
+    }
+    const lh = size * 1.18
+    let songSize = W * 0.03
+    let songGap = W * 0.0055
+    ctx.font = `600 ${songSize}px ${fonts.sans}`
+    while (spacedWidth(ctx, verse.song.toUpperCase(), songGap) > maxW && songSize > W * 0.014) {
+      songSize *= 0.95
+      songGap *= 0.95
+      ctx.font = `600 ${songSize}px ${fonts.sans}`
+    }
+    const albumSize = W * 0.021
+    const g1 = size * 0.8
+    const g2 = W * 0.016
+    const blockH = lines.length * lh + g1 + songSize + g2 + albumSize
+    // malo ispod sredine — gore je sat
+    let y = H * 0.5 - blockH / 2
+
+    ctx.save()
+    ctx.font = `400 ${size}px ${fonts.serif}`
+    ctx.fillStyle = p.text
+    if (!p.light) {
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'
+      ctx.shadowBlur = size * 0.4
+      ctx.shadowOffsetY = size * 0.03
+    }
+    lines.forEach((line, i) => ctx.fillText(line, W / 2, y + lh / 2 + i * lh))
+    ctx.restore()
+    y += lines.length * lh + g1
+
+    ctx.font = `600 ${songSize}px ${fonts.sans}`
+    ctx.fillStyle = p.chrome
+    spaced(ctx, verse.song.toUpperCase(), W / 2, y + songSize / 2, songGap)
+    y += songSize + g2
+    ctx.font = `500 ${albumSize}px ${fonts.sans}`
+    ctx.fillStyle = p.light ? 'rgba(27,20,11,0.7)' : 'rgba(255,255,255,0.62)'
+    spaced(ctx, `${verse.album} · ${verse.year}`.toUpperCase(), W / 2, y + albumSize / 2, W * 0.005)
+
+    // dno: potpis | Magaza, na sredini, između svjetiljke i kamere
+    const tint = (img: HTMLImageElement, w: number, h: number) => {
+      const s = document.createElement('canvas')
+      s.width = Math.ceil(w)
+      s.height = Math.ceil(h)
+      const sc = s.getContext('2d')!
+      sc.drawImage(img, 0, 0, w, h)
+      sc.globalCompositeOperation = 'source-in'
+      sc.fillStyle = p.light ? p.text : '#F4F4F4'
+      sc.fillRect(0, 0, w, h)
+      return s
+    }
+    const sigH = W * 0.075
+    const sigW = signature ? sigH * (signature.width / signature.height) : 0
+    const magH = W * 0.034
+    const magW = label ? magH * (316 / 87) : 0
+    const gap = W * 0.035
+    const both = signature && label
+    const rowW = sigW + magW + (both ? gap * 2 : 0)
+    const cy = H * 0.905
+    let x = W / 2 - rowW / 2
+    ctx.save()
+    ctx.globalAlpha = 0.92
+    if (signature) {
+      ctx.drawImage(tint(signature, sigW, sigH), x, cy - sigH / 2)
+      x += sigW
+    }
+    if (both) {
+      ctx.fillStyle = p.light ? rgba('#000000', 0.25) : 'rgba(255,255,255,0.3)'
+      ctx.fillRect(x + gap - 1, cy - magH * 0.75, 2, magH * 1.5)
+      x += gap * 2
+    }
+    if (label) ctx.drawImage(tint(label, magW, magH), x, cy - magH / 2 + magH * 0.08)
+    ctx.restore()
+  }
+
+  if (format === 'pozadina') {
+    const top = ctx.createLinearGradient(0, 0, 0, H * 0.36)
+    top.addColorStop(0, 'rgba(0,0,0,0.32)')
+    top.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = top
+    ctx.fillRect(0, 0, W, H * 0.36)
+    wallpaperText()
+  } else {
   /* 4 — slog: zaglavlje odozgo, podnožje odozdo, stih u sredini */
   const pad = W * 0.085
   ctx.textAlign = 'center'
@@ -620,6 +719,8 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   lines.forEach((line, i) => ctx.fillText(line, W / 2, firstY + i * lh))
   ctx.restore()
 
+
+  }
 
   /* 5 — zrno preko svega, da slika ima materijal a ne plastiku */
   if (p.grain > 0) {

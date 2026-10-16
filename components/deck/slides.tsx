@@ -1119,7 +1119,7 @@ function Dijeljenje() {
     await wait(300)
     if (!(await press('[data-tip="share"]'))) return
     await wait(1400)
-    for (const f of ['post', 'square', 'story']) {
+    for (const f of ['post', 'square', 'pozadina', 'story']) {
       if (!alive()) return
       await press(`[data-format="${f}"]`)
       await wait(1300)
@@ -1134,10 +1134,15 @@ function Dijeljenje() {
   return (
     <>
       <Text>
-        Story 9:16, objava 4:5 ili kvadrat — istim fontovima i bojama kao na ekranu. Slika ide pravo u Instagram,
-        WhatsApp ili Viber, ili se preuzme na telefon. Crta se na samom telefonu, odmah.
+        Story 9:16, objava 4:5, kvadrat ili pozadina za zaključan ekran — istim fontovima i bojama kao na ekranu.
+        Slika ide pravo u Instagram, WhatsApp ili Viber, ili se preuzme na telefon. Crta se na samom telefonu, odmah.
       </Text>
-      <Bullets items={[<>Diskretan potpis aplikacije na slici: <b>svako dijeljenje je preporuka.</b></>]} />
+      <Bullets
+        items={[
+          <>Diskretan potpis aplikacije na slici: <b>svako dijeljenje je preporuka.</b></>,
+          <><b>Pozadina:</b> stih ostaje na zaključanom ekranu cijeli dan — sat i obavijesti na čistom.</>,
+        ]}
+      />
     </>
   )
 }

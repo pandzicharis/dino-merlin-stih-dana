@@ -217,7 +217,7 @@ export default function SharePanel({
             </div>
 
             {/* format: segmentirana kontrola */}
-            <div className="mt-4 grid grid-cols-3 rounded-full border border-white/[0.08] bg-white/[0.03] p-1">
+            <div className="mt-4 grid grid-cols-4 rounded-full border border-white/[0.08] bg-white/[0.03] p-1">
               {(Object.keys(SHARE_FORMATS) as ShareFormat[]).map((f) => {
                 const F = SHARE_FORMATS[f]
                 const on = f === format
@@ -240,11 +240,17 @@ export default function SharePanel({
                       />
                     )}
                     <span className="relative font-medium">{F.label}</span>
-                    <span className="relative text-[10px] opacity-60">{F.hint}</span>
+                    {F.hint && <span className="relative text-[10px] opacity-60">{F.hint}</span>}
                   </button>
                 )
               })}
             </div>
+
+            {format === 'pozadina' && (
+              <p className="mt-3 text-center text-[12px] leading-snug text-white/50">
+                Sačuvaj sliku pa je postavi kao pozadinu zaključanog ekrana — sat i obavijesti ostaju na čistom.
+              </p>
+            )}
 
             {/* akcije */}
             <motion.button
