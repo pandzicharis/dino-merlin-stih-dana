@@ -1165,7 +1165,7 @@ function Obavijest({ d }: { d: DeckData }) {
     const t = setTimeout(() => {
       setOs('android')
       simulate('lock')
-    }, 18000)
+    }, 16000)
     return () => clearTimeout(t)
   }, [os, setOs, manual, replay, simulate])
   return (

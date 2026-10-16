@@ -525,10 +525,11 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     const sc = s.getContext('2d')!
     sc.drawImage(label, 0, 0, lw, lh)
     sc.globalCompositeOperation = 'source-in'
-    sc.fillStyle = p.light ? p.text : '#FFFFFF'
+    // ista boja i jačina kao potpis gore
+    sc.fillStyle = p.light ? p.text : '#F4F4F4'
     sc.fillRect(0, 0, lw, lh)
     ctx.save()
-    ctx.globalAlpha = p.light ? 0.55 : 0.5
+    ctx.globalAlpha = 0.92
     ctx.drawImage(s, W / 2 - lw / 2, bottom - lh)
     ctx.restore()
     // sadržaj ide gore, znak ostaje dolje — jasan razmak između njih

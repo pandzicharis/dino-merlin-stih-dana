@@ -117,10 +117,21 @@ export function IntroHost({
   // prezentacija (`?intro`): aplikacija se otvori uvodom — gomila papirića,
   // kao poslije dozvole na pravom telefonu (telefon kod izloga, "Od izloga
   // do hiljada ekrana")
+  // `?intro=cekaj`: aplikacija se učita unaprijed (skrivena), a uvod krene
+  // tek na poruku — telefon kod izloga poslije skeniranja nije crn
   useEffect(() => {
-    if (!inDeck() || deckParam('intro') === null) return
-    const t = window.setTimeout(() => playIntro(true), 350)
-    return () => clearTimeout(t)
+    const mode = inDeck() ? deckParam('intro') : null
+    if (mode === null) return
+    if (mode !== 'cekaj') {
+      const t = window.setTimeout(() => playIntro(true), 350)
+      return () => clearTimeout(t)
+    }
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === window.location.origin && e.data?.type === 'stihdana:uvod') playIntro(true)
+    }
+    window.addEventListener('message', onMessage)
+    window.parent.postMessage({ type: 'stihdana:uvod-spreman' }, window.location.origin)
+    return () => window.removeEventListener('message', onMessage)
   }, [])
 
   // Prezentacija traži izvlačenje porukom, ne novom adresom: ponovno

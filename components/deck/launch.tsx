@@ -354,8 +354,17 @@ function Izlog({ d }: { d: DeckData }) {
         transition={{ type: 'spring', stiffness: 120, damping: 20 }}
       >
         <IPhone width={`calc(${W} * 0.24)`} time="12:00">
-          <AnimatePresence mode="wait">
-            {phase < 2 ? (
+          {/* aplikacija se učita odmah, iza kamere — poslije skeniranja nije crno */}
+          <motion.div
+            className="absolute inset-0 bg-black"
+            initial={false}
+            animate={{ opacity: phase === 2 ? 1 : 0 }}
+            transition={{ duration: 0.3, delay: phase === 2 ? 0.12 : 0 }}
+          >
+            <LiveApp play={phase === 2} />
+          </motion.div>
+          <AnimatePresence>
+            {phase < 2 && (
               <motion.div key="cam" className="absolute inset-0 bg-black" exit={{ opacity: 0 }}>
                 {/* kamera: okvir koda i linija skeniranja */}
                 <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 50% 45%, #2a2622, #0b0a09 70%)' }} />
@@ -374,10 +383,6 @@ function Izlog({ d }: { d: DeckData }) {
                   )}
                 </div>
                 <p className="absolute bottom-[90em] left-0 right-0 text-center text-[15em] text-white/70">Stih dana</p>
-              </motion.div>
-            ) : (
-              <motion.div key="app" className="absolute inset-0 bg-black" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-                <LiveApp />
               </motion.div>
             )}
           </AnimatePresence>
@@ -407,9 +412,23 @@ function Izlog({ d }: { d: DeckData }) {
  * splashom (papirići → stih se podigne → stih na ekranu). Okvir je pravih
  * dimenzija ekrana (402 px), umanjen da stane u telefon na slajdu.
  */
-function LiveApp() {
+function LiveApp({ play }: { play: boolean }) {
   const box = useRef<HTMLDivElement>(null)
+  const frame = useRef<HTMLIFrameElement>(null)
   const [k, setK] = useState(0)
+  // uvod krene kad je telefon na ekranu; ako aplikacija još nije spremna,
+  // krene čim javi da jeste
+  const playRef = useRef(play)
+  useEffect(() => {
+    playRef.current = play
+    const start = () => frame.current?.contentWindow?.postMessage({ type: 'stihdana:uvod' }, window.location.origin)
+    if (play) start()
+    const onReady = (e: MessageEvent) => {
+      if (e.source === frame.current?.contentWindow && e.data?.type === 'stihdana:uvod-spreman' && playRef.current) start()
+    }
+    window.addEventListener('message', onReady)
+    return () => window.removeEventListener('message', onReady)
+  }, [play])
   useEffect(() => {
     const el = box.current
     if (!el) return
@@ -419,20 +438,20 @@ function LiveApp() {
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  // aplikacija počinje ispod statusne trake (u okviru nema "safe area")
-  const bar = 50
+  // aplikacija ide do vrha okvira; ispod statusne trake je spusti `--sat` (globals.css)
   return (
     <div ref={box} className="absolute inset-0 overflow-hidden">
       {k > 0 && (
         <iframe
-          src="/?intro"
+          ref={frame}
+          src="/?intro=cekaj"
           title="Stih dana — prvo otvaranje"
           style={{
             position: 'absolute',
             left: 0,
-            top: bar * k,
+            top: 0,
             width: IPHONE.w,
-            height: IPHONE.h - bar,
+            height: IPHONE.h,
             border: 0,
             transform: `scale(${k})`,
             transformOrigin: '0 0',

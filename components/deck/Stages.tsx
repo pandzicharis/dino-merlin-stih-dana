@@ -514,7 +514,7 @@ function LockNotify({
     if (opened.current) return
     opened.current = true
     setSwipe(true)
-    after(450, onOpen)
+    after(300, onOpen)
   }
   useEffect(() => {
     after(1400, () => setNoon(true))
@@ -523,8 +523,8 @@ function LockNotify({
       haptic([12, 60, 12])
       chime()
     })
-    // sam tok: obavijest se dodirne i aplikacija se odmah otvori
-    if (!manual) after(6000, tapNotification)
+    // sam tok: obavijest se dodirne (malo poslije dolaska) i aplikacija se odmah otvori
+    if (!manual) after(4200, tapNotification)
     const ts = timers.current
     return () => ts.forEach(clearTimeout)
     // tok se igra jednom po montaži

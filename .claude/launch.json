@@ -4,8 +4,25 @@
     {
       "name": "stih-dana",
       "runtimeExecutable": "/Users/harispandzic/.nvm/versions/node/v22.21.0/bin/node",
-      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev", "-p", "3111"],
+      "runtimeArgs": [
+        "node_modules/next/dist/bin/next",
+        "dev",
+        "-p",
+        "3111"
+      ],
       "port": 3111
+    },
+    {
+      "name": "portfolio",
+      "runtimeExecutable": "/Users/harispandzic/.nvm/versions/node/v20.19.4/bin/node",
+      "runtimeArgs": [
+        "/Users/harispandzic/Desktop/projects/portfolio/node_modules/next/dist/bin/next",
+        "dev",
+        "/Users/harispandzic/Desktop/projects/portfolio",
+        "-p",
+        "3000"
+      ],
+      "port": 3000
     }
   ]
 }

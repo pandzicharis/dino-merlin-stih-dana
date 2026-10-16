@@ -103,7 +103,9 @@ function typing(t: EventTarget | null) {
   return Boolean(el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))
 }
 
-const PORTFOLIO = 'https://harispandzic.dev'
+// na localhostu lokalni sajt (projekt portfolio, `next dev` na :3000) — da se
+// izmjene na CV-u vide u prezentaciji odmah, bez deploya
+const PORTFOLIO = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://harispandzic.dev'
 
 const SECTIONS: Section[] = ['Uvod', 'Aplikacija', 'Plan za launch', 'Pitanja']
 
