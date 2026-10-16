@@ -13,12 +13,6 @@ html {
   background: #000;
 }
 
-/* Kapija iz serverskog HTML-a — u instaliranoj aplikaciji je nema od prvog
-   frejma (skripta u layoutu), inače bljesne njena boja prije hidracije. */
-html[data-standalone] [data-ssr-gate] {
-  display: none;
-}
-
 body {
   background: transparent;
   color: #f5f5f5;

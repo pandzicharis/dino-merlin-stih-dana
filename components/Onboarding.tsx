@@ -245,8 +245,6 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
         <motion.div
           // `isolate` drži MoodBackground (z-index -10) iznad vlastite podloge
           className="fixed inset-0 isolate z-[60] overflow-y-auto"
-          // do montaže: instalirana aplikacija je sakrije (data-standalone, globals.css)
-          data-ssr-gate={mounted ? undefined : ''}
           style={{ backgroundColor: MOODS[mood].gradient[0] }}
           initial={false}
           exit={{ opacity: 0 }}
