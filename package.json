@@ -11,7 +11,8 @@
     "prebuild": "tsx scripts/check-verses.ts --strict",
     "brand:signature": "tsx scripts/make-signature.ts",
     "brand:icons": "tsx scripts/make-icons.ts",
-    "promo:video": "node scripts/export-video.mjs"
+    "promo:video": "node scripts/export-video.mjs",
+    "catalog:push": "tsx --env-file-if-exists=.env.local scripts/push-catalog.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
