@@ -202,7 +202,7 @@ export function VideoScene({
         {/* potpis */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/brand/signature.webp"
+          src="/brand/signature.webp?v=2"
           alt="Dino Merlin"
           style={{
             position: 'absolute',

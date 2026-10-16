@@ -338,7 +338,7 @@ function Lockup() {
   return (
     <div className="flex items-center gap-[clamp(18px,2.2vw,40px)]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/signature.webp" alt="Dino Merlin" style={{ height: 'clamp(64px, 12vh, 140px)', width: 'auto' }} />
+      <img src="/brand/signature.webp?v=2" alt="Dino Merlin" style={{ height: 'clamp(64px, 12vh, 140px)', width: 'auto' }} />
       <span className="block w-px bg-white/25" style={{ height: 'clamp(40px, 7vh, 84px)' }} />
       <span
         role="img"

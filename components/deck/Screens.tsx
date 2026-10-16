@@ -267,7 +267,7 @@ export function VerseMock({
           {/* potpis | Magaza — kao VerseScreen */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14em' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/signature.webp" alt="" style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
+            <img src="/brand/signature.webp?v=2" alt="" style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
             <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
             <MagazaMark height={22} style={{ opacity: 0.9, transform: 'translateY(2em)' }} />
           </div>
@@ -449,7 +449,7 @@ export function LockScreenMock({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8em', color: 'rgba(255,255,255,0.62)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-192.png" alt="" style={{ width: '20em', height: '20em', borderRadius: '6em' }} />
+            <img src="/icons/icon-192.png?v=2" alt="" style={{ width: '20em', height: '20em', borderRadius: '6em' }} />
             <span style={{ fontSize: '12.5em' }}>Stih dana</span>
             <span style={{ fontSize: '12.5em', opacity: 0.7 }}>· sada</span>
           </div>

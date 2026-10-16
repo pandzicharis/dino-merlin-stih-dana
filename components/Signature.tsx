@@ -44,7 +44,7 @@ export function Signature({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/brand/signature.webp"
+            src="/brand/signature.webp?v=2"
             alt="Dino Merlin"
             className={className}
             onError={() => setFailed(true)}

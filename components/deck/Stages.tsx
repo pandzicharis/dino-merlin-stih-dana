@@ -248,7 +248,7 @@ function Simulated({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/icons/icon-192.png"
+            src="/icons/icon-192.png?v=2"
             alt=""
             style={{ width: '38em', height: '38em', borderRadius: ios ? '9em' : '50%', flexShrink: 0 }}
           />
@@ -565,7 +565,7 @@ function LockNotify({
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/icon-192.png" alt="" style={{ width: '38em', height: '38em', borderRadius: '8.5em', flexShrink: 0 }} />
+      <img src="/icons/icon-192.png?v=2" alt="" style={{ width: '38em', height: '38em', borderRadius: '8.5em', flexShrink: 0 }} />
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8em' }}>
           <span style={{ fontSize: '15em', fontWeight: 600, letterSpacing: '-0.01em' }}>{title}</span>
@@ -615,7 +615,7 @@ function LockNotify({
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/icon-192.png" alt="" style={{ width: '34em', height: '34em', borderRadius: '50%', flexShrink: 0 }} />
+      <img src="/icons/icon-192.png?v=2" alt="" style={{ width: '34em', height: '34em', borderRadius: '50%', flexShrink: 0 }} />
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{ display: 'flex', alignItems: 'baseline', gap: '6em', color: 'rgba(255,255,255,0.62)' }}>
           <span style={{ fontSize: '12.5em' }}>Stih dana</span>

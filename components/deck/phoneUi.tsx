@@ -48,7 +48,7 @@ export function AppIcon({ platform, size, style }: { platform: Platform; size: n
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={platform === 'ios' ? '/icons/apple-touch-icon.png' : '/icons/icon-maskable-512.png'}
+      src={platform === 'ios' ? '/icons/apple-touch-icon.png?v=2' : '/icons/icon-maskable-512.png?v=2'}
       alt=""
       style={{ width: `${size}em`, height: `${size}em`, display: 'block', ...iconMask(platform), ...style }}
     />

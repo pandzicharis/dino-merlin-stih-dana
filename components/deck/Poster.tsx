@@ -251,7 +251,7 @@ function Headline({
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/signature.webp" alt="Dino Merlin" style={{ height: sig, width: 'auto' }} />
+      <img src="/brand/signature.webp?v=2" alt="Dino Merlin" style={{ height: sig, width: 'auto' }} />
       <p
         style={{
           // razmaci su u em-u formata, pa se dijele veličinom vlastitog fonta

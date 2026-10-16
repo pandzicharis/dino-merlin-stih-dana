@@ -243,7 +243,7 @@ function useSong({ verse, src, fallback, dur: known, onFail, preload }: Source &
       title: verse.song,
       artist: BRAND.name,
       album: verse.album,
-      artwork: [{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }],
+      artwork: [{ src: '/icons/icon-512.png?v=2', sizes: '512x512', type: 'image/png' }],
     })
     ms.setActionHandler('play', () => a.play())
     ms.setActionHandler('pause', () => a.pause())

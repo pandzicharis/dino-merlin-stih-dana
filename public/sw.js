@@ -6,7 +6,7 @@
  */
 
 const CACHE = 'stihdana-v2'
-const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png']
+const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2']
 
 /**
  * Oznaka "stigla je obavijest" — aplikacija je pročita pri otvaranju i
@@ -80,9 +80,9 @@ self.addEventListener('push', (e) => {
       body: d.body || '',
       tag: d.tag || 'stih-dana',
       renotify: true,
-      icon: '/icons/icon-192.png',
+      icon: '/icons/icon-192.png?v=2',
       // Android: mali znak u statusnoj traci mora biti jednobojan i proziran
-      badge: '/icons/badge-96.png',
+      badge: '/icons/badge-96.png?v=2',
       data: { url: d.url || '/' },
     })),
   )

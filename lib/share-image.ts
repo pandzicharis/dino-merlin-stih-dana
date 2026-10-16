@@ -316,7 +316,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   const [figure, signature, label, , , cover] = await Promise.all([
     // s albumom portreta nema — isto kao na ekranu
     p.figure > 0 && !coverSrc ? loadImage(FIGURE_SRC) : Promise.resolve(null),
-    loadImage('/brand/signature.webp'),
+    loadImage('/brand/signature.webp?v=2'),
     loadImage('/brand/magaza.svg'),
     document.fonts?.load(`400 100px ${fonts.serif}`, text).catch(() => null),
     document.fonts?.load(`500 40px ${fonts.sans}`).catch(() => null),

@@ -83,7 +83,7 @@ export function QrCode({
           <circle cx={n / 2} cy={n / 2} r={hole / 2 - 0.35} fill={ink} />
           <circle cx={n / 2} cy={n / 2} r={hole / 2 - 0.75} fill="none" stroke="#BFA87F" strokeWidth={0.14} opacity={0.9} />
           <image
-            href="/brand/signature.webp"
+            href="/brand/signature.webp?v=2"
             x={n / 2 - hole * 0.33}
             y={n / 2 - hole * 0.25}
             width={hole * 0.66}

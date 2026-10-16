@@ -191,7 +191,7 @@ function MiniPage({
         }}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/signature.webp" alt="" style={{ height: '64em', width: 'auto', opacity: 0.9 }} />
+      <img src="/brand/signature.webp?v=2" alt="" style={{ height: '64em', width: 'auto', opacity: 0.9 }} />
       <div
         className="flex flex-1 flex-col items-center justify-center text-center"
         style={{ width: '304em', paddingBottom: '96em' }}

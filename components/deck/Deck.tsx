@@ -745,7 +745,7 @@ function Bar({
         aria-hidden={bare}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/signature.webp" alt="Dino Merlin" className="h-[30px] w-auto opacity-90" />
+        <img src="/brand/signature.webp?v=2" alt="Dino Merlin" className="h-[30px] w-auto opacity-90" />
         <span className="h-5 w-px bg-white/20" />
         <MagazaLogo height={20} color="rgba(255,255,255,0.88)" />
         <span className="hidden h-4 w-px bg-white/15 sm:block" />
