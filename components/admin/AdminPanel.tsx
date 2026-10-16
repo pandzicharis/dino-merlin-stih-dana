@@ -11,6 +11,7 @@ import { withPeriod } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview } from './DevicePreview'
+import { PrintSlips } from './PrintSlips'
 import { DrawerIcon } from '../DrawerIcon'
 
 type AdminVerse = Verse & { active: boolean }
@@ -27,6 +28,13 @@ type Op =
   | { op: 'restore'; id: string }
 
 const PAGE = 30
+/** printer — dugme u zaglavlju i znak modala za štampu */
+const PRINT_ICON = (
+  <>
+    <path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2" />
+    <rect x="6" y="14" width="12" height="7" rx="1" />
+  </>
+)
 /** Sve u panelu pregleda osim samog uređaja: prekidač 42 + razmak 16. */
 const PREVIEW_CHROME = 42 + 16
 
@@ -49,6 +57,9 @@ export function AdminPanel() {
   const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null)
   const [editor, setEditor] = useState<{ verse?: AdminVerse } | null>(null)
   const [archiving, setArchiving] = useState<AdminVerse | null>(null)
+  // papirići za štampu (modal)
+  const [printing, setPrinting] = useState(false)
+  const [printCount, setPrintCount] = useState(0)
 
   const flash = useCallback((text: string, bad = false) => {
     setToast({ text, bad })
@@ -116,6 +127,21 @@ export function AdminPanel() {
       eyebrow="Stih dana"
       title="Postavke"
       right={
+        <div className="flex items-center gap-2">
+        {/* papirići za pult — A4 za štampu na papir u boji */}
+        <button
+          type="button"
+          onClick={() => setPrinting(true)}
+          disabled={!data}
+          data-print
+          className="flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white disabled:opacity-40"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2" />
+            <rect x="6" y="14" width="12" height="7" rx="1" />
+          </svg>
+          Štampa
+        </button>
         <button
           onClick={logout}
           className="flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white"
@@ -126,6 +152,7 @@ export function AdminPanel() {
           </svg>
           Odjava
         </button>
+        </div>
       }
     >
       {!data ? (
@@ -157,6 +184,36 @@ export function AdminPanel() {
 
           <Library data={data} busy={busy} onEdit={(v) => setEditor({ verse: v })} onArchive={setArchiving} onRestore={(v) => send({ op: 'restore', id: v.id }, 'Stih je vraćen u izvlačenje')} />
 
+          <AnimatePresence>
+            {printing && (
+              <Sheet
+                key="print"
+                huge
+                eyebrow="Magaza · štampa"
+                title="Papirići za štampu"
+                icon={PRINT_ICON}
+                onClose={() => setPrinting(false)}
+                actions={
+                  <button
+                    type="button"
+                    // u prezentaciji bez pravog prozora za štampu (iskočio bi na računaru prezentera)
+                    onClick={() => (inDeck() ? flash('PDF je spreman — papirici-stih-dana.pdf') : window.print())}
+                    disabled={!printCount}
+                    data-print-go
+                    className="flex h-9 items-center gap-2 rounded-full px-4 text-[12px] font-semibold text-black disabled:opacity-40"
+                    style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      {PRINT_ICON}
+                    </svg>
+                    Štampaj / PDF
+                  </button>
+                }
+              >
+                <PrintSlips verses={data.verses} onCount={setPrintCount} />
+              </Sheet>
+            )}
+          </AnimatePresence>
           <AnimatePresence>
             {editor && (
               <Editor
@@ -517,6 +574,7 @@ function Sheet({
   title,
   eyebrow = 'Stih dana',
   wide = false,
+  huge = false,
   icon,
   actions,
 }: {
@@ -525,6 +583,8 @@ function Sheet({
   title: string
   eyebrow?: string
   wide?: boolean
+  /** veliki modal skoro preko cijelog ekrana (štampa) */
+  huge?: boolean
   /** znak u zaglavlju, kao na drawerima (putanje za DrawerIcon) */
   icon?: React.ReactNode
   /** dugmad u zaglavlju, lijevo od zatvaranja */
@@ -554,7 +614,7 @@ function Sheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px] ${wide ? 'max-w-6xl' : 'max-w-[440px]'}`}
+        className={`relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px] ${huge ? 'h-[94dvh] max-h-[94dvh] max-w-[min(1500px,96vw)]' : wide ? 'max-w-6xl' : 'max-w-[440px]'}`}
         style={{
           background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
         }}
@@ -608,7 +668,7 @@ function Sheet({
             </div>
           </div>
         </div>
-        <div className="overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <div className={`overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] ${huge ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
           {children}
         </div>
       </motion.div>

@@ -130,6 +130,12 @@ const UREDNIK: FeatureDef[] = [
     enter: '/admin',
     body: () => <NoviStih />,
   },
+  {
+    id: 'stampa',
+    title: 'Papirići za pult',
+    enter: '/admin',
+    body: () => <Stampa />,
+  },
 ]
 
 /* ── priča: zašto Stih dana ─────────────────────────────────── */
@@ -964,6 +970,45 @@ function NoviStih() {
       </Text>
       <Bullets
         items={[<><b>Novi stih je u špilu odmah</b> — izvlači se od sutra, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>]}
+      />
+    </>
+  )
+}
+
+/**
+ * Štampa papirića: modal se otvori, stihovi se biraju jedan po jedan, list se
+ * popuni, pa "Štampaj / PDF" (u prezentaciji samo poruka — bez pravog prozora).
+ */
+function Stampa() {
+  useDeskScene(async ({ wait, find, click, all, alive }) => {
+    if (!(await find('[data-print]'))) return
+    await wait(500)
+    await click('[data-print]')
+    if (!(await find('[data-print-pick]'))) return
+    await wait(900)
+    // prvo bez ponavljanja — vidi se kako papirići sjedaju jedan po jedan
+    await click('[data-print-fill]')
+    await wait(500)
+    for (const el of all('[data-print-pick]').slice(0, 5)) {
+      if (!alive()) return
+      await click(el)
+      await wait(450)
+    }
+    await wait(700)
+    // pa "popuni list" — 45 papirića, spremno za rezanje
+    await click('[data-print-fill]')
+    await wait(2200)
+    if (!alive()) return
+    await click('[data-print-go]')
+  })
+  return (
+    <>
+      <Text>
+        Papirići na pultu ispred Magaze, iz iste liste stihova. Izabereš stihove, a admin složi A4 sa 45 papirića od
+        5,3 × 1,7 cm — crno na papir u boji, pa se samo izreže po linijama.
+      </Text>
+      <Bullets
+        items={[<><b>PDF ili pravo na printer</b> — bez prepisivanja i bez dizajnera; list se popuni i ponavljanjem.</>]}
       />
     </>
   )
