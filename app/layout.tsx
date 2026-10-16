@@ -45,8 +45,10 @@ const verseFonts = [serifItalic, playfair, cormorant, greatVibes, dancing, paris
  * iz prekidača ispod telefona (sessionStorage), inače iz preglednika —
  * a kad se ne prepozna (računar), podrazumijeva se iPhone.
  * `data-deck`: aplikacija je u telefonu prezentacije — bez dev trake.
+ * `data-standalone`: otvorena s početnog ekrana — kapija iz serverskog HTML-a
+ * se ne crta (globals.css), inače bljesne njena boja prije hidracije.
  */
-const OS_SCRIPT = `try{if(!/^\\/(prezentacija|admin)/.test(location.pathname)){var u=navigator.userAgent,o=sessionStorage.getItem('stihdana:os')||(/iPhone|iPad|iPod/.test(u)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'ios':/Android/.test(u)?'android':'ios');document.documentElement.dataset.os=o}}catch(e){}try{if(self!==top&&top.location.pathname.indexOf('/prezentacija')===0)document.documentElement.dataset.deck=''}catch(e){}`
+const OS_SCRIPT = `try{if(!/^\\/(prezentacija|admin)/.test(location.pathname)){var u=navigator.userAgent,o=sessionStorage.getItem('stihdana:os')||(/iPhone|iPad|iPod/.test(u)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'ios':/Android/.test(u)?'android':'ios');document.documentElement.dataset.os=o}}catch(e){}try{if(self!==top&&top.location.pathname.indexOf('/prezentacija')===0)document.documentElement.dataset.deck=''}catch(e){}try{if(matchMedia('(display-mode: standalone)').matches||navigator.standalone)document.documentElement.dataset.standalone=''}catch(e){}`
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
