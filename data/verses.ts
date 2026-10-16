@@ -37,6 +37,8 @@ export type Verse = {
   mood: Mood
   /** YouTube link ili ID — dugme za slušanje ispod stiha */
   youtube?: string
+  /** font stiha (lib/fonts.ts): `"a"` ili `"a+b"` — b za zadnji red */
+  font?: string
 }
 
 export const VERSES: Verse[] = [

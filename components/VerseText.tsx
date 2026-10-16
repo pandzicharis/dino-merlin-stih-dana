@@ -1,5 +1,6 @@
 'use client'
 
+import { parseFont, wordFont } from '@/lib/fonts'
 import { Fragment } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { withPeriod } from '@/lib/text'
@@ -41,6 +42,7 @@ export function VerseText({
   color,
   glow,
   appearAt,
+  font,
 }: {
   text: string
   color: string
@@ -48,11 +50,14 @@ export function VerseText({
   /** splash: stih se ne ispisuje — cijeli se pojavi u ovom trenutku, kad mu
    *  slova s papira stignu na mjesto, pa izgleda kao da su prenesena */
   appearAt?: number
+  /** font stiha (lib/fonts.ts) — glavni i po riječi */
+  font?: string
 }) {
   const reduced = useReducedMotion()
   // Tačka dolazi iz `withPeriod` — u podacima je stih bez nje.
   const full = withPeriod(text)
   const lines = full.split('\n')
+  const fonts = parseFont(font)
   const style = {
     color,
     fontSize: verseFontSize(full),
@@ -71,11 +76,24 @@ export function VerseText({
         className="verse"
         style={style}
       >
-        {lines.map((l, i) => (
-          <span key={i} className="block">
-            {l}
-          </span>
-        ))}
+        {(() => {
+          let n = 0
+          return lines.map((l, i) => (
+            <span key={i} className="block">
+              {l
+                .trim()
+                .split(/\s+/)
+                .map((word, j) => {
+                  const k = n++
+                  return (
+                    <Fragment key={j}>
+                      <span style={wordFont(fonts, k)}>{word}</span>{' '}
+                    </Fragment>
+                  )
+                })}
+            </span>
+          ))
+        })()}
       </motion.p>
     )
   }
@@ -98,6 +116,7 @@ export function VerseText({
                 <Fragment key={`${li}-${i}`}>
                   <motion.span
                     className="inline-block"
+                    style={wordFont(fonts, i)}
                     // bez blur filtera — po riječi je na iPhoneu preskup i koči ispis
                     initial={appearAt != null ? { opacity: 0 } : { opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}

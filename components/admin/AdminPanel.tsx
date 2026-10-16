@@ -12,6 +12,7 @@ import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview } from './DevicePreview'
 import { PrintSlips } from './PrintSlips'
+import { VERSE_FONTS, VERSE_FONT_KEYS, parseFont, sameStyle, stringifyFont, styleCss, styleOf, verseWords, type VerseFont, type WordStyle } from '@/lib/fonts'
 import { DrawerIcon } from '../DrawerIcon'
 
 type AdminVerse = Verse & { active: boolean }
@@ -20,7 +21,7 @@ type Snapshot = {
   source: 'supabase' | 'file' | 'static'
   writable: 'supabase' | 'file' | null
 }
-type Draft = { text: string; song: string; album: string; year: string; mood: Mood; youtube: string }
+type Draft = { text: string; song: string; album: string; year: string; mood: Mood; youtube: string; font: string }
 type Op =
   | { op: 'add'; verse: Draft }
   | { op: 'update'; id: string; verse: Draft }
@@ -700,6 +701,7 @@ function Editor({
     year: String(initial?.year ?? ''),
     mood: initial?.mood ?? 'nostalgija',
     youtube: initial?.youtube ?? '',
+    font: initial?.font ?? '',
   })
 
   // Na računaru pregled je visok koliko i forma (forma ima svoju visinu,
@@ -734,6 +736,7 @@ function Editor({
       year: Number(d.year) || new Date().getFullYear(),
       mood: d.mood,
       ...(d.youtube.trim() ? { youtube: d.youtube.trim() } : {}),
+      ...(d.font ? { font: d.font } : {}),
     }),
     [d, initial?.id],
   )
@@ -802,6 +805,9 @@ function Editor({
           </span>
         </label>
 
+        {/* font — glavni za cijeli stih, pa po želji riječ po riječ */}
+        <FontPicker value={d.font} text={d.text} onChange={(font) => setD({ ...d, font })} labelCls={labelCls} />
+
         {/* pjesma */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">
           <label className="col-span-2 block md:col-span-1">
@@ -864,7 +870,7 @@ function Editor({
                   key={k}
                   data-edit-mood={k}
                   onClick={() => setD({ ...d, mood: k })}
-                  className="relative flex h-14 items-center gap-2.5 md:h-11 overflow-hidden rounded-2xl border px-3.5 text-left text-[13px] transition-colors"
+                  className="relative flex h-14 items-center gap-2.5 md:h-10 overflow-hidden rounded-2xl border px-3.5 text-left text-[13px] transition-colors"
                   style={{
                     borderColor: on ? m.accent : 'rgba(255,255,255,0.08)',
                     background: `radial-gradient(circle at 15% 20%, ${m.gradient[2]} 0%, transparent 70%), radial-gradient(circle at 90% 90%, ${m.gradient[1]} 0%, transparent 70%), ${m.gradient[0]}`,
@@ -891,6 +897,151 @@ function Editor({
       </form>
       </div>
     </Sheet>
+  )
+}
+
+/**
+ * Fontovi stiha red po red — svaki red svoj font (npr. prvi red klasični,
+ * drugi pisani), podebljano (B) i ukoso (I; samo klasični). Podrazumijevano
+ * svi redovi imaju današnji font (Fraunces).
+ */
+function FontPicker({
+  value,
+  text,
+  onChange,
+  labelCls,
+}: {
+  value: string
+  text: string
+  onChange: (font: string) => void
+  labelCls: string
+}) {
+  const map = parseFont(value)
+  const rows = verseWords(text)
+  const starts = rows.reduce<number[]>((acc, r, i) => [...acc, i ? acc[i - 1] + rows[i - 1].length : 0], [])
+  // stil reda — ako su sve riječi istog stila; inače stil prve riječi
+  const styleOfLine = (li: number): WordStyle => styleOf(map, starts[li])
+  const uniform = (li: number) => rows[li].every((_, j) => sameStyle(styleOf(map, starts[li] + j), styleOfLine(li)))
+  const setLine = (li: number, patch: Partial<WordStyle>) => {
+    const cur = styleOfLine(li)
+    const next: WordStyle = { ...cur, ...patch }
+    if (VERSE_FONTS[next.font].kind === 'pisani') delete next.italic
+    if (!next.bold) delete next.bold
+    if (!next.italic) delete next.italic
+    const words = { ...map.words }
+    rows[li].forEach((_, j) => {
+      if (sameStyle(next, map.main)) delete words[starts[li] + j]
+      else words[starts[li] + j] = next
+    })
+    onChange(stringifyFont({ main: map.main, words }) ?? '')
+  }
+
+  return (
+    <div>
+      <p className={labelCls}>
+        Font <span className="normal-case tracking-normal text-white/30">— red po red (klasični, pa pisani · B podebljano · I ukoso)</span>
+      </p>
+      <div className="mt-2 space-y-1 rounded-xl border border-white/[0.06] bg-black/25 p-1.5">
+        {rows.length === 0 && <p className="px-1 py-1.5 text-[12px] text-white/35">Upiši stih — svaki red dobije svoj izbor fonta.</p>}
+        {rows.map((r, li) => {
+          const st = styleOfLine(li)
+          return (
+            <FontRow
+              key={li}
+              label={`${li + 1}. red`}
+              style={uniform(li) ? st : null}
+              onPick={(k) => setLine(li, { font: k })}
+              onBold={() => setLine(li, { bold: !st.bold })}
+              onItalic={() => setLine(li, { italic: !st.italic })}
+              data={String(li)}
+            >
+              {r.map((w, j) => (
+                <span key={j} style={{ ...styleCss(styleOf(map, starts[li] + j)), fontSize: undefined, lineHeight: undefined, paddingInline: undefined }}>
+                  {w}{' '}
+                </span>
+              ))}
+            </FontRow>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Red u izboru fonta: oznaka, tekst u svom stilu, šest "Aa" dugmića, B i I. */
+function FontRow({
+  label,
+  children,
+  style,
+  onPick,
+  onBold,
+  onItalic,
+  data,
+}: {
+  label: React.ReactNode
+  children?: React.ReactNode
+  /** stil reda; null kad su riječi u redu različite */
+  style: WordStyle | null
+  onPick: (k: VerseFont) => void
+  onBold: () => void
+  onItalic: () => void
+  data?: string
+}) {
+  const tile = (on: boolean) => ({
+    borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.08)',
+    background: on ? `${BRAND.gold}26` : 'rgba(0,0,0,0.3)',
+    color: on ? '#fff' : 'rgba(255,255,255,0.65)',
+  })
+  const script = style ? VERSE_FONTS[style.font].kind === 'pisani' : false
+  return (
+    <div className="flex items-center gap-2" data-edit-font-row={data}>
+      <span className="w-11 shrink-0 text-[10px] uppercase tracking-[0.14em] text-white/40">{label}</span>
+      <span className="min-w-0 flex-1 truncate text-[15px] text-white/85">{children}</span>
+      <div className="flex gap-1">
+        {VERSE_FONT_KEYS.map((k) => {
+          const f = VERSE_FONTS[k]
+          const on = style?.font === k
+          return (
+            <button
+              type="button"
+              key={k}
+              onClick={() => onPick(k)}
+              data-edit-font-pick={`${data}-${k}`}
+              title={`${f.label} · ${f.kind === 'pisani' ? 'pisani' : 'klasični'}`}
+              aria-pressed={on}
+              className="flex h-7 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors"
+              style={tile(on)}
+            >
+              <span style={{ fontFamily: `${f.family}, serif`, fontSize: `${15 * f.scale}px`, lineHeight: 1 }}>Aa</span>
+            </button>
+          )
+        })}
+        <span className="mx-0.5 w-px self-stretch bg-white/10" aria-hidden />
+        <button
+          type="button"
+          onClick={onBold}
+          data-edit-font-b={data}
+          title="Podebljano"
+          aria-pressed={Boolean(style?.bold)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-[13px] font-bold transition-colors"
+          style={tile(Boolean(style?.bold))}
+        >
+          B
+        </button>
+        <button
+          type="button"
+          onClick={onItalic}
+          data-edit-font-i={data}
+          disabled={script}
+          title={script ? 'Pisani font je već ukoso' : 'Ukoso'}
+          aria-pressed={Boolean(style?.italic)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border font-serif text-[14px] italic transition-colors disabled:opacity-30"
+          style={tile(Boolean(style?.italic))}
+        >
+          I
+        </button>
+      </div>
+    </div>
   )
 }
 

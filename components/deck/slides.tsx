@@ -952,7 +952,19 @@ function NoviStih() {
     await type('input[name="youtube"]', 'https://www.youtube.com/watch?v=kquGKS-qhn8', 18)
     await wait(400)
     await click('[data-edit-mood="ljubav"]')
-    await wait(1400)
+    await wait(1000)
+    if (!alive()) return
+    // fontovi red po red: prvi red klasični, drugi pisani, pa podebljano i ukoso
+    await click('[data-edit-font-pick="0-cormorant"]')
+    await wait(900)
+    await click('[data-edit-font-pick="1-greatvibes"]')
+    await wait(1100)
+    await click('[data-edit-font-i="0"]')
+    await wait(900)
+    await click('[data-edit-font-pick="1-parisienne"]')
+    await wait(900)
+    await click('[data-edit-font-b="1"]')
+    await wait(1300)
     if (!alive()) return
     // pregled: računar, pa nazad telefon
     await click('[data-device="desktop"]')
@@ -965,8 +977,8 @@ function NoviStih() {
   return (
     <>
       <Text>
-        Tekst, pjesma, album, godina, raspoloženje i YouTube. Pored je pravi ekran aplikacije, na telefonu ili
-        računaru, i mijenja se dok se kuca.
+        Tekst, pjesma, album, godina, raspoloženje, YouTube — i font red po red: klasični ili pisani, podebljano,
+        ukoso. Pored je pravi ekran aplikacije, na telefonu ili računaru, i mijenja se dok se kuca.
       </Text>
       <Bullets
         items={[<><b>Novi stih je u špilu odmah</b> — izvlači se od sutra, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>]}

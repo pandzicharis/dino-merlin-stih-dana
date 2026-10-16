@@ -302,6 +302,8 @@ alter table verse_schedule add column if not exists manual boolean not null defa
 
 -- Arhiviran stih ne ulazi u raspored, ali ostaje za prošle dane i stare linkove.
 alter table verses add column if not exists active boolean not null default true;
+-- font stiha iz admina (lib/fonts.ts): "cormorant;4-6:greatvibes.b"; prazno = Fraunces
+alter table verses add column if not exists font text;
 
 -- Sitna podešavanja kataloga; za sada samo `plan_start` — dan od kojeg se
 -- raspored računa (sve prije njega je zaključano u verse_schedule).

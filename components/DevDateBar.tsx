@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { MOOD_KEYS } from '@/data/moods'
 import { TIPS_ON, startTips } from './Tips'
-import { playIntro } from './IntroSplash'
+import { playIntro, playTombola } from './IntroSplash'
 import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
 import { redraw } from '@/lib/draw'
 
@@ -17,11 +17,23 @@ export function DevDateBar({
   date,
   verseId,
   mood,
+  verses = [],
 }: {
   date: string
   verseId: string
   mood: string
+  /** svi stihovi — za izbor stiha koji se prikaže (`?verse=`) */
+  verses?: { id: string; text: string; song: string; active?: boolean }[]
 }) {
+  /** Tačno ovaj stih (`?verse=`), ili prazno = izvučen kao i inače. */
+  const pickVerse = (id: string) => {
+    const url = new URL(window.location.href)
+    if (id) url.searchParams.set('verse', id)
+    else url.searchParams.delete('verse')
+    window.history.replaceState(null, '', url)
+    window.dispatchEvent(new Event('devdatechange'))
+  }
+  const forced = typeof window === 'undefined' ? '' : (new URLSearchParams(window.location.search).get('verse') ?? '')
   const move = (n: number) => setDevDate(addDays(date, n))
   const reset = () => setDevDate(null)
 
@@ -84,6 +96,10 @@ export function DevDateBar({
           tips
         </button>
       )}
+      {/* splash i tombola sa stihom na ekranu — i s onim izabranim dolje */}
+      <button onClick={() => playTombola()} className="px-1.5 text-white/50 hover:text-white">
+        tombola
+      </button>
       <button onClick={() => playIntro(true)} className="px-1.5 text-white/50 hover:text-white">
         splash
       </button>
@@ -108,9 +124,21 @@ export function DevDateBar({
       <span className="ml-auto text-white/40">
         dan {day}
       </span>
-      <span className="text-white">
-        {verseId} · {mood}
-      </span>
+      <select
+        value={forced}
+        onChange={(e) => pickVerse(e.target.value)}
+        title="Koji stih se prikaže"
+        className="max-w-[min(46vw,320px)] truncate rounded border border-white/15 bg-black px-1.5 py-0.5 text-white outline-none [color-scheme:dark]"
+      >
+        <option value="">izvučen · {verseId}</option>
+        {verses.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.active === false ? '(arhiva) ' : ''}
+            {v.song} — {v.text.split('\n')[0].slice(0, 40)}
+          </option>
+        ))}
+      </select>
+      <span className="text-white/60">{mood}</span>
     </div>
   )
 }

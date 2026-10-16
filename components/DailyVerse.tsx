@@ -52,7 +52,13 @@ export function DailyVerse({
     }
   }, [verseId, listed])
 
-  const verse = verseId ? (listed ?? (fetched?.id === verseId ? fetched : undefined)) : drawn?.verse
+  const picked = verseId ? (listed ?? (fetched?.id === verseId ? fetched : undefined)) : drawn?.verse
+  // dev: `?font=greatvibes` ili `?font=cormorant+parisienne` — pregled fontova (lib/fonts.ts)
+  const devFont =
+    process.env.NODE_ENV !== 'production' && typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('font')
+      : null
+  const verse = picked && devFont ? { ...picked, font: devFont } : picked
 
   // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka
   const [replay, setReplay] = useState(0)
@@ -124,10 +130,10 @@ export function DailyVerse({
           i stih uđu zajedno, kao i inače */}
       {verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} />}
       {/* key: novi stih — zastor od prvog frejma, prije tombole */}
-      {verse && <IntroHost key={verse.id} text={verse.text} others={others} mood={tone} date={date} onLand={land} fresh={fresh} />}
+      {verse && <IntroHost key={verse.id} text={verse.text} others={others} mood={tone} date={date} onLand={land} fresh={fresh} font={verse.font} />}
       <Tips />
       <UpdatePrompt accent={MOODS[tone].accent} />
-      {verse && <DevDateBar date={date} verseId={verse.id} mood={tone} />}
+      {verse && <DevDateBar date={date} verseId={verse.id} mood={tone} verses={verses} />}
     </>
   )
 }

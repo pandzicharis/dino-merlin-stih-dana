@@ -136,7 +136,7 @@ export function VerseScreen({
             </motion.p>
           )}
 
-          <VerseText key={`${verse.id}-${replay}`} text={verse.text} color={m.text} glow={m.accent} appearAt={arrive} />
+          <VerseText key={`${verse.id}-${replay}`} text={verse.text} color={m.text} glow={m.accent} appearAt={arrive} font={verse.font} />
 
           {/* odmah ispod stiha — sačuvati se želi baš ono što se upravo pročitalo */}
           {!compact && (

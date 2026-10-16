@@ -24,6 +24,7 @@
  *   3. `data/verses.ts` — početna lista; samo za čitanje
  */
 
+import { parseFont, stringifyFont } from './fonts'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { unstable_cache, revalidatePath, revalidateTag } from 'next/cache'
@@ -55,6 +56,8 @@ type VerseRow = {
   year: number
   mood: string
   youtube: string | null
+  /** font stiha (lib/fonts.ts); kolone nema dok se ne pokrene shema */
+  font?: string | null
   sort: number
   active: boolean | null
 }
@@ -68,6 +71,7 @@ function fromRow(r: VerseRow): CatalogVerse {
     year: r.year,
     mood: (MOOD_KEYS as string[]).includes(r.mood) ? (r.mood as Mood) : 'nostalgija',
     ...(r.youtube ? { youtube: r.youtube } : {}),
+    ...(r.font ? { font: r.font } : {}),
     active: r.active !== false,
   }
 }
@@ -80,19 +84,17 @@ function missing(code?: string) {
 async function readSupabase(): Promise<Catalog | null> {
   const db = supabase()
   if (!db) return null
-  const v = await db
-    .from('verses')
-    .select('id,text,song,album,year,mood,youtube,sort,active')
-    .order('sort')
-    .order('id')
-    .range(0, 9999)
+  const read = (cols: string) => db.from('verses').select(cols).order('sort').order('id').range(0, 9999)
+  let v = await read('id,text,song,album,year,mood,youtube,font,sort,active')
+  // kolona `font` još nije dodana u bazu — stihovi i dalje rade, bez fonta
+  if (v.error?.code === '42703') v = await read('id,text,song,album,year,mood,youtube,sort,active')
   if (v.error) {
     if (missing(v.error.code)) return null
     throw new Error(`verses: ${v.error.message}`)
   }
   // prazna tabela = admin još ništa nije upisao → početna lista
   if (!v.data?.length) return null
-  return { verses: (v.data as VerseRow[]).map(fromRow), source: 'supabase' }
+  return { verses: (v.data as unknown as VerseRow[]).map(fromRow), source: 'supabase' }
 }
 
 async function readFile(): Promise<Catalog | null> {
@@ -192,11 +194,18 @@ async function save(next: Draft, target: 'supabase' | 'file') {
     year: v.year,
     mood: v.mood,
     youtube: v.youtube ?? null,
+    // font samo kad ga neki stih ima — tako upis radi i bez kolone u bazi
+    ...(next.verses.some((x) => x.font) ? { font: v.font ?? null } : {}),
     sort: i,
     active: v.active,
     updated_at: new Date().toISOString(),
   }))
   const up = await db.from('verses').upsert(rows)
+  if (up.error && missing(up.error.code)) {
+    throw new CatalogError(
+      'Font se ne može sačuvati — u Supabase SQL Editoru pokreni: alter table verses add column if not exists font text;',
+    )
+  }
   if (up.error) throw new CatalogError(up.error.message)
 }
 
@@ -257,6 +266,9 @@ export function validateVerse(input: Partial<Verse>): { verse?: Omit<Verse, 'id'
   const year = Number(input.year)
   const mood = String(input.mood ?? '')
   const youtube = String(input.youtube ?? '').trim()
+  // font: provjeren i sređen zapis (lib/fonts.ts); nepoznato se odbaci
+  const font = String(input.font ?? '').trim().slice(0, 300)
+  const cleanFont = font ? stringifyFont(parseFont(font)) : undefined
 
   if (!text) return { error: 'Stih je prazan.' }
   if (text.split('\n').length > 3) return { error: 'Najviše 3 reda.' }
@@ -268,5 +280,7 @@ export function validateVerse(input: Partial<Verse>): { verse?: Omit<Verse, 'id'
   if (youtube && !/^(https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/|[\w-]{11}$)/.test(youtube)) {
     return { error: 'YouTube link nije ispravan.' }
   }
-  return { verse: { text, song, album, year, mood: mood as Mood, ...(youtube ? { youtube } : {}) } }
+  return {
+    verse: { text, song, album, year, mood: mood as Mood, ...(youtube ? { youtube } : {}), ...(cleanFont ? { font: cleanFont } : {}) },
+  }
 }

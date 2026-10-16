@@ -1,5 +1,6 @@
 'use client'
 
+import { parseFont, preloadFonts, wordFont } from '@/lib/fonts'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { AnimatePresence, motion, useReducedMotion, type Easing } from 'motion/react'
 import { COLORS, rng } from './deck/PaperToPhone'
@@ -34,6 +35,12 @@ const SEEN = 'stihdana:intro'
 /** Poslije dozvole za obavijesti: gomila papirića, pa savjeti. `force` — uvijek (dev, prezentacija). */
 export function playIntro(force = false) {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: { force } }))
+}
+
+/** Dev: tombola odmah, sa stihom koji je na ekranu (i izabranim u dev traci). */
+const TOMBOLA = 'stihdana:tombola'
+export function playTombola() {
+  window.dispatchEvent(new Event(TOMBOLA))
 }
 
 /** Prvo otvaranje u danu, kad je stih tek izvučen. Dok je kapija otvorena, čeka. */
@@ -85,6 +92,7 @@ export function IntroHost({
   date,
   onLand,
   fresh = false,
+  font,
 }: {
   text: string
   /** ostali stihovi iz liste — za papiriće u gomili na prvom otvaranju */
@@ -95,10 +103,14 @@ export function IntroHost({
   onLand: () => void
   /** prvo otvaranje danas — ekran sa stihom se ne smije vidjeti prije izvlačenja */
   fresh?: boolean
+  /** font stiha (lib/fonts.ts) — papirić ga ima od prvog kadra */
+  font?: string
 }) {
   const m = MOODS[mood]
   const bg = m.gradient[0]
   const lines = useMemo(() => [text, ...others], [text, others])
+  // fontovi stiha se učitaju odmah — prije nego što se papirić pojavi
+  useEffect(() => preloadFonts(font), [font])
   const reduced = useReducedMotion()
   const [on, setOn] = useState<{ first: boolean; demo: boolean } | null>(null)
   // svako novo izvlačenje iz prezentacije kreće ispočetka, i usred prethodnog
@@ -171,11 +183,19 @@ export function IntroHost({
       setHold(true)
       setPending(true)
     }
+    const tombola = () => {
+      stopTips()
+      setPending(false)
+      setRun((r) => r + 1)
+      setOn({ first: false, demo: false })
+    }
     window.addEventListener(EVENT, go)
     window.addEventListener(DRAW, draw)
+    window.addEventListener(TOMBOLA, tombola)
     return () => {
       window.removeEventListener(EVENT, go)
       window.removeEventListener(DRAW, draw)
+      window.removeEventListener(TOMBOLA, tombola)
     }
   }, [reduced])
 
@@ -206,9 +226,9 @@ export function IntroHost({
     {/* splash/tombola imaju svoju punu podlogu — zastor samo dok ne krenu (done ga skloni) */}
     {hold && !on && <div className="fixed inset-0 z-[59]" style={{ background: bg }} aria-hidden />}
     <AnimatePresence>
-      {on?.first && <IntroSplash key={`uvod-${run}`} lines={lines} bg={bg} onLand={onLand} onDone={done} />}
+      {on?.first && <IntroSplash key={`uvod-${run}`} lines={lines} font={font} bg={bg} onLand={onLand} onDone={done} />}
       {on && !on.first && (
-        <Tombola key={`tombola-${run}`} text={text} bg={bg} accent={m.accent} date={date} demo={on.demo} onLand={onLand} onDone={done} />
+        <Tombola key={`tombola-${run}`} text={text} font={font} bg={bg} accent={m.accent} date={date} demo={on.demo} onLand={onLand} onDone={done} />
       )}
     </AnimatePresence>
     </>
@@ -272,6 +292,7 @@ const RING = 2 * Math.PI * RING_R
  */
 function Tombola({
   text,
+  font,
   bg,
   accent,
   date,
@@ -280,6 +301,8 @@ function Tombola({
   onDone,
 }: {
   text: string
+  /** font stiha — izvučeni listić i slova koja lete */
+  font?: string
   bg: string
   accent: string
   date: string
@@ -895,16 +918,12 @@ function Tombola({
             animate={phase === 'fly' && to ? { opacity: 0 } : { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)', scale: 1 }}
             transition={phase === 'fly' ? { duration: 0 } : { delay: RISE + 0.3, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
           >
-            {text.split('\n').map((l, j) => (
-              <span key={j} className="block">
-                {l}
-              </span>
-            ))}
+            <PaperVerse text={text} font={font} />
           </motion.div>
         </motion.div>
       )}
 
-      {phase === 'fly' && to && <FlyText to={to} text={text} />}
+      {phase === 'fly' && to && <FlyText to={to} text={text} font={font} />}
     </motion.div>
   )
 }
@@ -1008,11 +1027,13 @@ const AT = { lift: 2500, fly: 4000, end: 5500 }
  */
 function IntroSplash({
   lines,
+  font,
   bg,
   onLand,
   onDone,
 }: {
   lines: string[]
+  font?: string
   bg: string
   onLand: () => void
   onDone: () => void
@@ -1255,17 +1276,14 @@ function IntroSplash({
           style={{ ...paper, color: '#1d1a16' }}
           initial={{ opacity: 1 }}
           animate={phase === 'fly' && to ? { opacity: 0 } : {}}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
+          // kopija koja leti je od prvog kadra tačno preko — zamjena odmah
+          transition={{ duration: 0 }}
         >
-          {(lines[0] ?? '').split('\n').map((l, j) => (
-            <span key={j} className="block">
-              {l}
-            </span>
-          ))}
+          <PaperVerse text={lines[0] ?? ''} font={font} />
         </motion.div>
       </motion.div>
 
-      {phase === 'fly' && to && <FlyText to={to} text={lines[0] ?? ''} />}
+      {phase === 'fly' && to && <FlyText to={to} text={lines[0] ?? ''} font={font} />}
     </motion.div>
   )
 }
@@ -1331,7 +1349,7 @@ function fall(p: Strip, vh: number): Keyframe[] {
 /** Jedan pokret: tekst s papira (već u slovima stiha) putuje i raste do
  *  stiha na ekranu. Na kraju je identičan stihu, pa ga stih zamijeni bez
  *  skoka — kopija stoji na mjestu stiha, pomak je vraća na papir. */
-function FlyText({ to, text }: { to: Transfer; text: string }) {
+function FlyText({ to, text, font }: { to: Transfer; text: string; font?: string }) {
   return (
     <motion.p
       className="verse pointer-events-none absolute m-0 text-center"
@@ -1357,7 +1375,7 @@ function FlyText({ to, text }: { to: Transfer; text: string }) {
         // tamna se skloni tek kad svijetla uđe — u prelazu slova ne izblijede
         transition={{ duration: 0.3, delay: 0.4, ease: 'easeOut' }}
       >
-        <VerseLines text={text} />
+        <VerseLines text={text} font={font} />
       </motion.span>
       <motion.span
         className="absolute inset-0 block"
@@ -1366,7 +1384,7 @@ function FlyText({ to, text }: { to: Transfer; text: string }) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.05, ease: 'easeInOut' }}
       >
-        <VerseLines text={text} />
+        <VerseLines text={text} font={font} />
       </motion.span>
     </motion.p>
   )
@@ -1424,7 +1442,9 @@ function measureTransfer(lift = 0.1, scale = LIFT_S): Transfer | null {
 }
 
 /** Stih po redovima, riječi kao na ekranu (inline-block + razmak). */
-function VerseLines({ text }: { text: string }) {
+function VerseLines({ text, font }: { text: string; font?: string }) {
+  const map = parseFont(font)
+  let n = 0
   return (
     <>
       {withPeriod(text)
@@ -1434,13 +1454,43 @@ function VerseLines({ text }: { text: string }) {
             {l
               .trim()
               .split(/\s+/)
-              .map((w, i) => (
-                <Fragment key={i}>
-                  <span className="inline-block">{w}</span>{' '}
-                </Fragment>
-              ))}
+              .map((w, i) => {
+                const k = n++
+                return (
+                  <Fragment key={i}>
+                    <span className="inline-block" style={wordFont(map, k)}>
+                      {w}
+                    </span>{' '}
+                  </Fragment>
+                )
+              })}
           </span>
         ))}
+    </>
+  )
+}
+
+/** Stih na papiriću — isti fontovi po riječi kao na ekranu (bez tačke, kao do sada). */
+function PaperVerse({ text, font }: { text: string; font?: string }) {
+  const map = parseFont(font)
+  let n = 0
+  return (
+    <>
+      {text.split('\n').map((l, j) => (
+        <span key={j} className="block">
+          {l
+            .trim()
+            .split(/\s+/)
+            .map((w, i) => {
+              const k = n++
+              return (
+                <Fragment key={i}>
+                  <span style={wordFont(map, k)}>{w}</span>{' '}
+                </Fragment>
+              )
+            })}
+        </span>
+      ))}
     </>
   )
 }
