@@ -7,7 +7,7 @@ import type { Verse } from '@/data/verses'
 import { MOODS, MOOD_KEYS, type Mood } from '@/data/moods'
 import { ALBUMS, albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
-import { audioSlug, asWritten, youtubeId } from '@/lib/text'
+import { audioSlug, asWritten, sameVerse, youtubeId } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview, DeviceSwitch, phoneWidth, type Device } from './DevicePreview'
@@ -240,6 +240,8 @@ export function AdminPanel() {
                 busy={busy}
                 onClose={() => setEditor(null)}
                 onSave={async (draft) => {
+                  if (data.verses.some((v) => v.id !== editor.verse?.id && sameVerse(v, draft)))
+                    return flash('Ovaj stih već postoji', true)
                   const ok = editor.verse
                     ? await send({ op: 'update', id: editor.verse.id, verse: draft }, 'Stih je sačuvan')
                     : await send({ op: 'add', verse: draft }, 'Stih je dodan · ulazi u izvlačenje od sutra')
@@ -280,20 +282,27 @@ export function AdminPanel() {
 
       <AnimatePresence>
         {toast && (
-          <motion.p
-            className="fixed inset-x-0 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-[120] mx-auto w-fit max-w-[90vw] rounded-full border px-5 py-2.5 text-center text-[13px] shadow-2xl backdrop-blur"
-            style={{
-              borderColor: toast.bad ? 'rgba(253,164,175,0.3)' : `${BRAND.gold}55`,
-              background: 'rgba(10,9,9,0.92)',
-              color: toast.bad ? '#fecdd3' : '#f5ecd9',
-            }}
-            initial={{ opacity: 0, y: 10 }}
+          <motion.div
+            key={toast.text}
+            className="pointer-events-none fixed inset-x-0 bottom-0 z-[140] flex justify-center px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))]"
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            role="status"
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 240 }}
           >
-            {toast.text}
-          </motion.p>
+            {/* isti oblik kao dugme "Nova verzija — osvježi" */}
+            <p
+              role="status"
+              className="max-w-[90vw] rounded-full border px-5 py-3 text-center text-[10.5px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+              style={{
+                color: toast.bad ? '#fda4af' : BRAND.gold,
+                borderColor: toast.bad ? 'rgba(253,164,175,0.3)' : `${BRAND.gold}4D`,
+                backgroundColor: 'rgba(0,0,0,0.55)',
+              }}
+            >
+              {toast.text}
+            </p>
+          </motion.div>
         )}
       </AnimatePresence>
     </PageShell>

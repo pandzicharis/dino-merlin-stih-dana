@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isAdmin } from '@/lib/admin-auth'
 import { CatalogError, mutateCatalog, readCatalog, slugify, validateVerse, writable, type Catalog } from '@/lib/catalog'
-import { youtubeId } from '@/lib/text'
+import { sameVerse } from '@/lib/text'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,13 +26,9 @@ export async function GET() {
   })
 }
 
-const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
-
-/** Isti stih: isti tekst, pjesma, album i YouTube link. */
+/** Isti stih se ne dodaje dva puta. */
 function duplicate(c: Pick<Catalog, 'verses'>, v: { text: string; song: string; album: string; youtube?: string }, except?: string) {
-  if (c.verses.some((x) => x.id !== except && norm(x.text) === norm(v.text) && norm(x.song) === norm(v.song) &&
-      norm(x.album) === norm(v.album) && youtubeId(x.youtube) === youtubeId(v.youtube)))
-    throw new CatalogError('Ovaj stih već postoji.')
+  if (c.verses.some((x) => x.id !== except && sameVerse(x, v))) throw new CatalogError('Ovaj stih već postoji')
 }
 
 type Op =

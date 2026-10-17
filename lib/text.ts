@@ -16,6 +16,19 @@ export function youtubeId(input?: string): string | null {
   return m ? m[1] : null
 }
 
+/** tekst bez velikih slova, kvačica, interpunkcije i viška razmaka */
+const loose = (s = '') =>
+  s.toLowerCase().replace(/đ/g, 'dj').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+
+type VerseKey = { text: string; song: string; album?: string; youtube?: string }
+
+/** Isti stih: isti tekst (bez obzira na interpunkciju i kvačice) iz iste pjesme ili s istog linka. */
+export function sameVerse(a: VerseKey, b: VerseKey): boolean {
+  if (loose(a.text) !== loose(b.text)) return false
+  const ya = youtubeId(a.youtube)
+  return loose(a.song) === loose(b.song) || (ya !== null && ya === youtubeId(b.youtube))
+}
+
 /** `Moj je život Švicarska` → `moj-je-zivot-svicarska` — ime fajla pjesme u public/audio */
 export function audioSlug(song: string): string {
   return song
