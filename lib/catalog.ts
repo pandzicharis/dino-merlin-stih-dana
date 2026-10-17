@@ -31,6 +31,7 @@ import { join } from 'node:path'
 import { unstable_cache, revalidatePath, revalidateTag } from 'next/cache'
 import { VERSES, type Verse } from '@/data/verses'
 import { MOOD_KEYS, type Mood } from '@/data/moods'
+import { albumOf } from '@/data/albums'
 import { supabase } from './supabase'
 
 export type CatalogVerse = Verse & {
@@ -68,7 +69,8 @@ function fromRow(r: VerseRow): CatalogVerse {
     id: r.id,
     text: r.text,
     song: r.song,
-    album: r.album,
+    // naziv uvijek s liste albuma — stariji zapisi (npr. puni naziv) se prikažu po novom
+    album: albumOf(r.album)?.title ?? r.album,
     year: r.year,
     mood: (MOOD_KEYS as string[]).includes(r.mood) ? (r.mood as Mood) : 'nostalgija',
     ...(r.youtube ? { youtube: r.youtube } : {}),

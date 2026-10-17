@@ -71,26 +71,26 @@ export function Poster({ data, width, style }: { data: PosterData; width: string
     <Sheet width={width} ratio={Math.SQRT2} style={style}>
       <Backdrop portrait={{ right: '-14em', top: '-2em', width: '78em', height: '104em' }} />
 
-      <Headline top="6em" sig="9em" h1="10em" sub="2.05em" center />
+      <Headline top="5em" sig="8em" h1="9em" sub="1.9em" center />
 
-      <Phones data={data} top="57em" height="64em" iphone="30em" galaxy="28.6em" spread="68em" />
+      {/* cijeli telefon, s gramofonom — ne tone u donji panel */}
+      <Phones data={data} top="47em" height="52em" iphone="24em" galaxy="22.9em" spread="55em" />
 
-      {/* telefoni tonu u donji panel */}
-      <Fade top="92em" span={13.3} />
+      <Fade top="99em" span={6} />
 
       <div
         style={{
           position: 'absolute',
           left: '7em',
           right: '7em',
-          bottom: '6.5em',
+          bottom: '5.5em',
           display: 'flex',
           alignItems: 'center',
           gap: '5em',
           zIndex: 4,
         }}
       >
-        <QrCard qr={data.qr} width="27em" label="1.45em" />
+        <QrCard qr={data.qr} width="24em" label="1.35em" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <Steps title="2.65em" sub="1.55em" gap="2.1em" />
           <Rule margin="3em 0 2em" />
@@ -153,15 +153,16 @@ export function SocialPost({ data, width, style }: { data: PosterData; width: st
   return (
     <Sheet width={width} ratio={1.25} style={style}>
       <Backdrop portrait={{ right: '-18em', top: '-4em', width: '86em', height: '115em' }} />
-      <Headline top="4.5em" sig="8.5em" h1="9.6em" sub="2.15em" center />
-      <Phones data={data} top="56em" height="56em" iphone="25em" galaxy="23.8em" spread="60em" />
-      <Fade top="86em" span={12} />
+      <Headline top="4em" sig="7.5em" h1="8.4em" sub="1.95em" center />
+      {/* cijeli telefon, s gramofonom — ne tone u poziv ispod */}
+      <Phones data={data} top="44.5em" height="50em" iphone="23em" galaxy="21.9em" spread="53em" />
+      <Fade top="94.5em" span={5} />
       <div
         style={{
           position: 'absolute',
           left: '7em',
           right: '7em',
-          bottom: '11.5em',
+          bottom: '15em',
           zIndex: 4,
           display: 'flex',
           flexDirection: 'column',
@@ -169,14 +170,14 @@ export function SocialPost({ data, width, style }: { data: PosterData; width: st
           textAlign: 'center',
         }}
       >
-        <Platforms size="1.6em" />
-        <LinkPill host={data.host} size="2.4em" style={{ marginTop: '1.5em' }} />
+        <Platforms size="1.5em" />
+        <LinkPill host={data.host} size="2.25em" style={{ marginTop: '1.4em' }} />
       </div>
       {/* znak sam pri dnu, odvojen od poziva */}
       <MagazaMark
-        height={3.6}
+        height={3.4}
         color="rgba(255,255,255,0.85)"
-        style={{ position: 'absolute', left: 0, right: 0, bottom: '3.5em', margin: '0 auto', zIndex: 4 }}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: '5em', margin: '0 auto', zIndex: 4 }}
       />
     </Sheet>
   )
@@ -190,15 +191,16 @@ export function SocialStory({ data, width, style }: { data: PosterData; width: s
   return (
     <Sheet width={width} ratio={16 / 9} style={style}>
       <Backdrop portrait={{ right: '-26em', top: '8em', width: '100em', height: '133em' }} />
-      <Headline top="17em" sig="10em" h1="11em" sub="2.55em" center />
-      <Phones data={data} top="78em" height="72em" iphone="32em" galaxy="30.5em" spread="76em" />
-      <Fade top="118em" span={13} />
+      <Headline top="15em" sig="9em" h1="10em" sub="2.35em" center />
+      {/* cijeli telefon, s gramofonom — ne tone u poziv ispod */}
+      <Phones data={data} top="64em" height="68em" iphone="31em" galaxy="29.5em" spread="72em" />
+      <Fade top="132em" span={5} />
       <div
         style={{
           position: 'absolute',
           left: '8em',
           right: '8em',
-          bottom: '32em',
+          bottom: '28em',
           zIndex: 4,
           display: 'flex',
           flexDirection: 'column',

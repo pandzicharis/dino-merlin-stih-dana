@@ -596,7 +596,8 @@ function Shortcut({ d }: { d: string }) {
 
 /** Plejer ispod stiha — ista ploča kao u SongCredit, mirna, na početku pjesme. */
 function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
-  const width = Math.min(w * 0.84, 320)
+  // kao CARD_W u SongCredit: min(100vw − 2.5rem, 360px)
+  const width = Math.min(w - 40, 360)
   return (
     <div style={{ width: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
       <span style={{ position: 'relative', width: '62em', height: '62em', flexShrink: 0 }}>

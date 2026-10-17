@@ -461,7 +461,7 @@ function AudioSong({ preview = false, ...props }: Source & { preview?: boolean }
   }, [fallback, preview])
 
   return (
-    <div data-tip="song" className="flex w-[min(84vw,320px)] items-center gap-4 text-left">
+    <div data-tip="song" className="flex items-center gap-4 text-left" style={{ width: CARD_W }}>
       {/* ploča visoka koliko i tekst s trakom desno */}
       <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} deck arm />
       <div className="min-w-0 flex-1">
@@ -604,9 +604,12 @@ function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => 
 }
 
 /** Naziv pored ploče: uvijek u jednom redu, nikad preko 15px. */
+/** širina reda s gramofonom — skoro do ivica ekrana, da duži naziv stane */
+const CARD_W = 'min(calc(100vw - 2.5rem), 360px)'
+
 function cardSongSize(song: string): string {
   const em = Math.max(song.length, 1) * 0.9 + 0.18
-  return `min(15px, calc((min(84vw, 320px) - 108px) / ${em.toFixed(2)}))`
+  return `min(15px, calc((${CARD_W} - 108px) / ${em.toFixed(2)}))`
 }
 
 function clock(s: number): string {

@@ -19,7 +19,7 @@ export const ALBUMS: Album[] = [
   { id: 'kokuzna-vremena', title: 'Kokuzna vremena', year: 1985, cover: '/albumi/hq/kokuzna-vremena.webp' },
   {
     id: 'tesko-meni-sa-tobom',
-    title: 'Teško meni sa tobom (a još teže bez tebe)',
+    title: 'Teško meni sa tobom',
     year: 1986,
     cover: '/albumi/hq/tesko-meni-sa-tobom.webp',
   },
