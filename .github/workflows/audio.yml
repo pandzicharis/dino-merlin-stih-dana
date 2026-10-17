@@ -97,9 +97,11 @@ jobs:
 
   # Rezerva: kad GitHubov server ne prođe, isto na Macu (npm run runner).
   # Bez pip/deno — tamo su yt-dlp i ffmpeg iz Homebrewa.
+  # Uključuje se tek kad postoji runner: GitHub → Settings → Secrets and
+  # variables → Actions → Variables → MAC_RUNNER = 1 (inače bi posao čekao).
   mac:
     needs: github
-    if: ${{ failure() }}
+    if: ${{ failure() && vars.MAC_RUNNER == '1' }}
     runs-on: [self-hosted, stih-dana]
     timeout-minutes: 20
     steps:
