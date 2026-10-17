@@ -949,6 +949,13 @@ function Biblioteka() {
     await wait(1800)
     await click('[data-filter="nostalgija"]')
     await wait(700)
+    if (!alive()) return
+    // filter po pjesmi: stihovi čija je pjesma u aplikaciji (♪)
+    if (await click('[data-song-filter="with"]')) {
+      await wait(1600)
+      await click('[data-song-filter="with"]')
+      await wait(700)
+    }
     // stranice: po 10 stihova
     if (await click('[data-page-next]')) {
       await wait(1600)
@@ -965,7 +972,7 @@ function Biblioteka() {
     <>
       <Text>
         Svi aktivni stihovi su špil iz kojeg svako izvlači svoj — nema kalendara ni rasporeda za održavanje. Pretraga,
-        filter po raspoloženju i stranice po 10.
+        filter po raspoloženju i po pjesmi (s njom ili bez nje) i stranice po 10.
       </Text>
       <Bullets
         items={[
