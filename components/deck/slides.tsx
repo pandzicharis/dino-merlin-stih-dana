@@ -1398,17 +1398,15 @@ function Slusanje() {
  */
 function Obavijest({ d }: { d: DeckData }) {
   const { simulate, os, setOs, manual } = useDeck()
-  // sačuvano s ranijih koraka ostaje; ako se skočilo pravo ovamo, sačuva se
-  // današnji — kad se aplikacija otvori, gore stoji ikonica s brojem
+  // stih tek stiže — još ništa nije sačuvano: ispod stiha stoji "Sačuvaj"
+  // (čuvanje dolazi na svom koraku, poslije)
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('stihdana:favorites') ?? '[]')
-      if (!Array.isArray(saved) || saved.length === 0)
-        localStorage.setItem('stihdana:favorites', JSON.stringify([d.todayVerse.id]))
+      localStorage.setItem('stihdana:favorites', '[]')
     } catch {
       /* privatni prozor */
     }
-  }, [d.todayVerse.id])
+  }, [])
   // "Ponovi" — obavijest stiže ispočetka na sistemu koji je upravo na telefonu
   const [replay, setReplay] = useState(0)
   useEffect(() => simulate('lock'), [simulate])
