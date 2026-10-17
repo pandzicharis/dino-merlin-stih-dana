@@ -3,7 +3,7 @@
 import { lookCss, lookScale, parseFont, wordFont } from '@/lib/fonts'
 import { Fragment, useEffect, useRef, useState, type RefObject } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { withPeriod } from '@/lib/text'
+import { asWritten } from '@/lib/text'
 
 /** Red stiha se ne lomi — veličinu slova sredi useFit. */
 const NOWRAP = { whiteSpace: 'nowrap' } as const
@@ -99,8 +99,8 @@ export function VerseText({
   font?: string
 }) {
   const reduced = useReducedMotion()
-  // Tačka dolazi iz `withPeriod` — u podacima je stih bez nje.
-  const full = withPeriod(text)
+  // stih kako je upisan — tačku stavlja urednik, ne aplikacija
+  const full = asWritten(text)
   const lines = full.split('\n')
   const fonts = parseFont(font)
   // svaki red stiha u jednom redu — slova se smanje koliko treba (i za pisane fontove)

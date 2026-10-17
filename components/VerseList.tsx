@@ -3,7 +3,7 @@
 import { albumOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
-import { oneLine, paperCase, withPeriod } from '@/lib/text'
+import { oneLine, paperCase, asWritten } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
 import { SongRow } from './SongCredit'
 
@@ -78,7 +78,7 @@ export function VerseList({
               style={{ fontFamily: 'var(--font-serif), serif', fontVariationSettings: "'opsz' 48, 'SOFT' 30" }}
             >
               {/* lista: uvijek osnovni font i mala slova (samo prvo veliko), kao papirić */}
-              {oneLine(withPeriod(paperCase(verse.text)))}
+              {oneLine(asWritten(paperCase(verse.text)))}
             </p>
 
             <div className="mt-3 flex items-center gap-3 border-t border-white/[0.08] pt-3">

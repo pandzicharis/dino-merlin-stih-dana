@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { oneLine, withPeriod } from '@/lib/text'
+import { oneLine, asWritten } from '@/lib/text'
 import {
   SHARE_FORMATS,
   canvasToBlob,
@@ -78,7 +78,7 @@ export default function SharePanel({
 
   const fileName = `stih-dana-${verse.id}-${format}.jpg`
   const link = typeof location !== 'undefined' ? `${location.origin}/stih/${verse.id}` : ''
-  const caption = `„${oneLine(withPeriod(verse.text))}“ — ${BRAND.name}, ${verse.song}`
+  const caption = `„${oneLine(asWritten(verse.text))}“ — ${BRAND.name}, ${verse.song}`
 
   const imageFile = async () => {
     const blob = canvasRef.current && (await canvasToBlob(canvasRef.current))

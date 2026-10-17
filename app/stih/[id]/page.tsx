@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { findVerse, getCatalog } from '@/lib/catalog'
-import { oneLine, withPeriod } from '@/lib/text'
+import { oneLine, asWritten } from '@/lib/text'
 import { todayInTz } from '@/lib/date'
 import { VerseScreen } from '@/components/VerseScreen'
 import { BackLink } from '@/components/BackLink'
@@ -25,7 +25,7 @@ export async function generateMetadata({
   const v = await findVerse(id)
   if (!v) return { title: 'Stih dana' }
 
-  const text = oneLine(withPeriod(v.text))
+  const text = oneLine(asWritten(v.text))
   const image = { url: `/og/${id}/post`, width: 1080, height: 1080, alt: text }
   // naziv pjesme i ime umjetnika (bez " — Stih dana" iz šablona layouta)
   const title = `${v.song} — Dino Merlin`

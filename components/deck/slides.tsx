@@ -924,6 +924,13 @@ function Biblioteka() {
     await wait(1800)
     await click('[data-filter="nostalgija"]')
     await wait(700)
+    // stranice: po 10 stihova
+    if (await click('[data-page-next]')) {
+      await wait(1600)
+      await click('[data-page="1"]')
+      await wait(900)
+    }
+    if (!alive()) return
     // arhiva: stih se više ne izvlači, a linkovi i sačuvani rade
     await click('[data-scope="archive"]')
     await wait(1900)
@@ -932,8 +939,8 @@ function Biblioteka() {
   return (
     <>
       <Text>
-        Svi aktivni stihovi su špil iz kojeg svako izvlači svoj — nema kalendara ni rasporeda za održavanje. Pretraga i
-        filter po raspoloženju.
+        Svi aktivni stihovi su špil iz kojeg svako izvlači svoj — nema kalendara ni rasporeda za održavanje. Pretraga,
+        filter po raspoloženju i stranice po 10.
       </Text>
       <Bullets
         items={[
@@ -959,8 +966,12 @@ function NoviStih() {
     await wait(900)
     await type('textarea[name="text"]', VOLIM_TE, 60)
     await wait(500)
-    // pjesma koja već ima stih: link, album i godina se popune sami
-    await type('input[name="song"]', 'U kandžama jastreba', 55)
+    // pjesma s liste postojećih: par slova, pa izbor — link, album i godina se popune sami
+    await type('input[name="song"]', 'U kan', 90)
+    await wait(700)
+    const option = await find('[data-song-option="u-kandzama-jastreba"]', 1500)
+    if (option) await click(option)
+    else await type('input[name="song"]', 'U kandžama jastreba', 55)
     await wait(1600)
     if (!alive()) return
     const yt = (await find('input[name="youtube"]', 1500)) as HTMLInputElement | null
@@ -989,12 +1000,13 @@ function NoviStih() {
   return (
     <>
       <Text>
-        Tekst, pjesma, album, godina, raspoloženje, YouTube. Pjesma koja već ima stih sama popuni link, album i
-        godinu. Pored je pravi ekran aplikacije, na telefonu ili računaru, i mijenja se dok se kuca.
+        Tekst, pjesma, album, godina, raspoloženje, YouTube. Pjesma se bira s liste postojećih — link, album i godina
+        se popune sami, a pjesma se može odmah pustiti. Pored je pravi ekran aplikacije, na telefonu ili računaru.
+        Stih stoji tačno kako je upisan.
       </Text>
       <Bullets
         items={[
-          <><b>Pjesma se preuzme sama</b> — samo ako je još nema, jednom, i ostaje za sve njene stihove.</>,
+          <><b>Nova pjesma se preuzme sama</b> — samo ako je još nema, jednom, i ostaje za sve njene stihove.</>,
           <><b>Novi stih je u špilu odmah</b> — izvlači se od sutra, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>,
         ]}
       />

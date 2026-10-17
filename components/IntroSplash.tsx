@@ -9,7 +9,7 @@ import { deckParam, inDeck } from '@/lib/deck'
 import { formatFullDateBs } from '@/lib/date'
 import { haptic } from '@/lib/haptic'
 import { SPLASH_ARRIVE } from './VerseText'
-import { paperCase, withPeriod } from '@/lib/text'
+import { paperCase, asWritten } from '@/lib/text'
 import { VERSES } from '@/data/verses'
 import { MOODS, type Mood } from '@/data/moods'
 
@@ -1475,7 +1475,7 @@ function VerseLines({ text, font }: { text: string; font?: string }) {
   let n = 0
   return (
     <>
-      {withPeriod(text)
+      {asWritten(text)
         .split('\n')
         .map((l, j) => (
           <span key={j} className="block">

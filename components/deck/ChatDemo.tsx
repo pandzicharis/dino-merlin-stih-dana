@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
-import { oneLine, withPeriod } from '@/lib/text'
+import { oneLine, asWritten } from '@/lib/text'
 import { AndroidStatus, Island, IosStatus, PunchHole } from './Devices'
 import { ROBOTO, SF, Tap } from './phoneUi'
 
@@ -114,7 +114,7 @@ export function ChatDemo({
   const top = ios ? 54 : 34
   const head = ios ? 52 : 60
   const foot = ios ? 50 + 34 : 64 + 16
-  const text = oneLine(withPeriod(verse.text))
+  const text = oneLine(asWritten(verse.text))
 
   return (
     <div

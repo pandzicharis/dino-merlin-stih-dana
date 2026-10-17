@@ -5,7 +5,7 @@ import type { Verse } from '@/data/verses'
 import { albumOf, ALBUMS } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
-import { withPeriod } from '@/lib/text'
+import { asWritten } from '@/lib/text'
 import { INVITE } from '@/lib/notify'
 import { ARTIST_LINKS } from '@/components/ArtistLinks'
 
@@ -237,7 +237,7 @@ export function VerseMock({
   bellOn?: boolean
 }) {
   const m = MOODS[mood ?? verse.mood]
-  const text = withPeriod(verse.text)
+  const text = asWritten(verse.text)
   const size = verseSize(text, w)
 
   return (

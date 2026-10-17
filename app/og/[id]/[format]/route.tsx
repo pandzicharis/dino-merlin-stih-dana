@@ -5,7 +5,7 @@ import { ImageResponse } from 'next/og'
 import { MOODS } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
 import { findVerse, getCatalog } from '@/lib/catalog'
-import { withPeriod } from '@/lib/text'
+import { asWritten } from '@/lib/text'
 
 /**
  * Share slika — jedini kanal rasta koji nam treba.
@@ -105,7 +105,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
   const { width, height } = FORMATS[format as Format]
   const m = MOODS[verse.mood]
 
-  const text = withPeriod(verse.text)
+  const text = asWritten(verse.text)
   // i velika/mala slova — dizajn stiha zna ih promijeniti
   const chars = `${text}${text.toLocaleUpperCase('bs')}${text.toLocaleLowerCase('bs')}${verse.song}${verse.album}${verse.year}Stih dana${BRAND.name}`
   const [serif, sans] = await Promise.all([

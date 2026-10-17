@@ -1,13 +1,10 @@
 /**
- * Stih se u `data/verses.ts` piše bez tačke na kraju — tako se lakše unosi
- * i lakše mijenja. Tačka je stvar prikaza, pa se dodaje ovdje, na jednom
- * mjestu, da ekran, share slika i notifikacija završe isto.
- *
- * Stih koji već nosi svoj znak (upitnik, uzvičnik, trotačka) ostaje netaknut.
+ * Stih se prikazuje tačno kako je upisan — tačka (ili upitnik, uzvičnik,
+ * trotačka) samo ako ju je urednik napisao; aplikacija ništa ne dodaje.
+ * Ovo je jedino mjesto za to, da ekran, slike i pregled linka završe isto.
  */
-export function withPeriod(text: string): string {
-  const t = text.trimEnd()
-  return /[.!?…]$/.test(t) ? t : `${t}.`
+export function asWritten(text: string): string {
+  return text.trimEnd()
 }
 
 /** Stih u jednom redu — za notifikaciju, gdje prelom ne postoji. */

@@ -14,7 +14,7 @@ import { albumOf } from '@/data/albums'
 import type { Verse } from '@/data/verses'
 import { BRAND } from './brand'
 import { formatFullDateBs } from './date'
-import { withPeriod } from './text'
+import { asWritten } from './text'
 import { VERSE_FONTS, caseOf, lookScale, lookSpacing, parseFont, styleOf, type FontMap } from './fonts'
 
 /* ── formati i stilovi ──────────────────────────────────────── */
@@ -322,7 +322,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   const { w: W, h: H } = SHARE_FORMATS[format]
   const p = palette(verse.mood)
   const fonts = fontFamilies()
-  const text = withPeriod(verse.text)
+  const text = asWritten(verse.text)
   const ratio = H / W
 
   const album = albumOf(verse.album)

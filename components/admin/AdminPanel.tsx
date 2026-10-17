@@ -7,12 +7,13 @@ import type { Verse } from '@/data/verses'
 import { MOODS, MOOD_KEYS, type Mood } from '@/data/moods'
 import { ALBUMS, albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
-import { audioSlug, withPeriod } from '@/lib/text'
+import { audioSlug, asWritten } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview } from './DevicePreview'
 import { PrintSlips } from './PrintSlips'
 import { VerseDesigner } from './VerseDesigner'
+import { SongPicker, SongPlayer } from './SongPicker'
 import { DrawerIcon } from '../DrawerIcon'
 
 type AdminVerse = Verse & { active: boolean }
@@ -31,7 +32,8 @@ type Op =
   | { op: 'archive'; id: string }
   | { op: 'restore'; id: string }
 
-const PAGE = 30
+/** stihova po stranici liste */
+const PAGE = 10
 /** printer — dugme u zaglavlju i znak modala za štampu */
 const PRINT_ICON = (
   <>
@@ -43,7 +45,7 @@ const PRINT_ICON = (
 const PREVIEW_CHROME = 42 + 16
 
 function oneLine(t: string) {
-  return withPeriod(t).replace(/\s*\n\s*/g, ' / ')
+  return asWritten(t).replace(/\s*\n\s*/g, ' / ')
 }
 
 /**
@@ -486,6 +488,12 @@ function Library({
   const pages = Math.max(1, Math.ceil(list.length / PAGE))
   const p = Math.min(page, pages - 1)
   const shown = list.slice(p * PAGE, p * PAGE + PAGE)
+  // nova stranica počinje od vrha liste
+  const listRef = useRef<HTMLDivElement>(null)
+  const go = (n: number) => {
+    setPage(n)
+    listRef.current?.scrollTo({ top: 0 })
+  }
   const archivedCount = data.verses.filter((v) => !v.active).length
 
   return (
@@ -583,7 +591,13 @@ function Library({
       </div>
 
       {/* lista ima svoju visinu i skrola se unutra — filteri i kartice ostaju na mjestu */}
-      <div className="max-h-[min(62dvh,640px)] overflow-y-auto overscroll-contain rounded-[20px] border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
+      <div
+        ref={listRef}
+        className="relative max-h-[min(62dvh,640px)] overflow-y-auto overscroll-contain rounded-[20px] border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl"
+      >
+        {/* izmjena ide na server — tanka zlatna traka dok traje */}
+        {busy && <LoadBar />}
+        <motion.div key={`${p}-${archived}-${mood}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
         {shown.map((v, i) => {
           const m = MOODS[v.mood]
           return (
@@ -638,30 +652,53 @@ function Library({
             {archived && !archivedCount ? 'Arhiva je prazna.' : 'Ništa ne odgovara pretrazi.'}
           </p>
         )}
+        </motion.div>
       </div>
 
+      {/* stranice: koliko je prikazano, pa brojevi (s … kad ih je mnogo) */}
       {pages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-[12px] text-white/50">
-          <span>
+        <div className="mt-4 flex items-center justify-between gap-3 text-[12px] text-white/50">
+          <span className="tabular">
             {p * PAGE + 1}–{Math.min(list.length, p * PAGE + PAGE)} od {list.length}
           </span>
           <span className="flex items-center gap-1">
             <button
-              onClick={() => setPage(p - 1)}
+              onClick={() => go(p - 1)}
               disabled={p === 0}
               aria-label="Prethodna strana"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 disabled:opacity-25"
+              data-page-prev
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 transition-colors hover:bg-white/5 disabled:opacity-25"
             >
               <Chevron dir="l" />
             </button>
-            <span className="tabular px-2">
-              {p + 1} / {pages}
-            </span>
+            {pageNumbers(p, pages).map((n, i) =>
+              n < 0 ? (
+                <span key={`gap-${i}`} className="w-5 text-center text-white/30">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={n}
+                  onClick={() => go(n)}
+                  aria-current={n === p ? 'page' : undefined}
+                  data-page={n + 1}
+                  className="tabular flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[12px] font-medium transition-colors"
+                  style={
+                    n === p
+                      ? { background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})`, color: '#14100A' }
+                      : { border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }
+                  }
+                >
+                  {n + 1}
+                </button>
+              ),
+            )}
             <button
-              onClick={() => setPage(p + 1)}
+              onClick={() => go(p + 1)}
               disabled={p >= pages - 1}
               aria-label="Sljedeća strana"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 disabled:opacity-25"
+              data-page-next
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 transition-colors hover:bg-white/5 disabled:opacity-25"
             >
               <Chevron dir="r" />
             </button>
@@ -669,6 +706,33 @@ function Library({
         </div>
       )}
     </>
+  )
+}
+
+/** Brojevi stranica oko trenutne; -1 je "…". */
+function pageNumbers(p: number, pages: number): number[] {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i)
+  const out = [0]
+  const from = Math.max(1, Math.min(p - 1, pages - 4))
+  const to = Math.min(pages - 2, Math.max(p + 1, 3))
+  if (from > 1) out.push(-1)
+  for (let i = from; i <= to; i++) out.push(i)
+  if (to < pages - 2) out.push(-1)
+  out.push(pages - 1)
+  return out
+}
+
+/** Tanka zlatna traka koja putuje — nešto se radi na serveru. */
+function LoadBar() {
+  return (
+    <span className="pointer-events-none absolute inset-x-0 top-0 z-10 block h-[2px] overflow-hidden rounded-t-[20px]" aria-hidden>
+      <motion.span
+        className="absolute inset-y-0 block w-1/3"
+        style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}, transparent)` }}
+        animate={{ left: ['-35%', '100%'] }}
+        transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+      />
+    </span>
   )
 }
 
@@ -890,8 +954,7 @@ function Editor({
     for (const v of verses) if (v.youtube && !m.has(audioSlug(v.song))) m.set(audioSlug(v.song), v)
     return m
   }, [verses])
-  const setSong = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const song = e.target.value
+  const setSong = (song: string) => {
     const known = knownSongs.get(audioSlug(song))
     setD({
       ...d,
@@ -976,12 +1039,15 @@ function Editor({
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">
           <label className="col-span-2 block md:col-span-1">
             <span className={labelCls}>Pjesma</span>
-            <input name="song" value={d.song} onChange={setSong} required placeholder="Naziv pjesme" list="admin-songs" autoComplete="off" className={`mt-2 ${field}`} />
-            <datalist id="admin-songs">
-              {[...knownSongs.values()].map((v) => (
-                <option key={v.song} value={v.song} />
-              ))}
-            </datalist>
+            <SongPicker
+              value={d.song}
+              songs={[...knownSongs.values()]}
+              ready={(s) => songOf(s)?.state === 'ready'}
+              onType={setSong}
+              // izbor s liste: link, album i godina te pjesme
+              onPick={(s) => setD({ ...d, song: s.song, youtube: s.youtube ?? d.youtube, album: s.album, year: String(s.year) })}
+              className={field}
+            />
           </label>
           <label className="col-span-2 block md:col-span-1">
             <span className={labelCls}>Album</span>
@@ -1024,18 +1090,20 @@ function Editor({
             </span>
             <input name="youtube" value={d.youtube} onChange={set('youtube')} required placeholder="link pjesme" className={`mt-2 ${field}`} />
           </label>
-          {/* svaki stih ima pjesmu koja se pušta odmah — ovdje se vidi je li već u aplikaciji */}
-          {d.song.trim() && (
-            <p className="col-span-2 -mt-1 flex items-center gap-2 text-[11px] text-white/45" data-song-hint>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill={BRAND.gold} aria-hidden>
-                <path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z" />
-              </svg>
-              {song?.state === 'ready'
-                ? 'Pjesma već postoji u aplikaciji — ne preuzima se ponovo, pušta se odmah.'
-                : song?.state === 'loading'
+          {/* svaki stih ima pjesmu koja se pušta odmah — postojeća se može pustiti ovdje */}
+          {song?.state === 'ready' ? (
+            <SongPlayer key={audioSlug(d.song)} song={d.song} />
+          ) : (
+            d.song.trim() && (
+              <p className="col-span-2 -mt-1 flex items-center gap-2 text-[11px] text-white/45" data-song-hint>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill={BRAND.gold} aria-hidden>
+                  <path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z" />
+                </svg>
+                {song?.state === 'loading'
                   ? 'Pjesma se upravo preuzima.'
                   : 'Ove pjesme još nema — preuzeće se jednom, kad sačuvaš stih, i ostaje za sve njene stihove.'}
-            </p>
+              </p>
+            )
           )}
         </div>
 
@@ -1170,11 +1238,31 @@ function Confirm({
 }
 
 function Skeleton() {
+  // isti oblik kao lista — ekran ne skače kad stihovi stignu
   return (
-    <div className="flex flex-col gap-2">
-      {Array.from({ length: 8 }, (_, i) => (
-        <div key={i} className="h-16 animate-pulse rounded-2xl bg-white/[0.04]" />
-      ))}
+    <div aria-busy="true" aria-label="Učitavam stihove">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="space-y-2">
+          <div className="h-5 w-32 animate-pulse rounded-md bg-white/[0.06]" />
+          <div className="h-3 w-64 animate-pulse rounded-md bg-white/[0.04]" />
+        </div>
+        <div className="h-11 w-32 animate-pulse rounded-full bg-white/[0.06]" />
+      </div>
+      <div className="mb-3 h-11 animate-pulse rounded-full bg-white/[0.04]" />
+      <div className="mb-4 h-10 animate-pulse rounded-full bg-white/[0.03]" />
+      <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.035]">
+        <LoadBar />
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3.5" style={{ borderTop: i ? '1px solid rgba(255,255,255,0.05)' : undefined }}>
+            <i className="block h-9 w-1 shrink-0 rounded-full bg-white/10" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-3.5 animate-pulse rounded bg-white/[0.07]" style={{ width: `${72 - ((i * 13) % 30)}%`, animationDelay: `${i * 90}ms` }} />
+              <div className="h-2.5 w-40 animate-pulse rounded bg-white/[0.04]" style={{ animationDelay: `${i * 90}ms` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-center text-[12px] text-white/35">Učitavam stihove…</p>
     </div>
   )
 }

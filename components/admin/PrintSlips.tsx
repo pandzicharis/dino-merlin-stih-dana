@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { paperCase, withPeriod } from '@/lib/text'
+import { paperCase, asWritten } from '@/lib/text'
 
 type AdminVerse = Verse & { active: boolean }
 
@@ -197,7 +197,7 @@ function A4({ slips, style }: { slips: AdminVerse[]; style?: React.CSSProperties
       >
         {Array.from({ length: PER_PAGE }, (_, i) => {
           const v = slips[i]
-          const text = v ? withPeriod(paperCase(v.text)) : ''
+          const text = v ? asWritten(paperCase(v.text)) : ''
           return (
             <div
               key={i}
