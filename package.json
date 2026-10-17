@@ -13,7 +13,8 @@
     "brand:icons": "tsx scripts/make-icons.ts",
     "promo:video": "node scripts/export-video.mjs",
     "catalog:push": "tsx --env-file-if-exists=.env.local scripts/push-catalog.ts",
-    "audio": "STIH_AUDIO_FETCH=1 tsx scripts/audio-sync.ts"
+    "audio": "STIH_AUDIO_FETCH=1 tsx scripts/audio-sync.ts",
+    "cookies": "sh scripts/yt-cookies.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

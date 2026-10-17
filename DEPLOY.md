@@ -297,15 +297,15 @@ Za produkciju jednom treba token:
 YouTube GitHubove servere bez prijave odbija („Sign in to confirm you're
 not a bot"). Zato workflow koristi kolačiće YouTube naloga, iz tajne
 `YT_COOKIES` (GitHub → Settings → Secrets and variables → Actions). Najbolje
-poseban Google nalog, ne lični. Kolačići se izvoze na računaru:
+poseban Google nalog, ne lični. Prijavi se na youtube.com u Chromeu, pa:
 
 ```bash
-yt-dlp --cookies-from-browser chrome --cookies /tmp/sve.txt --skip-download "https://www.youtube.com/watch?v=lKgI7Cxm0go"
-(head -1 /tmp/sve.txt; grep -E '^[^[:space:]]*(youtube|google)\.com' /tmp/sve.txt) | pbcopy && rm /tmp/sve.txt
+npm run cookies
 ```
 
-Druga linija ostavi samo YouTube/Google kolačiće i kopira ih — zalijepi kao
-vrijednost tajne `YT_COOKIES`. Kad isteknu (odjava, promjena šifre), ponovi.
+Uzme samo YouTube/Google kolačiće, kopira ih i otvori GitHub stranicu za
+novu tajnu — Name `YT_COOKIES`, Secret Cmd+V, *Add secret*. Kad kolačići
+isteknu (odjava, promjena šifre), ponovi.
 
 Ako i tad ne prođe, admin javi „pjesma nije preuzeta". Tad na računaru:
 
