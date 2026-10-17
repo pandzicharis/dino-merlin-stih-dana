@@ -42,7 +42,7 @@ function remote(job: Job | null): { state: SongState; error?: string } {
   if (job.conclusion === 'success') return Date.now() - job.at < DEPLOY_MS ? { state: 'loading' } : { state: 'missing' }
   return {
     state: 'error',
-    error: 'GitHub je nije uspio preuzeti — najčešće su istekli YouTube kolačići: npm run cookies -- "Stih dana" (DEPLOY.md → Pjesme).',
+    error: 'Preuzimanje nije uspjelo.',
   }
 }
 

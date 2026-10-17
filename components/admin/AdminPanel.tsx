@@ -1308,7 +1308,7 @@ function Editor({
                   {song?.state === 'loading'
                     ? 'Pjesma se upravo preuzima.'
                     : song?.state === 'error'
-                      ? <span className="text-rose-200/85">Pjesma nije preuzeta{song.error ? ` — ${song.error}` : '.'}</span>
+                      ? <span className="text-rose-200/85">Pjesma nije preuzeta.</span>
                       : 'Ove pjesme još nema — preuzeće se jednom, kad sačuvaš stih, i ostaje za sve njene stihove.'}
                 </span>
                 {/* ponovni pokušaj odmah, bez čuvanja stiha */}
