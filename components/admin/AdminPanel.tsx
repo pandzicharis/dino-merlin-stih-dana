@@ -7,12 +7,12 @@ import type { Verse } from '@/data/verses'
 import { MOODS, MOOD_KEYS, type Mood } from '@/data/moods'
 import { ALBUMS, albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
-import { withPeriod } from '@/lib/text'
+import { audioSlug, withPeriod } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview } from './DevicePreview'
 import { PrintSlips } from './PrintSlips'
-import { VERSE_FONTS, VERSE_FONT_KEYS, parseFont, sameStyle, stringifyFont, styleCss, styleOf, verseWords, type VerseFont, type WordStyle } from '@/lib/fonts'
+import { VerseDesigner } from './VerseDesigner'
 import { DrawerIcon } from '../DrawerIcon'
 
 type AdminVerse = Verse & { active: boolean }
@@ -22,6 +22,9 @@ type Snapshot = {
   writable: 'supabase' | 'file' | null
 }
 type Draft = { text: string; song: string; album: string; year: string; mood: Mood; youtube: string; font: string }
+/** pjesma stiha u aplikaciji (/api/admin/audio) */
+type SongInfo = { state: 'ready' | 'loading' | 'missing' | 'error'; error?: string }
+type SongsSnapshot = { mode: 'local' | 'github' | 'off'; job: string | null; songs: Record<string, SongInfo> }
 type Op =
   | { op: 'add'; verse: Draft }
   | { op: 'update'; id: string; verse: Draft }
@@ -66,6 +69,7 @@ export function AdminPanel() {
     setToast({ text, bad })
     setTimeout(() => setToast(null), 3200)
   }, [])
+  const songs = useSongs(Boolean(data), flash)
 
   useEffect(() => {
     fetch('/api/admin/catalog', { cache: 'no-store' })
@@ -189,7 +193,7 @@ export function AdminPanel() {
             </button>
           </div>
 
-          <Library data={data} busy={busy} onEdit={(v) => setEditor({ verse: v })} onArchive={setArchiving} onRestore={(v) => send({ op: 'restore', id: v.id }, 'Stih je vraćen u izvlačenje')} />
+          <Library data={data} busy={busy} songs={songs} onEdit={(v) => setEditor({ verse: v })} onArchive={setArchiving} onRestore={(v) => send({ op: 'restore', id: v.id }, 'Stih je vraćen u izvlačenje')} />
 
           <AnimatePresence>
             {printing && (
@@ -226,13 +230,18 @@ export function AdminPanel() {
               <Editor
                 key="editor"
                 initial={editor.verse}
+                verses={data.verses}
+                songOf={songs.of}
                 busy={busy}
                 onClose={() => setEditor(null)}
                 onSave={async (draft) => {
                   const ok = editor.verse
                     ? await send({ op: 'update', id: editor.verse.id, verse: draft }, 'Stih je sačuvan')
                     : await send({ op: 'add', verse: draft }, 'Stih je dodan · ulazi u izvlačenje od sutra')
-                  if (ok) setEditor(null)
+                  if (!ok) return
+                  setEditor(null)
+                  // pjesma se sprema odmah — dok stih uđe u izvlačenje, pušta se bez čekanja
+                  if (songs.of(draft.song)?.state !== 'ready') songs.fetch(draft.song, draft.youtube)
                 }}
               />
             )}
@@ -330,15 +339,131 @@ function Chevron({ dir }: { dir: 'l' | 'r' }) {
   )
 }
 
+/* ── pjesme: svaki stih mora imati pjesmu koja se pušta odmah ── */
+
+type Songs = {
+  mode: SongsSnapshot['mode'] | null
+  of: (song: string) => SongInfo | null
+  fetch: (song: string, youtube?: string) => void
+}
+
+/**
+ * Stanje pjesama (lib/audio-files.ts) i preuzimanje. Lokalno se pjesma sprema
+ * na ovom računaru, na produkciji je preuzme GitHub (.github/workflows/audio.yml)
+ * i Vercel objavi — dok traje, lista pokazuje "preuzima se" i sama se osvježava.
+ */
+function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): Songs {
+  const [snap, setSnap] = useState<SongsSnapshot | null>(null)
+  // poslano maloprije: GitHubu treba par sekundi da uopšte prijavi posao
+  const [pending, setPending] = useState<Record<string, number>>({})
+  const load = useCallback(async () => {
+    const r = await fetch('/api/admin/audio', { cache: 'no-store' }).catch(() => null)
+    if (r?.ok) setSnap((await r.json()) as SongsSnapshot)
+  }, [])
+  // u prezentaciji se stanje samo čita (znak ♪ u listi) — ništa se ne preuzima
+  const live = ready && !inDeck()
+  useEffect(() => {
+    if (ready) void load()
+  }, [ready, load])
+
+  const of = useCallback(
+    (song: string): SongInfo | null => {
+      const k = audioSlug(song)
+      const s = snap?.songs[k] ?? null
+      if (s?.state === 'ready') return s
+      if (pending[k] && Date.now() - pending[k] < 90_000) return { state: 'loading' }
+      return s
+    },
+    [snap, pending],
+  )
+
+  // dok se nešto sprema, pitaj ponovo (lokalno brzo, GitHub sporije)
+  const busy = Boolean(snap) && (Object.values(snap!.songs).some((s) => s.state === 'loading') || Object.keys(pending).length > 0)
+  useEffect(() => {
+    if (!live || !busy) return
+    const t = setTimeout(() => {
+      setPending((p) => Object.fromEntries(Object.entries(p).filter(([k, at]) => Date.now() - at < 90_000 && snap?.songs[k]?.state !== 'ready')))
+      void load()
+    }, snap?.mode === 'local' ? 2000 : 7000)
+    return () => clearTimeout(t)
+  }, [live, busy, snap, load])
+
+  const fetchSong = useCallback(
+    async (song: string, youtube?: string) => {
+      if (!live || !song.trim()) return
+      const k = audioSlug(song)
+      setPending((p) => ({ ...p, [k]: Date.now() }))
+      const r = await fetch('/api/admin/audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ song, youtube }),
+      }).catch(() => null)
+      if (!r?.ok) {
+        setPending(({ [k]: _drop, ...p }) => (void _drop, p))
+        flash(((await r?.json().catch(() => null)) as { error?: string } | null)?.error ?? 'Pjesma se nije mogla pokrenuti', true)
+      }
+      void load()
+    },
+    [live, load, flash],
+  )
+
+  return { mode: snap?.mode ?? null, of, fetch: fetchSong }
+}
+
+/** Mala oznaka uz naziv pjesme: spremna, preuzima se, ili fali (s dugmetom). */
+function SongBadge({ info, mode, onFetch }: { info: SongInfo | null; mode: Songs['mode']; onFetch: () => void }) {
+  if (!info) return null
+  if (info.state === 'ready') {
+    return (
+      <span title="Pjesma je u aplikaciji — pušta se odmah" className="shrink-0 opacity-70" style={{ color: BRAND.gold }} aria-label="Pjesma spremna">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z" />
+        </svg>
+      </span>
+    )
+  }
+  if (info.state === 'loading') {
+    return (
+      <span className="flex shrink-0 items-center gap-1.5 normal-case tracking-normal text-white/55" data-song-state="loading">
+        <motion.span
+          className="block h-2.5 w-2.5 rounded-full border border-current border-t-transparent"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
+          aria-hidden
+        />
+        {mode === 'github' ? 'pjesma se objavljuje…' : 'preuzimam pjesmu…'}
+      </span>
+    )
+  }
+  const hint = info.error ?? (mode === 'off' ? 'Na računaru: npm run audio, pa push.' : 'Pjesma još nije u aplikaciji.')
+  return (
+    <span className="flex shrink-0 items-center gap-1.5 normal-case tracking-normal" title={hint} data-song-state={info.state}>
+      <span className="text-rose-200/80">{info.state === 'error' ? 'pjesma nije preuzeta' : 'bez pjesme'}</span>
+      {mode !== 'off' && (
+        <button
+          type="button"
+          onClick={onFetch}
+          className="rounded-full border px-2 py-[1px] text-[10px] transition-colors hover:bg-white/5"
+          style={{ borderColor: `${BRAND.gold}66`, color: BRAND.gold }}
+        >
+          {info.state === 'error' ? 'Ponovo' : 'Preuzmi'}
+        </button>
+      )}
+    </span>
+  )
+}
+
 function Library({
   data,
   busy,
+  songs,
   onEdit,
   onArchive,
   onRestore,
 }: {
   data: Snapshot
   busy: boolean
+  songs: Songs
   onEdit: (v: AdminVerse) => void
   onArchive: (v: AdminVerse) => void
   onRestore: (v: AdminVerse) => void
@@ -439,6 +564,7 @@ function Library({
           <button
             key={k}
             data-filter={k}
+            aria-pressed={mood === k}
             onClick={() => {
               setMood(mood === k ? null : k)
               setPage(0)
@@ -471,11 +597,13 @@ function Library({
                 <p className="truncate text-[15px] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
                   {oneLine(v.text)}
                 </p>
-                <p className="mt-1 truncate text-[10px] uppercase tracking-[0.14em]">
-                  <span style={{ color: BRAND.gold }}>{v.song}</span>
+                <p className="mt-1 flex min-w-0 items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
+                  <span className="shrink-0" style={{ color: BRAND.gold }}>{v.song}</span>
+                  <SongBadge info={songs.of(v.song)} mode={songs.mode} onFetch={() => songs.fetch(v.song, v.youtube)} />
+                  <span className="truncate">
                   <span className="text-white/30">
-                    {' '}
-                    · {v.album} · {v.year}
+                    {v.album} · {v.year}
+                  </span>
                   </span>
                 </p>
               </div>
@@ -685,11 +813,16 @@ function Sheet({
 
 function Editor({
   initial,
+  verses,
+  songOf,
   busy,
   onClose,
   onSave,
 }: {
   initial?: AdminVerse
+  /** postojeći stihovi — ista pjesma donosi svoj link, album i godinu */
+  verses: AdminVerse[]
+  songOf: Songs['of']
   busy: boolean
   onClose: () => void
   onSave: (d: Draft) => void
@@ -704,19 +837,28 @@ function Editor({
     font: initial?.font ?? '',
   })
 
-  // Na računaru pregled je visok koliko i forma (forma ima svoju visinu,
-  // pregled se samo prilagodi — nikad obrnuto, da se ne vrte u krug).
+  // Na računaru pregled prati skrolanje: visok je koliko vidljivi dio
+  // prozora (ili forma, ako je kraća) i ostaje pored onoga što se uređuje —
+  // na dnu forme mu je dno poravnato sa zadnjim elementom. Forma ima svoju
+  // visinu, pregled se samo prilagodi — nikad obrnuto, da se ne vrte u krug.
   const [wide, setWide] = useState(false)
   const [full, setFull] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const [formH, setFormH] = useState(0)
+  const [viewH, setViewH] = useState(0)
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)')
     const sync = () => setWide(mq.matches)
     sync()
     mq.addEventListener('change', sync)
-    const ro = new ResizeObserver(([e]) => setFormH(e.contentRect.height))
-    if (formRef.current) ro.observe(formRef.current)
+    const form = formRef.current
+    const scroller = form?.closest<HTMLElement>('.overflow-y-auto')
+    const ro = new ResizeObserver(() => {
+      if (form) setFormH(form.getBoundingClientRect().height)
+      if (scroller) setViewH(scroller.clientHeight - parseFloat(getComputedStyle(scroller).paddingBottom || '0'))
+    })
+    if (form) ro.observe(form)
+    if (scroller) ro.observe(scroller)
     return () => {
       mq.removeEventListener('change', sync)
       ro.disconnect()
@@ -742,6 +884,23 @@ function Editor({
   )
   const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setD({ ...d, [k]: e.target.value })
+  // više stihova je iz iste pjesme: poznata pjesma popuni link, album i godinu
+  const knownSongs = useMemo(() => {
+    const m = new Map<string, AdminVerse>()
+    for (const v of verses) if (v.youtube && !m.has(audioSlug(v.song))) m.set(audioSlug(v.song), v)
+    return m
+  }, [verses])
+  const setSong = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const song = e.target.value
+    const known = knownSongs.get(audioSlug(song))
+    setD({
+      ...d,
+      song,
+      ...(known && !d.youtube.trim() ? { youtube: known.youtube! } : {}),
+      ...(known && !d.album ? { album: known.album, year: String(known.year) } : {}),
+    })
+  }
+  const song = d.song.trim() ? songOf(d.song) : null
   const field =
     'h-12 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 text-[14px] normal-case tracking-normal text-white outline-none placeholder:text-white/25 focus:border-[#BFA87F]/60'
   const labelCls = 'block text-[11px] uppercase tracking-[0.16em] text-white/45'
@@ -769,9 +928,14 @@ function Editor({
       {/* Pregled: pravi ekran aplikacije u istom okviru kao u prezentaciji
           (iPhone, ili prozor preglednika). Na telefonu iznad forme; na
           računaru desno, bez okvira oko njega — uređaj je sam svoj okvir. */}
-      <div className="min-w-0 md:order-2">
+      <div className="min-w-0 md:sticky md:top-0 md:order-2">
         <div className="flex flex-col items-center justify-center rounded-3xl bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.045),transparent_70%)]">
-          <DevicePreview verse={preview} maxHeight={wide && formH ? formH - PREVIEW_CHROME : 460} full={full} onFull={setFull} />
+          <DevicePreview
+            verse={preview}
+            maxHeight={wide && formH ? Math.min(formH, viewH || formH) - PREVIEW_CHROME : 460}
+            full={full}
+            onFull={setFull}
+          />
         </div>
       </div>
       <form
@@ -805,14 +969,19 @@ function Editor({
           </span>
         </label>
 
-        {/* font — glavni za cijeli stih, pa po želji riječ po riječ */}
-        <FontPicker value={d.font} text={d.text} onChange={(font) => setD({ ...d, font })} labelCls={labelCls} />
+        {/* dizajn — fontovi, veličina, naglasak, riječ po riječ ili cijeli stih */}
+        <VerseDesigner value={d.font} text={d.text} mood={d.mood} cover={album?.cover} onChange={(font) => setD({ ...d, font })} />
 
         {/* pjesma */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">
           <label className="col-span-2 block md:col-span-1">
             <span className={labelCls}>Pjesma</span>
-            <input name="song" value={d.song} onChange={set('song')} required placeholder="Naziv pjesme" className={`mt-2 ${field}`} />
+            <input name="song" value={d.song} onChange={setSong} required placeholder="Naziv pjesme" list="admin-songs" autoComplete="off" className={`mt-2 ${field}`} />
+            <datalist id="admin-songs">
+              {[...knownSongs.values()].map((v) => (
+                <option key={v.song} value={v.song} />
+              ))}
+            </datalist>
           </label>
           <label className="col-span-2 block md:col-span-1">
             <span className={labelCls}>Album</span>
@@ -851,10 +1020,23 @@ function Editor({
           </label>
           <label className="block">
             <span className={labelCls}>
-              YouTube <span className="normal-case tracking-normal text-white/30">(opcija)</span>
+              YouTube <span className="normal-case tracking-normal text-white/30">— pjesma</span>
             </span>
-            <input name="youtube" value={d.youtube} onChange={set('youtube')} placeholder="link" className={`mt-2 ${field}`} />
+            <input name="youtube" value={d.youtube} onChange={set('youtube')} required placeholder="link pjesme" className={`mt-2 ${field}`} />
           </label>
+          {/* svaki stih ima pjesmu koja se pušta odmah — ovdje se vidi je li već u aplikaciji */}
+          {d.song.trim() && (
+            <p className="col-span-2 -mt-1 flex items-center gap-2 text-[11px] text-white/45" data-song-hint>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill={BRAND.gold} aria-hidden>
+                <path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z" />
+              </svg>
+              {song?.state === 'ready'
+                ? 'Pjesma već postoji u aplikaciji — ne preuzima se ponovo, pušta se odmah.'
+                : song?.state === 'loading'
+                  ? 'Pjesma se upravo preuzima.'
+                  : 'Ove pjesme još nema — preuzeće se jednom, kad sačuvaš stih, i ostaje za sve njene stihove.'}
+            </p>
+          )}
         </div>
 
         {/* raspoloženje — pločice u bojama ekrana koji će stih dobiti */}
@@ -897,151 +1079,6 @@ function Editor({
       </form>
       </div>
     </Sheet>
-  )
-}
-
-/**
- * Fontovi stiha red po red — svaki red svoj font (npr. prvi red klasični,
- * drugi pisani), podebljano (B) i ukoso (I; samo klasični). Podrazumijevano
- * svi redovi imaju današnji font (Fraunces).
- */
-function FontPicker({
-  value,
-  text,
-  onChange,
-  labelCls,
-}: {
-  value: string
-  text: string
-  onChange: (font: string) => void
-  labelCls: string
-}) {
-  const map = parseFont(value)
-  const rows = verseWords(text)
-  const starts = rows.reduce<number[]>((acc, r, i) => [...acc, i ? acc[i - 1] + rows[i - 1].length : 0], [])
-  // stil reda — ako su sve riječi istog stila; inače stil prve riječi
-  const styleOfLine = (li: number): WordStyle => styleOf(map, starts[li])
-  const uniform = (li: number) => rows[li].every((_, j) => sameStyle(styleOf(map, starts[li] + j), styleOfLine(li)))
-  const setLine = (li: number, patch: Partial<WordStyle>) => {
-    const cur = styleOfLine(li)
-    const next: WordStyle = { ...cur, ...patch }
-    if (VERSE_FONTS[next.font].kind === 'pisani') delete next.italic
-    if (!next.bold) delete next.bold
-    if (!next.italic) delete next.italic
-    const words = { ...map.words }
-    rows[li].forEach((_, j) => {
-      if (sameStyle(next, map.main)) delete words[starts[li] + j]
-      else words[starts[li] + j] = next
-    })
-    onChange(stringifyFont({ main: map.main, words }) ?? '')
-  }
-
-  return (
-    <div>
-      <p className={labelCls}>
-        Font <span className="normal-case tracking-normal text-white/30">— red po red (klasični, pa pisani · B podebljano · I ukoso)</span>
-      </p>
-      <div className="mt-2 space-y-1 rounded-xl border border-white/[0.06] bg-black/25 p-1.5">
-        {rows.length === 0 && <p className="px-1 py-1.5 text-[12px] text-white/35">Upiši stih — svaki red dobije svoj izbor fonta.</p>}
-        {rows.map((r, li) => {
-          const st = styleOfLine(li)
-          return (
-            <FontRow
-              key={li}
-              label={`${li + 1}. red`}
-              style={uniform(li) ? st : null}
-              onPick={(k) => setLine(li, { font: k })}
-              onBold={() => setLine(li, { bold: !st.bold })}
-              onItalic={() => setLine(li, { italic: !st.italic })}
-              data={String(li)}
-            >
-              {r.map((w, j) => (
-                <span key={j} style={{ ...styleCss(styleOf(map, starts[li] + j)), fontSize: undefined, lineHeight: undefined, paddingInline: undefined }}>
-                  {w}{' '}
-                </span>
-              ))}
-            </FontRow>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-/** Red u izboru fonta: oznaka, tekst u svom stilu, šest "Aa" dugmića, B i I. */
-function FontRow({
-  label,
-  children,
-  style,
-  onPick,
-  onBold,
-  onItalic,
-  data,
-}: {
-  label: React.ReactNode
-  children?: React.ReactNode
-  /** stil reda; null kad su riječi u redu različite */
-  style: WordStyle | null
-  onPick: (k: VerseFont) => void
-  onBold: () => void
-  onItalic: () => void
-  data?: string
-}) {
-  const tile = (on: boolean) => ({
-    borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.08)',
-    background: on ? `${BRAND.gold}26` : 'rgba(0,0,0,0.3)',
-    color: on ? '#fff' : 'rgba(255,255,255,0.65)',
-  })
-  const script = style ? VERSE_FONTS[style.font].kind === 'pisani' : false
-  return (
-    <div className="flex items-center gap-2" data-edit-font-row={data}>
-      <span className="w-11 shrink-0 text-[10px] uppercase tracking-[0.14em] text-white/40">{label}</span>
-      <span className="min-w-0 flex-1 truncate text-[15px] text-white/85">{children}</span>
-      <div className="flex gap-1">
-        {VERSE_FONT_KEYS.map((k) => {
-          const f = VERSE_FONTS[k]
-          const on = style?.font === k
-          return (
-            <button
-              type="button"
-              key={k}
-              onClick={() => onPick(k)}
-              data-edit-font-pick={`${data}-${k}`}
-              title={`${f.label} · ${f.kind === 'pisani' ? 'pisani' : 'klasični'}`}
-              aria-pressed={on}
-              className="flex h-7 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors"
-              style={tile(on)}
-            >
-              <span style={{ fontFamily: `${f.family}, serif`, fontSize: `${15 * f.scale}px`, lineHeight: 1 }}>Aa</span>
-            </button>
-          )
-        })}
-        <span className="mx-0.5 w-px self-stretch bg-white/10" aria-hidden />
-        <button
-          type="button"
-          onClick={onBold}
-          data-edit-font-b={data}
-          title="Podebljano"
-          aria-pressed={Boolean(style?.bold)}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-[13px] font-bold transition-colors"
-          style={tile(Boolean(style?.bold))}
-        >
-          B
-        </button>
-        <button
-          type="button"
-          onClick={onItalic}
-          data-edit-font-i={data}
-          disabled={script}
-          title={script ? 'Pisani font je već ukoso' : 'Ukoso'}
-          aria-pressed={Boolean(style?.italic)}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border font-serif text-[14px] italic transition-colors disabled:opacity-30"
-          style={tile(Boolean(style?.italic))}
-        >
-          I
-        </button>
-      </div>
-    </div>
   )
 }
 

@@ -19,6 +19,17 @@ export function youtubeId(input?: string): string | null {
   return m ? m[1] : null
 }
 
+/** `Moj je život Švicarska` → `moj-je-zivot-svicarska` — ime fajla pjesme u public/audio */
+export function audioSlug(song: string): string {
+  return song
+    .toLowerCase()
+    .replace(/đ/g, 'dj')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 export function oneLine(text: string): string {
   return text.replace(/\s*\n\s*/g, ' ')
 }

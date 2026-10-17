@@ -25,6 +25,7 @@
  */
 
 import { parseFont, stringifyFont } from './fonts'
+import { youtubeId } from './text'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { unstable_cache, revalidatePath, revalidateTag } from 'next/cache'
@@ -267,7 +268,7 @@ export function validateVerse(input: Partial<Verse>): { verse?: Omit<Verse, 'id'
   const mood = String(input.mood ?? '')
   const youtube = String(input.youtube ?? '').trim()
   // font: provjeren i sređen zapis (lib/fonts.ts); nepoznato se odbaci
-  const font = String(input.font ?? '').trim().slice(0, 300)
+  const font = String(input.font ?? '').trim().slice(0, 600)
   const cleanFont = font ? stringifyFont(parseFont(font)) : undefined
 
   if (!text) return { error: 'Stih je prazan.' }
@@ -277,9 +278,9 @@ export function validateVerse(input: Partial<Verse>): { verse?: Omit<Verse, 'id'
   if (!album) return { error: 'Nedostaje album.' }
   if (!Number.isInteger(year) || year < 1970 || year > 2100) return { error: 'Godina nije ispravna.' }
   if (!(MOOD_KEYS as string[]).includes(mood)) return { error: 'Nepoznato raspoloženje.' }
-  if (youtube && !/^(https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/|[\w-]{11}$)/.test(youtube)) {
-    return { error: 'YouTube link nije ispravan.' }
-  }
+  // svaki stih ima pjesmu: plejer i preuzimanje (lib/audio-files.ts) idu preko ovog linka
+  if (!youtube) return { error: 'Nedostaje YouTube link pjesme.' }
+  if (!youtubeId(youtube)) return { error: 'YouTube link nije ispravan.' }
   return {
     verse: { text, song, album, year, mood: mood as Mood, ...(youtube ? { youtube } : {}), ...(cleanFont ? { font: cleanFont } : {}) },
   }

@@ -131,6 +131,12 @@ const UREDNIK: FeatureDef[] = [
     body: () => <NoviStih />,
   },
   {
+    id: 'dizajn',
+    title: 'Dizajn stiha, red po red',
+    enter: '/admin',
+    body: () => <Dizajn />,
+  },
+  {
     id: 'stampa',
     title: 'Papirići za pult',
     enter: '/admin',
@@ -929,12 +935,20 @@ function Biblioteka() {
         Svi aktivni stihovi su špil iz kojeg svako izvlači svoj — nema kalendara ni rasporeda za održavanje. Pretraga i
         filter po raspoloženju.
       </Text>
-      <Bullets items={['Arhiviran stih se više ne izvlači, a linkovi i sačuvani i dalje rade.']} />
+      <Bullets
+        items={[
+          'Arhiviran stih se više ne izvlači, a linkovi i sačuvani i dalje rade.',
+          <><b>Uz svaku pjesmu ♪</b> — pjesma je u aplikaciji i pušta se odmah; dok se nova preuzima, tu piše.</>,
+        ]}
+      />
     </>
   )
 }
 
-/** Novi stih: forma se popuni sama, pregled se mijenja dok se kuca — telefon i računar. */
+/**
+ * Novi stih: forma se popuni sama — poznata pjesma donese link, album i
+ * godinu — a pregled se mijenja dok se kuca, telefon i računar.
+ */
 function NoviStih() {
   useDeskScene(async ({ wait, find, click, type, choose, alive }) => {
     // forma za novi stih otvorena odmah na ulasku
@@ -943,28 +957,26 @@ function NoviStih() {
     add.click()
     await find('textarea[name="text"]')
     await wait(900)
-    await type('textarea[name="text"]', 'Kad sve saberem podijelim i oduzmem\nVolim te', 60)
+    await type('textarea[name="text"]', VOLIM_TE, 60)
     await wait(500)
+    // pjesma koja već ima stih: link, album i godina se popune sami
     await type('input[name="song"]', 'U kandžama jastreba', 55)
-    // album s liste — godina se popuni sama
-    await choose('select[name="album"]', 'Kokuzna vremena')
-    await wait(700)
-    await type('input[name="youtube"]', 'https://www.youtube.com/watch?v=kquGKS-qhn8', 18)
+    await wait(1600)
+    if (!alive()) return
+    const yt = (await find('input[name="youtube"]', 1500)) as HTMLInputElement | null
+    if (yt && !yt.value) {
+      // pjesme još nema u listi — kuca se kao prvi put
+      await choose('select[name="album"]', 'Kokuzna vremena')
+      await wait(700)
+      await type('input[name="youtube"]', 'https://www.youtube.com/watch?v=kquGKS-qhn8', 18)
+    }
     await wait(400)
     await click('[data-edit-mood="ljubav"]')
     await wait(1000)
     if (!alive()) return
-    // fontovi red po red: prvi red klasični, drugi pisani, pa podebljano i ukoso
-    await click('[data-edit-font-pick="0-cormorant"]')
-    await wait(900)
-    await click('[data-edit-font-pick="1-greatvibes"]')
-    await wait(1100)
-    await click('[data-edit-font-i="0"]')
-    await wait(900)
-    await click('[data-edit-font-pick="1-parisienne"]')
-    await wait(900)
-    await click('[data-edit-font-b="1"]')
-    await wait(1300)
+    // gotov stil jednim klikom — sve ostalo je na sljedećem koraku
+    await click('[data-edit-preset="romantika"]')
+    await wait(1600)
     if (!alive()) return
     // pregled: računar, pa nazad telefon
     await click('[data-device="desktop"]')
@@ -977,11 +989,119 @@ function NoviStih() {
   return (
     <>
       <Text>
-        Tekst, pjesma, album, godina, raspoloženje, YouTube — i font red po red: klasični ili pisani, podebljano,
-        ukoso. Pored je pravi ekran aplikacije, na telefonu ili računaru, i mijenja se dok se kuca.
+        Tekst, pjesma, album, godina, raspoloženje, YouTube. Pjesma koja već ima stih sama popuni link, album i
+        godinu. Pored je pravi ekran aplikacije, na telefonu ili računaru, i mijenja se dok se kuca.
       </Text>
       <Bullets
-        items={[<><b>Novi stih je u špilu odmah</b> — izvlači se od sutra, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>]}
+        items={[
+          <><b>Pjesma se preuzme sama</b> — samo ako je još nema, jednom, i ostaje za sve njene stihove.</>,
+          <><b>Novi stih je u špilu odmah</b> — izvlači se od sutra, a posjetioci i dalje dobijaju brzu, gotovu stranicu.</>,
+        ]}
+      />
+    </>
+  )
+}
+
+/** Stih za "Novi stih" i "Dizajn" — u tri reda, kako se pjeva. */
+const VOLIM_TE = 'Kad sve saberem\npodijelim i oduzmem\nVolim te'
+
+/**
+ * Dizajn: otvori se "Kad sve saberem…" u tri reda, gotovi stilovi, pa red
+ * po red — font, velika slova, ukoso, boja koju aplikacija predloži iz
+ * pozadine — i prored cijelog stiha. Ništa se ne čuva: prozor ostaje otvoren
+ * dok se ne ode s koraka.
+ */
+function Dizajn() {
+  useDeskScene(async ({ wait, find, all, click, clear, alive }) => {
+    await find('[data-new]')
+    // lista kao na početku — prezenter je možda prošao "Listu stihova" usred
+    // filtera; čeka se samo ako je zaista nešto vraćeno
+    const search = all('[data-search]')[0] as HTMLInputElement | undefined
+    const filters = all('[data-filter][aria-pressed="true"]')
+    const archive = all('[data-scope="archive"]').find((b) => b.style.color.includes('20, 16, 10'))
+    if (search?.value) clear(search)
+    filters.forEach((f) => f.click())
+    if (archive) all('[data-scope="active"]')[0]?.click()
+    if (search?.value || filters.length || archive) await wait(250)
+    // isti stih kao na prošlom koraku (iz iste pjesme, s njenim omotom) —
+    // otvara se odmah, bez puta kursora, da pregled bude tu čim se uđe u korak
+    const edits = all('button[aria-label="Uredi"]')
+    const row = (b: HTMLElement) => b.parentElement?.parentElement?.textContent ?? ''
+    const pick = edits.find((b) => row(b).includes('Kad sve saberem')) ?? edits[0]
+    if (!pick || !alive()) return
+    pick.click()
+    const text = (await find('textarea[name="text"]')) as HTMLTextAreaElement | null
+    if (!text || !alive()) return
+    // tačno tri reda — bez kucanja, korak je o dizajnu
+    if (text.value !== VOLIM_TE) {
+      const win = text.ownerDocument.defaultView as Window & typeof globalThis
+      Object.getOwnPropertyDescriptor(win.HTMLTextAreaElement.prototype, 'value')!.set!.call(text, VOLIM_TE)
+      text.dispatchEvent(new win.Event('input', { bubbles: true }))
+    }
+    await find('[data-edit-line="2"]')
+    await wait(700)
+    if (!alive()) return
+    // gotovi stilovi
+    await click('[data-edit-preset="romantika"]')
+    await wait(1400)
+    await click('[data-edit-preset="kontrast"]')
+    await wait(1400)
+    if (!alive()) return
+    // 1. red: Bodoni, velikim slovima
+    await click('[data-edit-line="0"]')
+    await wait(400)
+    await click('[data-edit-font="bodoni"]')
+    await wait(700)
+    await click('[data-edit-upper]')
+    await wait(900)
+    if (!alive()) return
+    // 2. red: Cormorant, ukoso
+    await click('[data-edit-line="1"]')
+    await wait(400)
+    await click('[data-edit-font="cormorant"]')
+    await wait(700)
+    await click('[data-edit-i]')
+    await wait(900)
+    if (!alive()) return
+    // 3. red: pisani, u bojama koje aplikacija predloži iz pozadine
+    await click('[data-edit-line="2"]')
+    await wait(400)
+    await click('[data-edit-font="allura"]')
+    await wait(800)
+    for (const sw of all('[data-edit-color]').filter((e) => e.dataset.editColor !== 'none').slice(0, 2)) {
+      await click(sw)
+      await wait(1000)
+      if (!alive()) return
+    }
+    // cijeli stih: prored se razmakne
+    const lh = (await find('[data-edit-slider="look-lh"] input', 1500)) as HTMLInputElement | null
+    if (lh && (await click(lh))) {
+      const win = lh.ownerDocument.defaultView as Window & typeof globalThis
+      const set = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!
+      for (let v = Number(lh.value); v <= 140 && alive(); v += 4) {
+        set.call(lh, String(v))
+        lh.dispatchEvent(new win.Event('input', { bubbles: true }))
+        await wait(70)
+      }
+    }
+    await wait(1400)
+    if (!alive()) return
+    // isti izgled i na računaru
+    await click('[data-device="desktop"]')
+    await wait(2600)
+    await click('[data-device="phone"]')
+  })
+  return (
+    <>
+      <Text>
+        Gotovi stilovi slože stih jednim klikom, a onda red po red: 17 fontova — klasični, moderni i pisani —
+        debljina, ukoso, velika slova, veličina i boja. Za cijeli stih još veličina, prored i razmak slova.
+      </Text>
+      <Bullets
+        items={[
+          <><b>Boju predlaže aplikacija</b> — iz pozadine stiha, raspoloženja i omota albuma, uvijek čitljivu na njoj.</>,
+          <><b>Isti izgled svuda</b> — na ekranu stiha, u slikama za dijeljenje i u pregledu linka.</>,
+        ]}
       />
     </>
   )
@@ -1038,22 +1158,31 @@ function Pristup() {
     const timers: number[] = []
     const wait = (ms: number) => new Promise<void>((r) => timers.push(window.setTimeout(r, ms)))
     ;(async () => {
+      // okvir zna promijeniti stranicu (/admin → /admin?prijava) dok se čeka —
+      // tad se polje traži ponovo, inače bi se kucalo u dokument kojeg više nema
       let form: HTMLFormElement | null = null
-      for (let t = 0; t < 80 && alive && !form; t++) {
-        try {
-          const w = desk()?.contentWindow
-          if (w && w.location.pathname === '/admin' && w.document.readyState === 'complete')
-            // ekran za prijavu (`?prijava`) — šifra se ukuca i prijava prođe
-            form = w.document.querySelector<HTMLFormElement>('form')
-        } catch {
-          /* tuđa adresa */
+      let input: HTMLInputElement | null | undefined = null
+      let button: HTMLButtonElement | null | undefined = null
+      for (let attempt = 0; attempt < 4 && alive; attempt++) {
+        form = null
+        for (let t = 0; t < 80 && alive && !form; t++) {
+          try {
+            const w = desk()?.contentWindow
+            if (w && w.location.pathname === '/admin' && w.document.readyState === 'complete')
+              // ekran za prijavu (`?prijava`) — šifra se ukuca i prijava prođe
+              form = w.document.querySelector<HTMLFormElement>('form')
+          } catch {
+            /* tuđa adresa */
+          }
+          if (!form) await wait(150)
         }
-        if (!form) await wait(150)
+        input = form?.querySelector<HTMLInputElement>('input[type="password"]')
+        button = form?.querySelector<HTMLButtonElement>('button[type="submit"]')
+        if (!form || !input || !button || !alive) return
+        await wait(900)
+        if (input.isConnected && input.ownerDocument.defaultView) break
       }
-      const input = form?.querySelector<HTMLInputElement>('input[type="password"]')
-      const button = form?.querySelector<HTMLButtonElement>('button[type="submit"]')
-      if (!form || !input || !button || !alive) return
-      await wait(900)
+      if (!input?.isConnected || !button || !alive) return
       // React prati vrijednost polja — upis ide kroz izvorni setter + input događaj
       const win = input.ownerDocument.defaultView as Window & typeof globalThis
       const set = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!

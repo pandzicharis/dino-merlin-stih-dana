@@ -30,6 +30,7 @@ export function VerseScreen({
   mood,
   compact = false,
   replay = 0,
+  instant = false,
 }: {
   verse: Verse
   date: string
@@ -38,6 +39,8 @@ export function VerseScreen({
   compact?: boolean
   /** promjena ponovo ispiše stih i podnožje — kad papirić iz splasha sleti */
   replay?: number
+  /** pregled u adminu: stih je tu odmah, bez ispisa riječ po riječ */
+  instant?: boolean
 }) {
   const m = MOODS[mood ?? verse.mood]
 
@@ -46,7 +49,7 @@ export function VerseScreen({
   // između stiha i potpisa; sada nota i podnožje ulaze dok stih još sjeda.
   // poslije splasha stih se ne ispisuje ponovo — pojavi se kad mu slova s
   // papira stignu na mjesto (pretope se), pa izgleda kao da su prenesena
-  const arrive = replay > 0 ? SPLASH_ARRIVE : undefined
+  const arrive = instant ? 0 : replay > 0 ? SPLASH_ARRIVE : undefined
   const tail = compact ? 0 : arrive != null ? arrive + 0.3 : verseTail(verse.text)
 
   // Statusna traka (Android, Chrome) preuzme gornju boju pozadine stiha,

@@ -175,12 +175,10 @@ stvari čitaju kao jedan znak.
 
 ## Slušanje pjesme
 
-Uz svaki stih ide `youtube` link. Pored naziva pjesme stoji YouTube znak
-koji otvara pjesmu **u novoj kartici** — namjerno nije ugrađeni plejer,
-da ekran ostane stih, a ne media player.
-
-Time otpada i problem autoplaya: browseri ionako blokiraju zvuk bez geste
-korisnika, a odlazak na YouTube je i licencno najčistiji put.
+Uz svaki stih ide pjesma (`youtube` link je obavezan). Ispod stiha je plejer
+u tonu aplikacije — zvuk iz `public/audio` sa CDN-a, bez videa; dok pjesme
+nema u aplikaciji, stoji YouTube znak. Kako pjesma dođe u aplikaciju (admin,
+GitHub, `npm run audio`): DEPLOY.md → *Pjesme*.
 
 ## Obavijesti
 

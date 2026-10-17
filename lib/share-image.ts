@@ -15,7 +15,7 @@ import type { Verse } from '@/data/verses'
 import { BRAND } from './brand'
 import { formatFullDateBs } from './date'
 import { withPeriod } from './text'
-import { VERSE_FONTS, parseFont, styleOf, type FontMap } from './fonts'
+import { VERSE_FONTS, caseOf, lookScale, lookSpacing, parseFont, styleOf, type FontMap } from './fonts'
 
 /* ── formati i stilovi ──────────────────────────────────────── */
 
@@ -110,7 +110,7 @@ function fontFamilies() {
 
 /* ── stih po riječima, svaka u svom fontu (lib/fonts.ts) — kao na ekranu ── */
 
-type Run = { text: string; css: string; width: number; pad: number }
+type Run = { text: string; css: string; width: number; pad: number; ls: number; accent: boolean; color?: string }
 type VLine = { runs: Run[]; width: number }
 
 /** CSS font riječi `i` za canvas — porodica iz next/font, veličina × `scale` fonta. */
@@ -122,12 +122,18 @@ function runCss(map: FontMap, i: number, size: number, serif: string): string {
     st.font === 'fraunces'
       ? (st.italic && cs.getPropertyValue('--font-serif-italic').trim()) || serif
       : cs.getPropertyValue(f.family.slice(4, -1)).trim() || serif
-  const px = size * (st.font === 'fraunces' ? 1 : f.scale)
+  const px = size * (st.font === 'fraunces' ? 1 : f.scale) * ((st.size ?? 100) / 100)
   return `${st.italic ? 'italic ' : ''}${st.bold ? 700 : 400} ${px}px ${family}`
+}
+
+/** Razmak slova na platnu (dizajn stiha) — gdje ga preglednik zna; pisani bez razmaka. */
+function setSpacing(ctx: CanvasRenderingContext2D, px: number) {
+  if ('letterSpacing' in ctx) ctx.letterSpacing = `${px}px`
 }
 
 /** Redovi stiha (prelom kako se pjeva, pa po širini) — riječi s izmjerenim širinama u svom fontu. */
 function layoutVerse(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, map: FontMap, serif: string): VLine[] {
+  setSpacing(ctx, 0)
   ctx.font = `400 ${size}px ${serif}`
   const space = ctx.measureText(' ').width
   const out: VLine[] = []
@@ -135,12 +141,18 @@ function layoutVerse(ctx: CanvasRenderingContext2D, text: string, maxW: number, 
   for (const raw of text.split('\n')) {
     let cur: Run[] = []
     let w = 0
-    for (const word of raw.trim().split(/\s+/).filter(Boolean)) {
+    for (const raw2 of raw.trim().split(/\s+/).filter(Boolean)) {
       const st = styleOf(map, n)
       const css = runCss(map, n++, size, serif)
+      const f = VERSE_FONTS[st.font]
+      // velika/mala slova i razmak slova kao na ekranu (lib/fonts.ts)
+      const word = caseOf(raw2, st, map.look)
+      const em = size * (st.font === 'fraunces' ? 1 : f.scale) * ((st.size ?? 100) / 100)
+      const ls = f.kind === 'pisani' ? 0 : em * (lookSpacing(map.look) + (st.upper ? 0.05 : 0))
       ctx.font = css
+      setSpacing(ctx, ls)
       // pisani nemaju "zraka" sa strane — isto kao na ekranu (0.09em)
-      const pad = VERSE_FONTS[st.font].kind === 'pisani' ? size * VERSE_FONTS[st.font].scale * 0.09 : 0
+      const pad = f.kind === 'pisani' ? em * 0.09 : 0
       const ww = ctx.measureText(word).width + pad * 2
       if (cur.length && w + space + ww > maxW) {
         out.push({ runs: cur, width: w })
@@ -148,10 +160,11 @@ function layoutVerse(ctx: CanvasRenderingContext2D, text: string, maxW: number, 
         w = 0
       }
       w += (cur.length ? space : 0) + ww
-      cur.push({ text: word, css, width: ww, pad })
+      cur.push({ text: word, css, width: ww, pad, ls, accent: Boolean(st.accent), color: st.color && `#${st.color}` })
     }
     if (cur.length) out.push({ runs: cur, width: w })
   }
+  setSpacing(ctx, 0)
   return out
 }
 
@@ -169,19 +182,25 @@ function fitWhole(ctx: CanvasRenderingContext2D, text: string, maxW: number, siz
   return Math.max(min, s)
 }
 
-/** Nacrtaj redove centrirano; `y` je sredina prvog reda. */
-function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, y: number, lh: number, size: number, serif: string) {
+/** Nacrtaj redove centrirano; `y` je sredina prvog reda. Riječi s naglaskom u boji `accent`. */
+function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, y: number, lh: number, size: number, serif: string, accent?: string) {
+  setSpacing(ctx, 0)
   ctx.font = `400 ${size}px ${serif}`
   const space = ctx.measureText(' ').width
+  const base = ctx.fillStyle
   ctx.textAlign = 'left'
   lines.forEach((l, i) => {
     let x = cx - l.width / 2
     for (const r of l.runs) {
       ctx.font = r.css
+      setSpacing(ctx, r.ls)
+      ctx.fillStyle = r.color ?? (r.accent && accent ? accent : base)
       ctx.fillText(r.text, x + r.pad, y + i * lh)
       x += r.width + space
     }
   })
+  setSpacing(ctx, 0)
+  ctx.fillStyle = base
   ctx.textAlign = 'center'
 }
 
@@ -310,6 +329,8 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   const coverSrc = album?.cover
   // fontovi stiha — učitani prije crtanja (canvas ne čeka sam)
   const map = parseFont(verse.font)
+  // prored stiha kao na ekranu (dizajn: lib/fonts.ts)
+  const lhOf = (map.look.lh ?? 118) / 100
   const words = text.split(/\s+/).filter(Boolean).length
   const runFonts = [...new Set(Array.from({ length: words }, (_, i) => runCss(map, i, 100, fonts.serif)))]
   await Promise.all(runFonts.map((c) => document.fonts?.load(c, text).catch(() => null)))
@@ -578,16 +599,16 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     const maxW = W * 0.8
-    let size = W * 0.086
+    let size = W * 0.086 * lookScale(map.look)
     // svaki red stiha cio (u jednom redu) — slova se smanje koliko treba
     size = fitWhole(ctx, text, maxW, size, W * 0.035, map, fonts.serif)
     let lines: VLine[] = []
     for (;;) {
       lines = layoutVerse(ctx, text, maxW, size, map, fonts.serif)
-      if (lines.length * size * 1.18 <= H * 0.2 || size <= W * 0.05) break
+      if (lines.length * size * lhOf <= H * 0.2 || size <= W * 0.05) break
       size *= 0.95
     }
-    const lh = size * 1.18
+    const lh = size * lhOf
     let songSize = W * 0.03
     let songGap = W * 0.0055
     ctx.font = `600 ${songSize}px ${fonts.sans}`
@@ -611,7 +632,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
       ctx.shadowBlur = size * 0.4
       ctx.shadowOffsetY = size * 0.03
     }
-    drawVerse(ctx, lines, W / 2, y + lh / 2, lh, size, fonts.serif)
+    drawVerse(ctx, lines, W / 2, y + lh / 2, lh, size, fonts.serif, p.accent)
     ctx.restore()
     y += lines.length * lh + g1
 
@@ -762,13 +783,13 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   // početna veličina kao na ekranu (VerseText verseFontSize): po najdužem redu,
   // 6.4–16 % širine; pa se smanji koliko treba da redovi stanu cijeli
   const longest = Math.max(...text.split('\n').map((l) => l.trim().length), 1)
-  let size = W * Math.min(0.16, Math.max(0.072, 1.74 / longest))
+  let size = W * Math.min(0.16, Math.max(0.072, 1.74 / longest)) * lookScale(map.look)
   size = fitWhole(ctx, text, maxW, size, W * 0.04, map, fonts.serif)
   let lines: VLine[] = []
   let lh = 0
   for (;;) {
     lines = layoutVerse(ctx, text, maxW, size, map, fonts.serif)
-    lh = size * 1.18
+    lh = size * lhOf
     const group = dateSize + size * GAP + lines.length * lh
     if (group <= areaBottom - areaTop || size <= W * 0.045) break
     size *= 0.96
@@ -801,7 +822,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.shadowBlur = size * 0.4
     ctx.shadowOffsetY = size * 0.03
   }
-  drawVerse(ctx, lines, W / 2, firstY, lh, size, fonts.serif)
+  drawVerse(ctx, lines, W / 2, firstY, lh, size, fonts.serif, p.accent)
   ctx.restore()
 
 

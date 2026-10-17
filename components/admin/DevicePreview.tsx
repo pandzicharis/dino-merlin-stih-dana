@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
+import { MOODS } from '@/data/moods'
 import { PUBLIC_URL } from '@/lib/site'
 import { IPHONE, IPhone, IosStatus, Island, Glass, deviceOuter } from '../deck/Devices'
 
@@ -32,7 +33,28 @@ function fit(device: Device, maxW: number, maxH: number) {
  * prezentaciji: iPhone 16 Pro sa statusnom trakom i ostrvom, ili prozor
  * preglednika s adresom. Unutra je iframe na `/pregled`.
  */
-function PreviewFrame({ device, width, frameRef }: { device: Device; width: number; frameRef: RefObject<HTMLIFrameElement | null> }) {
+function PreviewFrame({
+  device,
+  width,
+  frameRef,
+  bg,
+}: {
+  device: Device
+  width: number
+  frameRef: RefObject<HTMLIFrameElement | null>
+  /** boja raspoloženja — ekran je ima odmah, dok se aplikacija učitava (ne crno) */
+  bg: string
+}) {
+  // ekran aplikacije se pretopi preko boje raspoloženja tek kad je stih nacrtan
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === location.origin && e.data?.type === 'stihdana:preview-shown' && e.source === frameRef.current?.contentWindow) setShown(true)
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [frameRef])
+  const reveal = { opacity: shown ? 1 : 0, transition: 'opacity 0.2s ease' }
   if (device === 'phone') {
     const o = deviceOuter('iphone')
     const k = width / o.w
@@ -53,7 +75,7 @@ function PreviewFrame({ device, width, frameRef }: { device: Device; width: numb
             overflow: 'hidden',
             isolation: 'isolate',
             transform: 'translateZ(0)',
-            background: '#000',
+            background: bg,
             // 1em = 1 piksel ekrana — statusna traka i ostrvo se crtaju u em
             fontSize: `${k}px`,
           }}
@@ -74,6 +96,7 @@ function PreviewFrame({ device, width, frameRef }: { device: Device; width: numb
               transformOrigin: '0 0',
               pointerEvents: 'none',
               background: '#000',
+              ...reveal,
             }}
           />
           <IosStatus time="12:00" />
@@ -111,7 +134,7 @@ function PreviewFrame({ device, width, frameRef }: { device: Device; width: numb
         </span>
         <span className="w-[54px]" aria-hidden />
       </div>
-      <div style={{ position: 'relative', width, height: DESK.h * k, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width, height: DESK.h * k, overflow: 'hidden', background: bg }}>
         <iframe
           ref={frameRef}
           src="/pregled"
@@ -128,6 +151,7 @@ function PreviewFrame({ device, width, frameRef }: { device: Device; width: numb
             transformOrigin: '0 0',
             pointerEvents: 'none',
             background: '#0c0c0d',
+            ...reveal,
           }}
         />
       </div>
@@ -139,7 +163,8 @@ function PreviewFrame({ device, width, frameRef }: { device: Device; width: numb
 function usePreviewFeed(frame: RefObject<HTMLIFrameElement | null>, verse: Verse, date: string | undefined, on = true) {
   useEffect(() => {
     if (!on) return
-    const send = () => frame.current?.contentWindow?.postMessage({ type: 'stihdana:preview', verse, date }, location.origin)
+    // instant: u adminu stih stoji odmah — bez ispisa riječ po riječ pri otvaranju
+    const send = () => frame.current?.contentWindow?.postMessage({ type: 'stihdana:preview', verse, date, instant: true }, location.origin)
     send()
     const onMessage = (e: MessageEvent) => {
       if (e.origin === location.origin && e.data?.type === 'stihdana:preview-ready') send()
@@ -209,7 +234,7 @@ export function DevicePreview({
       </div>
 
       <div className="flex items-center justify-center" style={{ height: size.h }}>
-        <PreviewFrame key={device} device={device} width={size.w} frameRef={frame} />
+        <PreviewFrame key={device} device={device} width={size.w} frameRef={frame} bg={MOODS[verse.mood].gradient[0]} />
       </div>
 
       <FullPreview open={full} device={device} verse={verse} date={date} onClose={() => onFull(false)} />
@@ -277,7 +302,7 @@ function FullPreview({
           {bleed ? (
             <iframe ref={frame} src="/pregled" title="Puni pregled" className="absolute inset-0 h-full w-full border-0" />
           ) : (
-            vp.w > 0 && <PreviewFrame device={device} width={size.w} frameRef={frame} />
+            vp.w > 0 && <PreviewFrame device={device} width={size.w} frameRef={frame} bg={MOODS[verse.mood].gradient[0]} />
           )}
           <button
             onClick={onClose}

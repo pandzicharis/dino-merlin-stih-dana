@@ -4,6 +4,7 @@
 # data/audio.json, da plejer zna dužinu bez preuzimanja zaglavlja fajla.
 #
 #   sh scripts/encode-audio.sh        (macOS: afconvert; treba ffprobe)
+# Nove pjesme: npm run audio (preuzme, kodira i upiše trajanje odjednom).
 #
 # Već kodirani (HE-AAC) se preskaču, pa se smije pokretati koliko god puta.
 set -e

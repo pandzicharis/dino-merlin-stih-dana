@@ -1460,6 +1460,9 @@ function measureTransfer(lift = 0.1, scale = LIFT_S): Transfer | null {
       fontStyle: cs.fontStyle,
       letterSpacing: cs.letterSpacing,
       fontVariationSettings: cs.fontVariationSettings,
+      // dizajn stiha (lib/fonts.ts lookCss) — riječi ga čitaju kroz varijable
+      textTransform: cs.textTransform,
+      ...Object.fromEntries(['--verse-accent', '--verse-lh', '--verse-ls'].map((v) => [v, cs.getPropertyValue(v)]).filter(([, x]) => x)),
     } as React.CSSProperties,
     color: cs.color,
     shadow: cs.textShadow,

@@ -5,7 +5,8 @@ import type { Verse } from '@/data/verses'
 import { todayInTz } from '@/lib/date'
 import { VerseScreen } from './VerseScreen'
 
-export type PreviewMessage = { type: 'stihdana:preview'; verse: Verse; date?: string }
+/** `instant`: admin — stih odmah, bez ispisa (prezentacija ga izostavi i zadrži ispis) */
+export type PreviewMessage = { type: 'stihdana:preview'; verse: Verse; date?: string; instant?: boolean }
 
 /** Prima stih od admina (isto porijeklo) i crta ga tačno kao glavna stranica. */
 export function PreviewScreen() {
@@ -23,6 +24,12 @@ export function PreviewScreen() {
     return () => window.removeEventListener('message', onMessage)
   }, [])
 
+  // prvi stih nacrtan — admin tek tad pokaže ekran (do tad boja raspoloženja, ne crno)
+  const shown = Boolean(msg)
+  useEffect(() => {
+    if (shown) requestAnimationFrame(() => window.parent?.postMessage({ type: 'stihdana:preview-shown' }, location.origin))
+  }, [shown])
+
   if (!msg) return null
   // `inert`: pregled je samo za gledanje — srce, zvono, dijeljenje i
   // YouTube ne rade. (Srce bi inače stvarno sačuvalo stih: pregled dijeli
@@ -31,7 +38,7 @@ export function PreviewScreen() {
   const top = Number(new URLSearchParams(location.search).get('top')) || 0
   return (
     <div inert style={top ? ({ '--sat': `${top}px` } as React.CSSProperties) : undefined}>
-      <VerseScreen verse={msg.verse} date={msg.date ?? todayInTz()} />
+      <VerseScreen verse={msg.verse} date={msg.date ?? todayInTz()} instant={msg.instant} />
     </div>
   )
 }

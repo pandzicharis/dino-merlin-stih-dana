@@ -1,6 +1,6 @@
 'use client'
 
-import { parseFont, wordFont } from '@/lib/fonts'
+import { lookCss, lookScale, parseFont, wordFont } from '@/lib/fonts'
 import { Fragment, useEffect, useRef, useState, type RefObject } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { withPeriod } from '@/lib/text'
@@ -106,9 +106,12 @@ export function VerseText({
   // svaki red stiha u jednom redu — slova se smanje koliko treba (i za pisane fontove)
   const box = useRef<HTMLParagraphElement>(null)
   const fit = useFit(box, `${full}|${font ?? ''}`)
+  // dizajn cijelog stiha (lib/fonts.ts): veličina, prored, razmak, slova; naglasak u boji raspoloženja
+  const scale = lookScale(fonts.look)
   const style = {
+    ...lookCss(fonts.look, glow ?? color),
     color,
-    fontSize: verseFontSize(full),
+    fontSize: scale === 1 ? verseFontSize(full) : `calc(${verseFontSize(full)} * ${scale})`,
     // dvostruka sjena: crna za čitljivost, naglasak za dubinu
     textShadow: glow
       ? `0 2px 30px rgba(0,0,0,0.5), 0 0 48px ${glow}2e`

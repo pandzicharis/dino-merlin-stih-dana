@@ -1,0 +1,67 @@
+name: Stih dana — pjesme
+
+# Admin na produkciji sačuva stih s pjesmom koje još nema → ruta
+# /api/admin/audio pošalje `repository_dispatch` → ovdje se pjesma preuzme
+# (yt-dlp), kodira u HE-AAC 64 kbps (afconvert — zato macOS), upiše joj se
+# trajanje i sve se commita na trunk. Vercel objavi novi build i pjesma se
+# pušta odmah, sa CDN-a. Isto što lokalno radi `npm run audio`.
+#
+# Ruta zna i stanje ovog workflowa (admin pokaže "preuzima se" / "nije uspjelo").
+# Ako YouTube odbije GitHubov server, pjesmu sredi `npm run audio` na računaru.
+on:
+  repository_dispatch:
+    types: [audio]
+  workflow_dispatch:
+
+concurrency:
+  group: audio
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  audio:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # yt-dlp za YouTube treba JavaScript runtime (deno)
+      - uses: denoland/setup-deno@v2
+
+      - name: yt-dlp
+        run: python -m pip install --quiet --upgrade "yt-dlp[default]"
+
+      - name: Preuzmi pjesme koje fale
+        # naziv i link idu kroz env, ne u skriptu — bez ubacivanja u shell
+        env:
+          STIH_AUDIO_FETCH: '1'
+          AUDIO_SONG: ${{ github.event.client_payload.song }}
+          AUDIO_YOUTUBE: ${{ github.event.client_payload.youtube }}
+        run: npx -y tsx@4.23.13 scripts/audio-sync.ts
+
+      - name: Commit i push
+        # i kad neka pjesma ne prođe — one koje jesu idu gore
+        if: ${{ !cancelled() }}
+        run: |
+          git add public/audio data/audio.json
+          if git diff --cached --quiet; then
+            echo "Nema novih pjesama."
+            exit 0
+          fi
+          nove=$(git diff --cached --name-only --diff-filter=AM -- public/audio | xargs -n1 basename | sed 's/\.m4a$//' | paste -sd ', ' -)
+          # autor je vlasnik projekta — Vercel objavljuje samo njegove commite
+          git -c user.name="Haris Pandžić" -c user.email="42070972+pandzicharis@users.noreply.github.com" \
+            commit -q -m "Pjesme: $nove"
+          git pull -q --rebase origin trunk
+          git push -q origin HEAD:trunk
+          echo "Objavljeno: $nove"

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
-import { youtubeId } from '@/lib/text'
+import { audioSlug, youtubeId } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import AUDIO from '@/data/audio.json'
@@ -103,24 +103,13 @@ function SongTitle({ song, withIcon }: { song: string; withIcon: boolean }) {
   )
 }
 
-/** `Moj je život Švicarska` → `moj-je-zivot-svicarska` (ime fajla u public/audio, ako ga ima) */
-export function audioSlug(song: string): string {
-  return song
-    .toLowerCase()
-    .replace(/đ/g, 'dj')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
 const ICON = { initial: { scale: 0.5, opacity: 0 }, animate: { scale: 1, opacity: 1 }, exit: { scale: 0.5, opacity: 0 } }
 /** Svira jedna pjesma u isto vrijeme: kad krene nova, ostale stanu. */
 const SOLO = 'stihdana:solo'
 
 type State = 'idle' | 'loading' | 'playing' | 'paused'
 
-/** trajanja pjesama iz public/audio — `sh scripts/encode-audio.sh` */
+/** trajanja pjesama iz public/audio — lib/audio-files.ts (admin, `npm run audio`) */
 const DURATIONS: Record<string, number> = AUDIO
 
 type Source = { verse: Verse; src: string; fallback: string; dur?: number; onFail: () => void }

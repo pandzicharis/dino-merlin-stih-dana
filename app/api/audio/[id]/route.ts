@@ -1,9 +1,9 @@
-import { spawn } from 'node:child_process'
 import { createReadStream } from 'node:fs'
-import { copyFile, mkdir, readdir, stat } from 'node:fs/promises'
+import { mkdir, readdir, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
+import { AUDIO_DIR, YT_FORMAT as FORMAT, watch, ytdlp } from '@/lib/audio-files'
 
 /**
  * Zvuk pjesme s YouTubea, bez videa — redom, od najbržeg:
@@ -12,15 +12,15 @@ import { Readable } from 'node:stream'
  * 2. fajl u tmp-u → odavde, s Range podrškom (Safari bez 206 ne pušta audio)
  * 3. prvi put: yt-dlp nađe direktan audio link (~2 s) i zvuk se odmah
  *    prosljeđuje, a u pozadini se cijeli fajl spremi u tmp za sljedeći put.
- *    U developmentu se kopira i u public/audio, pa ga produkcija dobije statično.
+ *    U projekat (public/audio) pjesmu upisuje samo admin pri čuvanju stiha,
+ *    `npm run audio` ili GitHub (lib/audio-files.ts) — uvijek s tačnim parom
+ *    naziv–link. Pregled u adminu ovdje šalje i pola otkucan link.
  *
  * `?warm=1` (ekran sa stihom ga pošalje čim se pojavi) samo pokrene pripremu —
  * dok korisnik dođe do dugmeta, pjesma je obično već tu.
  */
 const DIR = path.join(tmpdir(), 'stih-audio')
-const PUBLIC = path.join(process.cwd(), 'public', 'audio')
 const TYPES: Record<string, string> = { '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.webm': 'audio/webm', '.opus': 'audio/ogg' }
-const FORMAT = 'bestaudio[ext=m4a]/bestaudio'
 
 const downloads = new Map<string, Promise<string>>()
 const links = new Map<string, Promise<{ url: string; exp: number }>>()
@@ -39,14 +39,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     const file = await cached(id)
     if (q.has('warm')) {
       if (!file) {
-        download(id, slug).catch(() => {})
+        download(id).catch(() => {})
         link(id).catch(() => {})
       }
       return new Response(null, { status: 204 })
     }
     if (file) return serve(req, file)
 
-    download(id, slug).catch((e) => console.error('[audio]', id, e))
+    download(id).catch((e) => console.error('[audio]', id, e))
     return proxy(req, await link(id))
   } catch (e) {
     console.error('[audio]', id, e)
@@ -56,7 +56,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
 async function staticFile(slug: string): Promise<string | null> {
   for (const ext of ['.m4a', '.mp3']) {
-    if (await stat(path.join(PUBLIC, slug + ext)).then(() => true, () => false)) return slug + ext
+    if (await stat(path.join(AUDIO_DIR, slug + ext)).then(() => true, () => false)) return slug + ext
   }
   return null
 }
@@ -87,41 +87,13 @@ function link(id: string): Promise<{ url: string; exp: number }> {
   })
 }
 
-function download(id: string, slug: string): Promise<string> {
+function download(id: string): Promise<string> {
   return once(downloads, id, async () => {
     await mkdir(DIR, { recursive: true })
     await ytdlp(['-f', FORMAT, '--no-playlist', '-q', '-N', '4', '-o', path.join(DIR, `${id}.%(ext)s`), watch(id)])
     const file = await cached(id)
     if (!file) throw new Error('yt-dlp nije napravio fajl')
-    // lokalno: fajl ostaje u projektu, pa ga produkcija servira statično
-    if (process.env.NODE_ENV === 'development' && slug) {
-      await mkdir(PUBLIC, { recursive: true })
-      await copyFile(file, path.join(PUBLIC, slug + path.extname(file))).catch(() => {})
-    }
     return file
-  })
-}
-
-const watch = (id: string) => `https://www.youtube.com/watch?v=${id}`
-
-async function ytdlp(args: string[]): Promise<string> {
-  try {
-    return await run(process.env.YTDLP_PATH || 'yt-dlp', args)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return run('python3', ['-m', 'yt_dlp', ...args])
-    throw e
-  }
-}
-
-function run(cmd: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
-    let out = ''
-    let err = ''
-    child.stdout.on('data', (d) => (out += d))
-    child.stderr.on('data', (d) => (err += d))
-    child.on('error', reject)
-    child.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(err.trim() || `${cmd} exit ${code}`))))
   })
 }
 

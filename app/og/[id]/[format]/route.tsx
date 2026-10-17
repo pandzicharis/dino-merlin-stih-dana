@@ -1,4 +1,4 @@
-import { VERSE_FONTS, parseFont, styleOf, verseWords, type WordStyle } from '@/lib/fonts'
+import { VERSE_FONTS, caseOf, lookScale, lookSpacing, parseFont, styleOf, verseWords, type WordStyle } from '@/lib/fonts'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
@@ -61,22 +61,14 @@ const fontCache = new Map<string, Promise<ArrayBuffer | null>>()
 
 /** Google Fonts upit za stil riječi (lib/fonts.ts) — isti rez kao na ekranu. */
 function googleFamily(st: WordStyle): string {
-  const w = st.bold ? 700 : 400
+  const f = VERSE_FONTS[st.font]
   const i = st.italic ? 1 : 0
-  switch (st.font) {
-    case 'fraunces':
-      return `Fraunces:ital,opsz,wght@${i},9..144,${st.bold ? 620 : 400}`
-    case 'playfair':
-      return `Playfair+Display:ital,wght@${i},${w}`
-    case 'cormorant':
-      return `Cormorant+Garamond:ital,wght@${i},${w}`
-    case 'dancing':
-      return `Dancing+Script:wght@${w}`
-    case 'greatvibes':
-      return 'Great+Vibes'
-    case 'parisienne':
-      return 'Parisienne'
-  }
+  if (st.font === 'fraunces') return `Fraunces:ital,opsz,wght@${i},9..144,${st.bold ? 620 : 400}`
+  const w = st.bold && f.bold ? 700 : 400
+  if (f.italic && f.bold) return `${f.google}:ital,wght@${i},${w}`
+  if (f.italic) return `${f.google}:ital@${i}`
+  if (f.bold) return `${f.google}:wght@${w}`
+  return f.google
 }
 const styleName = (st: WordStyle) => `V-${st.font}-${st.bold ? 'b' : ''}${st.italic ? 'i' : ''}`
 
@@ -114,7 +106,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
   const m = MOODS[verse.mood]
 
   const text = withPeriod(verse.text)
-  const chars = `${text}${verse.song}${verse.album}${verse.year}Stih dana${BRAND.name}`
+  // i velika/mala slova — dizajn stiha zna ih promijeniti
+  const chars = `${text}${text.toLocaleUpperCase('bs')}${text.toLocaleLowerCase('bs')}${verse.song}${verse.album}${verse.year}Stih dana${BRAND.name}`
   const [serif, sans] = await Promise.all([
     loadFont('Fraunces:opsz,wght@9..144,400', chars),
     loadFont('Rubik:wght@500', chars.toUpperCase() + chars),
@@ -123,11 +116,16 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
   const map = parseFont(verse.font)
   const rows = verseWords(text)
   let n = 0
-  const styled = rows.map((r) => r.map((w) => ({ w, st: styleOf(map, n++) })))
+  // riječi već u velikim/malim slovima (dizajn stiha) — Satori nema text-transform po riječi
+  const styled = rows.map((r) => r.map((w) => {
+    const st = styleOf(map, n++)
+    return { w: caseOf(w, st, map.look), st }
+  }))
+  const shown = styled.flat().map((x) => x.w).join(' ')
   const styles = new Map(styled.flat().map((x) => [styleName(x.st), x.st]))
   const verseFonts = (
     await Promise.all(
-      [...styles].map(async ([name, st]) => ({ name, st, data: await loadFont(googleFamily(st), text) })),
+      [...styles].map(async ([name, st]) => ({ name, st, data: await loadFont(googleFamily(st), shown) })),
     )
   ).filter((f) => f.data)
   const loaded = new Set(verseFonts.map((f) => f.name))
@@ -135,12 +133,19 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
 
   const long = text.length > 70
   const pad = height === 1080 ? 96 : 120
-  // svaki red cio: procjena širine po znakovima × uvećanje fonta, pa smanji koliko treba
+  // svaki red cio: procjena širine po znakovima × uvećanje fonta (i riječi), pa smanji koliko treba
+  const ls = lookSpacing(map.look)
   const est = Math.max(
-    ...styled.map((r) => r.reduce((a, x) => a + (x.w.length * 0.5 + 0.3) * VERSE_FONTS[x.st.font].scale, 0)),
+    ...styled.map((r) =>
+      r.reduce((a, x) => {
+        const caps = x.w !== x.w.toLocaleLowerCase('bs') && x.w === x.w.toLocaleUpperCase('bs') ? 1.3 : 1
+        return a + (x.w.length * (0.5 * caps + ls) + 0.3) * VERSE_FONTS[x.st.font].scale * ((x.st.size ?? 100) / 100)
+      }, 0),
+    ),
     1,
   )
-  const fontSize = Math.round(Math.min((height === 1080 ? 82 : 92) * (long ? 0.82 : 1), (width - pad * 2) / est))
+  const fontSize = Math.round(Math.min((height === 1080 ? 82 : 92) * (long ? 0.82 : 1) * lookScale(map.look), (width - pad * 2) / est))
+  const lh = 1.28 * ((map.look.lh ?? 118) / 118)
 
   return new ImageResponse(
     (
@@ -184,7 +189,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
             display: 'flex',
             flexDirection: 'column',
             fontSize,
-            lineHeight: 1.28,
+            lineHeight: lh,
+            letterSpacing: `${ls}em`,
             color: m.text,
             textAlign: 'center',
             alignItems: 'center',
@@ -195,16 +201,22 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
               {r.map((x, j) => {
                 const name = styleName(x.st)
                 const f = VERSE_FONTS[x.st.font]
+                const size = (x.st.size ?? 100) / 100
+                const own = loaded.has(name) && x.st.font !== 'fraunces'
                 return (
                   <span
                     key={j}
-                    style={
-                      loaded.has(name) && x.st.font !== 'fraunces'
-                        ? { fontFamily: name, fontSize: `${f.scale}em`, lineHeight: f.lh }
+                    style={{
+                      ...(own
+                        ? { fontFamily: name, fontSize: `${f.scale * size}em`, lineHeight: f.lh * (lh / 1.28) }
                         : loaded.has(name) && (x.st.bold || x.st.italic)
-                          ? { fontFamily: name }
-                          : {}
-                    }
+                          ? { fontFamily: name, ...(size !== 1 ? { fontSize: `${size}em` } : {}) }
+                          : size !== 1
+                            ? { fontSize: `${size}em` }
+                            : {}),
+                      ...(x.st.color ? { color: `#${x.st.color}` } : x.st.accent ? { color: m.accent } : {}),
+                      ...(f.kind === 'pisani' ? { letterSpacing: 0 } : {}),
+                    }}
                   >
                     {x.w}
                   </span>

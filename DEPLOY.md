@@ -73,6 +73,7 @@ Onda na [vercel.com/new](https://vercel.com/new) → import repozitorija. Next.j
 | `ADMIN_PASSWORD` | šifra za `/admin` (uređivanje stihova) — duga, nasumična |
 | `CRON_SECRET` | nasumična tajna iz koraka 1 |
 | `NEXT_PUBLIC_SITE_URL` | puna adresa, npr. `https://stih-dana.vercel.app` |
+| `GITHUB_AUDIO_TOKEN` | GitHub token za pjesme — vidi [Pjesme](#pjesme) |
 
 `NEXT_PUBLIC_SITE_URL` je bitan — po njemu se grade OG slike i share linkovi.
 **`NEXT_PUBLIC_DATE_OVERRIDE` ne postavljaj** u produkciji; bez nje nema dev trake.
@@ -269,6 +270,39 @@ bio kriv devet puta od deset.
    pretplate treba obrisati i ponovo uključiti zvono.
 4. **Tek onda telefon.** Ugašene obavijesti u sistemskim postavkama, Focus
    režim, ili PWA obrisan s početnog ekrana.
+
+---
+
+## Pjesme
+
+Svaki stih ima pjesmu koja se pušta odmah: `public/audio/<pjesma>.m4a`
+(HE-AAC 64 kbps) i trajanje u `data/audio.json` — oboje ide u build, pa se
+pjesma servira sa CDN-a. Stih bez toga ima samo YouTube znak.
+
+Kad se stih sačuva u adminu, pjesma se sprema sama:
+
+- **lokalno** (`npm run dev`) — odmah, na ovom računaru; poslije commit i push
+- **na produkciji** — admin javi GitHubu, workflow `Stih dana — pjesme`
+  (`.github/workflows/audio.yml`) je preuzme, kodira, commita na `trunk`, a
+  Vercel objavi novi build. Ukupno ~3–5 minuta; u listi stoji
+  „pjesma se objavljuje…" dok traje.
+
+Za produkciju jednom treba token:
+
+1. GitHub → **Settings → Developer settings → Fine-grained tokens → Generate new token**
+2. *Repository access*: samo `dino-merlin-stih-dana`
+3. *Permissions*: **Contents: Read and write** i **Actions: Read-only**
+4. Vercel → Environment Variables → `GITHUB_AUDIO_TOKEN` = token → Redeploy
+
+Ako YouTube odbije GitHubov server (rijetko, ali zna), admin javi
+„pjesma nije preuzeta". Tad na računaru:
+
+```bash
+npm run audio            # provjeri sve stihove s produkcije i preuzmi što fali
+git add public/audio data/audio.json && git commit -m "Pjesme" && git push
+```
+
+`npm run audio -- --check` samo provjeri, bez preuzimanja.
 
 ---
 
