@@ -41,6 +41,19 @@ jobs:
       - name: yt-dlp
         run: python -m pip install --quiet --upgrade "yt-dlp[default]"
 
+      # YouTube GitHubove servere bez prijave odbije ("Sign in to confirm you're
+      # not a bot") — zato kolačići YouTube naloga, iz tajne YT_COOKIES (DEPLOY.md)
+      - name: YouTube kolačići
+        env:
+          YT_COOKIES: ${{ secrets.YT_COOKIES }}
+        run: |
+          if [ -n "$YT_COOKIES" ]; then
+            printf '%s\n' "$YT_COOKIES" > "$RUNNER_TEMP/yt-cookies.txt"
+            echo "YTDLP_COOKIES=$RUNNER_TEMP/yt-cookies.txt" >> "$GITHUB_ENV"
+          else
+            echo "::warning::Nema tajne YT_COOKIES — YouTube zna odbiti GitHub (DEPLOY.md → Pjesme)"
+          fi
+
       - name: Preuzmi pjesme koje fale
         # naziv i link idu kroz env, ne u skriptu — bez ubacivanja u shell
         env:

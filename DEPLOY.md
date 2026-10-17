@@ -294,8 +294,20 @@ Za produkciju jednom treba token:
 3. *Permissions*: **Contents: Read and write** i **Actions: Read-only**
 4. Vercel → Environment Variables → `GITHUB_AUDIO_TOKEN` = token → Redeploy
 
-Ako YouTube odbije GitHubov server (rijetko, ali zna), admin javi
-„pjesma nije preuzeta". Tad na računaru:
+YouTube GitHubove servere bez prijave odbija („Sign in to confirm you're
+not a bot"). Zato workflow koristi kolačiće YouTube naloga, iz tajne
+`YT_COOKIES` (GitHub → Settings → Secrets and variables → Actions). Najbolje
+poseban Google nalog, ne lični. Kolačići se izvoze na računaru:
+
+```bash
+yt-dlp --cookies-from-browser chrome --cookies /tmp/sve.txt --skip-download "https://www.youtube.com/watch?v=lKgI7Cxm0go"
+(head -1 /tmp/sve.txt; grep -E '^[^[:space:]]*(youtube|google)\.com' /tmp/sve.txt) | pbcopy && rm /tmp/sve.txt
+```
+
+Druga linija ostavi samo YouTube/Google kolačiće i kopira ih — zalijepi kao
+vrijednost tajne `YT_COOKIES`. Kad isteknu (odjava, promjena šifre), ponovi.
+
+Ako i tad ne prođe, admin javi „pjesma nije preuzeta". Tad na računaru:
 
 ```bash
 npm run audio            # provjeri sve stihove s produkcije i preuzmi što fali
