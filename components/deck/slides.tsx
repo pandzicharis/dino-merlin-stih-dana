@@ -234,8 +234,7 @@ export const SLIDES: SlideDef[] = [
     section: 'Aplikacija',
     title: 'Urednički panel',
     mode: 'desktop',
-    // prvo pregled i miran ekran za prijavu; šifra se kuca tek na strelicu
-    intro: true,
+    // odmah na prvi korak — prijava kreće čim se slajd učita
     enter: '/admin?prijava',
     features: UREDNIK,
     body: (d) => (
@@ -834,13 +833,28 @@ function useDeskScene(run: (s: DeskScene) => Promise<void>) {
       const r = e.getBoundingClientRect()
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
     }
+    // element stoji na mjestu — skrol i animacije su gotovi (najviše ~1 s)
+    const settle = async (e: HTMLElement) => {
+      let prev = e.getBoundingClientRect()
+      for (let i = 0; i < 16 && alive; i++) {
+        await wait(60)
+        const r = e.getBoundingClientRect()
+        if (Math.abs(r.top - prev.top) < 0.5 && Math.abs(r.left - prev.left) < 0.5) return
+        prev = r
+      }
+    }
     const click = async (t: string | HTMLElement) => {
       const e = await el(t)
       if (!e || !alive) return false
       e.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-      await wait(250)
+      await wait(120)
+      await settle(e)
       const c = center(e)
       await move(c.x, c.y)
+      if (!alive) return false
+      // pomjerio se dok je kursor putovao — kursor ga dostigne prije dodira
+      const c2 = center(e)
+      if (Math.hypot(c2.x - c.x, c2.y - c.y) > 3) await move(c2.x, c2.y, 220)
       if (!alive) return false
       ripple(c.x, c.y)
       await wait(90)
@@ -887,8 +901,18 @@ function useDeskScene(run: (s: DeskScene) => Promise<void>) {
       // admin mora biti otvoren (poslije prijave)
       for (let t = 0; t < 100 && alive && !doc(); t++) await wait(150)
       if (!alive || !doc()) return
-      // prozor ostao otvoren s drugog koraka — zatvori ga
-      q('[role="dialog"]') && q('button[aria-label="Zatvori"]')?.click()
+      // svaki korak kreće od čistog admina, ma gdje stao prethodni: bez
+      // otvorenog prozora, pretrage, filtera, arhive, na prvoj stranici
+      if (q('[role="dialog"]')) {
+        q('button[aria-label="Zatvori"]')?.click()
+        for (let t = 0; t < 15 && alive && q('[role="dialog"]'); t++) await wait(80)
+      }
+      const search = q('[data-search]') as HTMLInputElement | null
+      if (search?.value) setValue(search, '')
+      all('[data-filter][aria-pressed="true"]').forEach((f) => f.click())
+      if (q('[data-scope="archive"]')?.style.color.includes('20, 16, 10')) q('[data-scope="active"]')?.click()
+      q('[data-page="1"]')?.click()
+      if (!alive) return
       await run({ wait, find, all, click, type, clear, choose, alive: () => alive })
     })()
     return () => {
@@ -1233,8 +1257,22 @@ function Pristup() {
 
 /** Stih se sačuva, a broj u zaglavlju otvori listu sačuvanih. */
 function Sacuvano() {
-  // na ulasku ništa nije sačuvano — i u Ručno. Sačuvano odavde dalje ostaje
-  // kroz sve naredne korake; briše se tek kad se krene ispočetka.
+  const { os, setOs, manual } = useDeck()
+  return (
+    <>
+      {/* scena po sistemu: kad iPhone završi, ista ide na Androidu (prekidač ide s njom) */}
+      <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
+      <Text>
+        „Sačuvaj stih“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir otvara listu. Bez naloga i
+        prijave: sve ostaje na telefonu, server ne radi ništa.
+      </Text>
+    </>
+  )
+}
+
+function SacuvanoScene({ onDone }: { onDone: () => void }) {
+  // na ulasku (i na drugom sistemu) ništa nije sačuvano — i u Ručno. Sačuvano
+  // odavde dalje ostaje kroz sve naredne korake; briše se tek ispočetka.
   useEffect(() => cleanSlate(), [])
   useScene(async ({ wait, find, press, home, alive }) => {
     if (!(await home())) return
@@ -1248,13 +1286,11 @@ function Sacuvano() {
     await find('[data-tip="saved"]', 3000)
     await wait(1300)
     if (alive()) await press('[data-tip="saved"]')
+    // lista sačuvanih ostane na ekranu, pa isto na drugom sistemu
+    await wait(2400)
+    if (alive()) onDone()
   })
-  return (
-    <Text>
-      „Sačuvaj stih“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir otvara listu. Bez naloga i
-      prijave: sve ostaje na telefonu, server ne radi ništa.
-    </Text>
-  )
+  return null
 }
 
 /** Dijeljenje: formati jedan za drugim, pa dugme za preuzimanje slike. */
