@@ -417,6 +417,50 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
   return { mode: snap?.mode ?? null, of, fetch: fetchSong, reload: () => void load() }
 }
 
+/** Desno u boxu stiha: pjesma se preuzima, ili nije preuzeta (natpis + ponovi). */
+function SongIssue({ info, mode, onRetry }: { info: SongInfo | null; mode: Songs['mode']; onRetry: () => void }) {
+  if (!info || info.state === 'ready') return null
+  if (info.state === 'loading') {
+    return (
+      <span className="flex shrink-0 items-center gap-1.5 text-[10px] text-white/50" data-song-state="loading">
+        <motion.span
+          className="block h-2.5 w-2.5 rounded-full border border-current border-t-transparent"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
+          aria-hidden
+        />
+        <span className="hidden sm:inline">{mode === 'github' ? 'pjesma se objavljuje…' : 'preuzimam pjesmu…'}</span>
+      </span>
+    )
+  }
+  const hint = info.error ?? (mode === 'off' ? 'Na računaru: npm run audio, pa push.' : 'Pjesma još nije u aplikaciji.')
+  return (
+    <span className="flex shrink-0 items-center gap-1" data-song-state={info.state}>
+      <span
+        title={hint}
+        className="rounded-full border border-rose-300/25 bg-rose-300/[0.07] px-2 py-0.5 text-[10px] text-rose-200/85"
+      >
+        <span className="sm:hidden">bez pjesme</span>
+        <span className="hidden sm:inline">{info.state === 'error' ? 'pjesma nije preuzeta' : 'bez pjesme'}</span>
+      </span>
+      {mode !== 'off' && (
+        <button
+          type="button"
+          onClick={onRetry}
+          title="Preuzmi ponovo"
+          aria-label="Preuzmi pjesmu ponovo"
+          data-song-retry
+          className="flex h-8 w-8 items-center justify-center rounded-full text-white/40 transition-colors hover:bg-white/5 hover:text-white"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+          </svg>
+        </button>
+      )}
+    </span>
+  )
+}
+
 /** Mala oznaka uz naziv pjesme: spremna, preuzima se, ili fali (s dugmetom). */
 function SongBadge({ info, mode, onFetch }: { info: SongInfo | null; mode: Songs['mode']; onFetch: () => void }) {
   if (!info) return null
@@ -660,7 +704,7 @@ function Library({
                 </p>
                 <p className="mt-1 flex min-w-0 items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
                   <span className="shrink-0" style={{ color: BRAND.gold }}>{v.song}</span>
-                  <SongBadge info={songs.of(v.song)} mode={songs.mode} onFetch={() => songs.fetch(v.song, v.youtube)} />
+                  {songs.of(v.song)?.state === 'ready' && <SongBadge info={songs.of(v.song)} mode={songs.mode} onFetch={() => {}} />}
                   <span className="truncate">
                   <span className="text-white/30">
                     {v.album} · {v.year}
@@ -668,6 +712,8 @@ function Library({
                   </span>
                 </p>
               </div>
+              {/* pjesma koja nije preuzeta: natpis i diskretno dugme, pored ikonica */}
+              <SongIssue info={songs.of(v.song)} mode={songs.mode} onRetry={() => songs.fetch(v.song, v.youtube)} />
               {writable && (
                 <div className="flex shrink-0 gap-1">
                   {!archived && (
