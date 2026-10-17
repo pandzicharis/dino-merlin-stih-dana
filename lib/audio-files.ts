@@ -235,7 +235,20 @@ export const watch = (id: string) => `https://www.youtube.com/watch?v=${id}`
 export async function ytdlp(args: string[]): Promise<string> {
   // GitHub: YouTube servere bez prijave zna odbiti ("not a bot") — kolačići naloga (YT_COOKIES)
   const cookies = process.env.YTDLP_COOKIES
-  if (cookies) args = ['--cookies', cookies, ...args]
+  if (!cookies) return ytdlpRun(args)
+  try {
+    return await ytdlpRun(['--cookies', cookies, ...args])
+  } catch (e) {
+    // istekli kolačići znaju biti gori od nikakvih (okrnjeni formati) — još jednom bez njih
+    try {
+      return await ytdlpRun(args)
+    } catch {
+      throw e
+    }
+  }
+}
+
+async function ytdlpRun(args: string[]): Promise<string> {
   try {
     return await run(process.env.YTDLP_PATH || 'yt-dlp', args)
   } catch (e) {

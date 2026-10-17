@@ -296,16 +296,25 @@ Za produkciju jednom treba token:
 
 YouTube GitHubove servere bez prijave odbija („Sign in to confirm you're
 not a bot"). Zato workflow koristi kolačiće YouTube naloga, iz tajne
-`YT_COOKIES` (GitHub → Settings → Secrets and variables → Actions). Najbolje
-poseban Google nalog, ne lični. Prijavi se na youtube.com u Chromeu, pa:
+`YT_COOKIES` (GitHub → Settings → Secrets and variables → Actions).
+
+**Trajni kolačići — poseban Chrome profil samo za ovo** (najbolje i poseban
+Google nalog, ne lični):
+
+1. Chrome → slika gore desno → *Add* → profil nazovi **Stih dana**
+2. U njemu se prijavi na youtube.com, pa **zatvori prozor tog profila**
+3. U Terminalu, u folderu projekta:
 
 ```bash
-npm run cookies
+npm run cookies -- "Stih dana"
 ```
 
-Uzme samo YouTube/Google kolačiće, kopira ih i otvori GitHub stranicu za
-novu tajnu — Name `YT_COOKIES`, Secret Cmd+V, *Add secret*. Kad kolačići
-isteknu (odjava, promjena šifre), ponovi.
+4. Na GitHub stranici koja se otvori: `YT_COOKIES` → *Update secret* → Cmd+V
+
+Taj profil više ne otvaraj. YouTube kolačiće zamijeni („rotira") čim ih
+preglednik nastavi koristiti — zato oni iz profila koji svakodnevno koristiš
+istroše se za dan-dva, a ovi traju mjesecima. Kad ipak isteknu, admin javi
+„pjesma nije preuzeta" — ponovi korake 2–4.
 
 Ako i tad ne prođe, admin javi „pjesma nije preuzeta". Tad na računaru:
 
