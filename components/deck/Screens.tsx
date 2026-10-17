@@ -1,4 +1,5 @@
-import { parseFont, wordFont } from '@/lib/fonts'
+import { lookCss, lookScale, parseFont, wordFont } from '@/lib/fonts'
+import { FitLines } from './FitLines'
 import { Fragment, type CSSProperties } from 'react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
@@ -238,7 +239,9 @@ export function VerseMock({
 }) {
   const m = MOODS[mood ?? verse.mood]
   const text = asWritten(verse.text)
-  const size = verseSize(text, w)
+  // dizajn cijelog stiha (lib/fonts.ts) — kao VerseText u aplikaciji
+  const look = parseFont(verse.font).look
+  const size = verseSize(text, w) * lookScale(look)
 
   return (
     <div style={{ ...fill, color: '#f5f5f5', fontFamily: 'var(--font-sans), sans-serif' }}>
@@ -305,12 +308,17 @@ export function VerseMock({
           <p
             className="verse"
             style={{
+              ...lookCss(look, m.accent),
               fontSize: `${size}em`,
               color: m.text,
               textShadow: `0 0.07em 1em rgba(0,0,0,0.5), 0 0 1.6em ${m.accent}2e`,
+              alignSelf: 'stretch',
             }}
           >
-            <FontedLines text={text} font={verse.font} />
+            {/* svaki red cio, kao u aplikaciji — slova se smanje, red se ne lomi */}
+            <FitLines>
+              <FontedLines text={text} font={verse.font} />
+            </FitLines>
           </p>
           <span
             style={{
