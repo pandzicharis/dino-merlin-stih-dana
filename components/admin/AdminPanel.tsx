@@ -991,30 +991,6 @@ function Editor({
       title={initial ? 'Uredi stih' : 'Novi stih'}
       icon={initial ? <path d="M4 20h4L19 9l-4-4L4 16z" /> : <path d="M12 5v14M5 12h14" />}
       actions={
-        <>
-        <span className="flex items-center rounded-full border border-white/10 bg-white/[0.04] p-0.5">
-          {(
-            [
-              ['undo', 'Nazad (⌘Z)', history.canUndo, history.undo, 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11'],
-              ['redo', 'Naprijed (⇧⌘Z)', history.canRedo, history.redo, 'm15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13'],
-            ] as const
-          ).map(([k, label, on, run, path]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={run}
-              disabled={!on}
-              title={label}
-              aria-label={label}
-              {...{ [`data-${k}`]: '' }}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25 disabled:hover:bg-transparent"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d={path} />
-              </svg>
-            </button>
-          ))}
-        </span>
         <button
           type="button"
           onClick={() => setFull(true)}
@@ -1025,7 +1001,6 @@ function Editor({
           </svg>
           Puni pregled
         </button>
-        </>
       }
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:items-start">
@@ -1177,14 +1152,40 @@ function Editor({
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="mt-auto h-12 rounded-2xl text-[14px] font-semibold text-black disabled:opacity-50"
-          style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
-        >
-          {busy ? 'Čuvam…' : initial ? 'Sačuvaj izmjene' : 'Dodaj stih'}
-        </button>
+        {/* dole: nazad / naprijed lijevo, čuvanje desno */}
+        <div className="mt-auto flex items-center gap-2.5">
+          <span className="flex h-12 shrink-0 items-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.04] px-1">
+            {(
+              [
+                ['undo', 'Nazad (⌘Z)', history.canUndo, history.undo, 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11'],
+                ['redo', 'Naprijed (⇧⌘Z)', history.canRedo, history.redo, 'm15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13'],
+              ] as const
+            ).map(([k, label, on, run, path]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={run}
+                disabled={!on}
+                title={label}
+                aria-label={label}
+                {...{ [`data-${k}`]: '' }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25 disabled:hover:bg-transparent"
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d={path} />
+                </svg>
+              </button>
+            ))}
+          </span>
+          <button
+            type="submit"
+            disabled={busy}
+            className="h-12 flex-1 rounded-2xl text-[14px] font-semibold text-black disabled:opacity-50"
+            style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
+          >
+            {busy ? 'Čuvam…' : initial ? 'Sačuvaj izmjene' : 'Dodaj stih'}
+          </button>
+        </div>
       </form>
       </div>
     </Sheet>

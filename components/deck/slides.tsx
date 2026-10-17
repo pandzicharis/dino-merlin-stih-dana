@@ -1090,24 +1090,30 @@ function Dizajn() {
     await click('[data-redo]')
     await wait(1000)
     if (!alive()) return
-    // 1. red: Bodoni, velikim slovima
-    await click('[data-edit-line="0"]')
-    await wait(400)
+    // 1. i 2. red zajedno (kvačice — više redova odjednom): Bodoni
+    await click('[data-edit-line="1"]')
+    await wait(500)
     await click('[data-edit-font="bodoni"]')
-    await wait(700)
+    await wait(900)
+    if (!alive()) return
+    // samo 1. red: velikim slovima
+    await click('[data-edit-line="1"]')
+    await wait(400)
     await click('[data-edit-upper]')
     await wait(900)
     if (!alive()) return
-    // 2. red: Cormorant, ukoso
+    // samo 2. red: ukoso
     await click('[data-edit-line="1"]')
+    await wait(300)
+    await click('[data-edit-line="0"]')
     await wait(400)
-    await click('[data-edit-font="cormorant"]')
-    await wait(700)
     await click('[data-edit-i]')
     await wait(900)
     if (!alive()) return
-    // 3. red: pisani, u bojama koje aplikacija predloži iz pozadine
+    // samo 3. red: pisani, u bojama koje aplikacija predloži iz pozadine
     await click('[data-edit-line="2"]')
+    await wait(300)
+    await click('[data-edit-line="1"]')
     await wait(400)
     await click('[data-edit-font="allura"]')
     await wait(800)
@@ -1137,8 +1143,9 @@ function Dizajn() {
   return (
     <>
       <Text>
-        Gotovi stilovi slože stih jednim klikom, a onda red po red: 17 fontova — klasični, moderni i pisani —
-        debljina, ukoso, velika slova, veličina i boja. Za cijeli stih još veličina, prored i razmak slova.
+        Gotovi stilovi slože stih jednim klikom, a onda red po red — ili više redova odjednom: 17 fontova (klasični,
+        moderni, pisani), debljina, ukoso, velika slova, veličina i boja. Za cijeli stih još veličina, prored i
+        razmak slova.
       </Text>
       <Bullets
         items={[

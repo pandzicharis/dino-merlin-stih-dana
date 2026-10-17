@@ -55,11 +55,15 @@ export function VerseDesigner({
   const total = rows.reduce((a, r) => a + r.length, 0)
   const accent = MOODS[mood].accent
 
-  // red koji se uređuje; 'all' = svi redovi
-  const [picked, setPicked] = useState<number | 'all'>(0)
-  const row = picked === 'all' || picked < rows.length ? picked : 'all'
+  // redovi koji se uređuju — može više odjednom; bar jedan je uvijek izabran
+  const [picked, setPicked] = useState<number[]>([0])
+  const chosen = picked.filter((li) => li < rows.length).sort((a, b) => a - b)
+  const lines = chosen.length ? chosen : rows.length ? [0] : []
+  const toggleRow = (li: number) =>
+    setPicked(lines.includes(li) ? (lines.length > 1 ? lines.filter((x) => x !== li) : lines) : [...lines, li])
   const lineOf = (li: number) => rows[li].map((_, j) => starts[li] + j)
-  const sel = row === 'all' ? [] : lineOf(row)
+  // svi redovi izabrani = cijeli stih (i glavni stil)
+  const sel = lines.length === rows.length ? [] : lines.flatMap(lineOf)
   const targets = sel.length ? sel : Array.from({ length: total }, (_, i) => i)
   const styles = targets.length ? targets.map((i) => styleOf(map, i)) : [map.main]
   const all = <K extends keyof WordStyle>(k: K) => styles.every((s) => Boolean(s[k]))
@@ -97,7 +101,8 @@ export function VerseDesigner({
   const accentOn = all('accent')
   const plain = styles.every((s) => !s.color && !s.accent)
   const italicOk = styles.every((s) => canItalic(s.font))
-  const scope = row === 'all' ? 'Svi redovi' : `${row + 1}. red`
+  const names = lines.map((li) => `${li + 1}.`)
+  const scope = names.length > 1 ? `${names.slice(0, -1).join(', ')} i ${names[names.length - 1]} red` : `${names[0] ?? '1.'} red`
   // uzorak na pločicama fontova: prva riječ reda (kratka), inače "Aa"
   const sample = (() => {
     const w = rows.flat()[targets[0]]
@@ -150,21 +155,34 @@ export function VerseDesigner({
         </div>
 
         {/* redovi stiha, svaki u svom stilu — klik bira red */}
-        <SectionTitle title="Uređivanje po redu" hint="klikni red koji mijenjaš" />
+        <SectionTitle title="Uređivanje po redu" hint="izaberi red, ili više njih odjednom" />
         <div className="space-y-1 px-2 pb-2" style={lookCss(map.look, accent)}>
           {rows.length === 0 && <p className="px-1 py-2 text-[12px] text-white/35">Upiši stih — onda ga ovdje oblikuješ red po red.</p>}
           {rows.map((r, li) => {
-            const on = row === li
+            const on = lines.includes(li)
             return (
               <button
                 type="button"
                 key={li}
                 data-edit-line={li}
-                onClick={() => setPicked(li)}
-                aria-pressed={on}
+                onClick={() => toggleRow(li)}
+                role="checkbox"
+                aria-checked={on}
                 className="flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-1.5 text-left transition-colors"
                 style={{ borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.06)', background: on ? `${BRAND.gold}14` : 'transparent' }}
               >
+                {/* kvačica — redova može biti više */}
+                <span
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border transition-colors"
+                  style={{ borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.25)', background: on ? BRAND.gold : 'transparent' }}
+                  aria-hidden
+                >
+                  {on && (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#14100A" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m5 12 5 5 9-10" />
+                    </svg>
+                  )}
+                </span>
                 <span className="w-9 shrink-0 text-[9px] uppercase tracking-[0.14em]" style={{ color: on ? BRAND.gold : 'rgba(255,255,255,0.35)' }}>
                   {li + 1}. red
                 </span>
@@ -191,18 +209,11 @@ export function VerseDesigner({
               </button>
             )
           })}
-          {rows.length > 1 && (
-            <div className="flex justify-end pt-0.5">
-              <Chip on={row === 'all'} onClick={() => setPicked('all')} data-edit-all>
-                Svi redovi
-              </Chip>
-            </div>
-          )}
         </div>
 
         {/* izabrani red: font, oznake, veličina, boja */}
         <div className="border-t border-white/[0.06]" style={{ background: `${BRAND.gold}08` }}>
-          <SectionTitle title={`Uređuješ: ${scope}`} hint="font, veličina i boja samo za njega" dot />
+          <SectionTitle title={`Uređuješ: ${scope}`} hint={lines.length > 1 ? 'isto za sve izabrane' : 'font, veličina i boja samo za njega'} dot />
           <div className="px-2.5 pb-2.5">
           <div className="space-y-2">
             {FONT_KINDS.map(({ kind, label }) => (
@@ -401,21 +412,6 @@ function FontTile({ k, on, sample, onPick }: { k: VerseFont; on: boolean; sample
         {sample}
       </span>
       <span className="text-[8.5px] uppercase tracking-[0.1em] text-white/40">{f.label}</span>
-    </button>
-  )
-}
-
-function Chip({ on, onClick, children, ...rest }: { on: boolean; onClick: () => void; children: React.ReactNode } & Record<`data-${string}`, unknown>) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className="h-6 rounded-full border px-2.5 text-[10px] uppercase tracking-[0.12em] transition-colors"
-      style={{ borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.1)', color: on ? BRAND.gold : 'rgba(255,255,255,0.45)', background: on ? `${BRAND.gold}14` : 'transparent' }}
-      {...rest}
-    >
-      {children}
     </button>
   )
 }
