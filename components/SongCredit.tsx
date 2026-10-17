@@ -20,16 +20,17 @@ import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
  * Zvuk se traži redom: `public/audio/<pjesma>.m4a` sa CDN-a, pa /api/audio
  * (lokalno ga izvuče s YouTubea). Ako ni jedno ne stigne, ostaje YouTube znak.
  */
-export function SongCredit({ verse }: { verse: Verse }) {
+export function SongCredit({ verse, preview = false }: { verse: Verse; preview?: boolean }) {
   const id = youtubeId(verse.youtube)
   // dok audio ne pukne, dodir pušta pjesmu; ako server ne može do zvuka, ostaje YouTube link
   // pamti se ZA KOJU pjesmu je zvuk pao — nova pjesma kreće ispočetka sama
   const [failedId, setFailedId] = useState<string | null>(null)
   const failed = failedId === id
 
-  if (id && !failed && playable(verse))
+  // pregled u adminu: gramofon i za pjesmu koja se tek preuzme kad se stih sačuva
+  if (id && !failed && (playable(verse) || preview))
     return (
-      <AudioSong key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} />
+      <AudioSong key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} preview={preview} />
     )
 
   return (
@@ -448,15 +449,16 @@ function Tonearm({ size, down, progress }: { size: number; down: boolean; progre
  * (desno titra ekvilajzer dok svira), album i traka za premotavanje.
  * Kontrole rade i sa zaključanog ekrana (Media Session).
  */
-function AudioSong(props: Source) {
-  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: true })
+function AudioSong({ preview = false, ...props }: Source & { preview?: boolean }) {
+  // pregled (samo za gledanje): bez pripreme i preuzimanja pjesme
+  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: !preview })
   const { verse, fallback } = props
 
   // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
   // Na Vercelu nema yt-dlp-a, pa tamo svira samo statični fajl i ovo ne treba.
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') fetch(`${fallback}&warm=1`).catch(() => {})
-  }, [fallback])
+    if (!preview && process.env.NODE_ENV === 'development') fetch(`${fallback}&warm=1`).catch(() => {})
+  }, [fallback, preview])
 
   return (
     <div data-tip="song" className="flex w-[min(84vw,320px)] items-center gap-4 text-left">

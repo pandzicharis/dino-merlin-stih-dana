@@ -910,7 +910,7 @@ function useDeskScene(run: (s: DeskScene) => Promise<void>) {
       }
       const search = q('[data-search]') as HTMLInputElement | null
       if (search?.value) setValue(search, '')
-      all('[data-filter][aria-pressed="true"]').forEach((f) => f.click())
+      all('[data-filter][aria-pressed="true"], [data-song-filter][aria-pressed="true"]').forEach((f) => f.click())
       if (q('[data-scope="archive"]')?.style.color.includes('20, 16, 10')) q('[data-scope="active"]')?.click()
       q('[data-page="1"]')?.click()
       if (!alive) return

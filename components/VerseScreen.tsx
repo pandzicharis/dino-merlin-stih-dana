@@ -31,6 +31,7 @@ export function VerseScreen({
   compact = false,
   replay = 0,
   instant = false,
+  preview = false,
 }: {
   verse: Verse
   date: string
@@ -41,6 +42,8 @@ export function VerseScreen({
   replay?: number
   /** pregled u adminu: stih je tu odmah, bez ispisa riječ po riječ */
   instant?: boolean
+  /** pregled (admin, prezentacija): gramofon i za pjesmu koja još nije preuzeta */
+  preview?: boolean
 }) {
   const m = MOODS[mood ?? verse.mood]
 
@@ -177,7 +180,7 @@ export function VerseScreen({
             </div>
           ) : (
             <>
-              <SongCredit verse={verse} />
+              <SongCredit verse={verse} preview={preview} />
               <span
                 className="h-px w-16"
                 style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}

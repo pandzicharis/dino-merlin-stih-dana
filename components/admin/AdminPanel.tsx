@@ -477,6 +477,9 @@ function Library({
 }) {
   const [q, setQ] = useState('')
   const [mood, setMood] = useState<Mood | null>(null)
+  // filter po pjesmi: ima li stih pjesmu u aplikaciji (♪) ili ne
+  const [withSong, setWithSong] = useState<boolean | null>(null)
+  const hasSong = (v: AdminVerse) => songs.of(v.song)?.state === 'ready'
   const [archived, setArchived] = useState(false)
   const [page, setPage] = useState(0)
   const writable = Boolean(data.writable)
@@ -486,6 +489,7 @@ function Library({
       (v) =>
         v.active !== archived &&
         (!mood || v.mood === mood) &&
+        (withSong == null || hasSong(v) === withSong) &&
         (!q || `${v.text} ${v.song} ${v.album}`.toLowerCase().includes(q.toLowerCase())),
     )
     // najnoviji prvi — to je ono što urednik najčešće traži
@@ -593,6 +597,44 @@ function Library({
             {MOODS[k].label}
           </button>
         ))}
+        {/* pjesma: s njom / bez nje — tek kad je stanje pjesama stiglo */}
+        {songs.mode && (
+          <>
+            <span className="mx-1 w-px shrink-0 self-stretch bg-white/10" aria-hidden />
+            {(
+              [
+                [true, 'S pjesmom'],
+                [false, 'Bez pjesme'],
+              ] as const
+            ).map(([k, label]) => {
+              const on = withSong === k
+              const n = data.verses.filter((v) => v.active !== archived && hasSong(v) === k).length
+              return (
+                <button
+                  key={label}
+                  data-song-filter={k ? 'with' : 'without'}
+                  aria-pressed={on}
+                  onClick={() => {
+                    setWithSong(on ? null : k)
+                    setPage(0)
+                  }}
+                  className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[11px] transition-colors"
+                  style={{
+                    borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.08)',
+                    color: on ? '#fff' : 'rgba(255,255,255,0.5)',
+                    background: on ? `${BRAND.gold}14` : 'transparent',
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill={k ? BRAND.gold : 'none'} stroke={k ? 'none' : 'currentColor'} strokeWidth="2" aria-hidden>
+                    <path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z" />
+                  </svg>
+                  {label}
+                  <span className="tabular opacity-60">{n}</span>
+                </button>
+              )
+            })}
+          </>
+        )}
       </div>
 
       {/* lista ima svoju visinu i skrola se unutra — filteri i kartice ostaju na mjestu */}
