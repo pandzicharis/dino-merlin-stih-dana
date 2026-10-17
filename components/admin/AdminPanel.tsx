@@ -7,7 +7,7 @@ import type { Verse } from '@/data/verses'
 import { MOODS, MOOD_KEYS, type Mood } from '@/data/moods'
 import { ALBUMS, albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
-import { audioSlug, asWritten } from '@/lib/text'
+import { audioSlug, asWritten, youtubeId } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview, DeviceSwitch, phoneWidth, type Device } from './DevicePreview'
@@ -233,6 +233,8 @@ export function AdminPanel() {
                 initial={editor.verse}
                 verses={data.verses}
                 songOf={songs.of}
+                fetchSong={songs.fetch}
+                songsMode={songs.mode}
                 onSongSaved={(snap, note) => {
                   setData(snap)
                   songs.reload()
@@ -1000,6 +1002,8 @@ function Editor({
   initial,
   verses,
   songOf,
+  fetchSong,
+  songsMode,
   onSongSaved,
   busy,
   onClose,
@@ -1009,6 +1013,9 @@ function Editor({
   /** postojeći stihovi — ista pjesma donosi svoj link, album i godinu */
   verses: AdminVerse[]
   songOf: Songs['of']
+  /** preuzmi pjesmu sada (ponovni pokušaj iz forme) */
+  fetchSong: Songs['fetch']
+  songsMode: Songs['mode']
   /** pjesma preimenovana (lista pjesama → olovka) — nova lista stihova */
   onSongSaved: (snap: Snapshot, note: string | null) => void
   busy: boolean
@@ -1297,9 +1304,27 @@ function Editor({
                 <svg width="12" height="12" viewBox="0 0 24 24" fill={BRAND.gold} aria-hidden>
                   <path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z" />
                 </svg>
-                {song?.state === 'loading'
-                  ? 'Pjesma se upravo preuzima.'
-                  : 'Ove pjesme još nema — preuzeće se jednom, kad sačuvaš stih, i ostaje za sve njene stihove.'}
+                <span className="min-w-0 flex-1">
+                  {song?.state === 'loading'
+                    ? 'Pjesma se upravo preuzima.'
+                    : song?.state === 'error'
+                      ? <span className="text-rose-200/85">Pjesma nije preuzeta{song.error ? ` — ${song.error}` : '.'}</span>
+                      : 'Ove pjesme još nema — preuzeće se jednom, kad sačuvaš stih, i ostaje za sve njene stihove.'}
+                </span>
+                {/* ponovni pokušaj odmah, bez čuvanja stiha */}
+                {song?.state !== 'loading' && songsMode !== 'off' && youtubeId(d.youtube) && (
+                  <button
+                    type="button"
+                    onClick={() => fetchSong(d.song, d.youtube)}
+                    data-song-retry
+                    className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-2.5 text-[11px] text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+                    </svg>
+                    {song?.state === 'error' ? 'Pokušaj ponovo' : 'Preuzmi sada'}
+                  </button>
+                )}
               </p>
             )
           )}
