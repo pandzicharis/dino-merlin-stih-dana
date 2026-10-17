@@ -91,20 +91,19 @@ export function VerseScreen({
               {m.label}
             </p>
           ) : (
-            <div className="flex items-center gap-3.5">
-              <Signature height={36} delay={0.15} duration={1.25} className="opacity-90" />
-              <motion.span
-                className="flex items-center gap-3.5"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.7, delay: 0.6, ease: 'easeOut' }}
-              >
-                <span className="h-6 w-px bg-white/20" aria-hidden />
-                <a href="https://magaza.com.ba" target="_blank" rel="noopener noreferrer" aria-label="Magaza" className="translate-y-0.5 opacity-90">
-                  <MagazaLogo height={22} color="#FFFFFF" />
-                </a>
-              </motion.span>
-            </div>
+            // oba znaka ulaze zajedno, istim fade-om
+            <motion.div
+              className="flex items-center gap-3.5"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
+            >
+              <Signature height={36} wipe={false} className="opacity-90" />
+              <span className="h-6 w-px bg-white/20" aria-hidden />
+              <a href="https://magaza.com.ba" target="_blank" rel="noopener noreferrer" aria-label="Magaza" className="translate-y-0.5 opacity-90">
+                <MagazaLogo height={22} color="#FFFFFF" />
+              </a>
+            </motion.div>
           )}
           {!compact && (
             <motion.div

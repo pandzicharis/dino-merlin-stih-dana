@@ -23,11 +23,14 @@ export function Signature({
   className,
   delay = 0,
   duration = 1.3,
+  wipe = true,
 }: {
   height?: number
   className?: string
   delay?: number
   duration?: number
+  /** false: bez vlastitog otkrivanja — animira ga roditelj */
+  wipe?: boolean
 }) {
   const [failed, setFailed] = useState(false)
 
@@ -37,7 +40,7 @@ export function Signature({
         <Wordmark width={Math.round(height * 1.7)} className={className} />
       ) : (
         <motion.div
-          initial={{ clipPath: 'inset(0 100% 0 0)' }}
+          initial={wipe ? { clipPath: 'inset(0 100% 0 0)' } : false}
           animate={{ clipPath: 'inset(0 0% 0 0)' }}
           transition={{ duration, delay, ease: [0.33, 0, 0.2, 1] }}
           style={{ height }}
