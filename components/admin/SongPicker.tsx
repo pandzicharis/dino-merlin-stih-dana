@@ -5,6 +5,7 @@ import { motion } from 'motion/react'
 import { albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { audioSlug } from '@/lib/text'
+import { audioFile } from '@/lib/audio-name'
 
 export type KnownSong = { song: string; album: string; year: number; youtube?: string }
 
@@ -21,6 +22,7 @@ export function SongPicker({
   ready,
   onType,
   onPick,
+  onEdit,
   className,
 }: {
   value: string
@@ -29,6 +31,8 @@ export function SongPicker({
   ready: (song: string) => boolean
   onType: (song: string) => void
   onPick: (s: KnownSong) => void
+  /** olovka uz pjesmu — uredi njen naziv i ime fajla */
+  onEdit?: (s: KnownSong) => void
   className: string
 }) {
   const [open, setOpen] = useState(false)
@@ -126,17 +130,16 @@ export function SongPicker({
             const cover = albumOf(s.album)?.cover
             const on = exact ? audioSlug(s.song) === q : i === active
             return (
+              <div key={s.song} className="group flex items-center rounded-lg transition-colors" style={{ background: on ? `${BRAND.gold}1f` : 'transparent' }}>
               <button
                 type="button"
-                key={s.song}
                 role="option"
                 aria-selected={on}
                 data-song-option={audioSlug(s.song)}
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => !exact && setActive(i)}
                 onClick={() => pick(s)}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors"
-                style={{ background: on ? `${BRAND.gold}1f` : 'transparent' }}
+                className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-1.5 text-left"
               >
                 {cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -156,6 +159,25 @@ export function SongPicker({
                   </svg>
                 )}
               </button>
+              {onEdit && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setOpen(false)
+                    onEdit(s)
+                  }}
+                  title="Uredi pjesmu (naziv i fajl)"
+                  aria-label={`Uredi pjesmu ${s.song}`}
+                  data-song-edit={audioSlug(s.song)}
+                  className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M4 20h4L19 9l-4-4L4 16z" />
+                  </svg>
+                </button>
+              )}
+              </div>
             )
           })}
         </motion.div>
@@ -173,7 +195,7 @@ export function SongPlayer({ song }: { song: string }) {
   const [t, setT] = useState(0)
   const [dur, setDur] = useState(0)
   // druga pjesma = novi plejer (key u formi) — kreće ispočetka, ne svira sama
-  const src = `/audio/${audioSlug(song)}.m4a`
+  const src = `/audio/${audioFile(song)}.m4a`
 
   const toggle = () => {
     const a = audio.current
@@ -234,5 +256,137 @@ export function SongPlayer({ song }: { song: string }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Uredi pjesmu: naziv (mijenja se u svim njenim stihovima) i ime fajla u
+ * public/audio. Ime fajla prati naziv dok ga urednik sam ne promijeni.
+ */
+export function SongEdit({
+  song,
+  file,
+  count,
+  onClose,
+  onSave,
+}: {
+  song: KnownSong
+  /** sadašnje ime fajla (bez .m4a) */
+  file: string
+  /** koliko stihova ima ova pjesma */
+  count: number
+  onClose: () => void
+  /** null = sačuvano, inače poruka greške */
+  onSave: (to: string, file: string) => Promise<string | null>
+}) {
+  const [name, setName] = useState(song.song)
+  const [fileName, setFileName] = useState(file)
+  // ime fajla ide za nazivom, dok ga urednik ne dirne
+  const [ownFile, setOwnFile] = useState(file !== audioSlug(song.song))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const valid = name.trim() && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(fileName)
+  const same = name.trim() === song.song && fileName === file
+  const field =
+    'h-11 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 text-[14px] text-white outline-none placeholder:text-white/25 focus:border-[#BFA87F]/60'
+
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [onClose])
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Uredi pjesmu"
+    >
+      <motion.form
+        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.2 }}
+        className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#141210] p-5 shadow-2xl"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          if (!valid || same || busy) return
+          setBusy(true)
+          setError(await onSave(name.trim(), fileName))
+          setBusy(false)
+        }}
+      >
+        <div className="mb-4 flex items-center gap-3">
+          {albumOf(song.album)?.cover && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={albumOf(song.album)!.cover} alt="" className="h-11 w-11 rounded-lg object-cover" />
+          )}
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-[0.24em]" style={{ color: BRAND.gold }}>
+              Uredi pjesmu
+            </p>
+            <p className="truncate text-[1.05rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
+              {song.song}
+            </p>
+          </div>
+        </div>
+
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-[0.16em] text-white/45">Naziv pjesme</span>
+          <input
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (!ownFile) setFileName(audioSlug(e.target.value))
+            }}
+            autoFocus
+            className={`mt-2 ${field}`}
+            data-song-edit-name
+          />
+        </label>
+        <label className="mt-4 block">
+          <span className="block text-[11px] uppercase tracking-[0.16em] text-white/45">
+            Fajl <span className="normal-case tracking-normal text-white/30">— u public/audio</span>
+          </span>
+          <span className="relative mt-2 flex items-center">
+            <input
+              value={fileName}
+              onChange={(e) => {
+                setOwnFile(true)
+                setFileName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))
+              }}
+              className={`${field} pr-14 font-mono text-[13px]`}
+              spellCheck={false}
+              data-song-edit-file
+            />
+            <span className="pointer-events-none absolute right-3.5 font-mono text-[13px] text-white/35">.m4a</span>
+          </span>
+        </label>
+
+        <p className="mt-3 text-[12px] leading-relaxed text-white/45">
+          Mijenja se u {count === 1 ? 'jednom stihu' : `${count} stiha`} ove pjesme.
+          {fileName !== file && <> Fajl <code className="text-white/65">{file}.m4a</code> postaje <code className="text-white/65">{fileName}.m4a</code>.</>}
+        </p>
+        {error && <p className="mt-2 text-[12px] text-rose-200/90">{error}</p>}
+
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button type="button" onClick={onClose} className="h-11 rounded-xl border border-white/10 text-[13px] text-white/70 transition-colors hover:bg-white/5">
+            Odustani
+          </button>
+          <button
+            type="submit"
+            disabled={!valid || same || busy}
+            className="h-11 rounded-xl text-[13px] font-semibold text-black disabled:opacity-40"
+            style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
+          >
+            {busy ? 'Čuvam…' : 'Sačuvaj'}
+          </button>
+        </div>
+      </motion.form>
+    </motion.div>
   )
 }

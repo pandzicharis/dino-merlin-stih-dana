@@ -3,7 +3,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
-import { audioSlug, youtubeId } from '@/lib/text'
+import { youtubeId } from '@/lib/text'
+import { audioFile } from '@/lib/audio-name'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import AUDIO from '@/data/audio.json'
@@ -115,9 +116,9 @@ const DURATIONS: Record<string, number> = AUDIO
 type Source = { verse: Verse; src: string; fallback: string; dur?: number; onFail: () => void }
 
 const sourceOf = (verse: Verse, id: string) => ({
-  src: `/audio/${audioSlug(verse.song)}.m4a`,
-  fallback: `/api/audio/${id}?s=${audioSlug(verse.song)}`,
-  dur: DURATIONS[audioSlug(verse.song)],
+  src: `/audio/${audioFile(verse.song)}.m4a`,
+  fallback: `/api/audio/${id}?s=${audioFile(verse.song)}`,
+  dur: DURATIONS[audioFile(verse.song)],
 })
 
 /**
@@ -126,7 +127,7 @@ const sourceOf = (verse: Verse, id: string) => ({
  * pada (nema yt-dlp-a). Lokalno server zvuk izvuče sam.
  */
 function playable(verse: Verse): boolean {
-  return audioSlug(verse.song) in DURATIONS || process.env.NODE_ENV === 'development'
+  return audioFile(verse.song) in DURATIONS || process.env.NODE_ENV === 'development'
 }
 
 /**

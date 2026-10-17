@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { audioSlug } from '@/lib/text'
+import { audioFile } from '@/lib/audio-name'
 import { LivePhone } from './Stages'
 import { MagazaMark } from './Screens'
 import { Backdrop, LinkPill, Sheet } from './Poster'
@@ -175,7 +175,7 @@ export function VideoScene({
       ready,
       done: false,
       marks: marks.current,
-      audio: `/audio/${audioSlug(verse.song)}.m4a`,
+      audio: `/audio/${audioFile(verse.song)}.m4a`,
       start: () => {
         void play()
         return Date.now()

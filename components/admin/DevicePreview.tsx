@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useId, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
@@ -11,7 +11,10 @@ import { IPHONE, IPhone, IosStatus, Island, Glass, deviceOuter } from '../deck/D
 
 const DESK = { w: 1280, h: 800, bar: 38 } as const
 const LABELS = { phone: 'Telefon', desktop: 'Računar' } as const
-type Device = keyof typeof LABELS
+export type Device = keyof typeof LABELS
+
+/** Širina telefona u pregledu za datu visinu — kolona forme ostavi tačno toliko mjesta. */
+export const phoneWidth = (maxHeight: number) => Math.round(fit('phone', Infinity, maxHeight).w)
 
 /** Statusna traka — aplikacija ide ispod nje do vrha, a sadržaj se spusti kao za "safe area". */
 const STATUS_BAR = 50
@@ -179,12 +182,45 @@ function usePreviewFeed(frame: RefObject<HTMLIFrameElement | null>, verse: Verse
  * prezentaciji. Stih se šalje porukom pri svakoj izmjeni, pa se pregled
  * mijenja dok urednik kuca, bez ponovnog učitavanja.
  */
+/** Telefon / Računar — u zaglavlju forme, iznad pregleda. */
+export function DeviceSwitch({ device, onDevice }: { device: Device; onDevice: (d: Device) => void }) {
+  // svaki prekidač svoju pilulu — dva na stranici (zaglavlje, uski ekran) inače se otimaju o nju
+  const pill = useId()
+  return (
+    <div className="grid w-[188px] shrink-0 grid-cols-2 rounded-full border border-white/10 bg-white/[0.04] p-0.5">
+      {(Object.keys(LABELS) as Device[]).map((d) => (
+        <button
+          key={d}
+          type="button"
+          data-device={d}
+          onClick={() => onDevice(d)}
+          className="relative flex h-8 items-center justify-center gap-1.5 rounded-full text-[11px] font-medium transition-colors"
+          style={{ color: d === device ? '#14100A' : 'rgba(255,255,255,0.6)' }}
+        >
+          {d === device && (
+            <motion.span
+              layoutId={pill}
+              className="absolute inset-0 rounded-full"
+              style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
+            />
+          )}
+          <svg className="relative" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            {d === 'phone' ? <rect x="7" y="2.5" width="10" height="19" rx="2.5" /> : <path d="M3 5.5h18v11H3zM8 20h8M12 16.5V20" />}
+          </svg>
+          <span className="relative">{LABELS[d]}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function DevicePreview({
   verse,
   date,
   maxHeight = 460,
   full,
   onFull,
+  device: controlled,
 }: {
   verse: Verse
   date?: string
@@ -192,8 +228,11 @@ export function DevicePreview({
   /** puni pregled — dugme za njega je u zaglavlju modala */
   full: boolean
   onFull: (open: boolean) => void
+  /** uređaj iz forme (prekidač je tad u zaglavlju) — inače svoj prekidač ovdje */
+  device?: Device
 }) {
-  const [device, setDevice] = useState<Device>('phone')
+  const [own, setDevice] = useState<Device>('phone')
+  const device = controlled ?? own
   const frame = useRef<HTMLIFrameElement>(null)
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(320)
@@ -211,27 +250,11 @@ export function DevicePreview({
 
   return (
     <div ref={box} className="flex w-full flex-col items-center">
-      <div className="mb-4 grid w-full max-w-[240px] grid-cols-2 rounded-full border border-white/10 bg-white/[0.04] p-1">
-        {(Object.keys(LABELS) as Device[]).map((d) => (
-          <button
-            key={d}
-            type="button"
-            data-device={d}
-            onClick={() => setDevice(d)}
-            className="relative h-8 rounded-full text-[11px] font-medium transition-colors"
-            style={{ color: d === device ? '#14100A' : 'rgba(255,255,255,0.6)' }}
-          >
-            {d === device && (
-              <motion.span
-                layoutId="preview-device"
-                className="absolute inset-0 rounded-full"
-                style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
-              />
-            )}
-            <span className="relative">{LABELS[d]}</span>
-          </button>
-        ))}
-      </div>
+      {!controlled && (
+        <div className="mb-4">
+          <DeviceSwitch device={device} onDevice={setDevice} />
+        </div>
+      )}
 
       <div className="flex items-center justify-center" style={{ height: size.h }}>
         <PreviewFrame key={device} device={device} width={size.w} frameRef={frame} bg={MOODS[verse.mood].gradient[0]} />

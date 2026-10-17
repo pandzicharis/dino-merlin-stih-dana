@@ -1026,8 +1026,8 @@ function NoviStih() {
     <>
       <Text>
         Tekst, pjesma, album, godina, raspoloženje, YouTube. Pjesma se bira s liste postojećih — link, album i godina
-        se popune sami, a pjesma se može odmah pustiti. Pored je pravi ekran aplikacije, na telefonu ili računaru.
-        Stih stoji tačno kako je upisan.
+        se popune sami, pjesma se može odmah pustiti, a olovkom urediti (naziv i fajl). Pored je pravi ekran
+        aplikacije, na telefonu ili računaru. Stih stoji tačno kako je upisan.
       </Text>
       <Bullets
         items={[

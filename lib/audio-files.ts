@@ -18,10 +18,13 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { audioSlug, youtubeId } from './text'
 import BUNDLED from '../data/audio.json'
+import BUNDLED_ALIAS from '../data/audio-alias.json'
+import { audioFile } from './audio-name'
 
 const ROOT = process.cwd()
 export const AUDIO_DIR = path.join(ROOT, 'public', 'audio')
 const DURATIONS = path.join(ROOT, 'data', 'audio.json')
+const ALIAS = path.join(ROOT, 'data', 'audio-alias.json')
 export const YT_FORMAT = 'bestaudio[ext=m4a]/bestaudio'
 
 /** Preuzimanje i kodiranje: lokalno (dev), `npm run audio` i GitHub (.github/workflows/audio.yml). */
@@ -50,9 +53,19 @@ export async function readDurations(): Promise<Record<string, number>> {
   }
 }
 
+/** Nadimci fajlova (data/audio-alias.json) — kao trajanja: na produkciji iz builda, lokalno svježe. */
+export async function readAlias(): Promise<Record<string, string>> {
+  if (!CAN_FETCH) return BUNDLED_ALIAS as Record<string, string>
+  try {
+    return JSON.parse(await readFile(ALIAS, 'utf8')) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+
 /** Stanje pjesme — iz fajlova, ne iz memorije (fajl je mogao doći i gitom). */
 export async function songState(song: string, durations?: Record<string, number>): Promise<{ state: SongState; error?: string }> {
-  const slug = audioSlug(song)
+  const slug = audioFile(song, await readAlias())
   if (state.jobs.has(slug)) return { state: 'loading' }
   const d = durations ?? (await readDurations())
   if (slug in d && (!CAN_FETCH || (await exists(path.join(AUDIO_DIR, `${slug}.m4a`))))) return { state: 'ready' }
@@ -65,8 +78,11 @@ export async function songState(song: string, durations?: Record<string, number>
  * Pjesma bez YouTube linka se traži kao "Dino Merlin <naziv>".
  */
 export function prepareSong(song: string, youtube?: string): Promise<void> {
-  const slug = audioSlug(song)
-  if (!slug) return Promise.reject(new Error('Pjesma nema naziv.'))
+  if (!audioSlug(song)) return Promise.reject(new Error('Pjesma nema naziv.'))
+  return readAlias().then((alias) => prepareFile(audioFile(song, alias), song, youtube))
+}
+
+function prepareFile(slug: string, song: string, youtube?: string): Promise<void> {
   let job = state.jobs.get(slug)
   if (!job) {
     state.errors.delete(slug)
@@ -155,17 +171,61 @@ async function duration(f: string): Promise<number> {
   return s
 }
 
-/** Isti zapis kao encode-audio.sh: ključevi po abecedi, jedna decimala. */
 async function writeDuration(slug: string, secs: number) {
-  const d = { ...(await readDurations()), [slug]: secs }
+  await writeDurations({ ...(await readDurations()), [slug]: secs })
+}
+
+/** Isti zapis kao encode-audio.sh: ključevi po abecedi, jedna decimala. */
+async function writeDurations(d: Record<string, number>) {
   const body = Object.keys(d)
     .sort()
     .map((k) => `  "${k}": ${d[k].toFixed(1)}`)
     .join(',\n')
-  // atomski: dev server (i plejer) nikad ne vidi pola upisanog fajla
-  const tmp = `${DURATIONS}.${process.pid}.tmp`
-  await writeFile(tmp, `{\n${body}\n}\n`)
-  await rename(tmp, DURATIONS)
+  await writeAtomic(DURATIONS, `{\n${body}\n}\n`)
+}
+
+/** atomski: dev server (i plejer) nikad ne vidi pola upisanog fajla */
+async function writeAtomic(file: string, body: string) {
+  const tmp = `${file}.${process.pid}.tmp`
+  await writeFile(tmp, body)
+  await rename(tmp, file)
+}
+
+/**
+ * Pjesma dobija novi naziv i/ili ime fajla: fajl i trajanje se preimenuju,
+ * a nadimak (naziv → fajl) se upiše samo kad se ime fajla ne poklapa s
+ * nazivom. Lokalno odmah; na produkciji isto radi GitHub (audio-rename).
+ */
+export async function renameSong(from: string, to: string, file: string): Promise<{ changed: boolean }> {
+  const alias = await readAlias()
+  const oldFile = audioFile(from, alias)
+  let changed = false
+  if (oldFile !== file) {
+    const src = path.join(AUDIO_DIR, `${oldFile}.m4a`)
+    const dst = path.join(AUDIO_DIR, `${file}.m4a`)
+    if (await exists(dst)) throw new Error(`Fajl ${file}.m4a već postoji — izaberi drugo ime.`)
+    if (await exists(src)) {
+      await rename(src, dst)
+      changed = true
+    }
+    const d = await readDurations()
+    if (oldFile in d) {
+      d[file] = d[oldFile]
+      delete d[oldFile]
+      await writeDurations(d)
+      changed = true
+    }
+  }
+  const next = { ...alias }
+  delete next[audioSlug(from)]
+  if (file !== audioSlug(to)) next[audioSlug(to)] = file
+  else delete next[audioSlug(to)]
+  const sorted = (o: Record<string, string>) => JSON.stringify(Object.fromEntries(Object.entries(o).sort()))
+  if (sorted(next) !== sorted(alias)) {
+    await writeAtomic(ALIAS, `${JSON.stringify(Object.fromEntries(Object.entries(next).sort()), null, 2)}\n`)
+    changed = true
+  }
+  return { changed }
 }
 
 /* ── yt-dlp ─────────────────────────────────────────────────── */

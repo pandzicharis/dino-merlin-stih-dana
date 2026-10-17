@@ -10,10 +10,11 @@ import { BRAND } from '@/lib/brand'
 import { audioSlug, asWritten } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
-import { DevicePreview } from './DevicePreview'
+import { DevicePreview, DeviceSwitch, phoneWidth, type Device } from './DevicePreview'
 import { PrintSlips } from './PrintSlips'
 import { VerseDesigner } from './VerseDesigner'
-import { SongPicker, SongPlayer } from './SongPicker'
+import { SongEdit, SongPicker, SongPlayer, type KnownSong } from './SongPicker'
+import { audioFile } from '@/lib/audio-name'
 import { DrawerIcon } from '../DrawerIcon'
 
 type AdminVerse = Verse & { active: boolean }
@@ -41,8 +42,6 @@ const PRINT_ICON = (
     <rect x="6" y="14" width="12" height="7" rx="1" />
   </>
 )
-/** Sve u panelu pregleda osim samog uređaja: prekidač 42 + razmak 16. */
-const PREVIEW_CHROME = 42 + 16
 
 function oneLine(t: string) {
   return asWritten(t).replace(/\s*\n\s*/g, ' / ')
@@ -234,6 +233,11 @@ export function AdminPanel() {
                 initial={editor.verse}
                 verses={data.verses}
                 songOf={songs.of}
+                onSongSaved={(snap, note) => {
+                  setData(snap)
+                  songs.reload()
+                  flash(note ?? 'Pjesma je sačuvana', Boolean(note))
+                }}
                 busy={busy}
                 onClose={() => setEditor(null)}
                 onSave={async (draft) => {
@@ -347,6 +351,7 @@ type Songs = {
   mode: SongsSnapshot['mode'] | null
   of: (song: string) => SongInfo | null
   fetch: (song: string, youtube?: string) => void
+  reload: () => void
 }
 
 /**
@@ -409,7 +414,7 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
     [live, load, flash],
   )
 
-  return { mode: snap?.mode ?? null, of, fetch: fetchSong }
+  return { mode: snap?.mode ?? null, of, fetch: fetchSong, reload: () => void load() }
 }
 
 /** Mala oznaka uz naziv pjesme: spremna, preuzima se, ili fali (s dugmetom). */
@@ -776,6 +781,9 @@ function Sheet({
   huge = false,
   icon,
   actions,
+  lead,
+  aside,
+  cols,
 }: {
   onClose: () => void
   children: React.ReactNode
@@ -788,6 +796,12 @@ function Sheet({
   icon?: React.ReactNode
   /** dugmad u zaglavlju, lijevo od zatvaranja */
   actions?: React.ReactNode
+  /** dugmad uz desnu ivicu lijeve kolone (forma stiha) — zaglavlje ima iste kolone kao sadržaj */
+  lead?: React.ReactNode
+  /** lijevo iznad desne kolone (prekidač uređaja) */
+  aside?: React.ReactNode
+  /** kolone zaglavlja = kolone sadržaja (CSS grid-template-columns), da se ivice poklope */
+  cols?: string
 }) {
   const drag = useDragControls()
   useEffect(() => {
@@ -840,7 +854,11 @@ function Sheet({
           onPointerDown={(e) => drag.start(e)}
         >
           <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div
+            className={`mb-4 flex items-center justify-between gap-3 ${cols ? 'md:grid md:grid-cols-[var(--cols)] md:gap-8' : ''}`}
+            style={cols ? ({ '--cols': cols } as React.CSSProperties) : undefined}
+          >
+            <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               {icon && <DrawerIcon>{icon}</DrawerIcon>}
               <div>
@@ -852,8 +870,16 @@ function Sheet({
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
-            {actions}
+            {lead && (
+              <div className="hidden md:flex" onPointerDown={(e) => e.stopPropagation()}>
+                {lead}
+              </div>
+            )}
+            </div>
+            <div className="flex min-w-0 items-center justify-end gap-2" onPointerDown={(e) => e.stopPropagation()}>
+            {aside && <div className="mr-auto hidden md:flex">{aside}</div>}
+            {/* na uskom ekranu ostala dugmad idu u red ispod — gore samo naslov i X */}
+            <div className={`${lead || aside ? 'hidden md:flex' : 'flex'} items-center gap-2`}>{actions}</div>
             <button
               onClick={onClose}
               onPointerDown={(e) => e.stopPropagation()}
@@ -866,6 +892,13 @@ function Sheet({
             </button>
             </div>
           </div>
+          {(lead || aside) && (
+            <div className="mb-4 mt-1 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-3 md:hidden" onPointerDown={(e) => e.stopPropagation()}>
+              {lead}
+              {aside}
+              {actions}
+            </div>
+          )}
         </div>
         <div className={`overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] ${huge ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
           {children}
@@ -879,6 +912,7 @@ function Editor({
   initial,
   verses,
   songOf,
+  onSongSaved,
   busy,
   onClose,
   onSave,
@@ -887,6 +921,8 @@ function Editor({
   /** postojeći stihovi — ista pjesma donosi svoj link, album i godinu */
   verses: AdminVerse[]
   songOf: Songs['of']
+  /** pjesma preimenovana (lista pjesama → olovka) — nova lista stihova */
+  onSongSaved: (snap: Snapshot, note: string | null) => void
   busy: boolean
   onClose: () => void
   onSave: (d: Draft) => void
@@ -923,6 +959,7 @@ function Editor({
   // visinu, pregled se samo prilagodi — nikad obrnuto, da se ne vrte u krug.
   const [wide, setWide] = useState(false)
   const [full, setFull] = useState(false)
+  const [device, setDevice] = useState<Device>('phone')
   const formRef = useRef<HTMLFormElement>(null)
   const [formH, setFormH] = useState(0)
   const [viewH, setViewH] = useState(0)
@@ -980,6 +1017,27 @@ function Editor({
     }, 'song')
   }
   const song = d.song.trim() ? songOf(d.song) : null
+  // uredi pjesmu iz liste: naziv i ime fajla
+  const [editSong, setEditSong] = useState<KnownSong | null>(null)
+  const saveSong = async (s: KnownSong, to: string, file: string): Promise<string | null> => {
+    if (inDeck()) return 'U prezentaciji se pjesme ne mijenjaju.'
+    const r = await fetch('/api/admin/songs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: s.song, to, file }),
+    }).catch(() => null)
+    const body = (await r?.json().catch(() => null)) as (Snapshot & { note?: string | null; error?: string }) | null
+    if (!r?.ok || !body) return body?.error ?? 'Pjesma nije sačuvana.'
+    // pjesma u formi je baš ova — i ona dobije novi naziv
+    if (audioSlug(d.song) === audioSlug(s.song)) setD({ ...d, song: to })
+    onSongSaved(body, body.note ?? null)
+    setEditSong(null)
+    return null
+  }
+  // telefon: forma široka, telefon skroz desno (kolona tačno njegove širine);
+  // računar: pregledu treba prostora, forma se suzi
+  const previewH = wide && formH ? Math.min(formH, viewH || formH) : 460
+  const cols = device === 'phone' ? `minmax(0,1fr) ${Math.max(300, phoneWidth(previewH))}px` : 'minmax(0,0.85fr) minmax(0,1.15fr)'
   const field =
     'h-12 w-full rounded-xl border border-white/10 bg-black/40 px-3.5 text-[14px] normal-case tracking-normal text-white outline-none placeholder:text-white/25 focus:border-[#BFA87F]/60'
   const labelCls = 'block text-[11px] uppercase tracking-[0.16em] text-white/45'
@@ -990,31 +1048,59 @@ function Editor({
       onClose={onClose}
       title={initial ? 'Uredi stih' : 'Novi stih'}
       icon={initial ? <path d="M4 20h4L19 9l-4-4L4 16z" /> : <path d="M12 5v14M5 12h14" />}
+      // nazad / naprijed: u zaglavlju, uz desnu ivicu forme
+      lead={
+        <span className="flex shrink-0 items-center gap-0.5 rounded-full border border-white/10 bg-white/[0.04] p-0.5">
+          {(
+            [
+              ['undo', 'Nazad (⌘Z)', history.canUndo, history.undo, 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11'],
+              ['redo', 'Naprijed (⇧⌘Z)', history.canRedo, history.redo, 'm15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13'],
+            ] as const
+          ).map(([k, label, on, run, path]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={run}
+              disabled={!on}
+              title={label}
+              aria-label={label}
+              {...{ [`data-${k}`]: '' }}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25 disabled:hover:bg-transparent"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d={path} />
+              </svg>
+            </button>
+          ))}
+        </span>
+      }
+      // iznad pregleda: uređaj lijevo, puni pregled i zatvaranje desno
+      aside={<DeviceSwitch device={device} onDevice={setDevice} />}
+      cols={cols}
       actions={
         <button
           type="button"
           onClick={() => setFull(true)}
-          className="flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-[12px] text-white/75 transition-colors hover:bg-white/10 hover:text-white"
+          title="Puni pregled"
+          aria-label="Puni pregled"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/75 transition-colors hover:bg-white/10 hover:text-white"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
           </svg>
-          Puni pregled
         </button>
       }
     >
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:items-start">
+      <div
+        className="grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-[var(--cols)] md:items-start"
+        style={{ '--cols': cols } as React.CSSProperties}
+      >
       {/* Pregled: pravi ekran aplikacije u istom okviru kao u prezentaciji
           (iPhone, ili prozor preglednika). Na telefonu iznad forme; na
           računaru desno, bez okvira oko njega — uređaj je sam svoj okvir. */}
       <div className="min-w-0 md:sticky md:top-0 md:order-2">
         <div className="flex flex-col items-center justify-center rounded-3xl bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.045),transparent_70%)]">
-          <DevicePreview
-            verse={preview}
-            maxHeight={wide && formH ? Math.min(formH, viewH || formH) - PREVIEW_CHROME : 460}
-            full={full}
-            onFull={setFull}
-          />
+          <DevicePreview verse={preview} maxHeight={previewH} full={full} onFull={setFull} device={device} />
         </div>
       </div>
       <form
@@ -1049,7 +1135,14 @@ function Editor({
         </label>
 
         {/* dizajn — fontovi, veličina, naglasak, riječ po riječ ili cijeli stih */}
-        <VerseDesigner value={d.font} text={d.text} mood={d.mood} cover={album?.cover} onChange={(font) => setD({ ...d, font }, 'font')} />
+        {/* dizajn tek kad ima šta da se dizajnira — bar 6 slova stiha */}
+        <AnimatePresence initial={false}>
+          {d.text.replace(/\s+/g, '').length >= 6 && (
+            <motion.div key="designer" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+              <VerseDesigner value={d.font} text={d.text} mood={d.mood} cover={album?.cover} onChange={(font) => setD({ ...d, font }, 'font')} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* pjesma */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">
@@ -1062,6 +1155,7 @@ function Editor({
               onType={setSong}
               // izbor s liste: link, album i godina te pjesme
               onPick={(s) => setD({ ...d, song: s.song, youtube: s.youtube ?? d.youtube, album: s.album, year: String(s.year) })}
+              onEdit={setEditSong}
               className={field}
             />
           </label>
@@ -1152,41 +1246,27 @@ function Editor({
           </div>
         </div>
 
-        {/* dole: nazad / naprijed lijevo, čuvanje desno */}
-        <div className="mt-auto flex items-center gap-2.5">
-          <span className="flex h-12 shrink-0 items-center gap-0.5 rounded-2xl border border-white/10 bg-white/[0.04] px-1">
-            {(
-              [
-                ['undo', 'Nazad (⌘Z)', history.canUndo, history.undo, 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11'],
-                ['redo', 'Naprijed (⇧⌘Z)', history.canRedo, history.redo, 'm15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13'],
-              ] as const
-            ).map(([k, label, on, run, path]) => (
-              <button
-                key={k}
-                type="button"
-                onClick={run}
-                disabled={!on}
-                title={label}
-                aria-label={label}
-                {...{ [`data-${k}`]: '' }}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25 disabled:hover:bg-transparent"
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d={path} />
-                </svg>
-              </button>
-            ))}
-          </span>
-          <button
-            type="submit"
-            disabled={busy}
-            className="h-12 flex-1 rounded-2xl text-[14px] font-semibold text-black disabled:opacity-50"
-            style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
-          >
-            {busy ? 'Čuvam…' : initial ? 'Sačuvaj izmjene' : 'Dodaj stih'}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={busy}
+          className="mt-auto h-12 rounded-2xl text-[14px] font-semibold text-black disabled:opacity-50"
+          style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
+        >
+          {busy ? 'Čuvam…' : initial ? 'Sačuvaj izmjene' : 'Dodaj stih'}
+        </button>
       </form>
+      <AnimatePresence>
+        {editSong && (
+          <SongEdit
+            key="song-edit"
+            song={editSong}
+            file={audioFile(editSong.song)}
+            count={verses.filter((v) => audioSlug(v.song) === audioSlug(editSong.song)).length}
+            onClose={() => setEditSong(null)}
+            onSave={(to, file) => saveSong(editSong, to, file)}
+          />
+        )}
+      </AnimatePresence>
       </div>
     </Sheet>
   )

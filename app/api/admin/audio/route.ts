@@ -3,6 +3,7 @@ import { isAdmin } from '@/lib/admin-auth'
 import { readCatalog } from '@/lib/catalog'
 import { CAN_FETCH, prepareSong, readDurations, songState, type SongState } from '@/lib/audio-files'
 import { audioSlug } from '@/lib/text'
+import { GITHUB_TOKEN, dispatchAudio, gh } from '@/lib/github'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -10,37 +11,20 @@ export const dynamic = 'force-dynamic'
 /**
  * Pjesme stihova. Lokalno (dev) se pjesma preuzme ovdje, odmah. Na produkciji
  * Vercel to ne može (nema yt-dlp-a, public/ je zaključan), pa ruta javi
- * GitHubu (.github/workflows/audio.yml): on preuzme, commita, Vercel objavi.
- *
- * GITHUB_AUDIO_TOKEN: fine-grained token samo za ovaj repo, dozvole
- * Contents: read & write (pokretanje) i Actions: read (stanje) — DEPLOY.md.
+ * GitHubu (lib/github.ts → .github/workflows/audio.yml): on preuzme, commita,
+ * Vercel objavi.
  */
-const REPO = process.env.GITHUB_REPO || 'pandzicharis/dino-merlin-stih-dana'
-const TOKEN = process.env.GITHUB_AUDIO_TOKEN
 const WORKFLOW = 'audio.yml'
 /** od uspješnog workflowa do novog builda na Vercelu */
 const DEPLOY_MS = 6 * 60_000
 
 const denied = () => NextResponse.json({ error: 'Niste prijavljeni.' }, { status: 401 })
 
-function gh(path: string, init?: RequestInit) {
-  return fetch(`https://api.github.com/repos/${REPO}${path}`, {
-    ...init,
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${TOKEN}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-    },
-  })
-}
-
 type Job = { status: string; conclusion: string | null; url: string; at: number }
 
 /** zadnje pokretanje workflowa za pjesme */
 async function lastJob(): Promise<Job | null> {
-  if (!TOKEN) return null
+  if (!GITHUB_TOKEN) return null
   try {
     const r = await gh(`/actions/workflows/${WORKFLOW}/runs?per_page=1`)
     if (!r.ok) return null
@@ -71,7 +55,7 @@ export async function GET() {
     songs[slug] = st.state === 'ready' || CAN_FETCH ? st : remote(job)
   }
   return NextResponse.json(
-    { mode: CAN_FETCH ? 'local' : TOKEN ? 'github' : 'off', job: job?.url ?? null, songs },
+    { mode: CAN_FETCH ? 'local' : GITHUB_TOKEN ? 'github' : 'off', job: job?.url ?? null, songs },
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }
@@ -90,15 +74,7 @@ export async function POST(req: Request) {
     prepareSong(song, youtube).catch(() => {})
     return NextResponse.json({ state: 'loading' })
   }
-  if (!TOKEN) {
-    return NextResponse.json(
-      { error: 'Pjesma još nije u aplikaciji — dodaj GITHUB_AUDIO_TOKEN u Vercel (DEPLOY.md) ili na računaru: npm run audio.' },
-      { status: 409 },
-    )
-  }
-  const r = await gh('/dispatches', { method: 'POST', body: JSON.stringify({ event_type: 'audio', client_payload: { song, youtube } }) }).catch(() => null)
-  if (!r?.ok) {
-    return NextResponse.json({ error: `GitHub nije primio zahtjev (${r?.status ?? 'nema veze'}) — provjeri GITHUB_AUDIO_TOKEN.` }, { status: 502 })
-  }
+  const fail = await dispatchAudio('audio', { song, youtube })
+  if (fail) return NextResponse.json({ error: fail }, { status: GITHUB_TOKEN ? 502 : 409 })
   return NextResponse.json({ state: 'loading' })
 }

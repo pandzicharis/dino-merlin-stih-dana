@@ -10,7 +10,8 @@ name: Stih dana — pjesme
 # Ako YouTube odbije GitHubov server, pjesmu sredi `npm run audio` na računaru.
 on:
   repository_dispatch:
-    types: [audio]
+    # audio: preuzmi pjesme koje fale; audio-rename: admin je preimenovao pjesmu
+    types: [audio, audio-rename]
   workflow_dispatch:
 
 concurrency:
@@ -54,7 +55,17 @@ jobs:
             echo "::warning::Nema tajne YT_COOKIES — YouTube zna odbiti GitHub (DEPLOY.md → Pjesme)"
           fi
 
+      - name: Preimenuj pjesmu
+        if: github.event.action == 'audio-rename'
+        env:
+          STIH_AUDIO_FETCH: '1'
+          AUDIO_FROM: ${{ github.event.client_payload.from }}
+          AUDIO_TO: ${{ github.event.client_payload.to }}
+          AUDIO_FILE: ${{ github.event.client_payload.file }}
+        run: npx -y tsx@4.23.13 scripts/audio-rename.ts
+
       - name: Preuzmi pjesme koje fale
+        if: github.event.action != 'audio-rename'
         # naziv i link idu kroz env, ne u skriptu — bez ubacivanja u shell
         env:
           STIH_AUDIO_FETCH: '1'
@@ -66,12 +77,13 @@ jobs:
         # i kad neka pjesma ne prođe — one koje jesu idu gore
         if: ${{ !cancelled() }}
         run: |
-          git add public/audio data/audio.json
+          git add -A public/audio data/audio.json data/audio-alias.json
           if git diff --cached --quiet; then
             echo "Nema novih pjesama."
             exit 0
           fi
-          nove=$(git diff --cached --name-only --diff-filter=AM -- public/audio | xargs -n1 basename | sed 's/\.m4a$//' | paste -sd ', ' -)
+          nove=$(git diff --cached --name-only --diff-filter=AMR -- public/audio | xargs -n1 basename | sed 's/\.m4a$//' | paste -sd ', ' -)
+          [ -n "$nove" ] || nove="nazivi"
           # autor je vlasnik projekta — Vercel objavljuje samo njegove commite
           git -c user.name="Haris Pandžić" -c user.email="42070972+pandzicharis@users.noreply.github.com" \
             commit -q -m "Pjesme: $nove"
