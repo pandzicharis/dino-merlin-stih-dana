@@ -179,9 +179,6 @@ export function AdminPanel() {
               <p className="text-[1.15rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
                 Stihovi <span className="tabular text-white/40">· {active}</span>
               </p>
-              <p className="mt-0.5 text-[12px] leading-snug text-white/40">
-                Svako svaki dan izvuče svoj, bez ponavljanja dok ne prođe sve.
-              </p>
             </div>
             <button
               onClick={() => setEditor({})}
