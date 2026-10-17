@@ -234,7 +234,8 @@ export const SLIDES: SlideDef[] = [
     section: 'Aplikacija',
     title: 'Urednički panel',
     mode: 'desktop',
-    // odmah na prvi korak — prijava kreće čim se slajd učita
+    // prvo pregled i miran ekran za prijavu; na strelicu sve krene odmah
+    intro: true,
     enter: '/admin?prijava',
     features: UREDNIK,
     body: (d) => (
@@ -1083,6 +1084,12 @@ function Dizajn() {
     await click('[data-edit-preset="kontrast"]')
     await wait(1400)
     if (!alive()) return
+    // korak nazad (Romantika) pa naprijed (Kontrast)
+    await click('[data-undo]')
+    await wait(1100)
+    await click('[data-redo]')
+    await wait(1000)
+    if (!alive()) return
     // 1. red: Bodoni, velikim slovima
     await click('[data-edit-line="0"]')
     await wait(400)
@@ -1137,6 +1144,7 @@ function Dizajn() {
         items={[
           <><b>Boju predlaže aplikacija</b> — iz pozadine stiha, raspoloženja i omota albuma, uvijek čitljivu na njoj.</>,
           <><b>Isti izgled svuda</b> — na ekranu stiha, u slikama za dijeljenje i u pregledu linka.</>,
+          <><b>Korak nazad i naprijed</b> — svaka izmjena u formi se može poništiti i vratiti (⌘Z / ⇧⌘Z).</>,
         ]}
       />
     </>

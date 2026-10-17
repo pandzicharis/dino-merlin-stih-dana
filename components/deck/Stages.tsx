@@ -701,8 +701,9 @@ function LockNotify({
             className="tabular"
             style={{
               fontSize: '110em',
-              fontWeight: 700,
-              letterSpacing: '-0.025em',
+              // tanki sat, kao na iPhoneu
+              fontWeight: 250,
+              letterSpacing: '-0.02em',
               lineHeight: 1,
               marginTop: '-0.02em',
               color: 'rgba(255,255,255,0.94)',
@@ -717,7 +718,7 @@ function LockNotify({
           <p style={{ fontSize: '15em', fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>{when}</p>
           <p
             className="tabular"
-            style={{ fontSize: '96em', fontWeight: 300, letterSpacing: '-0.03em', lineHeight: 1, marginTop: '0.04em' }}
+            style={{ fontSize: '96em', fontWeight: 250, letterSpacing: '-0.02em', lineHeight: 1, marginTop: '0.04em', fontFamily: SF_DISPLAY }}
           >
             {clock}
           </p>

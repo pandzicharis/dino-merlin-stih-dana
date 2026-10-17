@@ -891,7 +891,8 @@ function Editor({
   onClose: () => void
   onSave: (d: Draft) => void
 }) {
-  const [d, setD] = useState<Draft>({
+  // forma s historijom: nazad / naprijed (dugmad u zaglavlju, ⌘Z / ⇧⌘Z)
+  const history = useHistory<Draft>({
     text: initial?.text ?? '',
     song: initial?.song ?? '',
     album: initial?.album ?? '',
@@ -900,6 +901,21 @@ function Editor({
     youtube: initial?.youtube ?? '',
     font: initial?.font ?? '',
   })
+  const d = history.now
+  const setD = history.set
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      const k = e.key.toLowerCase()
+      if (k === 'z' || k === 'y') {
+        e.preventDefault()
+        if (k === 'y' || e.shiftKey) history.redo()
+        else history.undo()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [history])
 
   // Na računaru pregled prati skrolanje: visok je koliko vidljivi dio
   // prozora (ili forma, ako je kraća) i ostaje pored onoga što se uređuje —
@@ -947,7 +963,7 @@ function Editor({
     [d, initial?.id],
   )
   const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setD({ ...d, [k]: e.target.value })
+    setD({ ...d, [k]: e.target.value }, k)
   // više stihova je iz iste pjesme: poznata pjesma popuni link, album i godinu
   const knownSongs = useMemo(() => {
     const m = new Map<string, AdminVerse>()
@@ -961,7 +977,7 @@ function Editor({
       song,
       ...(known && !d.youtube.trim() ? { youtube: known.youtube! } : {}),
       ...(known && !d.album ? { album: known.album, year: String(known.year) } : {}),
-    })
+    }, 'song')
   }
   const song = d.song.trim() ? songOf(d.song) : null
   const field =
@@ -975,6 +991,30 @@ function Editor({
       title={initial ? 'Uredi stih' : 'Novi stih'}
       icon={initial ? <path d="M4 20h4L19 9l-4-4L4 16z" /> : <path d="M12 5v14M5 12h14" />}
       actions={
+        <>
+        <span className="flex items-center rounded-full border border-white/10 bg-white/[0.04] p-0.5">
+          {(
+            [
+              ['undo', 'Nazad (⌘Z)', history.canUndo, history.undo, 'M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11'],
+              ['redo', 'Naprijed (⇧⌘Z)', history.canRedo, history.redo, 'm15 14 5-5-5-5M20 9H9.5a5.5 5.5 0 0 0 0 11H13'],
+            ] as const
+          ).map(([k, label, on, run, path]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={run}
+              disabled={!on}
+              title={label}
+              aria-label={label}
+              {...{ [`data-${k}`]: '' }}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-25 disabled:hover:bg-transparent"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d={path} />
+              </svg>
+            </button>
+          ))}
+        </span>
         <button
           type="button"
           onClick={() => setFull(true)}
@@ -985,6 +1025,7 @@ function Editor({
           </svg>
           Puni pregled
         </button>
+        </>
       }
     >
       <div className="grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:items-start">
@@ -1033,7 +1074,7 @@ function Editor({
         </label>
 
         {/* dizajn — fontovi, veličina, naglasak, riječ po riječ ili cijeli stih */}
-        <VerseDesigner value={d.font} text={d.text} mood={d.mood} cover={album?.cover} onChange={(font) => setD({ ...d, font })} />
+        <VerseDesigner value={d.font} text={d.text} mood={d.mood} cover={album?.cover} onChange={(font) => setD({ ...d, font }, 'font')} />
 
         {/* pjesma */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">
@@ -1147,6 +1188,32 @@ function Editor({
       </form>
       </div>
     </Sheet>
+  )
+}
+
+/**
+ * Stanje s historijom za nazad / naprijed. Izmjene istog polja u kratkom
+ * razmaku (kucanje, povlačenje klizača) su jedan korak, ne slovo po slovo.
+ */
+function useHistory<T>(initial: T) {
+  const [h, setH] = useState({ past: [] as T[], now: initial, future: [] as T[], key: '', at: 0 })
+  return useMemo(
+    () => ({
+      now: h.now,
+      canUndo: h.past.length > 0,
+      canRedo: h.future.length > 0,
+      set: (next: T, key = '') =>
+        setH((s) => {
+          const t = Date.now()
+          const merge = Boolean(key) && s.key === key && t - s.at < 700
+          return { past: merge ? s.past : [...s.past.slice(-99), s.now], now: next, future: [], key, at: t }
+        }),
+      undo: () =>
+        setH((s) => (s.past.length ? { past: s.past.slice(0, -1), now: s.past[s.past.length - 1], future: [s.now, ...s.future], key: '', at: 0 } : s)),
+      redo: () =>
+        setH((s) => (s.future.length ? { past: [...s.past, s.now], now: s.future[0], future: s.future.slice(1), key: '', at: 0 } : s)),
+    }),
+    [h],
   )
 }
 

@@ -429,8 +429,10 @@ export function LockScreenMock({
           className="tabular"
           style={{
             fontSize: '96em',
-            fontWeight: 300,
-            letterSpacing: '-0.03em',
+            // tanki sat zaključanog ekrana (kao na telefonu), ne zaobljeni Rubik
+            fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", var(--font-sans), sans-serif',
+            fontWeight: 250,
+            letterSpacing: '-0.02em',
             lineHeight: 1,
             marginTop: '0.06em',
             textShadow: '0 0.04em 0.3em rgba(0,0,0,0.25)',
