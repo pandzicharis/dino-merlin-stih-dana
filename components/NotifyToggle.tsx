@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   ensurePermission,
@@ -70,7 +71,9 @@ export function NotifyToggle() {
   const intent = useNotifyIntent()
   /** Privremeno stanje dok traje sistemski dijalog. */
   const [pending, setPending] = useState<State | null>(null)
-  const [hint, setHint] = useState<string | null>(null)
+  /** Poruka dole, u obliku dugmeta za novu verziju. */
+  const [toast, setToast] = useState<{ text: string; color: string } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const state = pending ?? resolve(permission, intent)
 
@@ -93,19 +96,20 @@ export function NotifyToggle() {
     }
   }, [])
 
-  const showHint = (text: string) => {
-    setHint(text)
-    setTimeout(() => setHint(null), 3400)
+  const show = (text: string, color = '#D9D9D9') => {
+    clearTimeout(timer.current)
+    setToast({ text, color })
+    timer.current = setTimeout(() => setToast(null), 2600)
   }
 
   const onClick = async () => {
     if (state === 'busy') return
-    if (HINTS[state]) return showHint(HINTS[state]!)
+    if (HINTS[state]) return show(HINTS[state]!)
 
     if (state === 'on') {
       // Prekidač se pomjera odmah; odjava ide u pozadini.
-      // Nema poruke — crveni ✕ je već rekao sve.
       setNotifyIntent(false)
+      show('Obavijesti isključene', NO)
       void unsubscribeFromPush()
       return
     }
@@ -120,12 +124,13 @@ export function NotifyToggle() {
 
     setNotifyIntent(true)
     haptic([8, 40, 8])
+    show(`Obavijesti uključene — stih u ${SEND_TIME}`, OK)
 
     // Prijava servera ide poslije; ako padne, prekidač se vraća.
     const r = await subscribeToPush(SEND_HOUR)
     if (r !== 'ok') {
       setNotifyIntent(false)
-      showHint('Nije uspjelo — pokušaj ponovo')
+      show('Nije uspjelo — pokušaj ponovo', NO)
     }
   }
 
@@ -153,18 +158,31 @@ export function NotifyToggle() {
         <Bell on={on} muted={state === 'denied'} />
       </button>
 
-      <AnimatePresence>
-        {hint && (
-          <motion.p
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            className="absolute right-0 top-full mt-2 w-[min(70vw,16rem)] text-right text-[11px] leading-relaxed text-white/65"
-          >
-            {hint}
-          </motion.p>
+      {/* Portal: roditelji s `transform` bi `fixed` vezali za sebe. */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {toast && (
+              <motion.div
+                key={toast.text}
+                className="pointer-events-none fixed inset-x-0 bottom-0 z-[65] flex justify-center px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))]"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 240 }}
+              >
+                <p
+                  role="status"
+                  className="rounded-full border px-5 py-3 text-[10.5px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+                  style={{ color: toast.color, borderColor: `${toast.color}4D`, backgroundColor: 'rgba(0,0,0,0.55)' }}
+                >
+                  {toast.text}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   )
 }
