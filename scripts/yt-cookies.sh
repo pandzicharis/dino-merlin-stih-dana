@@ -9,8 +9,10 @@
 # Privremeni fajl se briše odmah.
 set -e
 browser="${1:-chrome}"
-tmp="$(mktemp -t yt-cookies)"
-trap 'rm -f "$tmp"' EXIT
+# fajl ne smije postojati unaprijed — yt-dlp bi ga prvo pokušao pročitati
+dir="$(mktemp -d -t yt-cookies)"
+tmp="$dir/cookies.txt"
+trap 'rm -rf "$dir"' EXIT
 yt-dlp --quiet --no-warnings --cookies-from-browser "$browser" --cookies "$tmp" \
   --skip-download "https://www.youtube.com/watch?v=lKgI7Cxm0go" >/dev/null
 n=$(grep -cE '^[^[:space:]]*(youtube|google)\.com' "$tmp" || true)
