@@ -8,10 +8,8 @@ name: Stih dana — pjesme
 #
 # Ruta zna i stanje ovog workflowa (admin pokaže "preuzima se" / "nije uspjelo").
 #
-# Dva pokušaja: prvo GitHubov server (s kolačićima YT_COOKIES, ako ih ima).
-# YouTube njega zna odbiti ("not a bot"), pa tad isti posao preuzme Mac
-# vlasnika (self-hosted runner, `npm run runner`) — kućnu adresu YouTube ne
-# blokira i kolačići ne trebaju. Ugašen Mac: posao čeka do 24 h.
+# YouTube GitHubov server bez prijave odbija ("not a bot") — zato kolačići
+# YouTube naloga iz tajne YT_COOKIES (npm run cookies, DEPLOY.md → Pjesme).
 on:
   repository_dispatch:
     # audio: preuzmi pjesme koje fale; audio-rename: admin je preimenovao pjesmu
@@ -94,54 +92,3 @@ jobs:
           git pull -q --rebase origin trunk
           git push -q origin HEAD:trunk
           echo "Objavljeno: $nove"
-
-  # Rezerva: kad GitHubov server ne prođe, isto na Macu (npm run runner).
-  # Bez pip/deno — tamo su yt-dlp i ffmpeg iz Homebrewa.
-  # Uključuje se tek kad postoji runner: GitHub → Settings → Secrets and
-  # variables → Actions → Variables → MAC_RUNNER = 1 (inače bi posao čekao).
-  mac:
-    needs: github
-    if: ${{ failure() && vars.MAC_RUNNER == '1' }}
-    runs-on: [self-hosted, stih-dana]
-    timeout-minutes: 20
-    steps:
-      # najnoviji trunk — GitHub je možda već objavio dio pjesama
-      - uses: actions/checkout@v4
-        with:
-          ref: trunk
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Preuzmi ili preimenuj
-        env:
-          STIH_AUDIO_FETCH: '1'
-          EVENT: ${{ github.event.action }}
-          AUDIO_SONG: ${{ github.event.client_payload.song }}
-          AUDIO_YOUTUBE: ${{ github.event.client_payload.youtube }}
-          AUDIO_FROM: ${{ github.event.client_payload.from }}
-          AUDIO_TO: ${{ github.event.client_payload.to }}
-          AUDIO_FILE: ${{ github.event.client_payload.file }}
-        run: |
-          if [ "$EVENT" = "audio-rename" ]; then
-            npx -y tsx@4.23.13 scripts/audio-rename.ts
-          else
-            npx -y tsx@4.23.13 scripts/audio-sync.ts
-          fi
-
-      - name: Commit i push
-        if: ${{ !cancelled() }}
-        run: |
-          git add -A public/audio data/audio.json data/audio-alias.json
-          if git diff --cached --quiet; then
-            echo "Nema novih pjesama."
-            exit 0
-          fi
-          nove=$(git diff --cached --name-only --diff-filter=AMR -- public/audio | xargs -n1 basename | sed 's/\.m4a$//' | paste -sd ', ' -)
-          [ -n "$nove" ] || nove="nazivi"
-          git -c user.name="Haris Pandžić" -c user.email="42070972+pandzicharis@users.noreply.github.com" \
-            commit -q -m "Pjesme: $nove"
-          git pull -q --rebase origin trunk
-          git push -q origin HEAD:trunk
-          echo "Objavljeno s Maca: $nove"

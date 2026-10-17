@@ -294,24 +294,21 @@ Za produkciju jednom treba token:
 3. *Permissions*: **Contents: Read and write** i **Actions: Read-only**
 4. Vercel → Environment Variables → `GITHUB_AUDIO_TOKEN` = token → Redeploy
 
-YouTube GitHubove servere zna odbiti („Sign in to confirm you're not a
-bot"). Zato workflow ima dva pokušaja: prvo GitHubov server (s kolačićima
-`YT_COOKIES`, ako ih ima), a kad on ne prođe — **tvoj Mac**. Kućnu adresu
-YouTube ne blokira, pa tamo kolačići ne trebaju. Postavlja se jednom, u
-Terminalu, u folderu projekta:
+YouTube GitHubove servere bez prijave odbija („Sign in to confirm you're
+not a bot"). Zato workflow koristi kolačiće YouTube naloga, iz tajne
+`YT_COOKIES` (GitHub → Settings → Secrets and variables → Actions).
 
-```bash
-npm run runner
-```
+**Trajni kolačići — poseban Chrome profil samo za ovo** (i poseban Google
+nalog, ne lični):
 
-Otvori se GitHub stranica — u dijelu *Configure* kopiraj token (iza
-`--token`) i zalijepi ga u Terminal. Runner radi u pozadini i pali se s
-Macom; kad je Mac ugašen, posao čeka (do 24 h) i završi se kad se upali.
-Siguran je: nijedan workflow ovog repoa ne radi na tuđim pull requestovima.
+1. Chrome → slika gore desno → *Add* → profil nazovi **Stih dana**
+2. U njemu se prijavi na youtube.com, pa **zatvori prozor tog profila**
+3. U Terminalu, u folderu projekta: `npm run cookies -- "Stih dana"`
+4. Na GitHub stranici koja se otvori: `YT_COOKIES` → *Update secret* → Cmd+V
 
-Kolačići (opciono, da i GitHubov server prolazi): poseban Chrome profil
-**Stih dana** — prijavi se na youtube.com, zatvori ga, pa
-`npm run cookies -- "Stih dana"` → GitHub tajna `YT_COOKIES`.
+Taj profil više ne otvaraj — YouTube kolačiće zamijeni čim ih preglednik
+nastavi koristiti, pa bi istekli. Ovako traju mjesecima; kad ipak isteknu,
+admin javi „Pjesma nije preuzeta" — ponovi korake 2–4.
 
 Ako i tad ne prođe, admin javi „pjesma nije preuzeta". Tad na računaru:
 
