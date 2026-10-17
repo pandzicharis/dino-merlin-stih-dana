@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { isAdmin } from '@/lib/admin-auth'
 import { CatalogError, mutateCatalog, readCatalog, slugify, validateVerse, writable, type Catalog } from '@/lib/catalog'
+import { youtubeId } from '@/lib/text'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -23,6 +24,15 @@ export async function GET() {
   return NextResponse.json(snapshot(await readCatalog(), await canWrite()), {
     headers: { 'Cache-Control': 'no-store' },
   })
+}
+
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
+
+/** Isti stih: isti tekst, pjesma, album i YouTube link. */
+function duplicate(c: Pick<Catalog, 'verses'>, v: { text: string; song: string; album: string; youtube?: string }, except?: string) {
+  if (c.verses.some((x) => x.id !== except && norm(x.text) === norm(v.text) && norm(x.song) === norm(v.song) &&
+      norm(x.album) === norm(v.album) && youtubeId(x.youtube) === youtubeId(v.youtube)))
+    throw new CatalogError('Ovaj stih već postoji.')
 }
 
 type Op =
@@ -50,6 +60,7 @@ export async function POST(req: Request) {
         const { verse, error } = validateVerse(body.verse)
         if (!verse) return bad(error!)
         cat = await mutateCatalog((c) => {
+          duplicate(c, verse)
           const base = slugify(verse.text) || 'stih'
           let id = base
           for (let n = 2; c.verses.some((v) => v.id === id); n++) id = `${base}-${n}`
@@ -63,6 +74,7 @@ export async function POST(req: Request) {
         cat = await mutateCatalog((c) => {
           const i = c.verses.findIndex((v) => v.id === body.id)
           if (i < 0) throw new CatalogError('Stih ne postoji.')
+          duplicate(c, verse, body.id)
           // id ostaje isti — po njemu idu share linkovi i favoriti
           c.verses[i] = { id: body.id, ...verse, active: c.verses[i].active }
         })
