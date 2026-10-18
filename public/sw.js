@@ -5,7 +5,7 @@
  * samo offline fallback za zadnji viđeni ekran + push notifikacije.
  */
 
-const CACHE = 'stihdana-v9'
+const CACHE = 'stihdana-v10'
 const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2']
 
 /**
