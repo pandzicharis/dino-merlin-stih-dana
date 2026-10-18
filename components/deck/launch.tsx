@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react'
-import { BRAND } from '@/lib/brand'
+import { BRAND, MAGAZA_RATIO } from '@/lib/brand'
 import { SEND_TIME } from '@/lib/date'
 import { useDeck } from './context'
 import { deviceOuter, IPhone, IPHONE, IosStatus } from './Devices'
@@ -505,10 +505,10 @@ function MagazaAvatar({ size }: { size: number }) {
         className="block"
         style={{
           width: '72%',
-          aspectRatio: '316 / 87',
+          aspectRatio: MAGAZA_RATIO,
           background: '#EDEDED',
-          mask: 'url(/brand/magaza.svg) center / contain no-repeat',
-          WebkitMask: 'url(/brand/magaza.svg) center / contain no-repeat',
+          mask: 'url(/brand/magaza.svg?v=2) center / contain no-repeat',
+          WebkitMask: 'url(/brand/magaza.svg?v=2) center / contain no-repeat',
         }}
       />
     </span>

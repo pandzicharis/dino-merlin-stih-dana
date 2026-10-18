@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { OVERRIDE_ON, formatFullDateBs } from '@/lib/date'
-import { BRAND } from '@/lib/brand'
+import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { MoodBackground } from './MoodBackground'
 import { albumOf } from '@/data/albums'
 import { SPLASH_ARRIVE, VerseText, verseTail } from './VerseText'
@@ -100,8 +100,8 @@ export function VerseScreen({
             >
               <Signature height={36} wipe={false} className="opacity-90" />
               <span className="h-6 w-px bg-white/20" aria-hidden />
-              <a href="https://magaza.com.ba" target="_blank" rel="noopener noreferrer" aria-label="Magaza" className="translate-y-0.5 opacity-90">
-                <MagazaLogo height={22} color="#FFFFFF" />
+              <a href="https://magaza.com.ba" target="_blank" rel="noopener noreferrer" aria-label="Magaza" className="opacity-90">
+                <MagazaLogo height={Math.round(36 * MAGAZA_BESIDE)} color="#FFFFFF" style={{ transform: MAGAZA_DROP_CSS }} />
               </a>
             </motion.div>
           )}

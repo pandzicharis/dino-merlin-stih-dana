@@ -305,7 +305,7 @@ export function VideoScene({
           <motion.div initial={false} animate={{ opacity: step === 'end' ? 1 : 0, y: step === 'end' ? 0 : '1em' }} transition={{ duration: 0.6 }}>
             <LinkPill host={host} size={story ? '2.7em' : '2.3em'} />
           </motion.div>
-          <MagazaMark height={story ? 4.2 : 3.6} color="rgba(255,255,255,0.85)" />
+          <MagazaMark height={story ? 3.25 : 2.8} color="rgba(255,255,255,0.85)" />
         </div>
       </Sheet>
 

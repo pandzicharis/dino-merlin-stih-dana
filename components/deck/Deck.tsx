@@ -6,6 +6,7 @@ import { FIGURE_SRC } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { MoodBackground } from '../MoodBackground'
 import { MagazaLogo } from '../MagazaLogo'
+import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { DeckContext } from './context'
 import { LiveDesktop, LivePhone } from './Stages'
 import { DemoToggle, OsToggle } from './ui'
@@ -747,7 +748,7 @@ function Bar({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/signature.webp?v=2" alt="Dino Merlin" className="h-[30px] w-auto opacity-90" />
         <span className="h-5 w-px bg-white/20" />
-        <MagazaLogo height={20} color="rgba(255,255,255,0.88)" />
+        <MagazaLogo height={30 * MAGAZA_BESIDE} color="rgba(255,255,255,0.88)" style={{ transform: MAGAZA_DROP_CSS }} />
         <span className="hidden h-4 w-px bg-white/15 sm:block" />
         <span className="hidden truncate text-[10px] font-medium uppercase tracking-[0.26em] text-white/40 sm:block">
           {slide.section}

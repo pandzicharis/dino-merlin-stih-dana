@@ -63,7 +63,7 @@ export function AdminLogin({
         className="w-full max-w-sm rounded-[26px] border border-white/10 bg-white/[0.03] p-7 shadow-[0_30px_80px_rgba(0,0,0,0.5)] backdrop-blur-sm"
       >
         <span className="mb-6 flex justify-center opacity-80">
-          <MagazaLogo height={32} color="#F4F4F4" />
+          <MagazaLogo height={25} color="#F4F4F4" />
         </span>
         <span
           className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full border"

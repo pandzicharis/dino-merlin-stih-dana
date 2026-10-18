@@ -4,7 +4,7 @@ import { Fragment, type CSSProperties } from 'react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { albumOf, ALBUMS } from '@/data/albums'
-import { BRAND } from '@/lib/brand'
+import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
 import { asWritten } from '@/lib/text'
 import { INVITE } from '@/lib/notify'
@@ -274,7 +274,7 @@ export function VerseMock({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/signature.webp?v=2" alt="" style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
             <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
-            <MagazaMark height={22} style={{ opacity: 0.9, transform: 'translateY(2em)' }} />
+            <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '18em', color: 'rgba(255,255,255,0.42)' }}>
             <Icon d={BELL} fill={bellOn ? 'rgba(141,201,163,0.22)' : 'none'} color={bellOn ? '#8DC9A3' : '#D08C8C'} />
@@ -730,7 +730,7 @@ export function MagazaMark({
   color?: string
   style?: CSSProperties
 }) {
-  const mask = 'url(/brand/magaza.svg) center / contain no-repeat'
+  const mask = 'url(/brand/magaza.svg?v=2) center / contain no-repeat'
   return (
     <span
       role="img"
@@ -738,7 +738,7 @@ export function MagazaMark({
       style={{
         display: 'inline-block',
         height: `${height}em`,
-        width: `${((height * 316) / 87).toFixed(2)}em`,
+        width: `${(height * MAGAZA_RATIO).toFixed(2)}em`,
         background: color,
         mask,
         WebkitMask: mask,

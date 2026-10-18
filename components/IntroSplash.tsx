@@ -12,6 +12,7 @@ import { SPLASH_ARRIVE } from './VerseText'
 import { paperCase, asWritten } from '@/lib/text'
 import { VERSES } from '@/data/verses'
 import { MOODS, type Mood } from '@/data/moods'
+import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
 
 /**
  * IZVLAČENJE STIHA — jednom dnevno, pri prvom otvaranju.
@@ -834,47 +835,8 @@ function Tombola({
             />
           ))}
         </div>
-        {/* naljepnica Magaze zalijepljena na staklo — ispod prednjeg sloja stakla,
-            pa odsjaji kugle prelaze preko nje; bez sjene (leži na staklu, ne visi),
-            rubovi prate oblinu */}
-        <div
-          className="absolute flex items-center justify-center"
-          style={{
-            // na sredini kugle, blago iznad, ravno
-            left: cx - R * 0.31,
-            top: cy - R * 0.12 - R * 0.06,
-            width: R * 0.62,
-            height: R * 0.24,
-            borderRadius: R * 0.045,
-            // papir: blaga oblina kugle (rubovi tamniji), topao ton, sitna zrnatost
-            background:
-              'linear-gradient(90deg, rgba(0,0,0,0.14) 0%, rgba(0,0,0,0) 18%, rgba(255,255,255,0.22) 44%, rgba(255,255,255,0) 64%, rgba(0,0,0,0.16) 100%), radial-gradient(rgba(0,0,0,0.035) 0.6px, transparent 0.7px) 0 0 / 3px 3px, #EFE7D6',
-            // tanka sjena uz rub — leži na staklu; bijeli rub izreza naljepnice
-            boxShadow: '0 0.5px 1px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(255,255,255,0.55), inset 0 0 0 0.5px rgba(0,0,0,0.1)',
-            opacity: 0.92,
-          }}
-          aria-hidden
-        >
-          <span
-            className="block"
-            style={{
-              width: '78%',
-              aspectRatio: '316 / 87',
-              background: '#1d1a16',
-              mask: 'url(/brand/magaza.svg) center / contain no-repeat',
-              WebkitMask: 'url(/brand/magaza.svg) center / contain no-repeat',
-            }}
-          />
-          {/* odsjaj stakla preko naljepnice — koso, kao preko ostatka kugle */}
-          <span
-            className="pointer-events-none absolute inset-0"
-            style={{
-              borderRadius: 'inherit',
-              background: 'linear-gradient(115deg, rgba(255,255,255,0) 28%, rgba(255,255,255,0.32) 44%, rgba(255,255,255,0) 60%)',
-            }}
-          />
-        </div>
         <Globe cx={cx} cy={cy} R={R} vw={vw} accent={accent} layer="front" band={band} />
+        <PlateLabel cx={cx} cy={cy} R={R} />
       </motion.div>
 
       {/* tvoj listić — kroz otvor, gore, pa na sredinu; otvori se s pola na cijeli.
@@ -953,6 +915,83 @@ function globeClip(cx: number, cy: number, R: number) {
   return `M ${cx - n} ${cy - R - 40} H ${cx + n} V ${cy - R + 4} A ${R} ${R} 0 1 1 ${cx - n} ${cy - R + 4} Z`
 }
 
+/** Ploča postolja: gdje počinje (foot) i koliko je visoka — na njoj su naljepnice. */
+function plate(cy: number, R: number) {
+  return { foot: cy + R + 30, h: Math.max(36, R * 0.29) }
+}
+
+/**
+ * Na ploči jedna mala pločica, zašarafljena: tamni emajl sa zlatnim rubom,
+ * mjedeni šaraf na svakom kraju, a u njoj ispupčen potpis | Magaza.
+ */
+function PlateLabel({ cx, cy, R }: { cx: number; cy: number; R: number }) {
+  const { foot, h } = plate(cy, R)
+  const bh = h * 0.72
+  const sc = Math.max(4, bh * 0.17)
+  // šaraf: mjedena glava s urezom, svaki malo drukčije okrenut
+  const screw = (side: 'left' | 'right', deg: number) => (
+    <span
+      className="absolute"
+      style={{
+        [side]: bh * 0.2,
+        top: '50%',
+        width: sc,
+        height: sc,
+        marginTop: -sc / 2,
+        borderRadius: '50%',
+        background: 'radial-gradient(circle at 35% 30%, #fff6e0, #c9a96e 45%, #6d5a3a)',
+        boxShadow: '0 0.6px 1px rgba(0,0,0,0.7)',
+      }}
+    >
+      <span className="absolute left-1/2 top-1/2" style={{ width: sc * 0.8, height: 0.8, background: 'rgba(40,28,12,0.85)', transform: `translate(-50%, -50%) rotate(${deg}deg)` }} />
+    </span>
+  )
+  // znak ispupčen iz pločice: svijetlo zlato, sjena ispod
+  const raised = (src: string, height: number, ratio: string, transform?: string) => (
+    <span
+      style={{
+        display: 'block',
+        transform,
+        height,
+        aspectRatio: ratio,
+        background: 'linear-gradient(180deg, #f6ead0 0%, #d6bd8b 55%, #a8895a 100%)',
+        mask: `url(${src}) center / contain no-repeat`,
+        WebkitMask: `url(${src}) center / contain no-repeat`,
+        filter: 'drop-shadow(0 0.7px 0 rgba(0,0,0,0.65))',
+      }}
+    />
+  )
+  const badge = (child: React.ReactNode, screws: [number, number]) => (
+    <div
+      className="relative flex items-center"
+      style={{
+        height: bh,
+        padding: `0 ${bh * 0.62}px`,
+        borderRadius: 3,
+        background: 'linear-gradient(180deg, #2e2822 0%, #171410 100%)',
+        boxShadow: '0 1.5px 2.5px rgba(0,0,0,0.55), inset 0 0.5px 0 rgba(255,240,210,0.3), inset 0 0 0 0.75px rgba(201,169,110,0.7)',
+      }}
+    >
+      {screw('left', screws[0])}
+      {child}
+      {screw('right', screws[1])}
+    </div>
+  )
+  return (
+    <div className="absolute" style={{ left: cx, top: foot - 3 + h / 2, transform: 'translate(-50%, -50%)' }} aria-hidden>
+      {badge(
+        <span className="flex items-center" style={{ gap: bh * 0.34 }}>
+          {raised('/brand/signature.webp?v=2', bh * 0.78, '1000 / 711')}
+          {/* tanka zlatna linija, kao u zaglavlju aplikacije */}
+          <span style={{ width: 0.75, height: bh * 0.4, background: 'rgba(214,189,139,0.5)' }} />
+          {raised('/brand/magaza.svg?v=2', bh * 0.78 * MAGAZA_BESIDE, `${MAGAZA_RATIO}`, MAGAZA_DROP_CSS)}
+        </span>,
+        [35, -20],
+      )}
+    </div>
+  )
+}
+
 /**
  * Staklena kugla na zlatnom postolju. Stražnji sloj (unutrašnjost) ide
  * ispod listića, prednji (staklo, odsjaj, obruč, otvor) preko.
@@ -975,9 +1014,9 @@ function Globe({
   band?: React.RefObject<SVGEllipseElement | null>
 }) {
   const id = `tombola-${layer}`
-  const foot = cy + R + 44
+  const { foot, h } = plate(cy, R)
   return (
-    <svg className="absolute left-0 top-0" width={vw} height={foot + 20} aria-hidden>
+    <svg className="absolute left-0 top-0" width={vw} height={foot + h + 20} aria-hidden>
       <defs>
         <radialGradient id={`${id}-in`} cx="45%" cy="40%" r="65%">
           <stop offset="0" stopColor={accent} stopOpacity="0.08" />
@@ -988,6 +1027,25 @@ function Globe({
           <stop offset="0.5" stopColor="#E2CFA6" />
           <stop offset="1" stopColor="#8A7148" />
         </linearGradient>
+        {/* brušeno: fine vodoravne linije */}
+        <pattern id={`${id}-brush`} width="6" height="2" patternUnits="userSpaceOnUse">
+          <rect width="6" height="0.7" fill="#fff" fillOpacity="0.09" />
+          <rect y="1.2" width="6" height="0.5" fill="#000" fillOpacity="0.05" />
+        </pattern>
+        {/* koso svjetlo preko ploče */}
+        <linearGradient id={`${id}-sheen`} x1="0" y1="0" x2="1" y2="0.35">
+          <stop offset="0.2" stopColor="#fff" stopOpacity="0" />
+          <stop offset="0.38" stopColor="#fff" stopOpacity="0.22" />
+          <stop offset="0.5" stopColor="#fff" stopOpacity="0" />
+          <stop offset="0.78" stopColor="#fff" stopOpacity="0.08" />
+          <stop offset="0.9" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={`${id}-bevel`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.35" />
+          <stop offset="0.18" stopColor="#fff" stopOpacity="0" />
+          <stop offset="0.8" stopColor="#000" stopOpacity="0" />
+          <stop offset="1" stopColor="#000" stopOpacity="0.3" />
+        </linearGradient>
         <radialGradient id={`${id}-shadow`}>
           <stop offset="0" stopColor="#000" stopOpacity="0.6" />
           <stop offset="1" stopColor="#000" stopOpacity="0" />
@@ -995,7 +1053,7 @@ function Globe({
       </defs>
       {layer === 'back' ? (
         <>
-          <ellipse cx={cx} cy={foot + 4} rx={R * 0.85} ry={10} fill={`url(#${id}-shadow)`} />
+          <ellipse cx={cx} cy={foot + h + 2} rx={R * 0.9} ry={10} fill={`url(#${id}-shadow)`} />
           {/* postolje — dvije zlatne noge i ploča */}
           <path
             d={`M ${cx - R * 0.42} ${cy + R * 0.9} L ${cx - R * 0.62} ${foot} M ${cx + R * 0.42} ${cy + R * 0.9} L ${cx + R * 0.62} ${foot}`}
@@ -1003,7 +1061,11 @@ function Globe({
             strokeWidth="3"
             strokeLinecap="round"
           />
-          <rect x={cx - R * 0.75} y={foot - 3} width={R * 1.5} height={7} rx={3.5} fill={`url(#${id}-gold)`} />
+          {/* ploča — viša, s naljepnicama (PlateLabel); blaga zaobljenost odozgo i odozdo */}
+          <rect x={cx - R * 0.75} y={foot - 3} width={R * 1.5} height={h} rx={4} fill={`url(#${id}-gold)`} />
+          <rect x={cx - R * 0.75} y={foot - 3} width={R * 1.5} height={h} rx={4} fill={`url(#${id}-brush)`} />
+          <rect x={cx - R * 0.75} y={foot - 3} width={R * 1.5} height={h} rx={4} fill={`url(#${id}-sheen)`} />
+          <rect x={cx - R * 0.75} y={foot - 3} width={R * 1.5} height={h} rx={4} fill={`url(#${id}-bevel)`} />
           <circle cx={cx} cy={cy} r={R} fill={`url(#${id}-in)`} />
         </>
       ) : (

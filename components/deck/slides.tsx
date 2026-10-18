@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
 import { motion } from 'motion/react'
 import { MOODS } from '@/data/moods'
 import { albumOf, ALBUMS } from '@/data/albums'
@@ -351,11 +352,13 @@ function Lockup() {
         aria-label="Magaza"
         className="block"
         style={{
-          height: 'clamp(30px, 5.2vh, 56px)',
-          aspectRatio: '316 / 87',
+          // isti odnos prema potpisu kao svugdje (lib/brand.ts)
+          height: `clamp(${64 * MAGAZA_BESIDE}px, ${12 * MAGAZA_BESIDE}vh, ${140 * MAGAZA_BESIDE}px)`,
+          aspectRatio: MAGAZA_RATIO,
+          transform: MAGAZA_DROP_CSS,
           background: 'rgba(255,255,255,0.92)',
-          mask: 'url(/brand/magaza.svg) left center / contain no-repeat',
-          WebkitMask: 'url(/brand/magaza.svg) left center / contain no-repeat',
+          mask: 'url(/brand/magaza.svg?v=2) left center / contain no-repeat',
+          WebkitMask: 'url(/brand/magaza.svg?v=2) left center / contain no-repeat',
         }}
       />
     </div>

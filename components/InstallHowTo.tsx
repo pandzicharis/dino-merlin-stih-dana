@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { FIGURE_SRC, MOODS, type Mood } from '@/data/moods'
-import { BRAND } from '@/lib/brand'
+import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { SEND_TIME } from '@/lib/date'
 import { GALAXY, Galaxy, IPHONE, IPhone, deviceOuter } from './deck/Devices'
 import { InstallDemo, type InstallPhase } from './deck/InstallDemo'
+import { MagazaMark } from './deck/Screens'
 
 type Platform = 'ios' | 'android'
 
@@ -190,8 +191,13 @@ function MiniPage({
           WebkitMaskImage: 'radial-gradient(ellipse 80% 62% at 78% 22%, black 30%, transparent 80%)',
         }}
       />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/signature.webp?v=2" alt="" style={{ height: '64em', width: 'auto', opacity: 0.9 }} />
+      {/* potpis | Magaza — kao na pravoj kapiji (BrandLockup) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '23em' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/signature.webp?v=2" alt="" style={{ height: '64em', width: 'auto', opacity: 0.9 }} />
+        <span style={{ width: '1em', height: '40em', background: 'rgba(255,255,255,0.2)' }} />
+        <MagazaMark height={64 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
+      </div>
       <div
         className="flex flex-1 flex-col items-center justify-center text-center"
         style={{ width: '304em', paddingBottom: '96em' }}

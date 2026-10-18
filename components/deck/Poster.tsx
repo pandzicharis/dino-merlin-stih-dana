@@ -99,7 +99,7 @@ export function Poster({ data, width, style }: { data: PosterData; width: string
               <Platforms size="1.25em" />
               <p style={{ marginTop: '0.6em', fontSize: '1.45em', color: 'rgba(255,255,255,0.5)' }}>{data.host}</p>
             </div>
-            <MagazaMark height={3.6} color="rgba(255,255,255,0.9)" />
+            <MagazaMark height={2.8} color="rgba(255,255,255,0.9)" />
           </div>
         </div>
       </div>
@@ -116,7 +116,7 @@ export function PosterLandscape({ data, width, style }: { data: PosterData; widt
       <Backdrop portrait={{ right: '-4em', top: '-6em', width: '62em', height: '84em' }} />
 
       <MagazaMark
-        height={2.3}
+        height={1.8}
         color="rgba(255,255,255,0.85)"
         style={{ position: 'absolute', right: '5em', top: '5em', zIndex: 4 }}
       />
@@ -175,7 +175,7 @@ export function SocialPost({ data, width, style }: { data: PosterData; width: st
       </div>
       {/* znak sam pri dnu, odvojen od poziva */}
       <MagazaMark
-        height={3.4}
+        height={2.6}
         color="rgba(255,255,255,0.85)"
         style={{ position: 'absolute', left: 0, right: 0, bottom: '5em', margin: '0 auto', zIndex: 4 }}
       />
@@ -213,7 +213,7 @@ export function SocialStory({ data, width, style }: { data: PosterData; width: s
       </div>
       {/* znak sam pri dnu, odvojen od poziva */}
       <MagazaMark
-        height={4.2}
+        height={3.25}
         color="rgba(255,255,255,0.85)"
         style={{ position: 'absolute', left: 0, right: 0, bottom: '15em', margin: '0 auto', zIndex: 4 }}
       />

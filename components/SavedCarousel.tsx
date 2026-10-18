@@ -10,6 +10,7 @@ import { asWritten } from '@/lib/text'
 import { favoriteDate, toggleFavorite } from '@/lib/storage'
 import { formatFullDateBs } from '@/lib/date'
 import { haptic } from '@/lib/haptic'
+import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { FontedLines, MagazaMark, MoodStill, Notes } from './deck/Screens'
 import { FitLines } from './deck/FitLines'
 import { SongRow } from './SongCredit'
@@ -227,7 +228,7 @@ function Card({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand/signature.webp?v=2" alt="" draggable={false} style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
               <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
-              <MagazaMark height={22} style={{ opacity: 0.9, transform: 'translateY(2em)' }} />
+              <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
             </div>
             <button
               data-nodrag

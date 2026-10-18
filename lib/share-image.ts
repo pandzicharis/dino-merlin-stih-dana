@@ -12,7 +12,7 @@
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import { albumOf } from '@/data/albums'
 import type { Verse } from '@/data/verses'
-import { BRAND } from './brand'
+import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP, MAGAZA_RATIO } from './brand'
 import { formatFullDateBs } from './date'
 import { asWritten } from './text'
 import { VERSE_FONTS, caseOf, lookScale, lookSpacing, parseFont, styleOf, type FontMap } from './fonts'
@@ -338,7 +338,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     // s albumom portreta nema — isto kao na ekranu
     p.figure > 0 && !coverSrc ? loadImage(FIGURE_SRC) : Promise.resolve(null),
     loadImage('/brand/signature.webp?v=2'),
-    loadImage('/brand/magaza.svg'),
+    loadImage('/brand/magaza.svg?v=2'),
     document.fonts?.load(`400 100px ${fonts.serif}`, text).catch(() => null),
     document.fonts?.load(`500 40px ${fonts.sans}`).catch(() => null),
     coverSrc ? loadImage(coverSrc) : Promise.resolve(null),
@@ -658,8 +658,10 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     }
     const sigH = W * 0.075
     const sigW = signature ? sigH * (signature.width / signature.height) : 0
-    const magH = W * 0.034
-    const magW = label ? magH * (316 / 87) : 0
+    // crta između znakova ostaje iste visine kao prije (mjera je stari znak sa "Sarajevo")
+    const rule = W * 0.034
+    const magH = sigH * MAGAZA_BESIDE
+    const magW = label ? magH * MAGAZA_RATIO : 0
     const gap = W * 0.035
     const both = signature && label
     const rowW = sigW + magW + (both ? gap * 2 : 0)
@@ -673,10 +675,10 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     }
     if (both) {
       ctx.fillStyle = p.light ? rgba('#000000', 0.25) : 'rgba(255,255,255,0.3)'
-      ctx.fillRect(x + gap - 1, cy - magH * 0.75, 2, magH * 1.5)
+      ctx.fillRect(x + gap - 1, cy - rule * 0.75, 2, rule * 1.5)
       x += gap * 2
     }
-    if (label) ctx.drawImage(tint(label, magW, magH), x, cy - magH / 2 + magH * 0.08)
+    if (label) ctx.drawImage(tint(label, magW, magH), x, cy - magH / 2 + magH * MAGAZA_DROP)
     ctx.restore()
   }
 
@@ -722,8 +724,8 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
 
   // na dnu znak izdavača; bez njega tihi natpis aplikacije
   if (label) {
-    const lh = W * 0.048
-    const lw = lh * (316 / 87)
+    const lh = W * 0.037
+    const lw = lh * MAGAZA_RATIO
     const s = document.createElement('canvas')
     s.width = Math.ceil(lw)
     s.height = Math.ceil(lh)

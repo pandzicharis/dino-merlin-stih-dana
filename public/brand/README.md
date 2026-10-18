@@ -29,7 +29,7 @@ Isti razgovor u kojem tražiš dozvolu za stihove pokriva i ovo.
 
 | Fajl | Izvor | Status |
 |---|---|---|
-| `magaza.svg` | `magaza.com.ba/assets/img/magaza_logo_20190410.svg` | znak izdavača — koristi se uz njihovo odobrenje |
+| `magaza.svg` | `magaza.com.ba/assets/img/magaza_logo_20190410.svg`, bez „SARAJEVO“ ispod (samo riječ s potezom, 316×67) | znak izdavača — koristi se uz njihovo odobrenje |
 
 SVG je crn; aplikacija ga boji preko CSS maske (`components/MagazaLogo.tsx`)
 i na slici za dijeljenje preko canvasa.
