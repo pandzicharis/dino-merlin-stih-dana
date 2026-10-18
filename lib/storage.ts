@@ -3,6 +3,8 @@
  * Svaki pristup je u try/catch: private mode i blokirani storage ne smiju srušiti ekran.
  */
 
+import { getActiveDate } from './date'
+
 const SEEN = 'stihdana:lastSeen'
 const NOTIFY = 'stihdana:notify'
 
@@ -64,6 +66,8 @@ export function setSharePrefs(prefs: { format: string }) {
 /* ── favoriti: lista id-eva, bez logina ──────────────────────── */
 
 const FAVORITES = 'stihdana:favorites'
+/** kad je koji stih sačuvan: id → YYYY-MM-DD */
+const FAVORITE_DATES = 'stihdana:favoriteDates'
 
 export function getFavorites(): string[] {
   const v = read<unknown>(FAVORITES, [])
@@ -75,8 +79,26 @@ export function toggleFavorite(id: string): boolean {
   const list = getFavorites()
   const on = !list.includes(id)
   write(FAVORITES, on ? [id, ...list] : list.filter((x) => x !== id))
+  const dates = { ...read<Record<string, string>>(FAVORITE_DATES, {}) }
+  if (on) dates[id] = getActiveDate()
+  else delete dates[id]
+  write(FAVORITE_DATES, dates)
   window.dispatchEvent(new Event('favchange'))
   return on
+}
+
+/**
+ * Dan kad je stih sačuvan. Za one sačuvane prije nego se ovo pamtilo —
+ * zadnji dan kad je bio izvučen na ovom uređaju (lib/draw.ts), ako ga ima.
+ */
+export function favoriteDate(id: string): string | undefined {
+  const dates = read<Record<string, string> | null>(FAVORITE_DATES, {})
+  if (typeof dates?.[id] === 'string') return dates[id]
+  const draw = read<{ days?: Record<string, { id?: string }> } | null>('stihdana:draw', {})
+  return Object.keys(draw?.days ?? {})
+    .filter((d) => draw?.days?.[d]?.id === id)
+    .sort()
+    .at(-1)
 }
 
 /** Izbaci sačuvane id-eve kojih više nema (obrisan stih, stari test). */

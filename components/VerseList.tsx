@@ -4,19 +4,11 @@ import { albumOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { oneLine, paperCase, asWritten } from '@/lib/text'
-import { BRAND } from '@/lib/brand'
 import { SongRow } from './SongCredit'
 
 /**
- * Gramofon (play) u sačuvanim stihovima. Isključen: pjesma se pušta samo
- * uz današnji stih, pa je manje preuzimanja zvuka (besplatni plan).
- * `true` vraća malu ploču s iglom i trakom u svaku karticu.
- */
-const SAVED_PLAYER = false
-
-/**
- * Kartice stihova: stih gore, ispod tanke linije pjesma i album, a desno
- * u istom redu akcija (npr. ukloni iz sačuvanih).
+ * Kartice stihova: stih gore, ispod tanke linije mali gramofon s pjesmom i
+ * albumom, a desno u istom redu akcija (npr. ukloni iz sačuvanih).
  * Kao ekran stiha, samo tiše: omot albuma desno, rastopljen prema tekstu, pod nijansom
  * raspoloženja — a stih ostaje na tamnom i čitak.
  */
@@ -82,7 +74,7 @@ export function VerseList({
             </p>
 
             <div className="mt-3 flex items-center gap-3 border-t border-white/[0.08] pt-3">
-              {SAVED_PLAYER ? <SongRow verse={verse} accent={m.accent} /> : <SongMeta verse={verse} />}
+              <SongRow verse={verse} accent={m.accent} />
               {action?.(verse)}
             </div>
           </li>
@@ -91,20 +83,3 @@ export function VerseList({
     </ul>
   )
 }
-
-/** Pjesma u kartici, bez plejera: naziv i album · godina. */
-function SongMeta({ verse }: { verse: Verse }) {
-  return (
-    <>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[11.5px] font-semibold uppercase leading-tight tracking-[0.18em]" style={{ color: BRAND.gold }}>
-          {verse.song}
-        </p>
-        <p className="mt-1 truncate text-[10px] uppercase tracking-[0.16em] text-white/55">
-          {verse.album} &middot; {verse.year}
-        </p>
-      </div>
-    </>
-  )
-}
-

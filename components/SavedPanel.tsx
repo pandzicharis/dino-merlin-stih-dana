@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { SavedVerses } from './SavedVerses'
+import { SavedVerses, SavedViewToggle } from './SavedVerses'
 import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
@@ -108,15 +108,18 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  aria-label="Zatvori"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:text-white"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                    <path d="M6 6l12 12M18 6 6 18" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-2.5">
+                  <SavedViewToggle />
+                  <button
+                    onClick={onClose}
+                    aria-label="Zatvori"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:text-white"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 

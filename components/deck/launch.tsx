@@ -1076,7 +1076,7 @@ export function Ostalo({ d }: { d: DeckData }) {
     ...(TIPS_ON ? ['Savjeti pri prvom otvaranju'] : []),
     'Atmosfera po raspoloženju, album u pozadini',
     'Pjesma uz stih, u pozadini',
-    'Sačuvani stihovi i dijeljenje kao slika',
+    'Sačuvani stihovi s pjesmom, dijeljenje kao slika',
     'Link koji izgleda kao poster',
     'Nova verzija stiže sama',
     'Izvlačenje stiha: jednom dnevno, svakom svoj',
@@ -1357,7 +1357,7 @@ export function Grafike({ d }: { d: DeckData }) {
 
 /**
  * Video za mreže — cijeli tok u pravom telefonu (obavijest → tombola → stih →
- * sačuvaj → pjesma), snimljen iz /prezentacija/video (scripts/export-video.mjs).
+ * sačuvaj → pjesma iz sačuvanih), snimljen iz /prezentacija/video (scripts/export-video.mjs).
  */
 export function Video() {
   const items = [
@@ -1378,7 +1378,7 @@ export function Video() {
       </R>
       <R i={2}>
         <p className="dk-lead mt-[1.8vh] max-w-[40em]">
-          Obavijest u podne, dodir, tombola, stih, sačuvaj i pjesma — u pravoj aplikaciji, uz natpise. Oko 34
+          Obavijest u podne, dodir, tombola, stih, sačuvaj i pjesma iz sačuvanih — u pravoj aplikaciji, uz natpise. Oko 30
           sekunde, sa zvukom obavijesti i pjesmom, spremno za objavu.
         </p>
       </R>

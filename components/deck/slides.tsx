@@ -588,7 +588,7 @@ function Atmosfera({ d }: { d: DeckData }) {
 /** Telefon pokaže gdje se dodirne. */
 /**
  * Čisto stanje aplikacije u telefonu: bez sačuvanih stihova, bez zapamćenog
- * formata slike, obavijesti uključene. Prezentacija i aplikacija dijele
+ * formata slike i prikaza sačuvanih (karte), obavijesti uključene. Prezentacija i aplikacija dijele
  * localStorage (ista adresa), a upis odavde aplikaciji stigne kao `storage`
  * događaj — pa se njen ekran odmah osvježi, bez ponovnog učitavanja.
  */
@@ -596,6 +596,7 @@ export function cleanSlate() {
   try {
     localStorage.setItem('stihdana:favorites', '[]')
     localStorage.removeItem('stihdana:share')
+    localStorage.removeItem('stihdana:savedView')
     localStorage.setItem('stihdana:notify', 'true')
   } catch {
     /* privatni prozor */
@@ -1277,7 +1278,7 @@ function Pristup() {
   )
 }
 
-/** Stih se sačuva, a broj u zaglavlju otvori listu sačuvanih. */
+/** Stih se sačuva, a broj u zaglavlju otvori sačuvane — prvo karte, pa lista. */
 function Sacuvano() {
   const { os, setOs, manual } = useDeck()
   return (
@@ -1285,8 +1286,10 @@ function Sacuvano() {
       {/* scena po sistemu: kad iPhone završi, ista ide na Androidu (prekidač ide s njom) */}
       <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
       <Text>
-        „Sačuvaj stih“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir otvara listu. Bez naloga i
-        prijave: sve ostaje na telefonu, server ne radi ništa.
+        „Sačuvaj stih“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir ih otvara kao špil karata:
+        svaka je ekran stiha u malom, s danom kad je sačuvan i svojom pjesmom na gramofonu; susjedne vire sa strane,
+        prevuci za sljedeći ili ih gledaj kao listu.
+        Bez naloga i prijave: sve ostaje na telefonu, server ne radi ništa.
       </Text>
     </>
   )
@@ -1308,7 +1311,10 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
     await find('[data-tip="saved"]', 3000)
     await wait(1300)
     if (alive()) await press('[data-tip="saved"]')
-    // lista sačuvanih ostane na ekranu, pa isto na drugom sistemu
+    // prvo karte (podrazumijevano), pa gore prekidač na listu — lista ostane
+    // na ekranu, pa isto na drugom sistemu
+    await wait(2600)
+    if (alive()) await press('[aria-label="Lista"]')
     await wait(2400)
     if (alive()) onDone()
   })

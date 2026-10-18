@@ -9,6 +9,8 @@ import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
 import { asWritten } from '@/lib/text'
 import { INVITE } from '@/lib/notify'
 import { ARTIST_LINKS } from '@/components/ArtistLinks'
+import { audioFile } from '@/lib/audio-name'
+import AUDIO from '@/data/audio.json'
 
 /**
  * Mirni ekrani aplikacije za mockupe — plakat i slajdove.
@@ -175,7 +177,7 @@ export function MoodStill({
 }
 
 /** Note koje u aplikaciji plutaju — ovdje zaustavljene na lijepim mjestima. */
-function Notes({ accent, spots }: { accent: string; spots: [number, number, number, string][] }) {
+export function Notes({ accent, spots }: { accent: string; spots: [number, number, number, string][] }) {
   return (
     <>
       {spots.map(([left, top, size, glyph], i) => (
@@ -594,10 +596,17 @@ function Shortcut({ d }: { d: string }) {
   )
 }
 
-/** Plejer ispod stiha — ista ploča kao u SongCredit, mirna, na početku pjesme. */
+/** Na grafikama pjesma nije na početku — pauzirana negdje u prvoj polovini. */
+const AT = 0.38
+
+/** Plejer ispod stiha — ista ploča kao u SongCredit, mirna, pauzirana usred pjesme. */
 function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
   // kao CARD_W u SongCredit: min(100vw − 2.5rem, 360px)
   const width = Math.min(w - 40, 360)
+  // kao u aplikaciji: kad je pjesma krenula, piše koliko je ostalo
+  const dur = (AUDIO as Record<string, number>)[audioFile(verse.song)] ?? 225
+  const left = Math.round(dur * (1 - AT))
+  const time = `-${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
   return (
     <div style={{ width: `${width}em`, display: 'flex', alignItems: 'center', gap: '16em', textAlign: 'left' }}>
       <span style={{ position: 'relative', width: '62em', height: '62em', flexShrink: 0 }}>
@@ -659,12 +668,6 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
           >
             {verse.song}
           </span>
-          {/* ekvilajzer, miran */}
-          <span style={{ display: 'flex', alignItems: 'flex-end', gap: '2em', height: '14em' }}>
-            {[0, 1, 2, 3].map((i) => (
-              <span key={i} style={{ width: '3em', height: '3em', borderRadius: '2em', background: BRAND.gold }} />
-            ))}
-          </span>
         </span>
         <span
           style={{
@@ -688,6 +691,17 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
               style={{
                 position: 'absolute',
                 left: 0,
+                top: 0,
+                height: '100%',
+                width: `calc(${AT} * (100% - 10em) + 5em)`,
+                borderRadius: '2em',
+                background: `linear-gradient(90deg, #8A7148, ${BRAND.gold})`,
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                left: `calc(${AT} * (100% - 10em))`,
                 top: '50%',
                 width: '10em',
                 height: '10em',
@@ -697,8 +711,8 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
               }}
             />
           </span>
-          <span style={{ width: '36em', textAlign: 'right', fontSize: '10.5em', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.6)' }}>
-            3:45
+          <span style={{ width: `${(36 / 10.5).toFixed(3)}em`, textAlign: 'right', fontSize: '10.5em', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.6)' }}>
+            {time}
           </span>
         </span>
       </span>

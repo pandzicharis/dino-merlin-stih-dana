@@ -88,7 +88,7 @@ Sve je aktivno samo u dev modu, ili uz `NEXT_PUBLIC_DATE_OVERRIDE=1` na stagingu
 | | |
 |---|---|
 | `/admin` | uređivanje liste stihova (šifra) |
-| `/sacuvano` | stihovi sačuvani srcem (localStorage, bez naloga) |
+| `/sacuvano` | stihovi sačuvani srcem — karte ili lista, svaki s pjesmom i danom kad je sačuvan (localStorage, bez naloga) |
 | `/stih/<id>` | trajni link na jedan stih |
 
 Slika za dijeljenje (Story 9:16, objava 4:5, kvadrat 1:1, tri stila) crta
@@ -177,7 +177,8 @@ stvari čitaju kao jedan znak.
 
 Uz svaki stih ide pjesma (`youtube` link je obavezan). Ispod stiha je plejer
 u tonu aplikacije — zvuk iz `public/audio` sa CDN-a, bez videa; dok pjesme
-nema u aplikaciji, stoji YouTube znak. Kako pjesma dođe u aplikaciju (admin,
+nema u aplikaciji, stoji YouTube znak. Isti plejer je i uz svaki sačuvani
+stih. Kako pjesma dođe u aplikaciju (admin,
 GitHub, `npm run audio`): DEPLOY.md → *Pjesme*.
 
 ## Obavijesti

@@ -9,6 +9,7 @@ import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import AUDIO from '@/data/audio.json'
 import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
+import { FitLines } from './deck/FitLines'
 
 /**
  * Potpis pjesme ispod stiha.
@@ -445,8 +446,8 @@ function Tonearm({ size, down, progress }: { size: number; down: boolean; progre
 }
 
 /**
- * Plejer ispod stiha — odmah otvoren, bez kutije: ploča, pored nje naziv
- * (desno titra ekvilajzer dok svira), album i traka za premotavanje.
+ * Plejer ispod stiha — odmah otvoren, bez kutije: ploča, pored nje naziv,
+ * album i traka za premotavanje.
  * Kontrole rade i sa zaključanog ekrana (Media Session).
  */
 function AudioSong({ preview = false, ...props }: Source & { preview?: boolean }) {
@@ -473,7 +474,6 @@ function AudioSong({ preview = false, ...props }: Source & { preview?: boolean }
           >
             {verse.song}
           </p>
-          <Equalizer playing={state === 'playing'} />
         </div>
         <p className="mt-2 truncate text-[10.5px] uppercase leading-none tracking-[0.22em] text-white/60">
           {verse.album} &middot; {verse.year}
@@ -488,10 +488,11 @@ function AudioSong({ preview = false, ...props }: Source & { preview?: boolean }
 }
 
 /**
- * Pjesma u kartici sačuvanog stiha: mala ploča je pusti, desno titra
- * ekvilajzer, ispod je traka za premotavanje. Bez zvuka ostaje tačka raspoloženja.
+ * Pjesma u kartici sačuvanog stiha: mala ploča je pusti, desno naziv i
+ * album, ispod traka za premotavanje. Bez zvuka ostaje tačka raspoloženja.
+ * `fit`: naziv i album cijeli, svaki u jednom redu — slova se smanje koliko treba (karte sačuvanih).
  */
-export function SongRow({ verse, accent }: { verse: Verse; accent: string }) {
+export function SongRow({ verse, accent, fit = false }: { verse: Verse; accent: string; fit?: boolean }) {
   const id = youtubeId(verse.youtube)
   const [failedId, setFailedId] = useState<string | null>(null)
 
@@ -500,26 +501,21 @@ export function SongRow({ verse, accent }: { verse: Verse; accent: string }) {
       <>
         <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} aria-hidden />
         <div className="min-w-0 flex-1">
-          <RowText verse={verse} />
+          <RowText verse={verse} fit={fit} />
         </div>
       </>
     )
-  return <AudioRow key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} />
+  return <AudioRow key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} fit={fit} />
 }
 
-function AudioRow(props: Source) {
+function AudioRow({ fit, ...props }: Source & { fit: boolean }) {
   const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: false })
   const { verse } = props
   return (
     <>
       <Vinyl size={60} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} arm />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <RowText verse={verse} onClick={toggle} />
-          </div>
-          <Equalizer playing={state === 'playing'} />
-        </div>
+        <RowText verse={verse} onClick={toggle} fit={fit} />
         <div className="flex items-center gap-2.5">
           <Seek value={progress} onSeek={seek} />
           <span className="tabular w-9 text-right text-[10px] tracking-[0.06em] text-white/60">{time}</span>
@@ -529,36 +525,19 @@ function AudioRow(props: Source) {
   )
 }
 
-function RowText({ verse, onClick }: { verse: Verse; onClick?: () => void }) {
+function RowText({ verse, onClick, fit = false }: { verse: Verse; onClick?: () => void; fit?: boolean }) {
+  // jedan red: skraćen (lista) ili cio, sa smanjenim slovima (karte)
+  const line = (t: React.ReactNode) => (fit ? <FitLines><span>{t}</span></FitLines> : t)
+  const cut = fit ? '' : 'truncate'
   return (
     <div className={onClick ? 'cursor-pointer' : undefined} onClick={onClick}>
-      <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: BRAND.gold }}>
-        {verse.song}
+      <p className={`${cut} text-[11px] font-semibold uppercase tracking-[0.18em]`} style={{ color: BRAND.gold }}>
+        {line(verse.song)}
       </p>
-      <p className="mt-1 truncate text-[10px] uppercase tracking-[0.16em] text-white/55">
-        {verse.album} &middot; {verse.year}
+      <p className={`mt-1 ${cut} text-[10px] uppercase tracking-[0.16em] text-white/55`}>
+        {line(<>{verse.album} &middot; {verse.year}</>)}
       </p>
     </div>
-  )
-}
-
-/** Četiri zlatne trake — titraju dok svira, spuste se na pauzi. */
-function Equalizer({ playing }: { playing: boolean }) {
-  return (
-    <span className="flex h-3.5 w-[18px] shrink-0 items-end gap-[2px]" aria-hidden>
-      {[0.9, 0.65, 1.05, 0.75].map((d, i) => (
-        // CSS animacija (globals.css) — titra i dok je JavaScript zauzet
-        <span
-          key={i}
-          className={`eq-bar h-full w-[3px] origin-bottom rounded-full ${playing ? 'eq-on' : ''}`}
-          style={{
-            background: `linear-gradient(to top, #8A7148, ${BRAND.gold}, #F1E2BF)`,
-            animationDuration: `${d}s`,
-            animationDelay: `${i * 0.1}s`,
-          }}
-        />
-      ))}
-    </span>
   )
 }
 

@@ -20,7 +20,7 @@ const CAPTIONS: Record<Step, { eyebrow: string; a: string; b: string }> = {
   tombola: { eyebrow: 'Jedan dodir', a: 'Listići zaplešu,', b: 'jedan je tvoj.' },
   verse: { eyebrow: 'Stih dana', a: 'Riječi koje', b: 'danas trebaš.' },
   save: { eyebrow: 'Sačuvaj', a: 'Da ti ostane', b: 'za kasnije.' },
-  play: { eyebrow: 'Poslušaj', a: 'I pjesmu', b: 'iz koje je.' },
+  play: { eyebrow: 'Poslušaj', a: 'Svaki sačuvan', b: 'sa svojom pjesmom.' },
   end: { eyebrow: 'Besplatno · iPhone · Android', a: 'Jedan stih.', b: 'Svaki dan.' },
 }
 
@@ -43,7 +43,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /**
  * Video za story (9:16) i objavu (4:5): cijeli tok u pravom telefonu —
- * obavijest → dodir → tombola → stih → sačuvaj → pjesma — uz natpise.
+ * obavijest → dodir → tombola → stih → sačuvaj → pjesma iz sačuvanih — uz natpise.
  * `rec`: bez dugmadi, čeka da ga skripta pokrene (snimanje kroz Chrome).
  */
 export function VideoScene({
@@ -141,15 +141,24 @@ export function VideoScene({
     setStep('save')
     await wait(700)
     await press('[data-tip="save"]', id)
-    await wait(2400)
+    // srce se upali i iskoči ikonica s brojem — pa odmah u sačuvane
+    await wait(1300)
 
-    // 4 — pusti pjesmu
+    // 4 — otvori sačuvane, pusti pjesmu s gramofona u kartici i zatvori —
+    // kratko, bez sjene koja ostane; pjesma dalje svira ispod stiha
     if (!alive()) return
     setStep('play')
+    await press('[data-tip="saved"]', id)
+    const card = '[aria-label="Sačuvani stihovi"] button[data-state]'
+    await until(() => Boolean(doc()?.querySelector(card)), 5000)
     await wait(700)
-    await press('[data-deck="play"]', id)
+    await press(card, id)
     mark('play')
-    await wait(6500)
+    await wait(2000)
+    if (!alive()) return
+    await press('[role="dialog"][aria-label="Sačuvani stihovi"] button[aria-label="Zatvori"]', id)
+    doc()?.querySelector<HTMLElement>('[data-deck="play"]')?.click()
+    await wait(3000)
 
     // 5 — kraj: poruka i link
     if (!alive()) return
@@ -262,8 +271,6 @@ export function VideoScene({
             zIndex: 3,
             ...(story ? { left: '8em', right: '8em', top: '58em', height: '86em' } : { right: '3em', width: '50em', top: '7em', height: '108em' }),
           }}
-          animate={{ opacity: step === 'end' ? 0.35 : 1, scale: step === 'end' ? 0.96 : 1 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
           <LivePhone
             kind="iphone"
