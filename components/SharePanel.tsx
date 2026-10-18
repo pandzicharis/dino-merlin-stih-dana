@@ -15,7 +15,7 @@ import {
 import { getSharePrefs, setSharePrefs } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
 import { DrawerIcon } from './DrawerIcon'
-import { SHEET_DRAG, SheetBackdrop, SheetLayer, SheetSlide, useSheetOpen } from './Sheet'
+import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
 type Target = 'share' | 'save'
 
@@ -54,6 +54,7 @@ export default function SharePanel({
   }, [open, verse, date, format])
 
   useSheetOpen(open)
+  const sheetDrag = useSheetDrag(onClose)
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
@@ -158,12 +159,10 @@ export default function SharePanel({
             aria-modal="true"
             aria-label="Podijeli stih"
             className="os-sheet relative flex max-h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px] sm:pb-6"
+            {...sheetDrag}
             style={{
+              ...sheetDrag.style,
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
-            }}
-            {...SHEET_DRAG}
-            onDragEnd={(_, info) => {
-              if (info.offset.y > 90 || info.velocity.y > 600) onClose()
             }}
           >
             {/* zlatna nit po vrhu panela */}

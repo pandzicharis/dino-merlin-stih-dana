@@ -9,7 +9,7 @@ import { SavedVerses, SavedViewToggle } from './SavedVerses'
 import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
-import { AfterOpen, SHEET_DRAG, SheetBackdrop, SheetLayer, SheetSlide, useSheetOpen } from './Sheet'
+import { AfterOpen, SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
 /** Sačuvani stihovi kao donji panel — isti kao panel za dijeljenje. */
 export default function SavedPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -33,6 +33,7 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
   }, [open])
 
   useSheetOpen(open)
+  const sheetDrag = useSheetDrag(onClose)
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
@@ -61,15 +62,13 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
             aria-modal="true"
             aria-label="Sačuvani stihovi"
             className="os-sheet relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
+            {...sheetDrag}
             style={{
+              ...sheetDrag.style,
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
-            {...SHEET_DRAG}
             dragControls={drag}
             dragListener={false}
-            onDragEnd={(_, info) => {
-              if (info.offset.y > 90 || info.velocity.y > 600) onClose()
-            }}
           >
             <span
               className="pointer-events-none absolute inset-x-10 top-0 h-px"

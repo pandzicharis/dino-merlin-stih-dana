@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { motion, useIsPresent } from 'motion/react'
+import { motion, useIsPresent, useMotionValue } from 'motion/react'
 
 /*
  * Donji paneli (sačuvani, dijeljenje) kao na nativnoj aplikaciji:
@@ -18,14 +18,27 @@ import { motion, useIsPresent } from 'motion/react'
 // kriva iOS panela: brzo krene, mekano sjedne
 const EASE = [0.32, 0.72, 0, 1] as const
 const OPEN = { duration: 0.5, ease: EASE }
-const CLOSE = { duration: 0.3, ease: EASE }
+const CLOSE = { duration: 0.45, ease: EASE }
 
-/** Povlačenje nadolje prati prst 1:1, kao na telefonu. */
-export const SHEET_DRAG = {
-  drag: 'y',
-  dragConstraints: { top: 0, bottom: 0 },
-  dragElastic: { top: 0, bottom: 1 },
-} as const
+/**
+ * Povlačenje nadolje prati prst 1:1, kao na telefonu. Kad se pusti dovoljno
+ * nisko, panel ne skače nazad nego nastavi dolje odatle gdje ga je prst ostavio.
+ */
+export function useSheetDrag(onClose: () => void) {
+  const y = useMotionValue(0)
+  return {
+    style: { y },
+    drag: 'y',
+    dragConstraints: { top: 0, bottom: 0 },
+    dragElastic: { top: 0, bottom: 1 },
+    onDragEnd: (_: unknown, info: { offset: { y: number }; velocity: { y: number } }) => {
+      if (info.offset.y > 90 || info.velocity.y > 600) {
+        y.stop() // bez vraćanja na vrh — izlazak kreće odavde
+        onClose()
+      }
+    },
+  } as const
+}
 
 /**
  * Sloj preko ekrana. Čim se panel zatvara, dodiri prolaze do ekrana ispod —
@@ -49,7 +62,7 @@ export function SheetBackdrop({ onClose }: { onClose: () => void }) {
       onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.4 } }}
-      exit={{ opacity: 0, transition: { duration: 0.3 } }}
+      exit={{ opacity: 0, transition: CLOSE }}
     />
   )
 }
