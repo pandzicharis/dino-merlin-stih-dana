@@ -15,10 +15,10 @@ import { motion, useIsPresent, useMotionValue } from 'motion/react'
  * Na širokom ekranu panel je na sredini, pa tamo ostaje kratko klizanje uz fade.
  */
 
-// kriva iOS panela: brzo krene, mekano sjedne
-const EASE = [0.32, 0.72, 0, 1] as const
-const OPEN = { duration: 0.5, ease: EASE }
-const CLOSE = { duration: 0.45, ease: EASE }
+// otvaranje: kriva iOS panela — brzo krene, mekano sjedne
+const OPEN = { duration: 0.5, ease: [0.32, 0.72, 0, 1] as const }
+// zatvaranje: krene polako pa ubrza — bez trzaja iz mirovanja
+const CLOSE = { duration: 0.5, ease: [0.4, 0.1, 0.2, 1] as const }
 
 /**
  * Povlačenje nadolje prati prst 1:1, kao na telefonu. Kad se pusti dovoljno
