@@ -1,11 +1,13 @@
 /**
  * Service worker — namjerno minimalan.
  *
- * Sadržaj se mijenja svaki dan, pa nema agresivnog keširanja:
- * samo offline fallback za zadnji viđeni ekran + push notifikacije.
+ * Sadržaj se mijenja svaki dan, pa se stranica uvijek traži s mreže;
+ * offline fallback za zadnji viđeni ekran + push notifikacije.
+ * Jedino JS/CSS/fontovi (imena s hešom, nikad se ne mijenjaju) i logotipi
+ * idu iz keša — aplikacija se otvori bez čekanja na njih.
  */
 
-const CACHE = 'stihdana-v11'
+const CACHE = 'stihdana-v12'
 const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2']
 
 /**
@@ -44,10 +46,34 @@ self.addEventListener('activate', (e) => {
   )
 })
 
+/**
+ * Cache-first samo za fajlove koji se pod istim imenom nikad ne mijenjaju:
+ * `/_next/static/` (heš u imenu) i `/brand/` (immutable, next.config.ts).
+ * Keš je vezan za verziju (CACHE), pa ga nova verzija očisti.
+ */
+const STATIC = /^\/(_next\/static|brand)\//
+
 /** Network-first za navigaciju: uvijek svjež stih, cache samo kad nema mreže. */
 self.addEventListener('fetch', (e) => {
   const req = e.request
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return
+  const url = new URL(req.url)
+  if (req.method !== 'GET' || url.origin !== self.location.origin) return
+
+  if (STATIC.test(url.pathname)) {
+    e.respondWith(
+      caches.open(CACHE).then((c) =>
+        c.match(req).then(
+          (hit) =>
+            hit ||
+            fetch(req).then((res) => {
+              if (res.ok && res.type === 'basic') c.put(req, res.clone())
+              return res
+            }),
+        ),
+      ),
+    )
+    return
+  }
 
   if (req.mode === 'navigate') {
     e.respondWith(
