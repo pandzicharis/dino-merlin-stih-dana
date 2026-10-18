@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { CEKAJ_SCRIPT } from '@/lib/cekaj'
 import {
   Alex_Brush,
   Allura,
@@ -127,6 +128,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* crno prije nego stigne globals.css — instalirana aplikacija inače trepne bijelo */}
         <style dangerouslySetInnerHTML={{ __html: 'html{background:#000}' }} />
         <script dangerouslySetInnerHTML={{ __html: OS_SCRIPT }} />
+        {/* obavijest možda čeka — zastor prije prvog kadra, da se ne vidi stih pa tombola (lib/cekaj.ts) */}
+        <script dangerouslySetInnerHTML={{ __html: CEKAJ_SCRIPT }} />
         {/* potpis na pločici tombole je CSS maska — maska se traži posebnim (CORS)
             zahtjevom tek kad se tombola pojavi; ovako stigne s HTML-om i stoji od prvog kadra */}
         <link rel="preload" as="image" href="/brand/signature.webp?v=2" crossOrigin="anonymous" fetchPriority="high" />

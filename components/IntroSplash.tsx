@@ -14,6 +14,7 @@ import { VERSES } from '@/data/verses'
 import { MOODS, type Mood } from '@/data/moods'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
 import { MAGAZA_PATH } from '@/lib/magaza-path'
+import { setCoverColor, uncover } from '@/lib/cekaj'
 
 /**
  * IZVLAČENJE STIHA — jednom dnevno, pri prvom otvaranju.
@@ -127,7 +128,11 @@ export function IntroHost({
   const runningRef = useRef(false)
   useEffect(() => {
     runningRef.current = on !== null
+    // tombola (ili uvod) ima svoju punu podlogu — zastor obavijesti više ne treba
+    if (on) uncover()
   }, [on])
+  // zastor obavijesti je u boji ove podloge, pa prelaz u tombolu ne trepne
+  useEffect(() => setCoverColor(bg), [bg])
 
   // prezentacija (`?intro`): aplikacija se otvori uvodom — gomila papirića,
   // kao poslije dozvole na pravom telefonu (telefon kod izloga, "Od izloga

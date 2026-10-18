@@ -8,6 +8,7 @@ import { markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
 import { setLastSeen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
 import { clearBadge, clearPushMark, hasPushMark } from '@/lib/push-client'
+import { cover, markHandled, mayWait, uncover } from '@/lib/cekaj'
 import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
 import { DevDateBar } from './DevDateBar'
@@ -68,6 +69,9 @@ export function DailyVerse({
     setReplay((r) => r + 1)
     if (!verseId) markSeen(date)
     clearPushMark()
+    // poslije podneva — obavijest je izvučena, danas više nema zastora
+    markHandled()
+    uncover()
   }, [verseId, date])
   const reduced = useReducedMotion()
 
@@ -86,32 +90,62 @@ export function DailyVerse({
   // viđen. Briše se tek kad papirić sleti (`land`). Na dan instalacije stih
   // iz uvoda je probni: obavijest ga zamijeni pravim izvlačenjem.
   // Bez obavijesti — samo makni tačku i obavijesti, kao i prije.
+  //
+  // Oznaka je u kešu (asinhrono) — dok se čita, ekran je pod zastorom
+  // (lib/cekaj.ts), pa se ne vidi stih pa tombola. Bez oznake zastor odmah ode.
   useEffect(() => {
-    if (!drawnId || verseId) return
+    // zadani stih (prezentacija, dev) — obavijesti se ne gledaju, zastora nema
+    if (verseId) return uncover()
+    if (!drawnId) return
     let busy = false
     const check = async () => {
       if (busy || document.visibilityState !== 'visible') return
       busy = true
       try {
-        if (!(await hasPushMark())) return clearBadge()
+        if (!(await hasPushMark())) {
+          uncover()
+          return clearBadge()
+        }
         // probni stih: dan se izvuče ispočetka — novi stih sam pokrene tombolu
         if (unseat(date, verses)) return
-        if (reduced) return clearPushMark()
+        if (reduced) {
+          uncover()
+          markHandled()
+          return clearPushMark()
+        }
         // ako se već izvlači (prvo otvaranje danas), IntroHost ovo preskoči
         playDraw()
       } finally {
         busy = false
       }
     }
-    const onMessage = (e: MessageEvent) => e.data?.type === 'stihdana:izvuci' && check()
+    // povratak u aplikaciju (i odlazak iz nje): zastor odmah, prije prvog kadra
+    const onVisibility = () => {
+      if (mayWait()) cover()
+      check()
+    }
+    // obavijest stigla dok je aplikacija otvorena (service worker javi odmah)
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type !== 'stihdana:izvuci') return
+      cover()
+      check()
+    }
     check()
-    document.addEventListener('visibilitychange', check)
+    document.addEventListener('visibilitychange', onVisibility)
     navigator.serviceWorker?.addEventListener('message', onMessage)
     return () => {
-      document.removeEventListener('visibilitychange', check)
+      document.removeEventListener('visibilitychange', onVisibility)
       navigator.serviceWorker?.removeEventListener('message', onMessage)
     }
   }, [drawnId, verseId, date, reduced, verses])
+
+  // dodir na obavijest otvara `/?izvuci` (zastor iz <head>) — adresa se očisti
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('izvuci')) return
+    url.searchParams.delete('izvuci')
+    window.history.replaceState(null, '', url)
+  }, [])
 
   // panel sačuvanih ne mora ponovo po listu — stranica je već donijela
   useEffect(() => {

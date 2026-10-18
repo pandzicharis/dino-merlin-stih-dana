@@ -273,3 +273,14 @@ html[data-deck] .dev-pad {
 @media (prefers-reduced-motion: reduce) {
   .vinyl-glow { animation: none; }
 }
+
+/* Zastor dok se ne zna ima li nepročitana obavijest (lib/cekaj.ts) — preko
+   ekrana stiha, ispod kapije (z-60) i tombole (z-70). */
+html[data-cekaj] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  background: var(--cekaj, #000);
+  pointer-events: none;
+}

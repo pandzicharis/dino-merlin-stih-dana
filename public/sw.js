@@ -5,7 +5,7 @@
  * samo offline fallback za zadnji viđeni ekran + push notifikacije.
  */
 
-const CACHE = 'stihdana-v4'
+const CACHE = 'stihdana-v5'
 const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2']
 
 /**
@@ -75,8 +75,15 @@ self.addEventListener('push', (e) => {
   const badge =
     'setAppBadge' in self.navigator ? self.navigator.setAppBadge(1).catch(() => {}) : Promise.resolve()
 
+  // otvorena aplikacija (i u pozadini) sazna odmah — ne tek na dodir
+  const tell = () =>
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((list) => list.forEach((c) => c.postMessage({ type: 'stihdana:izvuci' })))
+      .catch(() => {})
+
   e.waitUntil(
-    Promise.all([badge, markDraw()]).then(() => self.registration.showNotification(d.title || 'Stih dana', {
+    Promise.all([badge, markDraw()]).then(tell).then(() => self.registration.showNotification(d.title || 'Stih dana', {
       body: d.body || '',
       tag: d.tag || 'stih-dana',
       renotify: true,
@@ -91,8 +98,11 @@ self.addEventListener('push', (e) => {
 self.addEventListener('notificationclick', (e) => {
   // tačku na ikonici ne dira — briše je aplikacija kad se stih izvuče
   e.notification.close()
-  const url = (e.notification.data && e.notification.data.url) || '/'
-  const path = new URL(url, self.location.origin).pathname
+  // `?izvuci`: aplikacija od prvog kadra zna da je tombola (zastor iz <head>)
+  const target = new URL((e.notification.data && e.notification.data.url) || '/', self.location.origin)
+  target.searchParams.set('izvuci', '1')
+  const url = target.href
+  const path = target.pathname
   e.waitUntil(
     markDraw()
       .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
