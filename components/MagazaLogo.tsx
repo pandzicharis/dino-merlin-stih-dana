@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react'
 import { MAGAZA_RATIO } from '@/lib/brand'
+import { MAGAZA_PATH } from '@/lib/magaza-path'
 
 /**
- * Znak izdavača (Magaza). SVG je crn, pa se boji kroz CSS masku — ista
- * datoteka radi na tamnoj i svijetloj podlozi, u bilo kojoj boji.
+ * Znak izdavača (Magaza), nacrtan iz putanje u kodu — stoji od prvog
+ * kadra, bez zahtjeva prema mreži. Boja je `color` (i `currentColor`).
  */
 export function MagazaLogo({
   height = 14,
@@ -16,20 +17,15 @@ export function MagazaLogo({
   className?: string
   style?: CSSProperties
 }) {
-  const mask = 'url(/brand/magaza.svg?v=2) center / contain no-repeat'
   return (
-    <span
+    <svg
       role="img"
       aria-label="Magaza"
-      className={`inline-block ${className ?? ''}`}
-      style={{
-        height,
-        width: Math.round(height * MAGAZA_RATIO),
-        background: color,
-        mask,
-        WebkitMask: mask,
-        ...style,
-      }}
-    />
+      viewBox="0 0 316 67"
+      className={`inline-block shrink-0 ${className ?? ''}`}
+      style={{ height, width: Math.round(height * MAGAZA_RATIO), ...style }}
+    >
+      <path d={MAGAZA_PATH} fill={color} fillRule="evenodd" clipRule="evenodd" />
+    </svg>
   )
 }

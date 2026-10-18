@@ -127,6 +127,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* crno prije nego stigne globals.css — instalirana aplikacija inače trepne bijelo */}
         <style dangerouslySetInnerHTML={{ __html: 'html{background:#000}' }} />
         <script dangerouslySetInnerHTML={{ __html: OS_SCRIPT }} />
+        {/* potpis na pločici tombole je CSS maska — maska se traži posebnim (CORS)
+            zahtjevom tek kad se tombola pojavi; ovako stigne s HTML-om i stoji od prvog kadra */}
+        <link rel="preload" as="image" href="/brand/signature.webp?v=2" crossOrigin="anonymous" fetchPriority="high" />
       </head>
       <body>{children}</body>
     </html>

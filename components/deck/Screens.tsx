@@ -5,6 +5,7 @@ import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { albumOf, ALBUMS } from '@/data/albums'
 import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
+import { MAGAZA_PATH } from '@/lib/magaza-path'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
 import { asWritten } from '@/lib/text'
 import { INVITE } from '@/lib/notify'
@@ -720,7 +721,7 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
   )
 }
 
-/** Znak Magaze u `em` — `MagazaLogo` radi u pikselima. */
+/** Znak Magaze u `em` — `MagazaLogo` radi u pikselima. Putanja iz koda, bez zahtjeva. */
 export function MagazaMark({
   height,
   color = '#FFFFFF',
@@ -730,21 +731,15 @@ export function MagazaMark({
   color?: string
   style?: CSSProperties
 }) {
-  const mask = 'url(/brand/magaza.svg?v=2) center / contain no-repeat'
   return (
-    <span
+    <svg
       role="img"
       aria-label="Magaza"
-      style={{
-        display: 'inline-block',
-        height: `${height}em`,
-        width: `${(height * MAGAZA_RATIO).toFixed(2)}em`,
-        background: color,
-        mask,
-        WebkitMask: mask,
-        ...style,
-      }}
-    />
+      viewBox="0 0 316 67"
+      style={{ display: 'inline-block', flexShrink: 0, height: `${height}em`, width: `${(height * MAGAZA_RATIO).toFixed(2)}em`, ...style }}
+    >
+      <path d={MAGAZA_PATH} fill={color} fillRule="evenodd" clipRule="evenodd" />
+    </svg>
   )
 }
 

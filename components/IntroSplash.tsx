@@ -13,6 +13,7 @@ import { paperCase, asWritten } from '@/lib/text'
 import { VERSES } from '@/data/verses'
 import { MOODS, type Mood } from '@/data/moods'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
+import { MAGAZA_PATH } from '@/lib/magaza-path'
 
 /**
  * IZVLAČENJE STIHA — jednom dnevno, pri prvom otvaranju.
@@ -984,7 +985,27 @@ function PlateLabel({ cx, cy, R }: { cx: number; cy: number; R: number }) {
           {raised('/brand/signature.webp?v=2', bh * 0.78, '1000 / 711')}
           {/* tanka zlatna linija, kao u zaglavlju aplikacije */}
           <span style={{ width: 0.75, height: bh * 0.4, background: 'rgba(214,189,139,0.5)' }} />
-          {raised('/brand/magaza.svg?v=2', bh * 0.78 * MAGAZA_BESIDE, `${MAGAZA_RATIO}`, MAGAZA_DROP_CSS)}
+          {/* Magaza iz putanje u kodu — bez čekanja na mrežu, isto zlato kao potpis */}
+          <svg
+            viewBox="0 0 316 67"
+            aria-hidden
+            style={{
+              display: 'block',
+              height: bh * 0.78 * MAGAZA_BESIDE,
+              width: bh * 0.78 * MAGAZA_BESIDE * MAGAZA_RATIO,
+              transform: MAGAZA_DROP_CSS,
+              filter: 'drop-shadow(0 0.7px 0 rgba(0,0,0,0.65))',
+            }}
+          >
+            <defs>
+              <linearGradient id="plate-gold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="#f6ead0" />
+                <stop offset="0.55" stopColor="#d6bd8b" />
+                <stop offset="1" stopColor="#a8895a" />
+              </linearGradient>
+            </defs>
+            <path d={MAGAZA_PATH} fill="url(#plate-gold)" fillRule="evenodd" clipRule="evenodd" />
+          </svg>
         </span>,
         [35, -20],
       )}
