@@ -24,7 +24,8 @@ import { MOODS, type Mood } from '@/data/moods'
  * se digne na sredinu i otvori s pola na cijeli, s tvojim stihom.
  *
  * Stih je već izvučen (lib/draw.ts) — ovo je obred, ne lutrija.
- * Ostala otvaranja istog dana idu pravo na stih.
+ * Dok se ne zavrti (papirić sleti), svako otvaranje je opet tombola; poslije
+ * toga ostala otvaranja istog dana idu pravo na stih.
  */
 
 const EVENT = 'stihdana:intro'

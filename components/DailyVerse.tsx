@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
-import { unseat, useDraw, type ListVerse } from '@/lib/draw'
+import { markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
 import { setLastSeen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
 import { clearBadge, clearPushMark, hasPushMark } from '@/lib/push-client'
@@ -62,19 +62,24 @@ export function DailyVerse({
 
   // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka
   const [replay, setReplay] = useState(0)
-  // papirić otvoren = obavijest pročitana
+  // papirić otvoren = stih izvučen (tek tad, ne kad se tombola pokaže) i
+  // obavijest pročitana
   const land = useCallback(() => {
     setReplay((r) => r + 1)
+    if (!verseId) markSeen(date)
     clearPushMark()
-  }, [])
+  }, [verseId, date])
   const reduced = useReducedMotion()
 
-  // prvo otvaranje danas — stih se izvlači pred očima
+  // danas još nije zavrćen — stih se izvlači pred očima (i poslije ubijene
+  // aplikacije usred tombole). Bez animacija nema tombole — stih odmah.
   const fresh = Boolean(drawn?.fresh)
   const drawnId = drawn?.verse.id
   useEffect(() => {
-    if (fresh && drawnId) playDraw()
-  }, [fresh, drawnId, date])
+    if (!fresh || !drawnId) return
+    if (reduced) markSeen(date)
+    playDraw()
+  }, [fresh, drawnId, date, reduced])
 
   // PRAVILO: dok ima nepročitana obavijest (oznaka iz service workera,
   // tačka na ikonici), svako otvaranje je tombola — i kad je stih danas već

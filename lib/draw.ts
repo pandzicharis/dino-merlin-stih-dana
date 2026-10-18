@@ -30,7 +30,8 @@ type Entry = {
   id: string
   /** krug špila */
   r: number
-  /** otvoren u aplikaciji — do tad je samo izvučen (plan ili obavijest) */
+  /** zavrćen u tomboli (papirić sletio). Do tad se stih ne pokazuje —
+   *  svako otvaranje je tombola, i poslije ubijene aplikacije. */
   seen?: 1
   /** probni: prvi stih ikad (uvod poslije instalacije) — ne broji se za taj
    *  dan; obavijest istog dana ga zamijeni pravim izvlačenjem (`unseat`) */
@@ -148,14 +149,12 @@ function settle(s: State, today: string, pool: string[], known: Set<string>, avo
   return { days }
 }
 
-/** Datumi za koje je izvlačenje u ovoj sesiji bilo novo — animacija ih prati. */
-const fresh = new Set<string>()
 /** Probni stih koji je upravo zamijenjen — pravo izvlačenje ga zaobiđe. */
 let avoid: string | undefined
 
 /**
  * Stih koji ovaj uređaj ima za `date`. `null` dok se ne zna (server, prvi
- * frejm). `fresh`: prvi put otvoren danas — vrijeme za animaciju izvlačenja.
+ * frejm). `fresh`: danas još nije zavrćen — tombola, stih se ne smije vidjeti.
  */
 export function useDraw(date: string, verses: ListVerse[], on = true): { verse: Verse; fresh: boolean } | null {
   const raw = useSyncExternalStore(subscribe, snapshot, () => null)
@@ -176,21 +175,21 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
     save(settle(parse(snapshot()), date, pool, new Set(byId.keys()), avoid))
   }, [on, missing, date, pool, byId])
 
-  // otvoren = viđen; animacija ostaje upamćena za ovu sesiju
-  const id = verse?.id
-  const seen = entry?.seen
-  useEffect(() => {
-    if (!on || !id || seen) return
-    fresh.add(date)
-    const s = parse(snapshot())
-    if (s.days[date]?.id === id) {
-      s.days[date] = { ...s.days[date], seen: 1 }
-      save(s)
-    }
-  }, [on, id, seen, date])
-
   if (!on || !verse || !entry) return null
-  return { verse, fresh: !entry.seen || fresh.has(date) }
+  return { verse, fresh: !entry.seen }
+}
+
+/**
+ * Papirić sletio — stih za `date` je izvučen. Tek od tad se otvara pravo na
+ * stih; prikaz sam po sebi ne broji (ubiješ aplikaciju usred tombole —
+ * sljedeće otvaranje je opet tombola).
+ */
+export function markSeen(date: string) {
+  const s = parse(snapshot())
+  const e = s.days[date]
+  if (!e || e.seen) return
+  s.days[date] = { ...e, seen: 1 }
+  save(s)
 }
 
 /**
@@ -203,7 +202,6 @@ export function unseat(date: string, verses: ListVerse[]): boolean {
   if (!e?.pre) return false
   delete s.days[date]
   avoid = e.id
-  fresh.delete(date)
   // pravi stih odmah, u istom potezu — ekran ni na frejm ne ostane bez stiha
   const active = verses.filter((v) => v.active !== false)
   const pool = (active.length ? active : verses).map((v) => v.id)
@@ -215,6 +213,5 @@ export function unseat(date: string, verses: ListVerse[]): boolean {
 export function redraw(date: string) {
   const s = parse(snapshot())
   for (const d of Object.keys(s.days)) if (d >= date) delete s.days[d]
-  fresh.delete(date)
   save(s)
 }
