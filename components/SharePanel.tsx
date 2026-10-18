@@ -15,6 +15,7 @@ import {
 import { getSharePrefs, setSharePrefs } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
 import { DrawerIcon } from './DrawerIcon'
+import { SheetLayer, SheetSlide, useSheetOpen } from './Sheet'
 
 type Target = 'share' | 'save'
 
@@ -51,6 +52,8 @@ export default function SharePanel({
       alive = false
     }
   }, [open, verse, date, format])
+
+  useSheetOpen(open)
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
@@ -146,15 +149,10 @@ export default function SharePanel({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-        >
+        <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
           <button aria-label="Zatvori" className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose} />
 
+          <SheetSlide>
           <motion.div
             role="dialog"
             aria-modal="true"
@@ -163,10 +161,6 @@ export default function SharePanel({
             style={{
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
-            initial={{ y: 48, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 48, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 34 }}
             drag="y"
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.6 }}
@@ -287,7 +281,8 @@ export default function SharePanel({
               )}
             </AnimatePresence>
           </motion.div>
-        </motion.div>
+          </SheetSlide>
+        </SheetLayer>
       )}
     </AnimatePresence>,
     document.body,

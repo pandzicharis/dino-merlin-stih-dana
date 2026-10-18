@@ -284,3 +284,13 @@ html[data-cekaj] body::after {
   background: var(--cekaj, #000);
   pointer-events: none;
 }
+
+/* Dok je donji panel otvoren (components/Sheet.tsx), pozadina iza
+   zatamnjenja miruje — inače se blur iza panela računa iznova svaki kadar. */
+html[data-sheet] .bg-blob,
+html[data-sheet] .bg-breathe,
+html[data-sheet] .bg-bloom,
+html[data-sheet] .bg-grain,
+html[data-sheet] .note-float {
+  animation-play-state: paused !important;
+}

@@ -9,6 +9,7 @@ import { SavedVerses, SavedViewToggle } from './SavedVerses'
 import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
+import { AfterOpen, SheetLayer, SheetSlide, useSheetOpen } from './Sheet'
 
 /** Sačuvani stihovi kao donji panel — isti kao panel za dijeljenje. */
 export default function SavedPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -31,6 +32,8 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
     }
   }, [open])
 
+  useSheetOpen(open)
+
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
     if (!open) return
@@ -49,15 +52,10 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
   return createPortal(
     <AnimatePresence>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-        >
+        <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
           <button aria-label="Zatvori" className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose} />
 
+          <SheetSlide>
           <motion.div
             role="dialog"
             aria-modal="true"
@@ -66,10 +64,6 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
             style={{
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
-            initial={{ y: 48, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 48, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 34 }}
             drag="y"
             dragControls={drag}
             dragListener={false}
@@ -125,19 +119,29 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
 
             <div className="min-h-[200px] overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
               {verses ? (
-                <SavedVerses verses={verses} onClose={onClose} />
+                // karte i plejeri se slože dok panel već klizi
+                <AfterOpen fallback={<Skeleton />}>
+                  <SavedVerses verses={verses} onClose={onClose} />
+                </AfterOpen>
               ) : (
-                <div className="flex flex-col gap-3">
-                  {[0, 1].map((i) => (
-                    <div key={i} className="h-[140px] animate-pulse rounded-[22px] bg-white/[0.04]" />
-                  ))}
-                </div>
+                <Skeleton />
               )}
             </div>
           </motion.div>
-        </motion.div>
+          </SheetSlide>
+        </SheetLayer>
       )}
     </AnimatePresence>,
     document.body,
+  )
+}
+
+function Skeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      {[0, 1].map((i) => (
+        <div key={i} className="h-[140px] animate-pulse rounded-[22px] bg-white/[0.04]" />
+      ))}
+    </div>
   )
 }
