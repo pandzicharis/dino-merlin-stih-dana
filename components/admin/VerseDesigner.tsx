@@ -25,8 +25,9 @@ import {
 } from '@/lib/fonts'
 
 /**
- * Dizajner stiha, red po red. Izabereš red (ili sve redove), pa mu biraš
- * font, podebljano, ukoso, velika slova, veličinu i boju — boju s prijedlozima
+ * Dizajner stiha. Na platnu je stih kakav jeste (fontovi, boje); gore biraš
+ * šta uređuješ — cijeli stih, redove ili pojedine riječi — i dodirom na tekst
+ * označiš. Izabranom biraš font, podebljano, ukoso, velika slova, veličinu i boju — boju s prijedlozima
  * koje aplikacija izvuče iz pozadine (raspoloženje + omot albuma), uvijek
  * čitljivim na njoj. Dolje je izgled cijelog stiha (veličina, prored, razmak
  * slova, mala/velika slova), a gotovi stilovi slože sve odjednom. Pregled
@@ -55,15 +56,35 @@ export function VerseDesigner({
   const total = rows.reduce((a, r) => a + r.length, 0)
   const accent = MOODS[mood].accent
 
-  // redovi koji se uređuju — može više odjednom; bar jedan je uvijek izabran
+  // šta se uređuje: cijeli stih, redovi (više odjednom) ili riječi (više odjednom)
+  const [mode, setMode] = useState<'all' | 'line' | 'word'>('line')
   const [picked, setPicked] = useState<number[]>([0])
   const chosen = picked.filter((li) => li < rows.length).sort((a, b) => a - b)
   const lines = chosen.length ? chosen : rows.length ? [0] : []
-  const toggleRow = (li: number) =>
+  // dodir na red: u "Redovi" ga doda/makne (bar jedan ostaje), iz drugih načina pređe na taj red
+  const toggleRow = (li: number) => {
+    if (mode !== 'line') {
+      setMode('line')
+      return setPicked([li])
+    }
     setPicked(lines.includes(li) ? (lines.length > 1 ? lines.filter((x) => x !== li) : lines) : [...lines, li])
+  }
+  const [pickedWords, setPickedWords] = useState<number[]>([0])
+  const words = (() => {
+    const w = pickedWords.filter((i) => i < total).sort((a, b) => a - b)
+    return w.length ? w : total ? [0] : []
+  })()
+  const toggleWord = (i: number) => {
+    if (mode !== 'word') {
+      setMode('word')
+      return setPickedWords([i])
+    }
+    setPickedWords(words.includes(i) ? (words.length > 1 ? words.filter((x) => x !== i) : words) : [...words, i])
+  }
   const lineOf = (li: number) => rows[li].map((_, j) => starts[li] + j)
-  // svi redovi izabrani = cijeli stih (i glavni stil)
-  const sel = lines.length === rows.length ? [] : lines.flatMap(lineOf)
+  // cijeli stih (ili svi redovi) = i glavni stil
+  const sel = mode === 'all' ? [] : mode === 'word' ? words : lines.length === rows.length ? [] : lines.flatMap(lineOf)
+  const flat = rows.flat()
   const targets = sel.length ? sel : Array.from({ length: total }, (_, i) => i)
   const styles = targets.length ? targets.map((i) => styleOf(map, i)) : [map.main]
   const all = <K extends keyof WordStyle>(k: K) => styles.every((s) => Boolean(s[k]))
@@ -101,8 +122,15 @@ export function VerseDesigner({
   const accentOn = all('accent')
   const plain = styles.every((s) => !s.color && !s.accent)
   const italicOk = styles.every((s) => canItalic(s.font))
-  const names = lines.map((li) => `${li + 1}.`)
-  const scope = names.length > 1 ? `${names.slice(0, -1).join(', ')} i ${names[names.length - 1]} red` : `${names[0] ?? '1.'} red`
+  const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} i ${xs[xs.length - 1]}` : (xs[0] ?? ''))
+  const scope =
+    mode === 'all' || (mode === 'line' && lines.length === rows.length)
+      ? 'cijeli stih'
+      : mode === 'word'
+        ? words.length > 3
+          ? `${words.length} riječi`
+          : list(words.map((i) => `„${(flat[i] ?? '').replace(/[.,!?…:;]+$/, '')}“`))
+        : `${list(lines.map((li) => `${li + 1}.`))} red`
   // uzorak na pločicama fontova: prva riječ reda (kratka), inače "Aa"
   const sample = (() => {
     const w = rows.flat()[targets[0]]
@@ -154,66 +182,117 @@ export function VerseDesigner({
           })}
         </div>
 
-        {/* redovi stiha, svaki u svom stilu — klik bira red */}
-        <SectionTitle title="Uređivanje po redu" hint="izaberi red, ili više njih odjednom" />
-        <div className="space-y-1 px-2 pb-2" style={lookCss(map.look, accent)}>
-          {rows.length === 0 && <p className="px-1 py-2 text-[12px] text-white/35">Upiši stih — onda ga ovdje oblikuješ red po red.</p>}
-          {rows.map((r, li) => {
-            const on = lines.includes(li)
-            return (
-              <button
-                type="button"
-                key={li}
-                data-edit-line={li}
-                onClick={() => toggleRow(li)}
-                role="checkbox"
-                aria-checked={on}
-                className="flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-1.5 text-left transition-colors"
-                style={{ borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.06)', background: on ? `${BRAND.gold}14` : 'transparent' }}
-              >
-                {/* kvačica — redova može biti više */}
-                <span
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border transition-colors"
-                  style={{ borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.25)', background: on ? BRAND.gold : 'transparent' }}
-                  aria-hidden
+        {/* platno: stih u svojim fontovima — gore se bira šta se uređuje, dodirom se označi */}
+        <SectionTitle
+          title="Uređivanje"
+          hint={mode === 'all' ? 'cijeli stih odjednom' : mode === 'line' ? 'dodirni red' : 'dodirni riječ'}
+          right={
+            <div className="flex shrink-0 rounded-full border border-white/[0.1] p-0.5 text-[10px] font-medium normal-case tracking-normal" role="tablist">
+              {(
+                [
+                  ['all', 'Cijeli stih'],
+                  ['line', 'Redovi'],
+                  ['word', 'Riječi'],
+                ] as const
+              ).map(([m, l]) => (
+                <button
+                  type="button"
+                  key={m}
+                  role="tab"
+                  aria-selected={mode === m}
+                  data-edit-mode={m}
+                  onClick={() => {
+                    // na "Riječi": prva riječ reda koji je bio izabran
+                    if (m === 'word' && mode !== 'word') setPickedWords([starts[lines[0] ?? 0] ?? 0])
+                    setMode(m)
+                  }}
+                  className="h-6 rounded-full px-2.5 transition-colors"
+                  style={{ background: mode === m ? BRAND.gold : 'transparent', color: mode === m ? '#14100A' : 'rgba(255,255,255,0.55)' }}
                 >
-                  {on && (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#14100A" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m5 12 5 5 9-10" />
-                    </svg>
-                  )}
-                </span>
-                <span className="w-9 shrink-0 text-[9px] uppercase tracking-[0.14em]" style={{ color: on ? BRAND.gold : 'rgba(255,255,255,0.35)' }}>
-                  {li + 1}. red
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[19px] leading-tight text-white/90" style={{ textTransform: 'inherit' }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          }
+        />
+        <div className="mx-2 mb-2 rounded-xl border border-white/[0.06] bg-black/30 py-1.5" style={lookCss(map.look, accent)}>
+          {rows.length === 0 && <p className="px-3 py-2 text-[12px] text-white/35">Upiši stih — onda ga ovdje oblikuješ.</p>}
+          {rows.map((r, li) => {
+            const lineOn = mode === 'all' || (mode === 'line' && lines.includes(li))
+            return (
+              <div
+                key={li}
+                // cijeli red je klikabilan — riječ i broj imaju svoje (dugmad unutra)
+                onClick={(e) => {
+                  if (!(e.target as Element).closest('button')) toggleRow(li)
+                }}
+                className="relative flex cursor-pointer items-center gap-2 py-2.5 pl-3 pr-2 transition-colors hover:bg-white/[0.025]"
+                style={{ background: lineOn ? `${BRAND.gold}12` : undefined }}
+              >
+                {/* zlatna crta — izabran red */}
+                <span
+                  className="absolute bottom-1 left-0 top-1 w-[2px] rounded-full transition-opacity"
+                  style={{ background: BRAND.gold, opacity: lineOn ? 1 : 0 }}
+                  aria-hidden
+                />
+                {/* broj reda — dodir bira cijeli red */}
+                <button
+                  type="button"
+                  data-edit-line={li}
+                  onClick={() => toggleRow(li)}
+                  aria-pressed={mode === 'line' && lines.includes(li)}
+                  title={`${li + 1}. red`}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] tabular-nums transition-colors"
+                  style={{
+                    color: lineOn ? '#14100A' : 'rgba(255,255,255,0.4)',
+                    background: lineOn ? BRAND.gold : 'rgba(255,255,255,0.05)',
+                  }}
+                >
+                  {li + 1}
+                </button>
+                <span className="min-w-0 flex-1 text-[21px] leading-[1.3] text-white/90" style={{ textTransform: 'inherit' }}>
                   {r.map((w, j) => {
-                    const st = styleOf(map, starts[li] + j)
+                    const i = starts[li] + j
+                    const st = styleOf(map, i)
                     const css = sampleCss(st)
+                    const wordOn = mode === 'word' && words.includes(i)
                     return (
-                      <span
-                        key={j}
-                        style={{
-                          ...css,
-                          fontSize: `${Math.min(1.5, css.fontSize ? parseFloat(String(css.fontSize)) : 1)}em`,
-                          lineHeight: 1.25,
-                          paddingInline: undefined,
-                          color: st.color ? `#${st.color}` : st.accent ? accent : undefined,
-                        }}
-                      >
-                        {w}{' '}
+                      <span key={j}>
+                        <button
+                          type="button"
+                          data-edit-word={i}
+                          onClick={() => (mode === 'word' ? toggleWord(i) : mode === 'line' ? toggleRow(li) : toggleWord(i))}
+                          aria-pressed={wordOn}
+                          className="rounded-[6px] px-[2px] transition-colors"
+                          style={{
+                            ...css,
+                            fontSize: `${Math.min(1.5, css.fontSize ? parseFloat(String(css.fontSize)) : 1)}em`,
+                            lineHeight: 1.3,
+                            paddingInline: '2px',
+                            marginInline: '-2px',
+                            color: st.color ? `#${st.color}` : st.accent ? accent : undefined,
+                            background: wordOn ? `${BRAND.gold}33` : 'transparent',
+                            boxShadow: wordOn ? `inset 0 -2px 0 ${BRAND.gold}` : undefined,
+                          }}
+                        >
+                          {w}
+                        </button>{' '}
                       </span>
                     )
                   })}
                 </span>
-              </button>
+              </div>
             )
           })}
         </div>
 
         {/* izabrani red: font, oznake, veličina, boja */}
         <div className="border-t border-white/[0.06]" style={{ background: `${BRAND.gold}08` }}>
-          <SectionTitle title={`Uređuješ: ${scope}`} hint={lines.length > 1 ? 'isto za sve izabrane' : 'font, veličina i boja samo za njega'} dot />
+          <SectionTitle
+            title={`Uređuješ: ${scope}`}
+            hint={sel.length === 0 ? 'važi za sve' : (mode === 'word' ? words.length : lines.length) > 1 ? 'isto za sve izabrane' : 'samo za izabrano'}
+            dot
+          />
           <div className="px-2.5 pb-2.5">
           <div className="space-y-2">
             {FONT_KINDS.map(({ kind, label }) => (

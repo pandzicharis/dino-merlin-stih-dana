@@ -699,10 +699,24 @@ function Library({
         <motion.div key={`${p}-${archived}-${mood}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
         {shown.map((v, i) => {
           const m = MOODS[v.mood]
+          // klik na stih (bilo gdje na kartici) otvara uređivanje — dugmad unutra rade svoje
+          const editable = writable && !archived && !busy
           return (
             <div
               key={v.id}
-              className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.03] sm:gap-4"
+              role={editable ? 'button' : undefined}
+              tabIndex={editable ? 0 : undefined}
+              aria-label={editable ? `Uredi: ${oneLine(v.text)}` : undefined}
+              onClick={(e) => {
+                if (editable && !(e.target as Element).closest('button, a, input, label')) onEdit(v)
+              }}
+              onKeyDown={(e) => {
+                if (editable && e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault()
+                  onEdit(v)
+                }
+              }}
+              className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.03] sm:gap-4 ${editable ? 'cursor-pointer' : ''}`}
               style={{ borderTop: i ? '1px solid rgba(255,255,255,0.05)' : undefined }}
             >
               <i className="block h-9 w-1 shrink-0 rounded-full" style={{ background: m.accent }} />
