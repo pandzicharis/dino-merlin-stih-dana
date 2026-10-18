@@ -9,7 +9,7 @@ import { SavedVerses, SavedViewToggle } from './SavedVerses'
 import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
-import { AfterOpen, SheetLayer, SheetSlide, useSheetOpen } from './Sheet'
+import { AfterOpen, SHEET_DRAG, SheetBackdrop, SheetLayer, SheetSlide, useSheetOpen } from './Sheet'
 
 /** Sačuvani stihovi kao donji panel — isti kao panel za dijeljenje. */
 export default function SavedPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -53,7 +53,7 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
     <AnimatePresence>
       {open && (
         <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
-          <button aria-label="Zatvori" className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose} />
+          <SheetBackdrop onClose={onClose} />
 
           <SheetSlide>
           <motion.div
@@ -64,11 +64,9 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
             style={{
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
-            drag="y"
+            {...SHEET_DRAG}
             dragControls={drag}
             dragListener={false}
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.6 }}
             onDragEnd={(_, info) => {
               if (info.offset.y > 90 || info.velocity.y > 600) onClose()
             }}

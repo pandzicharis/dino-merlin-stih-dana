@@ -15,7 +15,7 @@ import {
 import { getSharePrefs, setSharePrefs } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
 import { DrawerIcon } from './DrawerIcon'
-import { SheetLayer, SheetSlide, useSheetOpen } from './Sheet'
+import { SHEET_DRAG, SheetBackdrop, SheetLayer, SheetSlide, useSheetOpen } from './Sheet'
 
 type Target = 'share' | 'save'
 
@@ -150,7 +150,7 @@ export default function SharePanel({
     <AnimatePresence>
       {open && (
         <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
-          <button aria-label="Zatvori" className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose} />
+          <SheetBackdrop onClose={onClose} />
 
           <SheetSlide>
           <motion.div
@@ -161,9 +161,7 @@ export default function SharePanel({
             style={{
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.6 }}
+            {...SHEET_DRAG}
             onDragEnd={(_, info) => {
               if (info.offset.y > 90 || info.velocity.y > 600) onClose()
             }}
