@@ -74,7 +74,7 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
             role="dialog"
             aria-modal="true"
             aria-label="Sačuvani stihovi"
-            className="os-sheet relative flex max-h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
+            className="os-sheet relative flex max-h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
             {...sheetDrag}
             style={{
               ...sheetDrag.style,

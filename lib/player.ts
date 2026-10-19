@@ -4,10 +4,10 @@
  * Zvuk pjesama — jedan plejer za sve: gramofon ispod stiha, karte sačuvanih
  * i plejer sačuvanih u panelu.
  *
- * Sačuvani dijele zvuk po pjesmi (mala i raširena karta su isti plejer), pa
- * pjesma ne staje kad se karta skupi ili prevuče. Sviraju redom kao lista:
- * kad jedna završi, krene sljedeća sačuvana (karte klize za njom); natrag i
- * naprijed rade i sa zaključanog ekrana. Zatvaranjem sačuvanih sve se utiša.
+ * Sačuvani sviraju kroz jedan stalni zvuk (mala i raširena karta, početna —
+ * isti plejer), pa pjesma ne staje kad se karta skupi ili prevuče. Sviraju
+ * redom kao lista: kad jedna završi, krene sljedeća (i sa zaključanog ekrana);
+ * natrag i naprijed rade i odande. Zatvaranjem sačuvanih sve se utiša.
  */
 
 import { useSyncExternalStore } from 'react'
@@ -17,7 +17,7 @@ import { albumOf } from '@/data/albums'
 import { audioFile } from './audio-name'
 import { BRAND } from './brand'
 import { youtubeId } from './text'
-import { cancelFade, dropNeedle, fadeOut, isRouted, stopCrackle, unlockVinyl } from './vinyl'
+import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from './vinyl'
 
 /** Svira jedna pjesma u isto vrijeme: kad krene nova, ostale stanu. */
 export const SOLO = 'stihdana:solo'
@@ -145,9 +145,22 @@ export function session(a: HTMLAudioElement, verse: Verse, tracks?: { prev: () =
   position()
 }
 
-/* ── sačuvani: zajednički zvuk, lista, stanje za plejer u panelu ── */
+/* ── sačuvani: JEDAN zvuk za sve pjesme, lista, stanje ── */
 
+/**
+ * Sačuvani sviraju kroz jedan stalni audio element ("ploča u plejeru"):
+ * sljedeća pjesma samo zamijeni izvor. Telefon (iPhone) novi element pušta
+ * samo iz dodira — jedan isti element, jednom pušten iz dodira, svira dalje i
+ * sam: kad pjesma završi, sa zaključanog ekrana, nasumično. Ne ide kroz Web
+ * Audio (tad bi zaključan ekran utišao) — utišavanje je preko jačine gdje se
+ * može, inače odmah stane.
+ *
+ * `shared`: izvor pjesme koja je u plejeru → taj element (najviše jedan
+ * unos) — karte te pjesme se prikače na njega (SongCredit, `share`).
+ */
 export const shared = new Map<string, Player>()
+/** Pjesma je izašla iz plejera (`detail`: njen izvor) — njene karte se otkače. */
+export const SHARED_GONE = 'stihdana:shared-gone'
 
 /**
  * `shuffle`: nasumičnim redom; `repeat`: ista pjesma ispočetka; `mini`:
@@ -245,13 +258,32 @@ export function currentSaved(): Player | null {
   return (s && shared.get(s.src)) || null
 }
 
-/** Plejer prati zvuk stiha: stanje za panel, a na kraju pjesme — sljedeća. */
-function track(a: Player, verse: Verse) {
-  a.addEventListener('playing', () => setState({ id: verse.id, playing: true }))
-  a.addEventListener('pause', () => state.id === verse.id && setState({ playing: false }))
+/* ── jedan element ── */
+
+let carrier: Player | null = null
+/** izvor (statični) pjesme koja je u plejeru, i njen stih */
+let loaded: { src: string; fallback: string; id: string } | null = null
+/** zaredom pjesme koje se nisu dale pustiti — da preskakanje ne ide u krug */
+let misses = 0
+
+function carrierEl(): Player {
+  if (carrier) return carrier
+  const a: Player = new Audio()
+  a.preload = 'auto'
+  a.fails = new Set()
+  a.addEventListener('playing', () => {
+    misses = 0
+    if (loaded) setState({ id: loaded.id, playing: true })
+    // pucketanje ploče dok svira (kontekst je otvoren iz dodira)
+    startCrackle(a)
+  })
+  a.addEventListener('pause', () => {
+    stopCrackle(a)
+    setState({ playing: false })
+  })
   a.addEventListener('ended', () => {
-    if (state.id !== verse.id) return
-    // ista pjesma ispočetka, ili sljedeća
+    stopCrackle(a)
+    // ista pjesma ispočetka, ili sljedeća — isti element, pa svira i bez dodira
     if (state.repeat) {
       a.currentTime = 0
       a.play().catch(() => {})
@@ -260,103 +292,124 @@ function track(a: Player, verse: Verse) {
     setState({ playing: false })
     nextSaved()
   })
-}
-
-/** Zajednički zvuk sačuvanog stiha — napravi ga ako ga još nema. */
-export function sharedFor(verse: Verse): Player | null {
-  const s = sourceFor(verse)
-  if (!s) return null
-  let a = shared.get(s.src)
-  if (!a) {
-    a = createPlayer(s.src, s.fallback)
-    track(a, verse)
-    shared.set(s.src, a)
-    window.dispatchEvent(new CustomEvent(SHARED, { detail: s.src }))
-  }
+  a.addEventListener('error', () => {
+    if (!loaded) return
+    // statičnog fajla nema (nova pjesma iz admina) → pokušaj preko servera
+    if (!a.src.includes('/api/audio/')) {
+      a.src = loaded.fallback
+      if (a.dataset.want) a.play().catch(() => {})
+      return
+    }
+    // ni server ne može — karte pokažu YouTube, plejer pređe na sljedeću
+    a.fails?.forEach((f) => f())
+    if (a.dataset.want && ++misses < Math.max(2, playlist.length)) nextSaved()
+  })
+  carrier = a
   return a
 }
 
-/**
- * Zvuk koji je prošao kroz Web Audio (utišavanje na iPhoneu) ne svira kad je
- * ekran zaključan — za novo puštanje dođe svjež, s istog mjesta u pjesmi.
- */
-function renew(verse: Verse, old: Player): Player {
-  const s = sourceFor(verse)!
-  const t = old.currentTime
-  const fresh = createPlayer(s.src, s.fallback)
-  fresh.preload = 'auto'
-  fresh.addEventListener(
-    'loadedmetadata',
-    () => {
+/** Utišaj pa stani (jačina gdje se može; na iPhoneu se ne može — odmah stane). */
+let fading = 0
+function cancelSoft(a: Player) {
+  if (!fading) return
+  clearInterval(fading)
+  fading = 0
+  try {
+    a.volume = 1
+  } catch {}
+}
+function softPause(a: Player, ms: number): Promise<void> {
+  cancelSoft(a)
+  if (a.paused) return Promise.resolve()
+  try {
+    a.volume = 0.999
+  } catch {}
+  if (Math.abs(a.volume - 0.999) > 0.0005) {
+    a.pause()
+    return Promise.resolve()
+  }
+  const t0 = performance.now()
+  return new Promise((resolve) => {
+    fading = window.setInterval(() => {
+      const p = Math.min(1, (performance.now() - t0) / ms)
       try {
-        fresh.currentTime = t
+        a.volume = 1 - p
       } catch {}
-    },
-    { once: true },
-  )
-  track(fresh, verse)
-  shared.set(s.src, fresh)
-  // karte iste pjesme pređu na novi zvuk
+      if (p < 1) return
+      clearInterval(fading)
+      fading = 0
+      a.pause()
+      try {
+        a.volume = 1
+      } catch {}
+      resolve()
+    }, 30)
+  })
+}
+
+/** Stavi pjesmu `verse` u plejer (ako već nije): stare karte se otkače, nove prikače. */
+function load(verse: Verse): Player | null {
+  const s = sourceFor(verse)
+  if (!s) return null
+  const a = carrierEl()
+  if (loaded?.src === s.src) return a
+  if (loaded) {
+    shared.delete(loaded.src)
+    window.dispatchEvent(new CustomEvent(SHARED_GONE, { detail: loaded.src }))
+  }
+  cancelSoft(a)
+  stopCrackle(a)
+  loaded = { src: s.src, fallback: s.fallback, id: verse.id }
+  a.src = s.src
+  shared.set(s.src, a)
   window.dispatchEvent(new CustomEvent(SHARED, { detail: s.src }))
-  return fresh
+  return a
+}
+
+/** Zvuk sačuvanog stiha ako je baš on u plejeru (karte se prikače na njega). */
+export function sharedFor(verse: Verse): Player | null {
+  const s = sourceFor(verse)
+  return (s && shared.get(s.src)) || null
 }
 
 /** Pusti sačuvani stih — iz dodira (karta, plejer) ili sam, kad prethodni završi. */
 export function playSaved(verse: Verse): boolean {
-  let a = sharedFor(verse)
+  const switching = loaded?.id !== verse.id
+  const a = load(verse)
   if (!a) return false
-  // utišava se (pauza upravo dodirnuta) — svira dalje punom jačinom
-  if (!a.paused && !a.dataset.want) {
-    cancelFade(a)
-    a.dataset.want = '1'
-    setState({ id: verse.id, playing: true })
-    return true
-  }
-  if (!a.paused) return true
-  // druga pjesma — kreće ispočetka, a prethodne se vrate na početak
-  if (state.id && state.id !== verse.id) {
-    for (const o of shared.values()) {
-      if (o === a) continue
-      o.dataset.want = ''
-      if (o.paused) o.currentTime = 0
-      else void fadeOut(o, 350).done.then(() => (o.currentTime = 0))
-    }
+  cancelSoft(a)
+  // druga pjesma kreće ispočetka
+  if (switching) {
     try {
       a.currentTime = 0
     } catch {}
   }
-  if (isRouted(a)) a = renew(verse, a)
   a.dataset.want = '1'
   // zvuk gramofona: kontekst se otvara iz dodira, tup kad igla legne
   unlockVinyl()
-  dropNeedle(0.3)
+  if (a.paused) dropNeedle(0.3)
   window.dispatchEvent(new CustomEvent(SOLO, { detail: a }))
   session(a, verse, { prev: prevSaved, next: nextSaved })
   if (history[history.length - 1] !== verse.id) history = [...history.slice(-30), verse.id]
   setState({ id: verse.id })
   window.dispatchEvent(new CustomEvent(SAVED_TRACK, { detail: verse.id }))
-  a.play().catch(() => {})
+  if (a.paused) a.play().catch(() => setState({ playing: false }))
+  else setState({ playing: true })
   return true
 }
 
-/** Pauza — pjesma se utiša pa stane. */
+/** Pauza — dugme i ploča odmah stanu, zvuk se utiša (gdje se može) pa stane. */
 export function pauseSaved() {
   const a = currentSaved()
   if (!a || a.paused) return
   a.dataset.want = ''
-  // dugme odmah pokaže pauzu, pucketanje ploče odmah stane — pjesma se samo još utišava
   setState({ playing: false })
-  stopCrackle()
-  fadeOut(a, 450)
+  stopCrackle(a)
+  void softPause(a, 450)
 }
 
-/** Pređi na stih `v`: ono što svira sada se utiša, novo krene. */
+/** Pređi na stih `v` — isti element, nova pjesma (bez dodira radi i sa zaključanog ekrana). */
 function go(v: Verse) {
-  const cur = currentSaved()
-  if (cur && !cur.paused && v.id !== state.id) {
-    cur.dataset.want = ''
-    fadeOut(cur, 350)
-  }
   playSaved(v)
 }
 
@@ -400,19 +453,21 @@ export function seekSaved(f: number) {
   if (a && Number.isFinite(a.duration)) a.currentTime = f * a.duration
 }
 
-/** Sačuvani zatvoreni — sve njihove pjesme se utišaju, stanu i vrate na početak. */
+/** Sačuvani zatvoreni — pjesma se utiša, stane i vrati na početak; karte se otkače. */
 export function stopSaved() {
-  for (const a of shared.values()) {
+  const a = carrier
+  if (a) {
     a.dataset.want = ''
     stopCrackle(a)
-    if (a.paused) a.currentTime = 0
-    else
-      void fadeOut(a, 700).done.then(() => {
-        a.currentTime = 0
-      })
+    void softPause(a, 700).then(() => {
+      // u međuvremenu je možda pokrenuta nova — ne diraj je
+      if (!a.dataset.want) a.currentTime = 0
+    })
   }
+  if (loaded) window.dispatchEvent(new CustomEvent(SHARED_GONE, { detail: loaded.src }))
   shared.clear()
-  // i pucketanje koje je ostalo od skupljene karte
+  loaded = null
+  // i pucketanje koje je ostalo
   if (state.id) stopCrackle()
   history = []
   // nasumično i ponavljanje ostaju kako ih je korisnik ostavio
@@ -421,11 +476,11 @@ export function stopSaved() {
 }
 
 // pjesma s gramofona (ili bilo koja druga) krene — sačuvana se utiša, i kad
-// panela nema (mini plejer); prezentacija na odlasku s koraka gasi sve
+// panela nema; prezentacija na odlasku s koraka gasi sve
 if (typeof window !== 'undefined') {
   window.addEventListener(SOLO, (e) => {
     const a = (e as CustomEvent).detail
-    if (state.playing && ![...shared.values()].includes(a)) pauseSaved()
+    if (state.playing && a !== carrier) pauseSaved()
   })
   window.addEventListener('stihdana:stop-audio', () => state.id && stopSaved())
 }

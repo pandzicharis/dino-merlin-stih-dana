@@ -437,7 +437,8 @@ export function CardFace({
         </div>
 
         {/* dan kad je sačuvan → stih — datum isti kao na ekranu stiha */}
-        <div ref={mid} className="flex flex-1 flex-col items-center justify-center" style={{ gap: '22em' }}>
+        {/* razmaci isti kao na ekranu stiha: datum → stih → dugmad (32 / 52) */}
+        <div ref={mid} className="flex flex-1 flex-col items-center justify-center" style={{ gap: '32em' }}>
           <p
             className="tabular"
             style={{
@@ -471,7 +472,7 @@ export function CardFace({
             </FitLines>
           </p>
           {/* radnje stiha — mjesto je i na maloj karti, pa se pri uvećanju ništa ne pomjeri */}
-          <div className="flex items-center justify-center" style={{ height: '46em' }}>
+          <div className="flex items-center justify-center" style={{ height: '44em', marginTop: '20em' }}>
             {actionsZoom && (
               <div data-nodrag data-big className="flex items-center gap-2.5" style={{ zoom: actionsZoom, opacity: 0 }}>
                 <FavoriteButton id={verse.id} accent={m.accent} />

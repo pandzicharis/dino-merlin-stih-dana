@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { BRAND } from '@/lib/brand'
@@ -12,6 +12,8 @@ import { Icon, TOAST_OK, toast } from './Toast'
 import { MagazaLogo } from './MagazaLogo'
 import { ARTIST_LINKS } from './ArtistLinks'
 import { GearIcon } from './Settings'
+import { QrCode } from './deck/QrCode'
+import APP_QR from '@/data/app-qr.json'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
 /** Broj verzije iz `public/sw.js` (`stihdana-vNN`) — raste sa svakim deployem. */
@@ -85,7 +87,7 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
               role="dialog"
               aria-modal="true"
               aria-label="Postavke"
-              className="os-sheet relative flex max-h-[88dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
+              className="os-sheet relative flex max-h-[88dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
               {...sheetDrag}
               style={{
                 ...sheetDrag.style,
@@ -141,6 +143,11 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
                     right={<Switch on={on} busy={notify.state === 'busy'} disabled={notify.state === 'unsupported'} />}
                     label={on ? 'Isključi obavijesti' : 'Uključi obavijesti'}
                   />
+                </Section>
+
+                {/* visoko, da se QR vidi čim se otvori */}
+                <Section title="Podijeli">
+                  <ShareApp />
                 </Section>
 
                 <Section title="Dino Merlin">
@@ -253,6 +260,96 @@ function Link({ href, tile, title, sub }: { href: string; tile: ReactNode; title
       <Text title={title} sub={sub} />
       <Chevron />
     </a>
+  )
+}
+
+/**
+ * "Podijeli aplikaciju" — red koji se otvori (harmonika) i pokaže QR kod
+ * aplikacije: drugi ga skenira kamerom i otvori Stih dana. Ispod adresa i
+ * dugme za slanje linka (sistemsko dijeljenje, ili kopiranje).
+ */
+function ShareApp() {
+  const [open, setOpen] = useState(false)
+  // otvoren — panel doskrola da se cio QR vidi
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const t = window.setTimeout(() => box.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 380)
+    return () => clearTimeout(t)
+  }, [open])
+  const url = APP_QR.url
+  const send = async () => {
+    haptic(6)
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Stih dana', text: 'Jedan stih Dine Merlina, svaki dan u 12:00h', url })
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      toast({ id: 'app-link', title: 'Link kopiran', sub: url.replace('https://', ''), color: TOAST_OK, icon: <Icon.ok /> })
+    } catch {
+      /* odustao od dijeljenja */
+    }
+  }
+  return (
+    <div ref={box} className="overflow-hidden rounded-[20px] border border-white/[0.08] bg-white/[0.03]">
+      <button
+        onClick={() => {
+          haptic(5)
+          setOpen((o) => !o)
+        }}
+        aria-expanded={open}
+        data-tip="share-app"
+        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.05] active:bg-white/[0.07]"
+      >
+        <Tile>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="3.5" y="3.5" width="6" height="6" rx="1.2" />
+            <rect x="14.5" y="3.5" width="6" height="6" rx="1.2" />
+            <rect x="3.5" y="14.5" width="6" height="6" rx="1.2" />
+            <path d="M14.5 14.5h2.5v2.5M20.5 14.5v.01M14.5 20.5h.01M17.5 20.5h3v-3" />
+          </svg>
+        </Tile>
+        <Text title="Podijeli aplikaciju" sub="QR kod — neka skenira kamerom" />
+        <motion.span className="flex text-white/35" animate={{ rotate: open ? 90 : 0 }} transition={{ type: 'spring', stiffness: 400, damping: 28 }}>
+          <Chevron />
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="qr"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="flex flex-col items-center gap-4 px-4 pb-5 pt-1">
+              <motion.div
+                className="rounded-[22px] p-3 shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
+                style={{ background: '#F6F1E7' }}
+                initial={{ scale: 0.92, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <QrCode qr={APP_QR} className="block h-[200px] w-[200px]" title="QR kod — otvori Stih dana" />
+              </motion.div>
+              <p className="text-[12.5px] text-white/50">{url.replace('https://', '')}</p>
+              <button
+                onClick={send}
+                className="flex h-10 items-center gap-2 rounded-full border px-4 text-[10px] font-medium uppercase tracking-[0.22em] transition-transform active:scale-95"
+                style={{ borderColor: `${BRAND.gold}55`, background: `${BRAND.gold}14`, color: BRAND.gold }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M12 3v13M12 3 8 7M12 3l4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                </svg>
+                Pošalji link
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 

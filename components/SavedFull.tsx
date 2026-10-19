@@ -28,6 +28,8 @@ const cardOf = (id: string) => document.querySelector<HTMLElement>(`[data-stih="
 // sporije i mekano na oba kraja — jasno se vidi kako karta raste i vraća se
 const OPEN = { duration: 760, easing: 'cubic-bezier(0.45, 0, 0.15, 1)' }
 const CLOSE = { duration: 640, easing: 'cubic-bezier(0.45, 0, 0.15, 1)' }
+/** spuštena prstom — nastavi brzinom prsta (bez sporog početka), pa mekano sjedne */
+const FLING = { duration: 520, easing: 'cubic-bezier(0.22, 0.75, 0.2, 1)' }
 /** kratko pretapanje kopije i male karte na početku i kraju */
 const SETTLE = 180
 /** zaobljenje karte u špilu (SavedCarousel) */
@@ -75,7 +77,8 @@ const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches
  * kretnje — prvi kadar velike je tačno mala karta, a zadnji kadar pri
  * vraćanju opet tačno mala karta. Ništa ne iskoči ni ne nestane naglo.
  */
-function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 0) {
+function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 0, curve?: string) {
+  const ease = curve ?? (toBig ? OPEN : CLOSE).easing
   const fade = (n: HTMLElement, show: boolean, delay: number, duration: number) => {
     n.style.visibility = ''
     n.style.pointerEvents = show ? '' : 'none'
@@ -92,7 +95,7 @@ function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 
   // pravu veličinu, kao na ekranu stiha
   el.querySelectorAll<HTMLElement>('[data-shrink]').forEach((n) => {
     const kf = [{ transform: 'none' }, { transform: `scale(${1 / k})` }]
-    n.animate(toBig ? kf : kf.reverse(), { duration: total, delay: lead, easing: (toBig ? OPEN : CLOSE).easing, fill: 'both' })
+    n.animate(toBig ? kf : kf.reverse(), { duration: total, delay: lead, easing: ease, fill: 'both' })
   })
   // stih: raširena karta je viša — klizne na njenu sredinu, i nazad
   // gramofon: ista ploča (bez uvećavanja — slova ostaju oštra) klizne na dno, i nazad
@@ -101,7 +104,7 @@ function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 
     n.animate([{ transform: toBig ? 'none' : big }, { transform: toBig ? big : 'none' }], {
       duration: total,
       delay: lead,
-      easing: (toBig ? OPEN : CLOSE).easing,
+      easing: ease,
       fill: 'both',
     })
   })
@@ -110,7 +113,7 @@ function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 
     n.animate([{ transform: toBig ? 'none' : big }, { transform: toBig ? big : 'none' }], {
       duration: total,
       delay: lead,
-      easing: (toBig ? OPEN : CLOSE).easing,
+      easing: ease,
       fill: 'both',
     })
   })
@@ -161,7 +164,7 @@ function SavedFull({
   const extras = useRef<HTMLDivElement>(null)
   const grab = useRef<HTMLDivElement>(null)
   const closing = useRef(false)
-  const drag = useRef<{ y0: number; dy: number } | null>(null)
+  const drag = useRef<{ x0: number; y0: number; dy: number; id: number; on: boolean } | null>(null)
   const [{ k, left, top, W, H, small, cut, whole }] = useState(() => layout(from))
 
   // otvaranje: velika karta stoji nevidljiva na mjestu male dok se ne iscrta,
@@ -223,41 +226,59 @@ function SavedFull({
       haptic(6)
       const el = box.current
       if (!el || still()) return onClosed()
+      // spuštena prstom: nastavi kretnju odmah, bez sporog početka
+      const curve = fromTransform === 'none' ? CLOSE : FLING
       for (const n of [extras.current, grab.current])
-        n?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: CLOSE.duration * 0.4, easing: 'ease-out', fill: 'forwards' })
+        n?.animate([{ opacity: Number(n.style.opacity || 1) }, { opacity: 0 }], { duration: curve.duration * 0.4, easing: 'ease-out', fill: 'forwards' })
       // sleti tačno na malu kartu, pa se kratko pretopi u nju — bez treptaja
-      el.animate([{ transform: fromTransform }, { transform: small }], { ...CLOSE, fill: 'forwards' })
-      clip.current?.animate([{ clipPath: whole }, { clipPath: cut }], { ...CLOSE, fill: 'forwards' })
+      el.animate([{ transform: fromTransform }, { transform: small }], { ...curve, fill: 'forwards' })
+      clip.current?.animate([{ clipPath: whole }, { clipPath: cut }], { ...curve, fill: 'forwards' })
         .finished.then(() => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SETTLE, easing: 'ease-in-out', fill: 'forwards' }).finished)
         .then(onClosed, onClosed)
-      swap(el, false, CLOSE.duration, k)
-      shade.current?.animate([{ opacity: Number(shade.current.style.opacity || 1) }, { opacity: 0 }], { ...CLOSE, fill: 'forwards' })
+      swap(el, false, curve.duration, k, 0, curve.easing)
+      shade.current?.animate([{ opacity: Number(shade.current.style.opacity || 1) }, { opacity: 0 }], { ...curve, fill: 'forwards' })
     },
     [small, k, cut, whole, onClosed],
   )
   const collapse = useCallback(() => close(), [close])
 
   // hvataljka: karta prati prst nadolje; dovoljno nisko — skupi se, inače nazad
+  // povuci kartu nadolje bilo gdje (ne s dugmadi, ploče ni trake) — prati
+  // prst, a dovoljno nisko se skupi; dodir bez povlačenja ne radi ništa
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
     if (closing.current) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    drag.current = { y0: e.clientY, dy: 0 }
+    if ((e.target as Element).closest('button, a, input, [role="slider"], [data-nodrag]')) return
+    drag.current = { x0: e.clientX, y0: e.clientY, dy: 0, id: e.pointerId, on: false }
   }
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
     if (!d || !box.current) return
-    d.dy = Math.max(0, e.clientY - d.y0)
+    const dy = e.clientY - d.y0
+    if (!d.on) {
+      // tek kad krene nadolje (a ne u stranu) — onda je to povlačenje
+      if (dy < 8 || Math.abs(e.clientX - d.x0) > dy) return
+      d.on = true
+      try {
+        e.currentTarget.setPointerCapture(d.id)
+      } catch {
+        /* prst je već otišao — povlačenje i dalje ide kroz događaje */
+      }
+    }
+    d.dy = Math.max(0, dy)
     box.current.style.transform = `translateY(${d.dy}px)`
     if (shade.current) shade.current.style.opacity = String(Math.max(0.3, 1 - d.dy / 500))
+    // rubovi ostalih karata gore se mekano gube dok se karta vuče — ne stoje kao zalijepljeni
+    if (extras.current) extras.current.style.opacity = String(Math.max(0, 1 - d.dy / 160))
   }
   const onUp = () => {
     const d = drag.current
     drag.current = null
-    if (!d || !box.current) return
+    if (!d || !d.on || !box.current) return
     const at = `translateY(${d.dy}px)`
     box.current.style.transform = ''
     if (d.dy > 110) return close(at)
     box.current.animate([{ transform: at }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' })
+    if (extras.current) extras.current.style.opacity = ''
     if (shade.current) shade.current.style.opacity = ''
   }
 
@@ -306,8 +327,12 @@ function SavedFull({
 
       <div
         ref={box}
-        className="absolute"
+        className="absolute touch-none"
         style={{ left, top, width: W, height: H, transformOrigin: '0 0', willChange: 'transform' }}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
       >
         {/* ista karta, složena u punoj veličini — oštra */}
         <div ref={clip} className="h-full w-full">
@@ -315,14 +340,10 @@ function SavedFull({
             <CardFace verse={verse} onCollapse={collapse} actionsZoom={1 / k} />
           </div>
         </div>
-        {/* hvataljka — kao na drawerima; za nju se karta povuče nadolje */}
+        {/* hvataljka — kao na drawerima (karta se vuče nadolje bilo gdje) */}
         <div
           ref={grab}
-          className="absolute inset-x-[30%] top-0 flex h-6 cursor-grab touch-none justify-center pt-2 active:cursor-grabbing"
-          onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onUp}
+          className="pointer-events-none absolute inset-x-[30%] top-0 flex h-6 justify-center pt-2"
           aria-hidden
         >
           <span className="h-1 w-10 rounded-full bg-white/35" />

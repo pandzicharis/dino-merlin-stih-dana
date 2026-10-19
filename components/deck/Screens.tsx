@@ -265,7 +265,7 @@ export function VerseMock({
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          padding: `${top}em 24em 62em`,
+          padding: `${top}em 24em ${savedCount > 0 ? 116 : 62}em`,
         }}
       >
         {/* zaglavlje */}
@@ -292,11 +292,12 @@ export function VerseMock({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '30em',
+            // razmaci kao na ekranu stiha: datum → stih → dugmad (32 / 52)
+            gap: '32em',
             padding: '16em 0 72em',
           }}
         >
-          {/* niz dana → datum, kao na ekranu stiha */}
+          {/* niz dana → datum, kao na ekranu stiha (više zraka do stiha) */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12em' }}>
             {streak > 1 && <StreakPill n={streak} />}
             <p
@@ -330,7 +331,7 @@ export function VerseMock({
             </FitLines>
           </p>
           {/* radnje stiha: sačuvaj i podijeli, jedno do drugog — FavoriteButton i ShareButton */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10em', marginTop: '20em' }}>
             <Pill accent={m.accent} on={saved} wide>
               <svg viewBox="0 0 24 24" style={{ width: '1.4em', height: '1.4em' }} fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
                 <path d={HEART} />
@@ -350,20 +351,8 @@ export function VerseMock({
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <PlayerMock verse={verse} w={w} />
           {/* "Player pjesama" ispod gramofona (kad ima sačuvanih) — mreže su u postavkama */}
-          {savedCount > 0 ? (
-            <span style={{ marginTop: '24em' }}>
-              <Pill accent={m.accent}>
-                {/* trake kao na dugmetu u aplikaciji */}
-                <span style={{ display: 'flex', alignItems: 'flex-end', gap: '0.2em', height: '1.2em' }} aria-hidden>
-                  {[0.55, 1, 0.4, 0.8].map((h, i) => (
-                    <span key={i} style={{ width: '0.2em', height: `${h * 100}%`, borderRadius: '1em', background: m.accent }} />
-                  ))}
-                </span>
-                Player pjesama
-                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{savedCount}</span>
-              </Pill>
-            </span>
-          ) : (
+          {/* crtica ispod gramofona; "Player pjesama" je traka na dnu (kao u aplikaciji) */}
+          {savedCount === 0 && (
             <span
               style={{
                 margin: '22em 0',
@@ -375,6 +364,62 @@ export function VerseMock({
           )}
         </div>
       </div>
+      {/* "Player pjesama" — na dnu, bez okvira, odmaknut od gramofona (PlayerDock) */}
+      {savedCount > 0 && (
+        <span
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            padding: '12em 0 24em',
+          }}
+        >
+          {/* pilula na sredini footera: omoti · natpis · trake */}
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12em',
+              padding: '7em 16em 7em 7em',
+              borderRadius: '99em',
+              background: 'rgba(255,255,255,0.05)',
+            }}
+          >
+            <span style={{ display: 'flex' }} aria-hidden>
+              {ALBUMS.slice(0, 3).map((al, i) => (
+                <span
+                  key={al.cover}
+                  style={{
+                    width: '24em',
+                    height: '24em',
+                    marginLeft: i ? '-9em' : 0,
+                    borderRadius: '50%',
+                    border: '1.5em solid #0c0b0a',
+                    backgroundImage: `url(${al.cover})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    boxShadow: '0 2em 6em rgba(0,0,0,0.5)',
+                    position: 'relative',
+                    zIndex: 3 - i,
+                  }}
+                />
+              ))}
+            </span>
+            <span style={{ fontSize: '9.5em', fontWeight: 500, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>
+              Player pjesama <span style={{ color: 'rgba(255,255,255,0.35)' }}>{savedCount}</span>
+            </span>
+            {/* trake kao na dugmetu u aplikaciji */}
+            <span style={{ display: 'flex', alignItems: 'flex-end', gap: '2em', height: '12em' }} aria-hidden>
+              {[0.55, 1, 0.4, 0.8].map((h, i) => (
+                <span key={i} style={{ width: '2em', height: `${h * 100}%`, borderRadius: '2em', background: m.accent }} />
+              ))}
+            </span>
+          </span>
+        </span>
+      )}
     </div>
   )
 }

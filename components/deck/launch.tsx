@@ -1076,12 +1076,15 @@ export function Ostalo({ d }: { d: DeckData }) {
     ...(TIPS_ON ? ['Savjeti pri prvom otvaranju'] : []),
     'Atmosfera po raspoloženju, album u pozadini',
     'Pjesma uz stih, u pozadini',
-    'Sačuvani stihovi s pjesmom, dijeljenje kao slika',
+    'Sačuvani kao špil karata, s pjesmom',
+    'Player pjesama na početnoj',
+    'Dijeljenje kao slika',
     'Link koji izgleda kao poster',
+    'QR kod aplikacije u postavkama',
     'Nova verzija stiže sama',
     'Izvlačenje stiha: jednom dnevno, svakom svoj',
     'Urednički panel: lista stihova, novi stih',
-    'Plakat A3, A4 i objave za mreže',
+    'Plakat A3, A4, objave i video za mreže',
   ]
   const todo: [string, ReactNode][] = [
     [
@@ -1378,8 +1381,8 @@ export function Video() {
       </R>
       <R i={2}>
         <p className="dk-lead mt-[1.8vh] max-w-[40em]">
-          Obavijest u podne, dodir, tombola, stih, sačuvaj i pjesma iz sačuvanih — u pravoj aplikaciji, uz natpise. Oko 30
-          sekunde, sa zvukom obavijesti i pjesmom, spremno za objavu.
+          Obavijest u podne, dodir, tombola, stih, sačuvaj i Player pjesama — u pravoj aplikaciji, uz natpise. Oko 30
+          sekundi, sa zvukom obavijesti i pjesmom, spremno za objavu.
         </p>
       </R>
       <div className="mt-[4vh] flex items-start gap-[clamp(18px,3vw,56px)]">

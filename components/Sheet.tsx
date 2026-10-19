@@ -88,6 +88,9 @@ export function SheetSlide({ children }: { children: ReactNode }) {
       exit={{ ...from, transition: CLOSE }}
     >
       {children}
+      {/* ispod panela je crno — i kad ga opruga ili prst malo podignu, ne vidi se
+          stranica (panel nema donji rub, ide do dna ekrana) */}
+      {!wide && <span aria-hidden className="pointer-events-none absolute inset-x-0 top-full h-[40vh] bg-[#0a0909]" />}
     </motion.div>
   )
 }

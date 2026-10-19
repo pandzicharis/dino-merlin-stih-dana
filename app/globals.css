@@ -284,7 +284,6 @@ html[data-sheet] .note-float:not([data-full] *) {
   animation-play-state: paused !important;
 }
 
-
 /* Fotografija umjesto portreta (MoodBackground `art`: uvodni ekran, uvod i
    kraj prezentacije). Telefon: preko cijelog ekrana, lik desno od sredine,
    vrh utopljen ispod logotipa. Široki ekran: cijela slika desno, kao portret,
@@ -316,6 +315,31 @@ html[data-sheet] .note-float:not([data-full] *) {
     -webkit-mask-composite: source-over;
     mask-composite: add;
   }
+}
+
+/*
+ * "Player pjesama" — footer na dnu početne (components/Listening.tsx, ~48px
+ * + donja zona iPhonea): podnožje se izdigne da je gramofon odvojen od njega.
+ */
+.dock-space {
+  height: calc(22px + env(safe-area-inset-bottom, 0px) * 0.6);
+}
+/* plejer u footeru je viši od pozivnice (kontrole i "Današnji stih") */
+.dock-extra {
+  height: 52px;
+}
+/* localhost: traka stoji iznad razvojne trake (99px), a donji razmak je pb-16 */
+.dev-dock {
+  bottom: 99px !important;
+}
+.dev-pad .dock-space {
+  height: 129px;
+}
+html[data-deck] .dev-dock {
+  bottom: 0 !important;
+}
+html[data-deck] .dev-pad .dock-space {
+  height: calc(22px + env(safe-area-inset-bottom, 0px) * 0.6);
 }
 
 /* "Player pjesama" (components/Listening.tsx) — trake titraju kao muzika */

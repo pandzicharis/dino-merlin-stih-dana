@@ -7,7 +7,7 @@ import { youtubeId } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
-import { SHARED, SOLO, createPlayer, pauseSaved, playSaved, playable, session, shared, sharedFor, sourceOf, type Player } from '@/lib/player'
+import { SHARED, SHARED_GONE, SOLO, createPlayer, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
 import { FitLines } from './deck/FitLines'
 
 /**
@@ -211,15 +211,25 @@ function useSong({
       a.dataset.want = ''
       fadeOut(a, 400)
     }
-    // druga karta iste pjesme pokrenula je zajednički zvuk — prati ga
+    // ova pjesma je ušla u plejer sačuvanih — karta ga prati
     const joined = (e: Event) => {
       const a = shared.get(src)
       if ((e as CustomEvent).detail === src && a) bind(a)
     }
+    // pjesma je izašla iz plejera (svira druga) — karta se otkači i stane
+    const gone = (e: Event) => {
+      if ((e as CustomEvent).detail !== src) return
+      unbind.current?.()
+      unbind.current = null
+      audio.current = null
+      setCur(0)
+      setState('idle')
+    }
     window.addEventListener('stihdana:stop-audio', stop)
-    window.addEventListener(SOLO, solo)
+    if (!share) window.addEventListener(SOLO, solo)
     if (share) {
       window.addEventListener(SHARED, joined)
+      window.addEventListener(SHARED_GONE, gone)
       const a = shared.get(src)
       if (a) attach(a)
     }
@@ -232,6 +242,7 @@ function useSong({
       window.removeEventListener('stihdana:stop-audio', stop)
       window.removeEventListener(SOLO, solo)
       window.removeEventListener(SHARED, joined)
+      window.removeEventListener(SHARED_GONE, gone)
       unbind.current?.()
       unbind.current = null
       // zajednički zvuk svira dalje — gasi ga tek zatvaranje sačuvanih
@@ -242,9 +253,10 @@ function useSong({
   }, [])
 
   // pucketanje ploče od dodira — igla je spuštena i dok se pjesma tek učitava
+  // (sačuvane: pucketanje vodi sam plejer, lib/player.ts)
   useEffect(() => {
     const a = audio.current
-    if (!a) return
+    if (!a || share) return
     if (state === 'playing' || state === 'loading') startCrackle(a)
     else stopCrackle(a)
     return () => {
@@ -255,8 +267,7 @@ function useSong({
 
   function player(): Player {
     if (audio.current) return audio.current
-    // sačuvani: zajednički zvuk pjesme (lib/player.ts); inače svoj
-    const a = (share && sharedFor(verse)) || createPlayer(src, fallback)
+    const a = createPlayer(src, fallback)
     attach(a)
     return a
   }
@@ -289,19 +300,20 @@ function useSong({
 
   function toggle() {
     haptic(6)
-    let a = player()
     // sačuvani: plejer sačuvanih pušta i pauzira (lista, natrag/naprijed)
     if (share) {
-      if (a.paused || !a.dataset.want) {
-        setState(a.paused ? 'loading' : 'playing')
-        playSaved(verse)
-      } else {
+      const on = shared.get(src)
+      if (on && !on.paused && on.dataset.want) {
         pauseSaved()
         // ploča odmah stane — zvuk se samo još utišava
         setState('paused')
+      } else {
+        setState('loading')
+        playSaved(verse)
       }
       return
     }
+    let a = player()
     // utišava se (pauza upravo dodirnuta) — novi dodir je vrati punom jačinom
     if (!a.paused && !a.dataset.want) {
       cancelFade(a)

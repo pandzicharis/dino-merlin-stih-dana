@@ -7,7 +7,6 @@ import { MOODS, type Mood } from '@/data/moods'
 import { suggestColors, type Suggestion } from '@/lib/palette'
 import {
   FONT_KINDS,
-  LIMITS,
   VERSE_FONTS,
   VERSE_FONT_KEYS,
   canItalic,
@@ -20,7 +19,6 @@ import {
   verseWords,
   type FontMap,
   type VerseFont,
-  type VerseLook,
   type WordStyle,
 } from '@/lib/fonts'
 
@@ -104,7 +102,6 @@ export function VerseDesigner({
     save(next)
   }
   const toggle = (k: 'bold' | 'italic' | 'upper') => apply({ [k]: !all(k) })
-  const setLook = (patch: Partial<VerseLook>) => save({ ...map, look: { ...map.look, ...patch } })
 
   // prijedlozi boje iz pozadine — računaju se kad se promijeni raspoloženje ili album
   const [suggested, setSuggested] = useState<Suggestion[]>([])
@@ -353,42 +350,6 @@ export function VerseDesigner({
               </label>
             </div>
           </div>
-          </div>
-        </div>
-
-        {/* cijeli stih */}
-        <div className="border-t border-white/[0.06] bg-white/[0.015]">
-          <SectionTitle title="Cijeli stih" hint="važi za sve redove" />
-          <div className="grid grid-cols-1 gap-y-2.5 px-2.5 pb-2.5">
-            <Slider label="Veličina" value={map.look.size ?? 100} min={LIMITS.size.min} max={LIMITS.size.max} step={5} base={100} unit="%" onChange={(v) => setLook({ size: v })} data="look-size" />
-            <Slider label="Prored" value={map.look.lh ?? LIMITS.lh.base} min={LIMITS.lh.min} max={LIMITS.lh.max} step={2} base={LIMITS.lh.base} onChange={(v) => setLook({ lh: v })} format={(v) => (v / 100).toFixed(2)} data="look-lh" />
-            <Slider label="Razmak slova" value={map.look.ls ?? 0} min={LIMITS.ls.min} max={LIMITS.ls.max} step={1} base={0} onChange={(v) => setLook({ ls: v })} format={(v) => (v > 0 ? `+${v}` : String(v))} data="look-ls" />
-            <div className="flex items-center gap-2">
-              <span className="w-[74px] shrink-0 text-[11px] text-white/50">Slova</span>
-              <div className="grid flex-1 grid-cols-3 rounded-lg border border-white/[0.08] p-0.5">
-                {(
-                  [
-                    [undefined, 'Kao tekst'],
-                    ['lower', 'mala'],
-                    ['upper', 'VELIKA'],
-                  ] as const
-                ).map(([c, l]) => {
-                  const on = map.look.case === c
-                  return (
-                    <button
-                      type="button"
-                      key={l}
-                      data-edit-case={c ?? 'none'}
-                      onClick={() => setLook({ case: c })}
-                      className="h-7 whitespace-nowrap rounded-md text-[11px] transition-colors"
-                      style={{ background: on ? `${BRAND.gold}2e` : 'transparent', color: on ? '#fff' : 'rgba(255,255,255,0.55)' }}
-                    >
-                      {l}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
           </div>
         </div>
       </div>

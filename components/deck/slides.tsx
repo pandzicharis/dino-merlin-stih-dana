@@ -108,6 +108,13 @@ const UZ_STIH: FeatureDef[] = [
     body: () => <Azuriranje />,
   },
   {
+    // postavke → "Podijeli aplikaciju": QR kod aplikacije, skenira se kamerom
+    id: 'qr',
+    title: 'Podijeli aplikaciju',
+    enter: '/',
+    body: () => <PodijeliApp />,
+  },
+  {
     id: 'link',
     title: 'Link koji izgleda kao poster',
     // bez svoje adrese: chat prekriva ekran, pa se naprijed/nazad ništa ne
@@ -233,7 +240,7 @@ export const SLIDES: SlideDef[] = [
         eyebrow={<>Aplikacija</>}
         title={
           <>
-            Link kao poster, <em>verzija sama stiže</em>
+            Dijeli se lako, <em>verzija sama stiže</em>
           </>
         }
       />
@@ -1159,17 +1166,6 @@ function Dizajn() {
       await wait(1000)
       if (!alive()) return
     }
-    // cijeli stih: prored se razmakne
-    const lh = (await find('[data-edit-slider="look-lh"] input', 1500)) as HTMLInputElement | null
-    if (lh && (await click(lh))) {
-      const win = lh.ownerDocument.defaultView as Window & typeof globalThis
-      const set = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!
-      for (let v = Number(lh.value); v <= 140 && alive(); v += 4) {
-        set.call(lh, String(v))
-        lh.dispatchEvent(new win.Event('input', { bubbles: true }))
-        await wait(70)
-      }
-    }
     await wait(1400)
     if (!alive()) return
     // isti izgled i na računaru
@@ -1181,8 +1177,7 @@ function Dizajn() {
     <>
       <Text>
         Gotovi stilovi slože stih jednim klikom, a onda red po red — ili više redova odjednom: 17 fontova (klasični,
-        moderni, pisani), debljina, ukoso, velika slova, veličina i boja. Za cijeli stih još veličina, prored i
-        razmak slova.
+        moderni, pisani), debljina, ukoso, velika slova, veličina i boja.
       </Text>
       <Bullets
         items={[
@@ -1317,7 +1312,8 @@ function Sacuvano() {
       <Text>
         „Sačuvaj“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir ih otvara kao špil karata: svaka
         je stih s danom kad je sačuvan i svojim gramofonom; susjedne vire sa strane, prevuci za sljedeći. Raširi
-        kartu i stih je tu preko cijelog ekrana, kao na početnoj. Bez naloga i prijave: sve ostaje na telefonu.
+        kartu i stih je tu preko cijelog ekrana, kao na početnoj — povuci je nadolje i vrati se u špil. Bez naloga
+        i prijave: sve ostaje na telefonu.
       </Text>
     </>
   )
@@ -1353,8 +1349,7 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
 
 /**
  * Player pjesama: sačuvani sviraju na početnoj — svaka pjesma donese svoj
- * stih (pozadina se pretopi, stih se ispiše), kontrole kao u Apple Musicu,
- * "Današnji stih" vraća današnji.
+ * stih (pozadina se pretopi), kontrole kao u Apple Musicu, "Današnji stih" vraća današnji.
  */
 function Plejer() {
   const { os, setOs, manual, phone } = useDeck()
@@ -1375,9 +1370,9 @@ function Plejer() {
     <>
       <PlejerScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
       <Text>
-        Sačuvani postaju plejer: „Player pjesama“ ispod gramofona — svaka pjesma donese svoj stih na ekran, pozadina
-        se pretopi, a ploča se vrti. Natrag, pauza, naprijed, nasumično i ponovi, kao u Apple Musicu. „Današnji stih“
-        vraća današnji. Radi i iz špila: pusti pjesmu na karti, spusti panel — muzika ide dalje na početnoj.
+        Sačuvani postaju plejer: „Player pjesama“ na dnu ekrana — svaka pjesma donese svoj stih, pozadina se pretopi.
+        Kontrole kao u Apple Musicu: natrag, pauza, naprijed, nasumično i ponovi. „Današnji stih“ vraća današnji. Radi i iz špila:
+        pusti pjesmu na karti, spusti panel — muzika ide dalje na početnoj.
       </Text>
     </>
   )
@@ -1407,9 +1402,9 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     if (alive()) await press('[aria-label="Player pjesama"]')
     await wait(4200)
     // sljedeća — novi stih, nova atmosfera
-    if (alive()) await press('main button[aria-label="Sljedeća"]')
+    if (alive()) await press('footer button[aria-label="Sljedeća"]')
     await wait(4200)
-    if (alive()) await press('main button[aria-label="Sljedeća"]')
+    if (alive()) await press('footer button[aria-label="Sljedeća"]')
     await wait(3800)
     // nazad na današnji — pa isto na drugom sistemu
     if (alive()) await press('[aria-label="Nazad na današnji stih"]')
@@ -1589,6 +1584,26 @@ function Azuriranje() {
       <Acts>
         <ActionChip onClick={() => simulate('update')}>{Ico.reload} Ponovi</ActionChip>
       </Acts>
+    </>
+  )
+}
+
+/** Postavke → "Podijeli aplikaciju": QR kod se rasklopi, drugi ga skenira kamerom. */
+function PodijeliApp() {
+  useKeepSaved()
+  useScene(async ({ wait, press, home, alive }) => {
+    if (!(await home())) return
+    await wait(900)
+    if (alive()) await press('[aria-label="Postavke"]')
+    await wait(1400)
+    if (alive()) await press('[data-tip="share-app"]')
+  })
+  return (
+    <>
+      <Text>
+        U postavkama, „Podijeli aplikaciju“ rasklopi QR kod — drugi ga skenira kamerom i aplikacija mu se otvori, s
+        uputstvom za instalaciju. Ispod je i link, za poruku.
+      </Text>
     </>
   )
 }

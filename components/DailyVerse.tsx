@@ -7,6 +7,7 @@ import { useDevParams } from '@/lib/client-store'
 import { markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
 import { bumpStreak, favoriteDate, peekStreak, setLastSeen } from '@/lib/storage'
 import { savedVerse, useSavedPlayer } from '@/lib/player'
+import { fadeSwap } from '@/lib/fade-swap'
 import { primeVerses } from '@/lib/verses-client'
 import { clearBadge, clearPushMark, hasPushMark } from '@/lib/push-client'
 import { cover, markHandled, mayWait, uncover } from '@/lib/cekaj'
@@ -66,9 +67,13 @@ export function DailyVerse({
 
   // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka
   const [replay, setReplay] = useState(0)
+  // vraćen s plejera sačuvanih — stih odmah, bez ispisivanja (vidi ispod)
+  const [back, setBack] = useState(false)
   // papirić otvoren = stih izvučen (tek tad, ne kad se tombola pokaže) i
   // obavijest pročitana
   const land = useCallback(() => {
+    // novi papirić — stih se opet ispisuje kad sleti (ne "odmah" kao poslije plejera)
+    setBack(false)
     setReplay((r) => r + 1)
     if (!verseId) markSeen(date)
     clearPushMark()
@@ -150,10 +155,10 @@ export function DailyVerse({
     window.history.replaceState(null, '', url)
   }, [])
 
-  // panel sačuvanih ne mora ponovo po listu — stranica je već donijela
-  useEffect(() => {
-    primeVerses(verses)
-  }, [verses])
+  // panel sačuvanih i "Player pjesama" ne traže ponovo listu — stranica ju
+  // je već donijela. Odmah u renderu (ne u efektu): efekti djece idu prije
+  // roditeljevih, pa bi footer s plejerom čekao poseban fetch i kasnio
+  if (typeof window !== 'undefined') primeVerses(verses)
 
   // niz dana zaredom (na serveru 0) — zapiše se prije `setLastSeen`, da
   // prvi put zna je li stih otvoren i jučer
@@ -171,6 +176,13 @@ export function DailyVerse({
   // novi (ispiše se, pozadina se pretopi) — bez naglog skoka
   const [shown, setShown] = useState<Verse | null>(null)
   const listening = playing && shown && shown.id !== playing.id ? shown : playing
+  // povratak s plejera na današnji stih: stih je odmah tu (ne ispisuje se
+  // ponovo riječ po riječ) — prelaz ne kasni
+  const [was, setWas] = useState(false)
+  if (was !== Boolean(listening)) {
+    setWas(Boolean(listening))
+    if (!listening) setBack(true)
+  }
   useEffect(() => {
     let alive = true
     const swap = () => alive && setShown(playing)
@@ -181,25 +193,8 @@ export function DailyVerse({
         alive = false
       }
     }
-    const main = document.querySelector<HTMLElement>('main')
-    if (!main) {
-      void Promise.resolve().then(swap)
-      return () => {
-        alive = false
-      }
-    }
-    main
-      .animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-in', fill: 'forwards' })
-      .finished.then(
-        (out) => {
-          swap()
-          requestAnimationFrame(() => {
-            out.cancel()
-            main.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })
-          })
-        },
-        swap,
-      )
+    // utiša se, promijeni, vrati — i u pozadini (zaključan ekran) promjena dođe
+    void Promise.resolve().then(() => fadeSwap(document.querySelector<HTMLElement>('main'), swap, 300, 600))
     return () => {
       alive = false
     }
@@ -223,10 +218,9 @@ export function DailyVerse({
           verse={listening}
           date={favoriteDate(listening.id) ?? date}
           listening
-          today={verse ? { text: verse.text, mood: mood ?? verse.mood } : undefined}
         />
       ) : (
-        verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} streak={verseId ? 0 : streak} />
+        verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} streak={verseId ? 0 : streak} instant={back} />
       )}
       {/* key: novi stih — zastor od prvog frejma, prije tombole */}
       {verse && <IntroHost key={verse.id} text={verse.text} others={others} mood={tone} date={date} onLand={land} fresh={fresh} font={verse.font} />}

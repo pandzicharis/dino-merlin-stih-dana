@@ -205,7 +205,7 @@ export default function SharePanel({
             role="dialog"
             aria-modal="true"
             aria-label="Podijeli stih"
-            className="os-sheet relative flex max-h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px] sm:pb-6"
+            className="os-sheet relative flex max-h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px] sm:pb-6"
             {...sheetDrag}
             style={{
               ...sheetDrag.style,
