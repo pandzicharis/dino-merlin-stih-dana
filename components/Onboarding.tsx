@@ -253,8 +253,9 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
         >
           {mounted && (
             <>
-              {/* ista pozadina kao na stihu — mrlje, portret, note, vinjeta */}
-              <MoodBackground mood={mood} seed={seed} still />
+              {/* ista pozadina kao na stihu — mrlje, note, vinjeta; umjesto
+                  portreta fotografija iz najave albuma „Mi“, u bojama raspoloženja */}
+              <MoodBackground mood={mood} seed={seed} still art="/brand/gate.webp" />
 
               <div
                 className={`relative flex min-h-[100dvh] flex-col items-center px-8 pt-[max(4rem,calc(var(--sat)+2rem))] ${

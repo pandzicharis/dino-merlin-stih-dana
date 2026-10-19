@@ -4,11 +4,10 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { youtubeId } from '@/lib/text'
-import { audioFile } from '@/lib/audio-name'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
-import AUDIO from '@/data/audio.json'
-import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
+import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
+import { SHARED, SOLO, createPlayer, pauseSaved, playSaved, playable, session, shared, sharedFor, sourceOf, type Player } from '@/lib/player'
 import { FitLines } from './deck/FitLines'
 
 /**
@@ -21,7 +20,16 @@ import { FitLines } from './deck/FitLines'
  * Zvuk se traži redom: `public/audio/<pjesma>.m4a` sa CDN-a, pa /api/audio
  * (lokalno ga izvuče s YouTubea). Ako ni jedno ne stigne, ostaje YouTube znak.
  */
-export function SongCredit({ verse, preview = false }: { verse: Verse; preview?: boolean }) {
+export function SongCredit({
+  verse,
+  preview = false,
+  share = false,
+}: {
+  verse: Verse
+  preview?: boolean
+  /** sačuvani sviraju na početnoj — ploča je plejer sačuvanih (lib/player.ts) */
+  share?: boolean
+}) {
   const id = youtubeId(verse.youtube)
   // dok audio ne pukne, dodir pušta pjesmu; ako server ne može do zvuka, ostaje YouTube link
   // pamti se ZA KOJU pjesmu je zvuk pao — nova pjesma kreće ispočetka sama
@@ -31,7 +39,7 @@ export function SongCredit({ verse, preview = false }: { verse: Verse; preview?:
   // pregled u adminu: gramofon i za pjesmu koja se tek preuzme kad se stih sačuva
   if (id && !failed && (playable(verse) || preview))
     return (
-      <AudioSong key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} preview={preview} />
+      <AudioSong key={`${id}-${share}`} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} preview={preview} share={share} />
     )
 
   return (
@@ -107,30 +115,9 @@ function SongTitle({ song, withIcon }: { song: string; withIcon: boolean }) {
 }
 
 const ICON = { initial: { scale: 0.5, opacity: 0 }, animate: { scale: 1, opacity: 1 }, exit: { scale: 0.5, opacity: 0 } }
-/** Svira jedna pjesma u isto vrijeme: kad krene nova, ostale stanu. */
-const SOLO = 'stihdana:solo'
-
 type State = 'idle' | 'loading' | 'playing' | 'paused'
 
-/** trajanja pjesama iz public/audio — lib/audio-files.ts (admin, `npm run audio`) */
-const DURATIONS: Record<string, number> = AUDIO
-
 type Source = { verse: Verse; src: string; fallback: string; dur?: number; onFail: () => void }
-
-const sourceOf = (verse: Verse, id: string) => ({
-  src: `/audio/${audioFile(verse.song)}.m4a`,
-  fallback: `/api/audio/${id}?s=${audioFile(verse.song)}`,
-  dur: DURATIONS[audioFile(verse.song)],
-})
-
-/**
- * Ima li pjesma zvuk. Na produkciji samo ako je fajl u public/audio — inače
- * odmah YouTube znak, bez zahtjeva prema /api/audio koji na Vercelu ionako
- * pada (nema yt-dlp-a). Lokalno server zvuk izvuče sam.
- */
-function playable(verse: Verse): boolean {
-  return audioFile(verse.song) in DURATIONS || process.env.NODE_ENV === 'development'
-}
 
 /**
  * Zvuk jedne pjesme: statični fajl, pa server; stanje, vrijeme, premotavanje.
@@ -139,40 +126,116 @@ function playable(verse: Verse): boolean {
  * stiha ga pripremi kad se ekran smiri (osim uz uštedu podataka), a svaki
  * plejer i na sam pritisak prsta — pola sekunde prije nego dodir postane klik.
  */
-function useSong({ verse, src, fallback, dur: known, onFail, preload }: Source & { preload: boolean }) {
-  const audio = useRef<HTMLAudioElement | null>(null)
-  const want = useRef(false)
-  const [state, setState] = useState<State>('idle')
-  const [cur, setCur] = useState(0)
-  const [dur, setDur] = useState(known ?? 0)
+function useSong({
+  verse,
+  src,
+  fallback,
+  dur: known,
+  onFail,
+  preload,
+  share = false,
+}: Source & { preload: boolean; share?: boolean }) {
+  const audio = useRef<Player | null>(null)
+  const unbind = useRef<(() => void) | null>(null)
+  const leaving = useRef(false)
+  // zajednički zvuk već svira (npr. pokrenut na raširenoj karti) — plejer to
+  // pokaže od prvog kadra
+  const [state, setState] = useState<State>(() => {
+    const a = share ? shared.get(src) : undefined
+    return !a ? 'idle' : !a.paused ? 'playing' : a.currentTime > 0 ? 'paused' : 'idle'
+  })
+  const [cur, setCur] = useState(() => (share ? (shared.get(src)?.currentTime ?? 0) : 0))
+  const [dur, setDur] = useState(() => {
+    const d = share ? shared.get(src)?.duration : undefined
+    return d && Number.isFinite(d) ? d : (known ?? 0)
+  })
+
+  /** Ovaj plejer prati zvuk `a` — stanje i vrijeme stižu kroz događaje. */
+  function attach(a: Player) {
+    if (audio.current === a && unbind.current) return
+    unbind.current?.()
+    const time = () => {
+      setCur(a.currentTime)
+      if (Number.isFinite(a.duration)) setDur(a.duration)
+    }
+    const waiting = () => setState('loading')
+    const playing = () => setState('playing')
+    const pause = () => setState((s) => (s === 'idle' ? s : 'paused'))
+    const ended = () => setState('paused')
+    const fail = () => {
+      setState('idle')
+      onFail()
+    }
+    const on: [string, () => void][] = [
+      ['timeupdate', time],
+      ['durationchange', time],
+      ['waiting', waiting],
+      ['playing', playing],
+      ['pause', pause],
+      ['ended', ended],
+    ]
+    for (const [e, f] of on) a.addEventListener(e, f)
+    a.fails?.add(fail)
+    unbind.current = () => {
+      for (const [e, f] of on) a.removeEventListener(e, f)
+      a.fails?.delete(fail)
+    }
+    audio.current = a
+  }
+
+  /** Prati zvuk `a` i odmah preuzmi gdje je stao (na mountu to radi početno stanje). */
+  function bind(a: Player) {
+    attach(a)
+    if (!a.paused) setState('playing')
+    else if (a.currentTime > 0) setState('paused')
+    setCur(a.currentTime)
+    if (Number.isFinite(a.duration)) setDur(a.duration)
+  }
 
   useEffect(() => {
     // prezentacija: odlaskom s koraka pjesma stane i vrati se na početak
     const stop = () => {
       const a = audio.current
-      want.current = false
       if (a) {
+        a.dataset.want = ''
         a.pause()
         a.currentTime = 0
       }
       setCur(0)
       setState('idle')
     }
+    // krenula je druga pjesma — ova se utiša i stane
     const solo = (e: Event) => {
-      if ((e as CustomEvent).detail === audio.current) return
-      want.current = false
-      audio.current?.pause()
+      const a = audio.current
+      if (!a || (e as CustomEvent).detail === a) return
+      a.dataset.want = ''
+      fadeOut(a, 400)
+    }
+    // druga karta iste pjesme pokrenula je zajednički zvuk — prati ga
+    const joined = (e: Event) => {
+      const a = shared.get(src)
+      if ((e as CustomEvent).detail === src && a) bind(a)
     }
     window.addEventListener('stihdana:stop-audio', stop)
     window.addEventListener(SOLO, solo)
+    if (share) {
+      window.addEventListener(SHARED, joined)
+      const a = shared.get(src)
+      if (a) attach(a)
+    }
     // plejer ispod stiha: početak pjesme se preuzme kad se ekran smiri
     const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
     const t = preload && !conn?.saveData ? window.setTimeout(prime, 1500) : 0
     return () => {
+      leaving.current = true
       clearTimeout(t)
       window.removeEventListener('stihdana:stop-audio', stop)
       window.removeEventListener(SOLO, solo)
-      audio.current?.pause()
+      window.removeEventListener(SHARED, joined)
+      unbind.current?.()
+      unbind.current = null
+      // zajednički zvuk svira dalje — gasi ga tek zatvaranje sačuvanih
+      if (!share) audio.current?.pause()
       audio.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,39 +247,36 @@ function useSong({ verse, src, fallback, dur: known, onFail, preload }: Source &
     if (!a) return
     if (state === 'playing' || state === 'loading') startCrackle(a)
     else stopCrackle(a)
-    return () => stopCrackle(a)
-  }, [state])
-
-  function player(): HTMLAudioElement {
-    if (audio.current) return audio.current
-    const a = new Audio(src)
-    a.preload = 'none'
-    const time = () => {
-      setCur(a.currentTime)
-      if (Number.isFinite(a.duration)) setDur(a.duration)
+    return () => {
+      // zajednička pjesma svira dalje i kad se ova karta skupi — i pucketanje
+      if (!(share && leaving.current)) stopCrackle(a)
     }
-    a.addEventListener('timeupdate', time)
-    a.addEventListener('durationchange', time)
-    a.addEventListener('waiting', () => setState('loading'))
-    a.addEventListener('playing', () => setState('playing'))
-    a.addEventListener('pause', () => setState((s) => (s === 'idle' ? s : 'paused')))
-    a.addEventListener('ended', () => {
-      a.currentTime = 0
-      setState('paused')
-    })
-    a.addEventListener('error', () => {
-      if (audio.current !== a) return // stari plejer, već ugašen
-      // statičnog fajla nema (nova pjesma iz admina) → pokušaj preko servera
-      if (a.src.endsWith(src)) {
-        a.src = fallback
-        if (want.current) a.play().catch(() => {})
-        return
-      }
-      setState('idle')
-      onFail()
-    })
-    audio.current = a
+  }, [state, share])
+
+  function player(): Player {
+    if (audio.current) return audio.current
+    // sačuvani: zajednički zvuk pjesme (lib/player.ts); inače svoj
+    const a = (share && sharedFor(verse)) || createPlayer(src, fallback)
+    attach(a)
     return a
+  }
+
+  /**
+   * Zvuk koji je prošao kroz Web Audio (utišavanje na iPhoneu) ne svira kad je
+   * ekran zaključan — za novo puštanje dođe svjež, s istog mjesta u pjesmi.
+   */
+  function renew(old: Player): Player {
+    const t = old.currentTime
+    const fresh = createPlayer(src, fallback)
+    fresh.preload = 'auto'
+    const seek = () => {
+      try {
+        fresh.currentTime = t
+      } catch {}
+    }
+    fresh.addEventListener('loadedmetadata', seek, { once: true })
+    attach(fresh)
+    return fresh
   }
 
   /** Preuzmi početak pjesme unaprijed — dodir je onda trenutan. */
@@ -227,36 +287,44 @@ function useSong({ verse, src, fallback, dur: known, onFail, preload }: Source &
     a.load()
   }
 
-  /** kontrole sa zaključanog ekrana — za pjesmu koja upravo svira */
-  function session(a: HTMLAudioElement) {
-    if (!('mediaSession' in navigator)) return
-    const ms = navigator.mediaSession
-    ms.metadata = new MediaMetadata({
-      title: verse.song,
-      artist: BRAND.name,
-      album: verse.album,
-      artwork: [{ src: '/icons/icon-512.png?v=2', sizes: '512x512', type: 'image/png' }],
-    })
-    ms.setActionHandler('play', () => a.play())
-    ms.setActionHandler('pause', () => a.pause())
-    ms.setActionHandler('seekto', (d) => d.seekTime != null && (a.currentTime = d.seekTime))
-  }
-
   function toggle() {
     haptic(6)
-    const a = player()
+    let a = player()
+    // sačuvani: plejer sačuvanih pušta i pauzira (lista, natrag/naprijed)
+    if (share) {
+      if (a.paused || !a.dataset.want) {
+        setState(a.paused ? 'loading' : 'playing')
+        playSaved(verse)
+      } else {
+        pauseSaved()
+        // ploča odmah stane — zvuk se samo još utišava
+        setState('paused')
+      }
+      return
+    }
+    // utišava se (pauza upravo dodirnuta) — novi dodir je vrati punom jačinom
+    if (!a.paused && !a.dataset.want) {
+      cancelFade(a)
+      a.dataset.want = '1'
+      setState('playing')
+      return
+    }
     if (a.paused) {
-      want.current = true
+      if (isRouted(a)) a = renew(a)
+      a.dataset.want = '1'
       // zvuk gramofona: kontekst se otvara iz dodira, tup kad igla legne
       unlockVinyl()
       dropNeedle(0.3)
       window.dispatchEvent(new CustomEvent(SOLO, { detail: a }))
-      session(a)
+      session(a, verse)
       setState('loading')
       a.play().catch(() => setState('paused'))
     } else {
-      want.current = false
-      a.pause()
+      // pauza — ploča, dugme i pucketanje odmah stanu, pjesma se utiša pa stane
+      a.dataset.want = ''
+      setState('paused')
+      stopCrackle()
+      fadeOut(a, 450)
     }
   }
 
@@ -286,6 +354,7 @@ function Vinyl({
   onPrime,
   deck = false,
   arm = false,
+  hole = false,
 }: {
   size: number
   state: State
@@ -298,6 +367,8 @@ function Vinyl({
   deck?: boolean
   /** ručica gramofona koja se spusti na ploču */
   arm?: boolean
+  /** rupa na etiketi umjesto play/pauze — kontrole su u plejeru ispod (sačuvani) */
+  hole?: boolean
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
   const playing = state === 'playing'
@@ -373,7 +444,7 @@ function Vinyl({
       {/* znak na etiketi — ne vrti se */}
       <span className="absolute inset-0 flex items-center justify-center">
         <AnimatePresence mode="wait" initial={false}>
-          {state === 'loading' ? (
+          {state === 'loading' && !hole ? (
             <motion.span
               key="load"
               className="rounded-full border-[1.5px] border-[#16110A] border-t-transparent"
@@ -382,6 +453,20 @@ function Vinyl({
               animate={{ opacity: 1, rotate: 360 }}
               exit={{ opacity: 0 }}
               transition={{ rotate: { duration: 0.8, repeat: Infinity, ease: 'linear' } }}
+            />
+          ) : hole ? (
+            // rupa na sredini ploče, kao na pravoj — ne vrti se
+            <motion.span
+              key="hole"
+              className="rounded-full"
+              style={{
+                width: Math.max(5, Math.round(icon * 0.5)),
+                height: Math.max(5, Math.round(icon * 0.5)),
+                background: 'radial-gradient(circle at 40% 35%, #3a332a 0%, #0c0a08 70%)',
+                boxShadow: 'inset 0 1px 1.5px rgba(0,0,0,0.9), 0 0 0 1px rgba(22,17,10,0.45), 0 0.5px 0 rgba(255,240,210,0.35)',
+              }}
+              {...ICON}
+              aria-hidden
             />
           ) : playing ? (
             <motion.svg key="pause" width={icon} height={icon} viewBox="0 0 12 12" {...ICON} aria-hidden>
@@ -450,9 +535,9 @@ function Tonearm({ size, down, progress }: { size: number; down: boolean; progre
  * album i traka za premotavanje.
  * Kontrole rade i sa zaključanog ekrana (Media Session).
  */
-function AudioSong({ preview = false, ...props }: Source & { preview?: boolean }) {
+function AudioSong({ preview = false, share = false, ...props }: Source & { preview?: boolean; share?: boolean }) {
   // pregled (samo za gledanje): bez pripreme i preuzimanja pjesme
-  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: !preview })
+  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: !preview && !share, share })
   const { verse, fallback } = props
 
   // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
@@ -464,7 +549,8 @@ function AudioSong({ preview = false, ...props }: Source & { preview?: boolean }
   return (
     <div data-tip="song" className="flex items-center gap-4 text-left" style={{ width: CARD_W }}>
       {/* ploča visoka koliko i tekst s trakom desno */}
-      <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} deck arm />
+      {/* sačuvani sviraju — samo ploča (rupa), dugmad su ispod; današnji ima pusti */}
+      <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} deck arm hole={share} />
       <div className="min-w-0 flex-1">
         {/* dodir na naziv radi isto što i ploča */}
         <div className="flex cursor-pointer items-center gap-2" onClick={toggle} onPointerDown={prime}>
@@ -492,7 +578,21 @@ function AudioSong({ preview = false, ...props }: Source & { preview?: boolean }
  * album, ispod traka za premotavanje. Bez zvuka ostaje tačka raspoloženja.
  * `fit`: naziv i album cijeli, svaki u jednom redu — slova se smanje koliko treba (karte sačuvanih).
  */
-export function SongRow({ verse, accent, fit = false }: { verse: Verse; accent: string; fit?: boolean }) {
+export function SongRow({
+  verse,
+  accent,
+  fit = false,
+  hole = false,
+  vinyl = 60,
+}: {
+  verse: Verse
+  accent: string
+  fit?: boolean
+  /** rupa na ploči umjesto play — kad je plejer ispod (karte u panelu sačuvanih) */
+  hole?: boolean
+  /** veličina ploče (px) — manja na kartama u špilu */
+  vinyl?: number
+}) {
   const id = youtubeId(verse.youtube)
   const [failedId, setFailedId] = useState<string | null>(null)
 
@@ -505,36 +605,40 @@ export function SongRow({ verse, accent, fit = false }: { verse: Verse; accent: 
         </div>
       </>
     )
-  return <AudioRow key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} fit={fit} />
+  return <AudioRow key={id} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} fit={fit} hole={hole} vinyl={vinyl} />
 }
 
-function AudioRow({ fit, ...props }: Source & { fit: boolean }) {
-  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: false })
+function AudioRow({ fit, hole, vinyl, ...props }: Source & { fit: boolean; hole: boolean; vinyl: number }) {
+  // plejer na karti sačuvanih — zajednički zvuk, ne staje kad se karta skupi ili prevuče
+  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: false, share: true })
   const { verse } = props
+  // mala ploča (karta u špilu) — i slova sitnija
+  const small = vinyl < 56
   return (
     <>
-      <Vinyl size={60} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} arm />
+      <Vinyl size={vinyl} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} arm hole={hole} />
       <div className="min-w-0 flex-1">
-        <RowText verse={verse} onClick={toggle} fit={fit} />
-        <div className="flex items-center gap-2.5">
+        <RowText verse={verse} onClick={toggle} fit={fit} small={small} />
+        <div className={`flex items-center ${small ? 'gap-2' : 'gap-2.5'}`}>
           <Seek value={progress} onSeek={seek} />
-          <span className="tabular w-9 text-right text-[10px] tracking-[0.06em] text-white/60">{time}</span>
+          <span className={`tabular text-right tracking-[0.06em] text-white/60 ${small ? 'w-7 text-[8.5px]' : 'w-9 text-[10px]'}`}>{time}</span>
         </div>
       </div>
     </>
   )
 }
 
-function RowText({ verse, onClick, fit = false }: { verse: Verse; onClick?: () => void; fit?: boolean }) {
-  // jedan red: skraćen (lista) ili cio, sa smanjenim slovima (karte)
+function RowText({ verse, onClick, fit = false, small = false }: { verse: Verse; onClick?: () => void; fit?: boolean; small?: boolean }) {
+  // jedan red: skraćen (lista) ili cio, sa smanjenim slovima (karte) — nikad
+  // preko ivice: duga pjesma se smanji, ne gura razmak
   const line = (t: React.ReactNode) => (fit ? <FitLines><span>{t}</span></FitLines> : t)
-  const cut = fit ? '' : 'truncate'
+  const cut = fit ? 'overflow-hidden' : 'truncate'
   return (
-    <div className={onClick ? 'cursor-pointer' : undefined} onClick={onClick}>
-      <p className={`${cut} text-[11px] font-semibold uppercase tracking-[0.18em]`} style={{ color: BRAND.gold }}>
+    <div className={`min-w-0 ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
+      <p className={`${cut} ${small ? 'text-[9px] tracking-[0.16em]' : 'text-[11px] tracking-[0.18em]'} font-semibold uppercase`} style={{ color: BRAND.gold }}>
         {line(verse.song)}
       </p>
-      <p className={`mt-1 ${cut} text-[10px] uppercase tracking-[0.16em] text-white/55`}>
+      <p className={`mt-1 ${cut} ${small ? 'text-[8.5px] tracking-[0.14em]' : 'text-[10px] tracking-[0.16em]'} uppercase text-white/55`}>
         {line(<>{verse.album} &middot; {verse.year}</>)}
       </p>
     </div>
@@ -542,7 +646,7 @@ function RowText({ verse, onClick, fit = false }: { verse: Verse; onClick?: () =
 }
 
 /** Traka napretka — dodir ili povlačenje prstom premota pjesmu. */
-function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => void }) {
+export function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => void }) {
   const [drag, setDrag] = useState<number | null>(null)
   const shown = drag ?? value
   const at = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -591,7 +695,7 @@ function cardSongSize(song: string): string {
   return `min(15px, calc((${CARD_W} - 108px) / ${em.toFixed(2)}))`
 }
 
-function clock(s: number): string {
+export function clock(s: number): string {
   if (!Number.isFinite(s) || s < 0) s = 0
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 }

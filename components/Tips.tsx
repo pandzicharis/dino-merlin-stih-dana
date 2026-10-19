@@ -33,7 +33,7 @@ const TIPS: Tip[] = [
   {
     target: ['notify'],
     title: 'Obavijest u 12:00',
-    body: 'Svaki dan: „Vrijeme je za stih dana! Uzmi svoj!“ Zvono obavijesti pali i gasi, kad god poželiš.',
+    body: 'Svaki dan: „Vrijeme je za stih dana! Uzmi svoj!“ Obavijesti pališ i gasiš u postavkama, kad god poželiš.',
     icon: (
       <>
         <path d="M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5" />
@@ -50,7 +50,7 @@ const TIPS: Tip[] = [
   {
     target: ['share'],
     title: 'Podijeli kao sliku',
-    body: 'Story, objava ili kvadrat — za Instagram, WhatsApp ili Viber. Sliku možeš i preuzeti.',
+    body: 'Story (i kao video), objava ili kvadrat — za Instagram, WhatsApp ili Viber. Možeš i preuzeti.',
     icon: (
       <>
         <path d="M12 3v13M12 3 8 7M12 3l4 4" />
@@ -61,7 +61,7 @@ const TIPS: Tip[] = [
   {
     target: ['song'],
     title: 'Poslušaj pjesmu',
-    body: 'Dodir na naziv pusti pjesmu iz koje je stih — u pozadini, bez napuštanja stiha.',
+    body: 'Dodir na ploču pusti pjesmu iz koje je stih — u pozadini, bez napuštanja stiha.',
     icon: <path d="M9 6.8v10.4l8.4-5.2z" />,
   },
 ]

@@ -9,7 +9,6 @@ import { MAGAZA_PATH } from '@/lib/magaza-path'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
 import { asWritten } from '@/lib/text'
 import { INVITE } from '@/lib/notify'
-import { ARTIST_LINKS } from '@/components/ArtistLinks'
 import { audioFile } from '@/lib/audio-name'
 import AUDIO from '@/data/audio.json'
 
@@ -225,7 +224,7 @@ export function VerseMock({
   top = 64,
   saved = true,
   savedCount = 3,
-  bellOn = true,
+  streak = 7,
 }: {
   verse: Verse
   date: string
@@ -238,7 +237,8 @@ export function VerseMock({
   saved?: boolean
   /** broj na ikonici sačuvanih; 0 = ikonice nema, kao u aplikaciji */
   savedCount?: number
-  bellOn?: boolean
+  /** dana zaredom — pilula iznad datuma, tek od drugog dana (Streak.tsx) */
+  streak?: number
 }) {
   const m = MOODS[mood ?? verse.mood]
   const text = asWritten(verse.text)
@@ -265,7 +265,7 @@ export function VerseMock({
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          padding: `${top}em 24em 30em`,
+          padding: `${top}em 24em 62em`,
         }}
       >
         {/* zaglavlje */}
@@ -277,14 +277,14 @@ export function VerseMock({
             <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
             <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18em', color: 'rgba(255,255,255,0.42)' }}>
-            <Icon d={BELL} fill={bellOn ? 'rgba(141,201,163,0.22)' : 'none'} color={bellOn ? '#8DC9A3' : '#D08C8C'} />
+          {/* sačuvani i postavke — kao VerseScreen (obavijesti su u postavkama) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20em', color: 'rgba(255,255,255,0.6)' }}>
             {savedCount > 0 && <SavedIcon count={savedCount} />}
-            <Icon d={SHARE} />
+            <Gear />
           </div>
         </div>
 
-        {/* datum → stih → srce */}
+        {/* datum → stih → srce — malo iznad sredine, kao na ekranu stiha */}
         <div
           style={{
             flex: 1,
@@ -293,21 +293,27 @@ export function VerseMock({
             alignItems: 'center',
             justifyContent: 'center',
             gap: '30em',
+            padding: '16em 0 72em',
           }}
         >
-          <p
-            className="tabular"
-            style={{
-              fontSize: '10.5em',
-              fontWeight: 600,
-              letterSpacing: '0.3em',
-              textTransform: 'uppercase',
-              color: m.accent,
-              opacity: 0.78,
-            }}
-          >
-            {formatFullDateBs(date)}
-          </p>
+          {/* niz dana → datum, kao na ekranu stiha */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12em' }}>
+            {streak > 1 && <StreakPill n={streak} />}
+            <p
+              className="tabular"
+              style={{
+                fontSize: '12em',
+                fontWeight: 700,
+                letterSpacing: '0.2em',
+                whiteSpace: 'nowrap',
+                textTransform: 'uppercase',
+                color: m.accent,
+                textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.65)',
+              }}
+            >
+              {formatFullDateBs(date)}
+            </p>
+          </div>
           <p
             className="verse"
             style={{
@@ -323,68 +329,50 @@ export function VerseMock({
               <FontedLines text={text} font={verse.font} />
             </FitLines>
           </p>
-          <span
-            style={{
-              fontSize: '10em',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.8em',
-              height: '3.6em',
-              minWidth: '15.2em',
-              padding: '0 1.6em',
-              borderRadius: '99em',
-              border: `0.1em solid ${saved ? `${m.accent}66` : 'rgba(255,255,255,0.14)'}`,
-              background: saved ? `${m.accent}14` : 'rgba(255,255,255,0.03)',
-              color: saved ? m.accent : 'rgba(255,255,255,0.6)',
-              fontWeight: 500,
-              letterSpacing: '0.22em',
-              textTransform: 'uppercase',
-            }}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              style={{ width: '1.4em', height: '1.4em' }}
-              fill={saved ? 'currentColor' : 'none'}
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-            >
-              <path d={HEART} />
-            </svg>
-            {saved ? 'Sačuvano' : 'Sačuvaj stih'}
-          </span>
+          {/* radnje stiha: sačuvaj i podijeli, jedno do drugog — FavoriteButton i ShareButton */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10em' }}>
+            <Pill accent={m.accent} on={saved} wide>
+              <svg viewBox="0 0 24 24" style={{ width: '1.4em', height: '1.4em' }} fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+                <path d={HEART} />
+              </svg>
+              {saved ? 'Sačuvano' : 'Sačuvaj'}
+            </Pill>
+            <Pill accent={m.accent}>
+              <svg viewBox="0 0 24 24" style={{ width: '1.4em', height: '1.4em' }} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d={SHARE} />
+              </svg>
+              Podijeli
+            </Pill>
+          </div>
         </div>
 
         {/* podnožje */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <PlayerMock verse={verse} w={w} />
-          <span
-            style={{
-              margin: '22em 0',
-              width: '64em',
-              height: '1em',
-              background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`,
-            }}
-          />
-          {/* web, Instagram, Spotify, YouTube — samo ikonice, zlatne, kao ArtistLinks na telefonu */}
-          <span style={{ display: 'flex', justifyContent: 'center', gap: '30em', color: `${BRAND.gold}cc`, filter: `drop-shadow(0 0 6em ${BRAND.gold}4d)` }}>
-            {ARTIST_LINKS.map((l) => (
-              <svg
-                key={l.label}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ width: '22em', height: '22em' }}
-                aria-hidden
-              >
-                <path d={l.d} />
-              </svg>
-            ))}
-          </span>
+          {/* "Player pjesama" ispod gramofona (kad ima sačuvanih) — mreže su u postavkama */}
+          {savedCount > 0 ? (
+            <span style={{ marginTop: '24em' }}>
+              <Pill accent={m.accent}>
+                {/* trake kao na dugmetu u aplikaciji */}
+                <span style={{ display: 'flex', alignItems: 'flex-end', gap: '0.2em', height: '1.2em' }} aria-hidden>
+                  {[0.55, 1, 0.4, 0.8].map((h, i) => (
+                    <span key={i} style={{ width: '0.2em', height: `${h * 100}%`, borderRadius: '1em', background: m.accent }} />
+                  ))}
+                </span>
+                Player pjesama
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{savedCount}</span>
+              </Pill>
+            </span>
+          ) : (
+            <span
+              style={{
+                margin: '22em 0',
+                width: '64em',
+                height: '1em',
+                background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`,
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -505,22 +493,80 @@ export function LockScreenMock({
 
 /* ── sitni dijelovi ─────────────────────────────────────────── */
 
-const BELL = 'M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5M13.7 20a2 2 0 0 1-3.4 0'
 const SHARE = 'M12 3v13M12 3 8 7M12 3l4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6'
 const HEART = 'M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z'
 
-function Icon({ d, color = 'currentColor', fill = 'none' }: { d: string; color?: string; fill?: string }) {
+/** Pilula radnje ispod stiha — isti oblik kao FavoriteButton / ShareButton (h-11, verzal). */
+function Pill({ accent, on = false, wide = false, children }: { accent: string; on?: boolean; wide?: boolean; children: React.ReactNode }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      style={{ width: '20em', height: '20em', color }}
-      fill={fill}
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <span
+      style={{
+        fontSize: '10em',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.8em',
+        height: '4.4em',
+        minWidth: wide ? '13.6em' : undefined,
+        padding: wide ? '0 1.6em' : '0 2em',
+        borderRadius: '99em',
+        border: `0.1em solid ${on ? `${accent}66` : 'rgba(255,255,255,0.14)'}`,
+        background: on ? `${accent}14` : 'rgba(255,255,255,0.03)',
+        color: on ? accent : 'rgba(255,255,255,0.75)',
+        fontWeight: 500,
+        letterSpacing: '0.22em',
+        textTransform: 'uppercase',
+      }}
     >
-      <path d={d} />
+      {children}
+    </span>
+  )
+}
+
+/** Niz dana — tamna pilula s vatricom iznad datuma (Streak.tsx). */
+function StreakPill({ n }: { n: number }) {
+  return (
+    <span
+      className="tabular"
+      style={{
+        fontSize: '9.5em',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.6em',
+        padding: '0.4em 1.05em 0.4em 0.85em',
+        borderRadius: '99em',
+        border: '0.1em solid rgba(255,255,255,0.1)',
+        background: 'rgba(0,0,0,0.3)',
+        color: 'rgba(255,255,255,0.8)',
+        fontWeight: 500,
+        letterSpacing: '0.24em',
+        textTransform: 'uppercase',
+      }}
+    >
+      <svg viewBox="0 0 24 24" style={{ width: '1.26em', height: '1.26em' }} aria-hidden>
+        <defs>
+          <linearGradient id="mock-flame" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#FFD27A" />
+            <stop offset="0.55" stopColor="#FF9A3D" />
+            <stop offset="1" stopColor="#F2552C" />
+          </linearGradient>
+        </defs>
+        <path
+          fill="url(#mock-flame)"
+          d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+        />
+      </svg>
+      {n}. stih dana
+    </span>
+  )
+}
+
+/** Zupčanik postavki — isti kao `SettingsButton` u aplikaciji. */
+function Gear() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: '23em', height: '23em' }} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   )
 }

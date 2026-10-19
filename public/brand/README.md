@@ -7,7 +7,8 @@ za privatni prototip koji se pokazuje njegovom timu.
 |---|---|---|
 | `wordmark.svg` | `dinomerlin.com/assets/img/DinoMerlin.svg` | zaštićeni znak — traži odobrenje |
 | `signature.webp` | rukom pisani potpis; pravi se iz `signature-src.png` sa `npm run brand:signature` | zaštićeni znak — traži odobrenje |
-| `figure.webp` | portret uz najavu albuma „Mi“; alfa izvučena iz luminacije pa se lik stapa s pozadinom | fotografija ima zasebnog autora |
+| `figure-mi.webp` | lik iz najave albuma „Mi“ (isti kao `gate.webp`); alfa izvučena iz luminacije pa se lik stapa s pozadinom | fotografija ima zasebnog autora |
+| `gate.webp` | ista fotografija iz najave albuma „Mi“, bez natpisa — pozadina uvodnog ekrana | fotografija ima zasebnog autora |
 
 ## Prije bilo kakvog javnog launcha
 

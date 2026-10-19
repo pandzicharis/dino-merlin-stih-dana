@@ -6,7 +6,7 @@ import { toggleFavorite } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
 
 /**
- * Sačuvaj stih — dugme s tekstom ispod pjesme. Bez logina: lista živi u
+ * Sačuvaj — dugme s tekstom ispod pjesme. Bez logina: lista živi u
  * localStorage-u. Na dodir mali "otkucaj" srca i haptika.
  *
  * Do hidratacije se ne zna je li stih sačuvan, pa dugme stoji tiho u
@@ -25,7 +25,7 @@ export function FavoriteButton({ id, accent }: { id: string; accent: string }) {
       }}
       aria-pressed={on}
       data-tip="save"
-      className="relative flex h-11 min-w-[10rem] items-center justify-center gap-2 rounded-full border px-4 text-[10px] font-medium uppercase tracking-[0.22em] backdrop-blur-sm transition-colors duration-300"
+      className="relative flex h-11 min-w-[8.5rem] items-center justify-center gap-2 rounded-full border px-4 text-[10px] font-medium uppercase tracking-[0.22em] backdrop-blur-sm transition-colors duration-300"
       style={{
         color: on ? accent : 'rgba(255,255,255,0.75)',
         borderColor: on ? `${accent}66` : 'rgba(255,255,255,0.14)',
@@ -69,7 +69,7 @@ export function FavoriteButton({ id, accent }: { id: string; accent: string }) {
           )}
         </AnimatePresence>
       </span>
-      {on ? 'Sačuvano' : 'Sačuvaj stih'}
+      {on ? 'Sačuvano' : 'Sačuvaj'}
     </motion.button>
   )
 }

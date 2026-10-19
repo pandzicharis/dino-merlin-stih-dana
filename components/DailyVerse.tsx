@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
 import { markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
-import { setLastSeen } from '@/lib/storage'
+import { bumpStreak, favoriteDate, peekStreak, setLastSeen } from '@/lib/storage'
+import { savedVerse, useSavedPlayer } from '@/lib/player'
 import { primeVerses } from '@/lib/verses-client'
 import { clearBadge, clearPushMark, hasPushMark } from '@/lib/push-client'
 import { cover, markHandled, mayWait, uncover } from '@/lib/cekaj'
@@ -24,6 +25,8 @@ import { IntroHost, playDraw } from './IntroSplash'
  * stih za danas i zapamti ga. Prvo otvaranje u danu ide uz animaciju
  * izvlačenja. Prezentacija i dev `?verse=` i dalje pokazuju tačno zadani stih.
  */
+const noop = () => () => {}
+
 export function DailyVerse({
   serverDate,
   verses,
@@ -152,7 +155,55 @@ export function DailyVerse({
     primeVerses(verses)
   }, [verses])
 
-  useEffect(() => setLastSeen(date), [date])
+  // niz dana zaredom (na serveru 0) — zapiše se prije `setLastSeen`, da
+  // prvi put zna je li stih otvoren i jučer
+  const streak = useSyncExternalStore(noop, () => peekStreak(date), () => 0)
+  useEffect(() => {
+    bumpStreak(date)
+    setLastSeen(date)
+  }, [date])
+
+  // sačuvani sviraju na početnoj — ekran pokazuje stih pjesme koja svira
+  // (components/Listening.tsx); × na pilulici vraća današnji
+  const player = useSavedPlayer()
+  const playing = player.mini && player.id ? savedVerse() : null
+  // nova pjesma dok sačuvani sviraju: stari stih se mekano utiša, pa dođe
+  // novi (ispiše se, pozadina se pretopi) — bez naglog skoka
+  const [shown, setShown] = useState<Verse | null>(null)
+  const listening = playing && shown && shown.id !== playing.id ? shown : playing
+  useEffect(() => {
+    let alive = true
+    const swap = () => alive && setShown(playing)
+    if (!playing || !shown || shown.id === playing.id || reduced) {
+      // ulazak/izlazak već ide kroz prelaz (components/Listening.tsx)
+      if (shown?.id !== playing?.id) void Promise.resolve().then(swap)
+      return () => {
+        alive = false
+      }
+    }
+    const main = document.querySelector<HTMLElement>('main')
+    if (!main) {
+      void Promise.resolve().then(swap)
+      return () => {
+        alive = false
+      }
+    }
+    main
+      .animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'ease-in', fill: 'forwards' })
+      .finished.then(
+        (out) => {
+          swap()
+          requestAnimationFrame(() => {
+            out.cancel()
+            main.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 600, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' })
+          })
+        },
+        swap,
+      )
+    return () => {
+      alive = false
+    }
+  }, [playing, shown, reduced])
 
   const tone = mood ?? verse?.mood ?? 'nostalgija'
   // ostali aktivni stihovi — papirići u gomili na prvom otvaranju
@@ -167,7 +218,16 @@ export function DailyVerse({
       <Onboarding mood={tone} seed={verse?.id ?? 'stih-dana'} />
       {/* dok uređaj ne izvuče stih (prvi frejm), ekran je prazan — pozadina
           i stih uđu zajedno, kao i inače */}
-      {verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} />}
+      {listening ? (
+        <VerseScreen
+          verse={listening}
+          date={favoriteDate(listening.id) ?? date}
+          listening
+          today={verse ? { text: verse.text, mood: mood ?? verse.mood } : undefined}
+        />
+      ) : (
+        verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} streak={verseId ? 0 : streak} />
+      )}
       {/* key: novi stih — zastor od prvog frejma, prije tombole */}
       {verse && <IntroHost key={verse.id} text={verse.text} others={others} mood={tone} date={date} onLand={land} fresh={fresh} font={verse.font} />}
       <Tips />

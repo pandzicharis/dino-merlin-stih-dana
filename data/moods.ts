@@ -111,4 +111,4 @@ export type Mood = keyof typeof MOODS
 export const MOOD_KEYS = Object.keys(MOODS) as Mood[]
 
 /** Portret u pozadini — vidi public/brand/README.md. */
-export const FIGURE_SRC = '/brand/figure.webp'
+export const FIGURE_SRC = '/brand/figure-mi.webp'

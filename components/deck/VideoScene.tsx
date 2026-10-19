@@ -20,7 +20,7 @@ const CAPTIONS: Record<Step, { eyebrow: string; a: string; b: string }> = {
   tombola: { eyebrow: 'Jedan dodir', a: 'Listići zaplešu,', b: 'jedan je tvoj.' },
   verse: { eyebrow: 'Stih dana', a: 'Riječi koje', b: 'danas trebaš.' },
   save: { eyebrow: 'Sačuvaj', a: 'Da ti ostane', b: 'za kasnije.' },
-  play: { eyebrow: 'Poslušaj', a: 'Svaki sačuvan', b: 'sa svojom pjesmom.' },
+  play: { eyebrow: 'Poslušaj', a: 'Sačuvani sviraju', b: 'jedan za drugim.' },
   end: { eyebrow: 'Besplatno · iPhone · Android', a: 'Jedan stih.', b: 'Svaki dan.' },
 }
 
@@ -144,20 +144,19 @@ export function VideoScene({
     // srce se upali i iskoči ikonica s brojem — pa odmah u sačuvane
     await wait(1300)
 
-    // 4 — otvori sačuvane, pusti pjesmu s gramofona u kartici i zatvori —
-    // kratko, bez sjene koja ostane; pjesma dalje svira ispod stiha
+    // 4 — otvori sačuvane, pusti pjesmu s gramofona na prednjoj karti i
+    // spusti panel — pjesma svira dalje na početnoj, gramofon je plejer
     if (!alive()) return
     setStep('play')
     await press('[data-tip="saved"]', id)
-    const card = '[aria-label="Sačuvani stihovi"] button[data-state]'
-    await until(() => Boolean(doc()?.querySelector(card)), 5000)
+    const go = '[aria-label="Sačuvani stihovi"] [data-stih] button[data-state]'
+    await until(() => Boolean(doc()?.querySelector(go)), 5000)
     await wait(700)
-    await press(card, id)
+    await press(go, id)
     mark('play')
     await wait(2000)
     if (!alive()) return
-    await press('[role="dialog"][aria-label="Sačuvani stihovi"] button[aria-label="Zatvori"]', id)
-    doc()?.querySelector<HTMLElement>('[data-deck="play"]')?.click()
+    await press('[role="dialog"][aria-label="Sačuvani stihovi"] button[aria-label="Spusti"]', id)
     await wait(3000)
 
     // 5 — kraj: poruka i link

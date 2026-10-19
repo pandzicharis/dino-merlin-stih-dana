@@ -182,8 +182,19 @@ function fitWhole(ctx: CanvasRenderingContext2D, text: string, maxW: number, siz
   return Math.max(min, s)
 }
 
+/** Gdje je koja riječ stiha na slici — za video (lib/share-video.ts). */
+export type WordBox = { x: number; y: number; w: number; h: number; line: number }
+/** Gdje je koji element Story slike — za video, da svaki uđe svojim pokretom. */
+export type Mark = { kind: 'sig' | 'date' | 'song' | 'album' | 'label'; x: number; y: number; w: number; h: number }
+/**
+ * `bare`: samo pozadina — bez potpisa, datuma, stiha, pjesme, albuma i znaka;
+ * `boxes`: zapiši gdje je koja riječ stiha; `marks`: gdje je koji ostali element.
+ */
+type VerseOpts = { bare?: boolean; boxes?: WordBox[]; marks?: Mark[] }
+
 /** Nacrtaj redove centrirano; `y` je sredina prvog reda. Riječi s naglaskom u boji `accent`. */
-function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, y: number, lh: number, size: number, serif: string, accent?: string) {
+function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, y: number, lh: number, size: number, serif: string, accent?: string, opts: VerseOpts = {}) {
+  if (opts.bare) return
   setSpacing(ctx, 0)
   ctx.font = `400 ${size}px ${serif}`
   const space = ctx.measureText(' ').width
@@ -196,6 +207,7 @@ function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, y:
       setSpacing(ctx, r.ls)
       ctx.fillStyle = r.color ?? (r.accent && accent ? accent : base)
       ctx.fillText(r.text, x + r.pad, y + i * lh)
+      opts.boxes?.push({ x, y: y + i * lh - lh / 2, w: r.width, h: lh, line: i })
       x += r.width + space
     }
   })
@@ -294,6 +306,18 @@ export async function drawShareImage(target: HTMLCanvasElement, input: ShareInpu
   show(target, await shareCanvas(input))
 }
 
+/**
+ * Za video (lib/share-video.ts): sama pozadina i cijela slika, i gdje je
+ * koji element — video na pozadinu unosi element po element iz cijele slike.
+ */
+export async function storyLayers(input: ShareInput) {
+  const words: WordBox[] = []
+  const marks: Mark[] = []
+  const full = await render(input, { boxes: words, marks })
+  const bare = await render(input, { bare: true })
+  return { full, bare, words, marks }
+}
+
 /** Nacrtaj sliku unaprijed, u tišini — prvi dodir na „Podijeli“ je onda trenutan. */
 export function warmShareImage(input: ShareInput) {
   shareCanvas(input).catch(() => {})
@@ -317,7 +341,7 @@ function shareCanvas(input: ShareInput): Promise<HTMLCanvasElement> {
   return p
 }
 
-async function render(input: ShareInput): Promise<HTMLCanvasElement> {
+async function render(input: ShareInput, opts: VerseOpts = {}): Promise<HTMLCanvasElement> {
   const { verse, date, format } = input
   const { w: W, h: H } = SHARE_FORMATS[format]
   const p = palette(verse.mood)
@@ -632,7 +656,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
       ctx.shadowBlur = size * 0.4
       ctx.shadowOffsetY = size * 0.03
     }
-    drawVerse(ctx, lines, W / 2, y + lh / 2, lh, size, fonts.serif, p.accent)
+    drawVerse(ctx, lines, W / 2, y + lh / 2, lh, size, fonts.serif, p.accent, opts)
     ctx.restore()
     y += lines.length * lh + g1
 
@@ -698,7 +722,9 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
   // zaglavlje: samo potpis — datum ide uz stih, kao na ekranu
   let top = pad + (ratio > 1.5 ? W * 0.06 : 0)
   const sigH = W * (ratio > 1.5 ? 0.1 : 0.085)
-  if (signature) {
+  if (opts.bare) {
+    /* samo pozadina */
+  } else if (signature) {
     const sw = sigH * (signature.width / signature.height)
     const s = document.createElement('canvas')
     s.width = Math.ceil(sw)
@@ -712,10 +738,12 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.globalAlpha = 0.92
     ctx.drawImage(s, W / 2 - sw / 2, top)
     ctx.restore()
+    opts.marks?.push({ kind: 'sig', x: W / 2 - sw / 2, y: top, w: sw, h: sigH })
   } else {
     ctx.fillStyle = p.light ? p.text : '#F4F4F4'
     ctx.font = `700 ${W * 0.045}px ${fonts.sans}`
     spaced(ctx, BRAND.name.toUpperCase(), W / 2, top + sigH / 2, W * 0.008)
+    opts.marks?.push({ kind: 'sig', x: pad, y: top, w: W - pad * 2, h: sigH })
   }
   top += sigH
 
@@ -735,24 +763,36 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     // ista boja i jačina kao potpis gore
     sc.fillStyle = p.light ? p.text : '#F4F4F4'
     sc.fillRect(0, 0, lw, lh)
-    ctx.save()
-    ctx.globalAlpha = 0.92
-    ctx.drawImage(s, W / 2 - lw / 2, bottom - lh)
-    ctx.restore()
+    if (!opts.bare) {
+      ctx.save()
+      ctx.globalAlpha = 0.92
+      ctx.drawImage(s, W / 2 - lw / 2, bottom - lh)
+      ctx.restore()
+      opts.marks?.push({ kind: 'label', x: W / 2 - lw / 2, y: bottom - lh, w: lw, h: lh })
+    }
     // sadržaj ide gore, znak ostaje dolje — jasan razmak između njih
     bottom -= lh + W * (ratio > 1.5 ? 0.14 : 0.1)
   } else {
     const tagSize = W * 0.0165
     ctx.font = `500 ${tagSize}px ${fonts.sans}`
     ctx.fillStyle = p.muted
-    spaced(ctx, 'STIH DANA', W / 2, bottom - tagSize / 2, W * 0.009)
+    if (!opts.bare) {
+      spaced(ctx, 'STIH DANA', W / 2, bottom - tagSize / 2, W * 0.009)
+      const tw = spacedWidth(ctx, 'STIH DANA', W * 0.009)
+      opts.marks?.push({ kind: 'label', x: W / 2 - tw / 2, y: bottom - tagSize, w: tw, h: tagSize })
+    }
     bottom -= tagSize + W * 0.05
   }
 
   const albumSize = W * 0.025
   ctx.font = `500 ${albumSize}px ${fonts.sans}`
   ctx.fillStyle = p.light ? 'rgba(27,20,11,0.7)' : 'rgba(255,255,255,0.62)'
-  spaced(ctx, `${verse.album} · ${verse.year}`.toUpperCase(), W / 2, bottom - albumSize / 2, W * 0.0055)
+  if (!opts.bare) {
+    const t = `${verse.album} · ${verse.year}`.toUpperCase()
+    spaced(ctx, t, W / 2, bottom - albumSize / 2, W * 0.0055)
+    const aw = spacedWidth(ctx, t, W * 0.0055)
+    opts.marks?.push({ kind: 'album', x: W / 2 - aw / 2, y: bottom - albumSize, w: aw, h: albumSize })
+  }
   bottom -= albumSize + W * 0.028
 
   let songSize = W * 0.043
@@ -765,7 +805,11 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.font = `600 ${songSize}px ${fonts.sans}`
   }
   ctx.fillStyle = p.chrome
-  spaced(ctx, verse.song.toUpperCase(), W / 2, bottom - songSize / 2, songGap)
+  if (!opts.bare) {
+    spaced(ctx, verse.song.toUpperCase(), W / 2, bottom - songSize / 2, songGap)
+    const sw2 = spacedWidth(ctx, verse.song.toUpperCase(), songGap)
+    opts.marks?.push({ kind: 'song', x: W / 2 - sw2 / 2, y: bottom - songSize, w: sw2, h: songSize })
+  }
   bottom -= songSize
 
   // Srednji blok, isti kao na ekranu: datum → stih, sa razmakom od ~0.62
@@ -806,7 +850,12 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
 
   ctx.font = `600 ${dateSize}px ${fonts.sans}`
   ctx.fillStyle = p.accent
-  spaced(ctx, formatFullDateBs(date).toUpperCase(), W / 2, groupTop + dateSize / 2, W * 0.0062)
+  if (!opts.bare) {
+    const t = formatFullDateBs(date).toUpperCase()
+    spaced(ctx, t, W / 2, groupTop + dateSize / 2, W * 0.0062)
+    const dw = spacedWidth(ctx, t, W * 0.0062)
+    opts.marks?.push({ kind: 'date', x: W / 2 - dw / 2, y: groupTop, w: dw, h: dateSize })
+  }
 
   if (p.bloom > 0) {
     const g = ctx.createRadialGradient(W / 2, mid, 0, W / 2, mid, W * 0.55)
@@ -824,7 +873,7 @@ async function render(input: ShareInput): Promise<HTMLCanvasElement> {
     ctx.shadowBlur = size * 0.4
     ctx.shadowOffsetY = size * 0.03
   }
-  drawVerse(ctx, lines, W / 2, firstY, lh, size, fonts.serif, p.accent)
+  drawVerse(ctx, lines, W / 2, firstY, lh, size, fonts.serif, p.accent, opts)
   ctx.restore()
 
 

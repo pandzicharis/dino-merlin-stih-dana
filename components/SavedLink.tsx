@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
+import { OPEN_SAVED } from '@/lib/player'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
 const load = () => import('./SavedPanel')
@@ -28,6 +29,15 @@ export function SavedLink() {
   useEffect(() => {
     const t = setTimeout(load, 3000)
     return () => clearTimeout(t)
+  }, [])
+  // pilula sačuvanih na početnoj vraća panel
+  useEffect(() => {
+    const show = () => {
+      setUsed(true)
+      setOpen(true)
+    }
+    window.addEventListener(OPEN_SAVED, show)
+    return () => window.removeEventListener(OPEN_SAVED, show)
   }, [])
 
   return (

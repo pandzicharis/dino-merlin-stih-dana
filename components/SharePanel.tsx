@@ -13,6 +13,7 @@ import {
   type ShareFormat,
 } from '@/lib/share-image'
 import { getSharePrefs, setSharePrefs } from '@/lib/storage'
+import { recordStory, videoSupported } from '@/lib/share-video'
 import { haptic } from '@/lib/haptic'
 import { DrawerIcon } from './DrawerIcon'
 import { Icon, TOAST_BAD, TOAST_OK, toast } from './Toast'
@@ -41,6 +42,12 @@ export default function SharePanel({
   })
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState<Target | null>(null)
+  // video za Story (lib/share-video.ts) — važi za stih i format za koji je snimljen
+  const [canVideo] = useState(videoSupported)
+  const vidKey = `${verse.id}|${format}`
+  const [vidState, setVid] = useState<{ key: string; p: number; file?: File } | null>(null)
+  const vid = vidState?.key === vidKey ? vidState : null
+  const recording = Boolean(vid && !vid.file)
 
   useEffect(() => {
     if (!open || !canvasRef.current) return
@@ -54,7 +61,7 @@ export default function SharePanel({
   }, [open, verse, date, format])
 
   useSheetOpen(open)
-  const sheetDrag = useSheetDrag(onClose)
+  const sheetDrag = useSheetDrag(onClose, open)
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
@@ -88,7 +95,7 @@ export default function SharePanel({
     const url = URL.createObjectURL(file)
     const a = document.createElement('a')
     a.href = url
-    a.download = fileName
+    a.download = file.name
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
@@ -140,12 +147,57 @@ export default function SharePanel({
     }
   }
 
+  /**
+   * Prvi dodir snimi video (stih se ispiše riječ po riječ) — vidi
+   * se u pregledu dok nastaje. Drugi dodir ga sačuva: na telefonu kroz
+   * sistemski share ("Sačuvaj video"), kao i slika; na računaru se preuzme.
+   * Čuvanje traži svjež dodir, a snimanje traje nekoliko sekundi.
+   */
+  const video = async () => {
+    if (recording || busy) return
+    if (vid?.file) {
+      haptic(6)
+      try {
+        const touch = window.matchMedia('(pointer: coarse)').matches
+        if (touch && navigator.canShare?.({ files: [vid.file] })) await navigator.share({ files: [vid.file] })
+        else {
+          download(vid.file)
+          toast({ id: 'share', title: 'Video je sačuvan', color: TOAST_OK, icon: <Icon.ok /> })
+        }
+      } catch (e) {
+        if ((e as Error)?.name !== 'AbortError') toast({ id: 'share', title: 'Nije uspjelo', sub: 'Pokušaj ponovo', color: TOAST_BAD, icon: <Icon.bad /> })
+      }
+      return
+    }
+    const canvas = canvasRef.current
+    if (!canvas) return
+    haptic(6)
+    const key = vidKey
+    setVid({ key, p: 0 })
+    let shown = 0
+    try {
+      const file = await recordStory(canvas, { verse, date, format: 'story' }, (p) => {
+        const pct = Math.floor(p * 100)
+        if (pct !== shown) setVid({ key, p: (shown = pct) / 100 })
+      })
+      if (!file) throw new Error('video')
+      setVid({ key, p: 1, file })
+      haptic([8, 40, 8])
+    } catch {
+      setVid(null)
+      toast({ id: 'share', title: 'Video nije uspio', sub: 'Pokušaj ponovo', color: TOAST_BAD, icon: <Icon.bad /> })
+    } finally {
+      // pregled se vrati na sliku
+      if (canvasRef.current) await drawShareImage(canvasRef.current, { verse, date, format })
+    }
+  }
+
   if (typeof document === 'undefined') return null
 
   return createPortal(
     <AnimatePresence>
       {open && (
-        <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+        <SheetLayer className="fixed inset-0 z-[120] flex items-end justify-center sm:items-center">
           <SheetBackdrop onClose={onClose} />
 
           <SheetSlide>
@@ -211,6 +263,7 @@ export default function SharePanel({
                   <button
                     key={f}
                     onClick={() => choose(f)}
+                    disabled={recording}
                     data-format={f}
                     aria-pressed={on}
                     aria-label={`${F.label} ${F.hint}`}
@@ -232,16 +285,10 @@ export default function SharePanel({
               })}
             </div>
 
-            {format === 'pozadina' && (
-              <p className="mt-3 text-center text-[12px] leading-snug text-white/50">
-                Sačuvaj sliku pa je postavi kao pozadinu zaključanog ekrana — sat i obavijesti ostaju na čistom.
-              </p>
-            )}
-
             {/* akcije */}
             <motion.button
               onClick={() => run('share')}
-              disabled={!ready || busy !== null}
+              disabled={!ready || busy !== null || recording}
               whileTap={{ scale: 0.98 }}
               className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl text-[14px] font-semibold tracking-wide text-black disabled:opacity-60"
               style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
@@ -249,15 +296,39 @@ export default function SharePanel({
               {busy === 'share' ? <Spinner /> : <ShareIcon />}
               Podijeli sliku
             </motion.button>
-            <button
-              onClick={() => run('save')}
-              data-tip="download"
-              disabled={!ready || busy !== null}
-              className="mt-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 text-[14px] text-white/80 transition-colors hover:bg-white/5 disabled:opacity-50"
-            >
-              {busy === 'save' ? <Spinner /> : <DownloadIcon />}
-              Sačuvaj sliku
-            </button>
+            {/* Story: pored "Sačuvaj sliku" i video — isti red, panel ne raste */}
+            <div className={`mt-2 grid gap-2 ${canVideo && format === 'story' ? 'grid-cols-2' : ''}`}>
+              <button
+                onClick={() => run('save')}
+                data-tip="download"
+                disabled={!ready || busy !== null || recording}
+                className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 text-[14px] text-white/80 transition-colors hover:bg-white/5 disabled:opacity-50"
+              >
+                {busy === 'save' ? <Spinner /> : <DownloadIcon />}
+                Sačuvaj sliku
+              </button>
+              {canVideo && format === 'story' && (
+                <button
+                  onClick={video}
+                  disabled={!ready || busy !== null || recording}
+                  className="relative flex h-12 items-center justify-center gap-2 overflow-hidden rounded-2xl border text-[14px] transition-colors hover:bg-white/5 disabled:cursor-default"
+                  style={{ borderColor: vid?.file ? `${BRAND.gold}80` : 'rgba(255,255,255,0.1)', color: vid?.file ? BRAND.gold : 'rgba(255,255,255,0.8)' }}
+                >
+                  {/* napredak snimanja — tiha zlatna traka ispod natpisa */}
+                  {recording && (
+                    <span
+                      className="absolute inset-y-0 left-0 transition-[width] duration-200 ease-linear"
+                      style={{ width: `${(vid?.p ?? 0) * 100}%`, background: `${BRAND.gold}26` }}
+                      aria-hidden
+                    />
+                  )}
+                  <span className="relative flex items-center gap-2">
+                    {recording ? <Spinner /> : vid?.file ? <DownloadIcon /> : <VideoIcon />}
+                    {recording ? `${Math.round((vid?.p ?? 0) * 100)}%` : vid?.file ? 'Sačuvaj video' : 'Video'}
+                  </span>
+                </button>
+              )}
+            </div>
 
           </motion.div>
           </SheetSlide>
@@ -274,6 +345,15 @@ function ShareIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M12 3v13M12 3 8 7M12 3l4 4" />
       <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+    </svg>
+  )
+}
+
+function VideoIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="6" width="13" height="12" rx="2.5" />
+      <path d="m16 10.5 5-3v9l-5-3" />
     </svg>
   )
 }

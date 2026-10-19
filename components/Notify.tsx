@@ -18,18 +18,18 @@ import { getNotifyIntent, setNotifyIntent } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
 import { Icon, TOAST_BAD, TOAST_OK, toast } from './Toast'
 
-type State = 'off' | 'on' | 'denied' | 'install' | 'unsupported' | 'busy'
+export type NotifyState = 'off' | 'on' | 'denied' | 'install' | 'unsupported' | 'busy'
 
 /**
  * Stanje se računa SINHRONO iz dozvole i korisnikovog prekidača.
  *
  * Ranije se čekalo `getSubscription()`, koji čeka service worker, koji čeka
- * mrežu — pa je zvono prvo bilo nevidljivo, a paljenje i gašenje su stajali
+ * mrežu — pa je prekidač prvo bio nevidljiv, a paljenje i gašenje su stajali
  * dok se ne vrati odgovor sa servera. Server sad radi u pozadini.
  */
-function resolve(permission: string, intent: boolean): State {
-  // Na serveru (i pri hidrataciji) store vraća 'unsupported' — zvono se tada
-  // ne crta, pa se HTML sa servera i prvi klijentski render poklapaju.
+function resolve(permission: string, intent: boolean): NotifyState {
+  // Na serveru (i pri hidrataciji) store vraća 'unsupported' — prekidač se
+  // tada ne crta, pa se HTML sa servera i prvi klijentski render poklapaju.
   if (permission === 'unsupported') return 'unsupported'
   if (!pushSupported()) return 'unsupported'
   if (needsInstallFirst()) return 'install'
@@ -38,41 +38,18 @@ function resolve(permission: string, intent: boolean): State {
   return intent ? 'on' : 'off'
 }
 
-const HINTS: Partial<Record<State, { title: string; sub: string }>> = {
+const HINTS: Partial<Record<NotifyState, { title: string; sub: string }>> = {
   denied: { title: 'Obavijesti su blokirane', sub: 'Uključi ih u postavkama telefona' },
   install: { title: 'Dodaj na početni ekran', sub: 'Tek tada obavijesti rade' },
-}
-
-const ARIA: Record<Exclude<State, 'unsupported'>, string> = {
-  on: `Obavijesti uključene, stih stiže u ${SEND_TIME}. Isključi.`,
-  off: 'Uključi dnevnu obavijest',
-  busy: 'Trenutak…',
-  denied: 'Obavijesti su blokirane u postavkama telefona',
-  install: 'Obavijesti rade tek kad je aplikacija na početnom ekranu',
+  unsupported: { title: 'Obavijesti ovdje ne rade', sub: 'Otvori aplikaciju na telefonu' },
 }
 
 /**
- * Zeleno = stiže, crveno = ne stiže.
- *
- * Prigušeni tonovi, ne signalne boje: zvono stoji uz ikonu dijeljenja i ne
- * smije je nadglasati. Uz boju ide i drugi znak — puno zvono kad stiže,
- * prazno kad ne — da stanje ne visi samo o nijansi.
+ * Obavijesti u pozadini, na svakom otvaranju: service worker se registruje
+ * (nova verzija, obavijesti), a pretplata se tiho popravi. Ne crta ništa —
+ * prekidač je u postavkama (components/SettingsPanel.tsx).
  */
-const OK = '#8DC9A3'
-const NO = '#D08C8C'
-
-export function NotifyToggle() {
-  const permission = useSyncExternalStore(
-    subscribePermission,
-    permissionSnapshot,
-    () => 'unsupported',
-  )
-  const intent = useNotifyIntent()
-  /** Privremeno stanje dok traje sistemski dijalog. */
-  const [pending, setPending] = useState<State | null>(null)
-
-  const state = pending ?? resolve(permission, intent)
-
+export function NotifySync() {
   useEffect(() => {
     registerSW()
 
@@ -91,10 +68,20 @@ export function NotifyToggle() {
       alive = false
     }
   }, [])
+  return null
+}
+
+/** Stanje obavijesti i jedan dodir za paljenje/gašenje — za prekidač u postavkama. */
+export function useNotify(): { state: NotifyState; toggle: () => Promise<void> } {
+  const permission = useSyncExternalStore(subscribePermission, permissionSnapshot, () => 'unsupported')
+  const intent = useNotifyIntent()
+  /** Privremeno stanje dok traje sistemski dijalog. */
+  const [pending, setPending] = useState<NotifyState | null>(null)
+  const state = pending ?? resolve(permission, intent)
 
   const show = (t: Omit<Parameters<typeof toast>[0], 'id'>) => toast({ id: 'notify', ...t })
 
-  const onClick = async () => {
+  const toggle = async () => {
     if (state === 'busy') return
     if (HINTS[state]) return show({ ...HINTS[state]!, icon: <Icon.info /> })
 
@@ -126,51 +113,5 @@ export function NotifyToggle() {
     }
   }
 
-  if (state === 'unsupported') return null
-
-  const on = state === 'on'
-  // Stanje nosi samo boja zvona: zeleno stiže, crveno ne stiže.
-  const mark = on ? OK : NO
-
-  return (
-    // `flex` je bitan: kao blok, omotač bi bio visok koliko linija teksta oko
-    // inline SVG-a, pa bi se centrirala pogrešna kutija i zvono bi stajalo
-    // nekoliko piksela više od ikone dijeljenja pored njega.
-    <div className="relative flex items-center">
-      {/* Isti oblik kao dugme za dijeljenje: gola ikona, bez okvira i podloge. */}
-      <button
-        onClick={onClick}
-        aria-pressed={on}
-        aria-label={ARIA[state]}
-        data-tip="notify"
-        disabled={state === 'busy'}
-        className="-m-[10.5px] p-[10.5px] transition-all duration-500 active:scale-90 disabled:opacity-40"
-        style={{ color: mark }}
-      >
-        <Bell on={on} muted={state === 'denied'} />
-      </button>
-
-    </div>
-  )
-}
-
-function Bell({ on, muted }: { on: boolean; muted: boolean }) {
-  return (
-    <svg
-      width="23"
-      height="23"
-      viewBox="0 0 24 24"
-      fill={on ? 'currentColor' : 'none'}
-      fillOpacity={on ? 0.22 : undefined}
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5" />
-      <path d="M13.7 20a2 2 0 0 1-3.4 0" />
-      {muted && <path d="M3 3l18 18" strokeWidth="1.5" />}
-    </svg>
-  )
+  return { state, toggle }
 }

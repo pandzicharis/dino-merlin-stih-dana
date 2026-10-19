@@ -10,13 +10,15 @@ import { MoodBackground } from './MoodBackground'
 import { albumOf } from '@/data/albums'
 import { SPLASH_ARRIVE, VerseText, verseTail } from './VerseText'
 import { SongCredit } from './SongCredit'
-import { NotifyToggle } from './NotifyToggle'
+import { NotifySync } from './Notify'
+import { SettingsButton } from './Settings'
 import { ShareButton } from './ShareSheet'
 import { Signature } from './Signature'
 import { FavoriteButton } from './FavoriteButton'
 import { SavedLink } from './SavedLink'
 import { MagazaLogo } from './MagazaLogo'
-import { ArtistLinks } from './ArtistLinks'
+import { StreakLine } from './Streak'
+import { ListenKey, RetroDeck } from './Listening'
 
 /**
  * Čista prezentacija — datum i stih dolaze izvana.
@@ -32,6 +34,9 @@ export function VerseScreen({
   replay = 0,
   instant = false,
   preview = false,
+  streak = 0,
+  listening = false,
+  today,
 }: {
   verse: Verse
   date: string
@@ -44,6 +49,15 @@ export function VerseScreen({
   instant?: boolean
   /** pregled (admin, prezentacija): gramofon i za pjesmu koja još nije preuzeta */
   preview?: boolean
+  /** dana zaredom (lib/storage.ts) — tiho iznad datuma, tek od drugog dana */
+  streak?: number
+  /**
+   * sačuvani sviraju na početnoj (components/Listening.tsx): stih je pjesme
+   * koja svira, gramofon je plejer sačuvanih, ispod njega kontrole
+   */
+  listening?: boolean
+  /** današnji stih — viri ispod kontrola dok sačuvani sviraju (povratak na njega) */
+  today?: { text: string; mood: Mood }
 }) {
   const m = MOODS[mood ?? verse.mood]
 
@@ -52,7 +66,9 @@ export function VerseScreen({
   // između stiha i potpisa; sada nota i podnožje ulaze dok stih još sjeda.
   // poslije splasha stih se ne ispisuje ponovo — pojavi se kad mu slova s
   // papira stignu na mjesto (pretope se), pa izgleda kao da su prenesena
-  const arrive = instant ? 0 : replay > 0 ? SPLASH_ARRIVE : undefined
+  // dok sačuvani sviraju, novi stih ulazi cio, zajedno s mekanim pretapanjem
+  // ekrana (DailyVerse) — bez ispisivanja koje bi kasnilo iza prelaza
+  const arrive = instant || listening ? 0 : replay > 0 ? SPLASH_ARRIVE : undefined
   const tail = compact ? 0 : arrive != null ? arrive + 0.3 : verseTail(verse.text)
 
   // Statusna traka (Android, Chrome) preuzme gornju boju pozadine stiha,
@@ -80,7 +96,7 @@ export function VerseScreen({
           compact
             ? 'flex min-h-[260px] flex-col justify-between p-5'
             : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(3rem,calc(var(--sat)+1.75rem))] ${
-                OVERRIDE_ON ? 'dev-pad pb-16' : 'pb-[max(2.25rem,env(safe-area-inset-bottom))]'
+                OVERRIDE_ON ? 'dev-pad pb-16' : 'pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+2rem))]'
               }`
         }
       >
@@ -112,9 +128,10 @@ export function VerseScreen({
               animate={{ opacity: 1 }}
               transition={{ duration: 0.7, delay: 0.7, ease: 'easeOut' }}
             >
-              <NotifyToggle />
+              {/* obavijesti rade u pozadini; prekidač je u postavkama */}
+              <NotifySync />
               <SavedLink />
-              <ShareButton verse={verse} accent={m.accent} date={date} />
+              <SettingsButton />
             </motion.div>
           )}
         </header>
@@ -124,21 +141,26 @@ export function VerseScreen({
           className={
             compact
               ? 'flex flex-col items-center gap-3 py-4'
-              : 'flex flex-1 flex-col items-center justify-center gap-8 py-8'
+              : // malo iznad sredine — više zraka ispod stiha, prema gramofonu
+                'flex flex-1 flex-col items-center justify-center gap-8 pb-[min(10vh,80px)] pt-4'
           }
         >
           {!compact && (
-            <motion.p
-              data-tip="mine"
-              className="tabular text-[11px] font-semibold uppercase tracking-[0.3em]"
-              // čitljiv na svakoj pozadini (i preko svijetlog dijela omota): puna boja + tamni oreol
-              style={{ color: m.accent, textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.65)' }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.9, delay: 0.2, ease: 'easeOut' }}
-            >
-              {formatFullDateBs(date)}
-            </motion.p>
+            // niz dana iznad datuma, tiho — tek od drugog dana
+            <div className="flex flex-col items-center gap-3">
+              {!listening && streak > 1 && <StreakLine n={streak} accent={m.accent} />}
+              <motion.p
+                data-tip="mine"
+                className="tabular whitespace-nowrap text-[12px] font-bold uppercase tracking-[0.2em]"
+                // čitljiv na svakoj pozadini (i preko svijetlog dijela omota): puna boja + tamni oreol
+                style={{ color: m.accent, textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.65)' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.9, delay: 0.2, ease: 'easeOut' }}
+              >
+                {formatFullDateBs(date)}
+              </motion.p>
+            </div>
           )}
 
           <VerseText key={`${verse.id}-${replay}`} text={verse.text} color={m.text} glow={m.accent} appearAt={arrive} font={verse.font} />
@@ -146,24 +168,30 @@ export function VerseScreen({
           {/* odmah ispod stiha — sačuvati se želi baš ono što se upravo pročitalo */}
           {!compact && (
             <motion.div
-              key={`s-${verse.id}-${replay}`}
+              // dok sačuvani sviraju, dugmad ostaju — mijenja se samo stih
+              key={listening ? 's-listen' : `s-${verse.id}-${replay}`}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: Math.max(0.15, tail - 0.5), ease: [0.22, 1, 0.36, 1] }}
             >
-              <FavoriteButton id={verse.id} accent={m.accent} />
+              {/* radnje stiha: sačuvaj i podijeli, jedno do drugog */}
+              <div className="flex items-center gap-2.5">
+                <FavoriteButton id={verse.id} accent={m.accent} />
+                <ShareButton verse={verse} accent={m.accent} date={date} pill />
+              </div>
             </motion.div>
           )}
         </div>
 
         {/* podnožje — uvijek prisutno, samo se stiša */}
         <motion.footer
-          key={`f-${verse.id}-${replay}`}
+          // dok sačuvani sviraju, podnožje (gramofon, kontrole) ostaje — mijenja se samo pjesma
+          key={listening ? 'f-listen' : `f-${verse.id}-${replay}`}
           className="flex flex-col items-center gap-6 text-center"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           // podnožje (gramofon, plejer) ne čeka da stih sjedne — ulazi dok se još ispisuje
-          transition={{ duration: 0.75, delay: compact ? 0 : Math.max(0.3, tail - 0.3), ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.75, delay: compact ? 0 : listening ? 0.1 : Math.max(0.3, tail - 0.3), ease: [0.22, 1, 0.36, 1] }}
         >
           {compact ? (
             <div>
@@ -179,13 +207,23 @@ export function VerseScreen({
             </div>
           ) : (
             <>
-              <SongCredit verse={verse} preview={preview} />
-              <span
-                className="h-px w-16"
-                style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
-                aria-hidden
-              />
-              <ArtistLinks />
+              <SongCredit verse={verse} preview={preview} share={listening} />
+              {listening ? (
+                // sačuvani sviraju — kontrole i "Današnji stih" ispod gramofona
+                <RetroDeck accent={m.accent} today={today} />
+              ) : (
+                // "Player pjesama" (sačuvanih, kad ih ima); mreže su u postavkama
+                <ListenKey
+                  accent={m.accent}
+                  fallback={
+                    <span
+                      className="h-px w-16 shrink-0"
+                      style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
+                      aria-hidden
+                    />
+                  }
+                />
+              )}
             </>
           )}
         </motion.footer>

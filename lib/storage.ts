@@ -3,7 +3,7 @@
  * Svaki pristup je u try/catch: private mode i blokirani storage ne smiju srušiti ekran.
  */
 
-import { getActiveDate } from './date'
+import { addDays, getActiveDate } from './date'
 
 const SEEN = 'stihdana:lastSeen'
 const NOTIFY = 'stihdana:notify'
@@ -49,6 +49,27 @@ export function getLastSeen(): string | null {
 
 export function setLastSeen(iso: string) {
   write(SEEN, iso)
+}
+
+/* ── niz: dana zaredom s otvorenim stihom ─────────────────────── */
+
+const STREAK = 'stihdana:niz'
+
+/**
+ * Koliki je niz na dan `iso` — samo čita. Raste ako je stih otvoren i jučer,
+ * inače kreće ispočetka. Ko je aplikaciju koristio i prije niza, a otvorio
+ * je jučer (`lastSeen`), kreće od dva.
+ */
+export function peekStreak(iso: string): number {
+  const s = read<{ last: string; n: number } | null>(STREAK, null)
+  if (s?.last === iso) return s.n
+  const yesterday = addDays(iso, -1)
+  return s ? (s.last === yesterday ? s.n + 1 : 1) : getLastSeen() === yesterday ? 2 : 1
+}
+
+/** Stih otvoren na dan `iso` — zapamti niz. Zove se PRIJE `setLastSeen`. */
+export function bumpStreak(iso: string) {
+  write(STREAK, { last: iso, n: peekStreak(iso) })
 }
 
 /* ── dijeljenje: zadnji izabrani format ───────────────────────── */
@@ -99,6 +120,18 @@ export function favoriteDate(id: string): string | undefined {
     .filter((d) => draw?.days?.[d]?.id === id)
     .sort()
     .at(-1)
+}
+
+/**
+ * Dan sačuvanog stiha, uvijek: ako se ne zna (sačuvan davno, prije nego se
+ * pamtilo, a nije ni u izvlačenjima), zapiše se današnji — od tad stoji isti.
+ */
+export function savedDay(id: string): string {
+  const known = favoriteDate(id)
+  if (known) return known
+  const day = getActiveDate()
+  write(FAVORITE_DATES, { ...read<Record<string, string>>(FAVORITE_DATES, {}), [id]: day })
+  return day
 }
 
 /** Izbaci sačuvane id-eve kojih više nema (obrisan stih, stari test). */

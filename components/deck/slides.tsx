@@ -6,6 +6,8 @@ import { motion } from 'motion/react'
 import { MOODS } from '@/data/moods'
 import { albumOf, ALBUMS } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
+import { playable } from '@/lib/player'
+import { DECK_VERSE } from '@/lib/deck'
 import { useDeck } from './context'
 import { TIPS_ON } from '../Tips'
 import { Grafike, LANSIRANJE, LaunchPlan, Ostalo, PwaNative, Video } from './launch'
@@ -83,6 +85,13 @@ const STIH: FeatureDef[] = [
     title: 'Poslušaj pjesmu',
     enter: '/',
     body: () => <Slusanje />,
+  },
+  {
+    // sačuvani kao plejer na početnoj: svaka pjesma donese svoj stih
+    id: 'plejer',
+    title: 'Player pjesama',
+    enter: '/',
+    body: () => <Plejer />,
   },
   {
     id: 'dijeljenje',
@@ -599,11 +608,28 @@ export function cleanSlate() {
   try {
     localStorage.setItem('stihdana:favorites', '[]')
     localStorage.removeItem('stihdana:share')
-    localStorage.removeItem('stihdana:savedView')
     localStorage.setItem('stihdana:notify', 'true')
   } catch {
     /* privatni prozor */
   }
+}
+
+/**
+ * Poslije koraka "Sačuvaj stih" stih prezentacije ostaje sačuvan na svim
+ * narednim koracima — i kad prezenter preskoči čuvanje (Ručno, skok na korak).
+ * Telefon dijeli localStorage s prezentacijom, pa se "Sačuvano" i brojač
+ * gore odmah pokažu (događaj `storage`).
+ */
+function useKeepSaved() {
+  useEffect(() => {
+    try {
+      const list: unknown = JSON.parse(localStorage.getItem('stihdana:favorites') || '[]')
+      const ids = Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : []
+      if (!ids.includes(DECK_VERSE)) localStorage.setItem('stihdana:favorites', JSON.stringify([DECK_VERSE, ...ids]))
+    } catch {
+      /* privatni prozor */
+    }
+  }, [])
 }
 
 type Scene = {
@@ -1281,7 +1307,7 @@ function Pristup() {
   )
 }
 
-/** Stih se sačuva, a broj u zaglavlju otvori sačuvane — prvo karte, pa lista. */
+/** Stih se sačuva, broj u zaglavlju otvori sačuvane: špil karata, raširena karta. */
 function Sacuvano() {
   const { os, setOs, manual } = useDeck()
   return (
@@ -1289,10 +1315,9 @@ function Sacuvano() {
       {/* scena po sistemu: kad iPhone završi, ista ide na Androidu (prekidač ide s njom) */}
       <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
       <Text>
-        „Sačuvaj stih“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir ih otvara kao špil karata:
-        svaka je ekran stiha u malom, s danom kad je sačuvan i svojom pjesmom na gramofonu; susjedne vire sa strane,
-        prevuci za sljedeći ili ih gledaj kao listu.
-        Bez naloga i prijave: sve ostaje na telefonu, server ne radi ništa.
+        „Sačuvaj“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir ih otvara kao špil karata: svaka
+        je stih s danom kad je sačuvan i svojim gramofonom; susjedne vire sa strane, prevuci za sljedeći. Raširi
+        kartu i stih je tu preko cijelog ekrana, kao na početnoj. Bez naloga i prijave: sve ostaje na telefonu.
       </Text>
     </>
   )
@@ -1314,11 +1339,81 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
     await find('[data-tip="saved"]', 3000)
     await wait(1300)
     if (alive()) await press('[data-tip="saved"]')
-    // prvo karte (podrazumijevano), pa gore prekidač na listu — lista ostane
-    // na ekranu, pa isto na drugom sistemu
-    await wait(2600)
-    if (alive()) await press('[aria-label="Lista"]')
-    await wait(2400)
+    // "Raširi" — stih preko cijelog ekrana, kao na početnoj; "Skupi" ga
+    // vrati u špil — pa isto na drugom sistemu
+    await wait(2200)
+    if (alive()) await press('[aria-label="Raširi"]')
+    await wait(3400)
+    if (alive()) await press('[data-full] [aria-label="Skupi"]')
+    await wait(2000)
+    if (alive()) onDone()
+  })
+  return null
+}
+
+/**
+ * Player pjesama: sačuvani sviraju na početnoj — svaka pjesma donese svoj
+ * stih (pozadina se pretopi, stih se ispiše), kontrole kao u Apple Musicu,
+ * "Današnji stih" vraća današnji.
+ */
+function Plejer() {
+  const { os, setOs, manual, phone } = useDeck()
+  useKeepSaved()
+  // odlaskom s koraka muzika stane (i sačuvani na početnoj)
+  useEffect(
+    () => () => {
+      try {
+        const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
+        w?.dispatchEvent(new w.Event('stihdana:stop-audio'))
+      } catch {
+        /* tuđa adresa */
+      }
+    },
+    [phone],
+  )
+  return (
+    <>
+      <PlejerScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
+      <Text>
+        Sačuvani postaju plejer: „Player pjesama“ ispod gramofona — svaka pjesma donese svoj stih na ekran, pozadina
+        se pretopi, a ploča se vrti. Natrag, pauza, naprijed, nasumično i ponovi, kao u Apple Musicu. „Današnji stih“
+        vraća današnji. Radi i iz špila: pusti pjesmu na karti, spusti panel — muzika ide dalje na početnoj.
+      </Text>
+    </>
+  )
+}
+
+/** Uz sačuvani iz prošlog koraka doda još dva s pjesmom — da plejer ima šta listati. */
+async function seedSaved(win: Window | null | undefined) {
+  if (!win) return
+  try {
+    const all = (await fetch('/api/verses').then((r) => r.json())) as Verse[]
+    const have: string[] = JSON.parse(win.localStorage.getItem('stihdana:favorites') || '[]')
+    const more = all.filter((v) => v.youtube && playable(v) && !have.includes(v.id)).slice(0, 2).map((v) => v.id)
+    win.localStorage.setItem('stihdana:favorites', JSON.stringify([...have, ...more]))
+    win.dispatchEvent(new Event('favchange'))
+  } catch {
+    /* bez liste — svira ono što je sačuvano */
+  }
+}
+
+function PlejerScene({ onDone }: { onDone: () => void }) {
+  const { phone } = useDeck()
+  useScene(async ({ wait, press, home, alive }) => {
+    if (!(await home())) return
+    await seedSaved(phone()?.contentWindow)
+    await wait(900)
+    // "Player pjesama" — ekran pređe na stih prve sačuvane pjesme
+    if (alive()) await press('[aria-label="Player pjesama"]')
+    await wait(4200)
+    // sljedeća — novi stih, nova atmosfera
+    if (alive()) await press('main button[aria-label="Sljedeća"]')
+    await wait(4200)
+    if (alive()) await press('main button[aria-label="Sljedeća"]')
+    await wait(3800)
+    // nazad na današnji — pa isto na drugom sistemu
+    if (alive()) await press('[aria-label="Nazad na današnji stih"]')
+    await wait(2200)
     if (alive()) onDone()
   })
   return null
@@ -1327,6 +1422,7 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
 /** Dijeljenje: formati jedan za drugim, pa dugme za preuzimanje slike. */
 function Dijeljenje() {
   const { tapAt } = useDeck()
+  useKeepSaved()
   useEffect(() => {
     try {
       localStorage.removeItem('stihdana:share')
@@ -1361,6 +1457,7 @@ function Dijeljenje() {
         items={[
           <>Diskretan potpis aplikacije na slici: <b>svako dijeljenje je preporuka.</b></>,
           <><b>Pozadina:</b> stih ostaje na zaključanom ekranu cijeli dan — sat i obavijesti na čistom.</>,
+          <><b>Video:</b> story se složi pred očima — potpis, dan i pjesma, pa stih riječ po riječ.</>,
         ]}
       />
     </>
@@ -1370,6 +1467,7 @@ function Dijeljenje() {
 /** Pjesma krene sama — dugme u aplikaciji se zaista pritisne; odlaskom s koraka stane. */
 function Slusanje() {
   const { phone, manual } = useDeck()
+  useKeepSaved()
   useEffect(() => {
     let alive = !manual // Ručno: pjesmu pušta prezenter — ali i tad stane na odlasku
     let t = 0
@@ -1464,6 +1562,7 @@ function Obavijest({ d }: { d: DeckData }) {
 
 function Azuriranje() {
   const { simulate, phone } = useDeck()
+  useKeepSaved()
   // ponuda nove verzije stigne tek kad je aplikacija učitana i na ekranu
   useScene(async ({ wait, find, alive }) => {
     for (let t = 0; t < 80 && alive(); t++) {
@@ -1497,6 +1596,7 @@ function Azuriranje() {
 /** WhatsApp na telefonu: poruka s linkom se ukuca i pošalje — u chatu postane kartica sa slikom stiha. */
 function LinkPreview() {
   const { simulate } = useDeck()
+  useKeepSaved()
   useEffect(() => simulate('chat'), [simulate])
   return (
     <>

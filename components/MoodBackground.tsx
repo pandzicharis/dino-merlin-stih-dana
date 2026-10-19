@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, useSpring } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import { ALBUMS } from '@/data/albums'
@@ -29,12 +29,15 @@ export function MoodBackground({
   cover,
   /** koliko je omot podignut (dio njegove visine) */
   coverLift = 0,
+  /** fotografija umjesto portreta (uvodni ekran) — u bojama raspoloženja, utopljena */
+  art,
 }: {
   mood: Mood
   seed: string
   still?: boolean
   cover?: string
   coverLift?: number
+  art?: string
 }) {
   const m = MOODS[mood]
   const coverFill = cover ? ALBUMS.find((a) => a.cover === cover)?.fill : undefined
@@ -153,9 +156,14 @@ export function MoodBackground({
             </>
           )}
 
+          {/* 3b — fotografija uvodnog ekrana: luminacija slike na boji
+                  raspoloženja (pa je slika u njegovim bojama), utopljena na
+                  rubovima i stišana prema sredini, gdje je tekst */}
+          {art && !cover && <Art src={art} />}
+
           {/* 3 — portret: krupan, u gornjem desnom uglu, da stih u sredini
                  ostane na čistoj podlozi a lice ne bude iza teksta */}
-          {!cover && (
+          {!cover && !art && (
           // paralaksa za mišem (motion) je spolja, disanje (CSS) unutra —
           // dvije animacije ne smiju dijeliti isti transform
           <motion.div
@@ -222,5 +230,26 @@ export function MoodBackground({
         }}
       />
     </div>
+  )
+}
+
+/** Slika se pojavi tek kad stigne — blago, bez bljeska. */
+function Art({ src }: { src: string }) {
+  const [on, setOn] = useState(false)
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      decoding="async"
+      onLoad={() => setOn(true)}
+      ref={(el) => {
+        // već u kešu: `load` je prošao prije Reacta
+        if (el?.complete && el.naturalWidth) setOn(true)
+      }}
+      // raspored i utapanje: globals.css `.mood-art` (telefon / široki ekran)
+      className="mood-art transition-opacity duration-[1600ms] ease-out"
+      style={{ mixBlendMode: 'luminosity', opacity: on ? 0.8 : 0 }}
+    />
   )
 }

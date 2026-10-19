@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import { motion, useIsPresent, useMotionValue } from 'motion/react'
 
 /*
@@ -23,9 +23,14 @@ const CLOSE = { duration: 0.5, ease: [0.4, 0.1, 0.2, 1] as const }
 /**
  * Povlačenje nadolje prati prst 1:1, kao na telefonu. Kad se pusti dovoljno
  * nisko, panel ne skače nazad nego nastavi dolje odatle gdje ga je prst ostavio.
+ * Pri sljedećem otvaranju povlačenje kreće od nule — inače bi se panel
+ * otvorio tamo gdje ga je prst zadnji put pustio (do pola).
  */
-export function useSheetDrag(onClose: () => void) {
+export function useSheetDrag(onClose: () => void, open: boolean) {
   const y = useMotionValue(0)
+  useLayoutEffect(() => {
+    if (open) y.set(0)
+  }, [open, y])
   return {
     style: { y },
     drag: 'y',
@@ -53,12 +58,12 @@ export function SheetLayer({ children, className }: { children: ReactNode; class
   )
 }
 
-/** Zatamnjenje iza panela — samo ono se pojavljuje postepeno. */
+/** Zatamnjenje iza panela — blago, ekran ispod se vidi zamućen; pojavljuje se postepeno. */
 export function SheetBackdrop({ onClose }: { onClose: () => void }) {
   return (
     <motion.button
       aria-label="Zatvori"
-      className="absolute inset-0 bg-black/75 backdrop-blur-md"
+      className="absolute inset-0 bg-black/25 backdrop-blur-md backdrop-saturate-150"
       onClick={onClose}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { duration: 0.4 } }}

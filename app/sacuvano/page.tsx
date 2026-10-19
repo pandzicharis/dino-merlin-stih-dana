@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { PageShell } from '@/components/PageShell'
-import { SavedVerses, SavedViewToggle } from '@/components/SavedVerses'
+import { SavedVerses } from '@/components/SavedVerses'
 import { allVerses } from '@/lib/catalog'
 
 export const metadata: Metadata = { title: 'Sačuvani stihovi' }
@@ -15,7 +15,7 @@ export const revalidate = 3600
 export default async function SacuvanoPage() {
   const verses = await allVerses()
   return (
-    <PageShell eyebrow="Stih dana" title="Sačuvani stihovi" right={<SavedViewToggle />}>
+    <PageShell eyebrow="Stih dana" title="Sačuvani stihovi">
       <SavedVerses verses={verses} />
     </PageShell>
   )

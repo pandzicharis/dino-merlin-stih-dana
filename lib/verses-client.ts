@@ -9,9 +9,19 @@ import type { Verse } from '@/data/verses'
  */
 let cache: Promise<Verse[]> | null = null
 
+/** stihovi koje je stranica donijela — odmah, bez čekanja (dodir pusti pjesmu u istom trenu) */
+let known: Verse[] = []
+
 /** Glavna stranica već nosi listu — panel sačuvanih je ne traži ponovo. */
 export function primeVerses(list: Verse[]) {
-  if (list.length) cache ??= Promise.resolve(list)
+  if (!list.length) return
+  known = list
+  cache ??= Promise.resolve(list)
+}
+
+/** Lista koju je stranica donijela (prazna dok se ne učita). */
+export function knownVerses(): Verse[] {
+  return known
 }
 
 export function loadVerses(): Promise<Verse[]> {

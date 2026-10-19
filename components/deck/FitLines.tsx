@@ -15,17 +15,28 @@ export function FitLines({ children }: { children: ReactNode }) {
     const parent = el?.parentElement
     if (!el || !parent) return
     const fit = () => {
-      el.style.fontSize = '1em'
       // širine s ekrana (getBoundingClientRect) — i roditelj i redovi, pa
       // vrijedi i kad je cijeli uređaj umanjen transformom
-      const avail = parent.getBoundingClientRect().width
+      const avail = parent.getBoundingClientRect().width * 0.98
       const range = document.createRange()
-      let widest = 0
-      for (const line of Array.from(el.children)) {
-        range.selectNodeContents(line)
-        widest = Math.max(widest, range.getBoundingClientRect().width)
+      const widest = () => {
+        let w = 0
+        for (const line of Array.from(el.children)) {
+          range.selectNodeContents(line)
+          w = Math.max(w, range.getBoundingClientRect().width)
+        }
+        return w
       }
-      if (avail && widest > avail * 0.98) el.style.fontSize = `${((avail * 0.98) / widest).toFixed(4)}em`
+      // razmak između slova (tracking roditelja) se ne smanjuje sa slovima —
+      // zato par krugova: smanji, izmjeri, opet, dok ne stane
+      let size = 1
+      el.style.fontSize = '1em'
+      for (let i = 0; i < 4 && avail; i++) {
+        const w = widest()
+        if (w <= avail) break
+        size *= avail / w
+        el.style.fontSize = `${size.toFixed(4)}em`
+      }
     }
     fit()
     const ro = new ResizeObserver(fit)

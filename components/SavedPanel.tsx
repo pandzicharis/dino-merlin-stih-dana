@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { SavedVerses, SavedViewToggle } from './SavedVerses'
+import { SavedVerses } from './SavedVerses'
+import { closeSaved, dismissSaved, minimizeSaved, useSavedPlayer } from '@/lib/player'
 import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
@@ -33,12 +34,24 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
   }, [open])
 
   useSheetOpen(open)
-  const sheetDrag = useSheetDrag(onClose)
+  // pjesme sačuvanih sviraju dok je panel otvoren (i kad se karta skupi ili
+  // prevuče) — zatvaranjem stanu; spušten panel ih pušta dalje, na početnoj
+  useEffect(() => {
+    if (!open) closeSaved()
+  }, [open])
+  const { id } = useSavedPlayer()
+  // povlačenje dolje, dodir pored, Escape — dok svira, panel se spusti i
+  // pjesma svira dalje na početnoj; "Zatvori" (×) gasi sve
+  const dismiss = useCallback(() => {
+    dismissSaved()
+    onClose()
+  }, [onClose])
+  const sheetDrag = useSheetDrag(dismiss, open)
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && dismiss()
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
@@ -46,7 +59,7 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [open, onClose])
+  }, [open, dismiss])
 
   if (typeof document === 'undefined') return null
 
@@ -54,14 +67,14 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
     <AnimatePresence>
       {open && (
         <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
-          <SheetBackdrop onClose={onClose} />
+          <SheetBackdrop onClose={dismiss} />
 
           <SheetSlide>
           <motion.div
             role="dialog"
             aria-modal="true"
             aria-label="Sačuvani stihovi"
-            className="os-sheet relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
+            className="os-sheet relative flex max-h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-white/10 shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
             {...sheetDrag}
             style={{
               ...sheetDrag.style,
@@ -100,7 +113,28 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5">
-                  <SavedViewToggle />
+                  {/* spusti — muzika ide dalje, početna pokazuje stih pjesme koja svira */}
+                  <AnimatePresence initial={false}>
+                    {id && (
+                      <motion.button
+                        key="mini"
+                        onClick={() => {
+                          minimizeSaved()
+                          onClose()
+                        }}
+                        aria-label="Spusti"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2 }}
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:text-white"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                   <button
                     onClick={onClose}
                     aria-label="Zatvori"
@@ -114,7 +148,7 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
               </div>
             </div>
 
-            <div className="min-h-[200px] overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="min-h-[200px] overflow-y-auto overscroll-contain px-5 pb-4">
               {verses ? (
                 // karte i plejeri se slože dok panel već klizi
                 <AfterOpen fallback={<Skeleton />}>

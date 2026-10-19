@@ -25,6 +25,83 @@ export function unlockVinyl() {
   }
 }
 
+/**
+ * Pjesma se utiša pa stane (pauza, druga pjesma, zatvoreni sačuvani).
+ * iPhone ne da mijenjati jačinu `<audio>` — zato zvuk za utišavanje prođe
+ * kroz Web Audio (isti kontekst kao pucketanje); bez njega se jačina spušta
+ * direktno (računar, Android). Vraća `true` ako je zvuk prošao kroz Web Audio:
+ * takav ne svira kad je ekran zaključan, pa ga plejer za sljedeće puštanje
+ * zamijeni svježim (SongCredit `renew`).
+ */
+const gains = new WeakMap<HTMLMediaElement, GainNode>()
+const fades = new WeakMap<HTMLMediaElement, () => void>()
+
+export function fadeOut(a: HTMLMediaElement, ms = 500): { routed: boolean; done: Promise<void> } {
+  fades.get(a)?.()
+  if (a.paused) return { routed: gains.has(a), done: Promise.resolve() }
+  let g = gains.get(a)
+  if (!g && ctx && ctx.state === 'running') {
+    try {
+      const src = ctx.createMediaElementSource(a)
+      g = ctx.createGain()
+      src.connect(g).connect(ctx.destination)
+      gains.set(a, g)
+    } catch {
+      /* već spojen negdje drugo — ide preko jačine */
+    }
+  }
+  const v0 = a.volume
+  let timer = 0
+  if (g && ctx) {
+    const t = ctx.currentTime
+    g.gain.cancelScheduledValues(t)
+    g.gain.setValueAtTime(g.gain.value, t)
+    g.gain.linearRampToValueAtTime(0, t + ms / 1000)
+  } else {
+    const t0 = performance.now()
+    timer = window.setInterval(() => {
+      const p = Math.min(1, (performance.now() - t0) / ms)
+      try {
+        a.volume = v0 * (1 - p)
+      } catch {}
+    }, 30)
+  }
+  const restore = () => {
+    clearInterval(timer)
+    if (g) g.gain.value = 1
+    else
+      try {
+        a.volume = v0
+      } catch {}
+  }
+  const done = new Promise<void>((resolve) => {
+    const end = window.setTimeout(() => {
+      fades.delete(a)
+      a.pause()
+      restore()
+      resolve()
+    }, ms)
+    // ponovo pušteno usred utišavanja — prekini, jačina nazad
+    fades.set(a, () => {
+      clearTimeout(end)
+      fades.delete(a)
+      restore()
+      resolve()
+    })
+  })
+  return { routed: Boolean(g), done }
+}
+
+/** Utišavanje u toku — prekini ga (pjesma svira dalje, punom jačinom). */
+export function cancelFade(a: HTMLMediaElement) {
+  fades.get(a)?.()
+}
+
+/** Je li zvuk prošao kroz Web Audio (pa na zaključanom ekranu ne bi svirao). */
+export function isRouted(a: HTMLMediaElement) {
+  return gains.has(a)
+}
+
 /** Šest sekundi tihog šuma s rijetkim pucketima različite jačine. */
 function makeCrackle(c: AudioContext): AudioBuffer {
   const len = c.sampleRate * 6

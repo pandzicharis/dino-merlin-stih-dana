@@ -1,19 +1,23 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import { motion, useDragControls, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
+import { motion, useDragControls, useMotionValue, useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
+import { ExpandIcon } from './ExpandIcon'
+import { FavoriteButton } from './FavoriteButton'
+import { ShareButton } from './ShareSheet'
 import { MOODS } from '@/data/moods'
 import { albumOf } from '@/data/albums'
 import { lookCss, lookScale, parseFont, preloadFonts } from '@/lib/fonts'
 import { asWritten } from '@/lib/text'
-import { favoriteDate, toggleFavorite } from '@/lib/storage'
+import { savedDay, toggleFavorite } from '@/lib/storage'
 import { formatFullDateBs } from '@/lib/date'
 import { haptic } from '@/lib/haptic'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { FontedLines, MagazaMark, MoodStill, Notes } from './deck/Screens'
 import { FitLines } from './deck/FitLines'
 import { SongRow } from './SongCredit'
+import { SAVED_TRACK, playSaved, setSavedPlaylist, useSavedPlayer } from '@/lib/player'
 
 /**
  * Sačuvani kao špil karata: svaka karta je ekran aplikacije u malom (isti
@@ -27,11 +31,21 @@ import { SongRow } from './SongCredit'
 
 /** ekran telefona u pikselima — karta je on, umanjen */
 const W = 390
-const H = 560
-/** koliko karte ispod vire sa strane prednje: prva, pa druga iza nje */
-const PEEK = [0, 14, 22, 26]
-/** ukupno sa svake strane */
-const SIDE = PEEK[2]
+const H = 620
+/**
+ * Koliko zraka ostaje od ivice ekrana do karte ispod (px): prva susjeda,
+ * druga (vidi se tanka traka iza prve) — i lijevo i desno, nikad do same
+ * ivice. Treća je skrivena iza druge.
+ */
+const GAP = [0, 28, 14, 14]
+/** najmanje mjesta sa svake strane prednje karte, kad je karta široka */
+const SIDE = 54
+/** zraka unutar karte, lijevo i desno (em od W) */
+const SIDE_PAD = 32
+/** ploča na karti u špilu (px) — raširena karta je uvećana, pa je i ona veća */
+const SMALL_VINYL = 46
+/** atmosfera se pri dnu pretopi u boju karte — na raširenoj, višoj karti nema ruba */
+const STILL_MASK = 'linear-gradient(to bottom, black 80%, transparent 100%)'
 
 /** Isto pravilo kao `verseFontSize` (i VerseMock) — za ekran širok W. */
 function verseSize(text: string) {
@@ -40,46 +54,87 @@ function verseSize(text: string) {
   return Math.min(76, Math.max(28, (vw * W) / 100))
 }
 
-/** Gdje stoji karta: 0 prednja; po dvije vire ispod nje s lijeve (prethodne) i desne (sljedeće). */
-function place(o: number, cw: number) {
+/**
+ * Gdje stoji karta: 0 prednja; po dvije vire ispod nje s lijeve (prethodne) i
+ * desne (sljedeće). `side`: slobodan prostor od prednje karte do ivice ekrana.
+ */
+function place(o: number, cw: number, side: number) {
   if (o === 0) return { x: 0, scale: 1, opacity: 1 }
   const d = Math.min(Math.abs(o), 3)
   const scale = 1 - d * 0.04
-  // umanjena oko središta — pomjeri se taman da joj ivica viri PEEK[d]
-  const x = Math.sign(o) * ((cw * (1 - scale)) / 2 + PEEK[d])
+  // umanjena oko središta — pomjeri se taman da joj ivica stane GAP[d] od ivice ekrana
+  const x = Math.sign(o) * ((cw * (1 - scale)) / 2 + Math.max(0, side - GAP[d]))
   return { x, scale, opacity: Math.abs(o) > 2 ? 0 : 1 }
 }
 
-export function SavedCarousel({ verses, size }: { verses: Verse[]; size: string }) {
+export function SavedCarousel({
+  verses,
+  size,
+  onOpen,
+}: {
+  verses: Verse[]
+  size: string
+  /** dodir na prednju kartu — stih preko cijelog ekrana (components/SavedFull.tsx) */
+  onOpen?: (verse: Verse) => void
+}) {
   const n = verses.length
-  const [index, setIndex] = useState(0)
+  const player = useSavedPlayer()
+  // otvoren dok sačuvani sviraju (s početne) — prednja je pjesma koja svira
+  const [index, setIndex] = useState(() => Math.max(0, verses.findIndex((v) => v.id === player.id)))
+  // povratak na pjesmu koja svira klizi mekano preko više karata; prevlačenje ostaje opruga
+  const [glide, setGlide] = useState(false)
   // u krug — i kad se neki ukloni pa ih je manje
   const wrap = useCallback((k: number) => (n ? ((k % n) + n) % n : 0), [n])
   const at = wrap(index)
   const go = useCallback(
-    (k: number) => {
+    (k: number, soft = false) => {
       if (n < 2) return
       if (wrap(k) !== at) haptic(6)
+      setGlide(soft)
       setIndex(wrap(k))
     },
     [n, at, wrap],
   )
+  // plejer sačuvanih svira ovim redom; kad pređe na drugu pjesmu, špil klizi za njom
+  useEffect(() => setSavedPlaylist(verses), [verses])
+  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma
+  useEffect(() => {
+    const v = verses[at]
+    if (player.playing && v && v.id !== player.id) playSaved(v)
+  }, [at, verses, player.playing, player.id])
+  useEffect(() => {
+    const onTrack = (e: Event) => {
+      const i = verses.findIndex((v) => v.id === (e as CustomEvent).detail)
+      if (i >= 0) go(i, true)
+    }
+    window.addEventListener(SAVED_TRACK, onTrack)
+    return () => window.removeEventListener(SAVED_TRACK, onTrack)
+  }, [verses, go])
+
   /** mjesto karte u odnosu na prednju, u krug: lijevo prethodne, desno sljedeće */
   const rel = (i: number) => {
     const o = wrap(i - at)
     return o > n / 2 ? o - n : o
   }
 
-  // širina karte u pikselima — koliko daleko odleti
+  // širina karte i cijelog špila u pikselima — koliko daleko odleti i koliko vire susjede
   const box = useRef<HTMLDivElement>(null)
+  const deck = useRef<HTMLDivElement>(null)
   const [cw, setCw] = useState(260)
+  const [fw, setFw] = useState(375)
   useLayoutEffect(() => {
     const el = box.current
-    if (!el) return
-    const ro = new ResizeObserver(() => setCw(el.getBoundingClientRect().width))
+    const all = deck.current
+    if (!el || !all) return
+    const ro = new ResizeObserver(() => {
+      setCw(el.getBoundingClientRect().width)
+      setFw(all.getBoundingClientRect().width)
+    })
     ro.observe(el)
+    ro.observe(all)
     return () => ro.disconnect()
   }, [])
+  const side = Math.max(SIDE, (fw - cw) / 2)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -106,13 +161,14 @@ export function SavedCarousel({ verses, size }: { verses: Verse[]; size: string 
         role="region"
         aria-roledescription="carousel"
         aria-label="Karte"
-        className="relative mx-auto"
-        style={{ width: `calc(var(--cw) + ${SIDE * 2}px)`, height: `calc(var(--cw) * ${H / W})` }}
+        ref={deck}
+        className="relative w-full"
+        style={{ height: `calc(var(--cw) * ${H / W})` }}
       >
         {/* mjera karte, nevidljiva */}
         <div ref={box} className="pointer-events-none invisible absolute" style={{ width: 'var(--cw)' }} aria-hidden />
         {verses.map((v, i) => (
-          <Card key={v.id} verse={v} o={rel(i)} cw={cw} onNext={() => go(at + 1)} onPrev={() => go(at - 1)} />
+          <Card key={v.id} verse={v} o={rel(i)} cw={cw} side={side} glide={glide} onNext={() => go(at + 1)} onPrev={() => go(at - 1)} onOpen={onOpen} />
         ))}
       </div>
 
@@ -122,7 +178,7 @@ export function SavedCarousel({ verses, size }: { verses: Verse[]; size: string 
             {verses.map((v, i) => (
               <button
                 key={v.id}
-                onClick={() => go(i)}
+                onClick={() => go(i, true)}
                 aria-label={`Stih ${i + 1}`}
                 aria-current={i === at}
                 className="flex h-6 items-center justify-center px-0.5"
@@ -139,6 +195,7 @@ export function SavedCarousel({ verses, size }: { verses: Verse[]; size: string 
             {at + 1} / {verses.length}
           </p>
         ))}
+
     </div>
   )
 }
@@ -147,58 +204,75 @@ function Card({
   verse,
   o,
   cw,
+  side,
   onNext,
   onPrev,
+  onOpen,
+  glide = false,
 }: {
   verse: Verse
   /** mjesto u špilu u odnosu na prednju kartu */
   o: number
   cw: number
+  /** slobodan prostor od prednje karte do ivice ekrana */
+  side: number
+  /** mekano klizanje (povratak na pjesmu, tačkice) umjesto opruge */
+  glide?: boolean
   onNext: () => void
   onPrev: () => void
+  onOpen?: (verse: Verse) => void
 }) {
-  const m = MOODS[verse.mood]
-  const album = albumOf(verse.album)
-  const text = asWritten(verse.text)
-  const look = parseFont(verse.font).look
   const front = o === 0
   const reduced = useReducedMotion()
   const drag = useDragControls()
   const x = useMotionValue(0)
-  // karta se blago nagne dok se vuče
-  const rotate = useTransform(x, [-cw, 0, cw], [-9, 0, 9])
 
-  useEffect(() => preloadFonts(verse.font), [verse.font])
-  // karte postoje samo na klijentu (poslije hidratacije) — smije se čitati odmah
-  const [saved] = useState(() => favoriteDate(verse.id))
-
-  const to = place(o, cw)
+  const to = place(o, cw, side)
+  // dodir (ne povlačenje) na prednju kartu je otvara — dugmad i plejer rade svoje
+  const down = useRef<{ x: number; y: number } | null>(null)
+  const tap = (e: React.MouseEvent) => {
+    const d = down.current
+    down.current = null
+    if (!front || !onOpen) return
+    // bez pritiska prije (prezentacija klikne sama) — to je dodir
+    if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return
+    if ((e.target as Element).closest('button, a, input, [data-nodrag]')) return
+    onOpen(verse)
+  }
   return (
     <motion.div
       className="absolute top-0"
       style={{
-        left: SIDE,
+        // na sredini špila — susjede se rašire do ivica
+        left: 'calc(50% - var(--cw) / 2)',
         width: 'var(--cw)',
         aspectRatio: `${W} / ${H}`,
         zIndex: 50 - Math.abs(o),
         x,
-        rotate,
         visibility: Math.abs(o) > 3 ? 'hidden' : undefined,
         pointerEvents: front ? undefined : 'none',
         touchAction: 'pan-y',
       }}
       initial={false}
       animate={{ x: to.x, scale: to.scale, opacity: to.opacity }}
-      transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 320, damping: 32 }}
+      transition={
+        reduced
+          ? { duration: 0 }
+          : glide
+            ? { duration: 0.8, ease: [0.45, 0, 0.15, 1] }
+            : { type: 'spring', stiffness: 320, damping: 32 }
+      }
       drag={front ? 'x' : false}
       dragControls={drag}
       dragListener={false}
       dragSnapToOrigin
       dragElastic={0.9}
       onPointerDown={(e) => {
+        down.current = { x: e.clientX, y: e.clientY }
         // plejer se ne vuče — premotavanje i ploča rade svoje
         if (front && !(e.target as Element).closest('[data-nodrag]')) drag.start(e)
       }}
+      onClick={tap}
       onDragEnd={(_, info) => {
         const swipe = Math.abs(info.offset.x) > cw * 0.28 || Math.abs(info.velocity.x) > 450
         if (!swipe) return
@@ -207,35 +281,152 @@ function Card({
       }}
       aria-hidden={!front}
     >
-      <div
-        className="relative h-full w-full select-none overflow-hidden rounded-[26px] border border-white/15 shadow-[0_24px_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.1)]"
-        style={{ fontSize: `calc(var(--cw) / ${W})`, color: '#f5f5f5' }}
-      >
+      <CardFace verse={verse} o={o} onOpen={onOpen} />
+    </motion.div>
+  )
+}
+
+/**
+ * Lice karte — isto u špilu i raširenoj karti (components/SavedFull.tsx).
+ * Sve je u `em` od `--cw` (širina karte), pa raširena karta izgleda isto,
+ * samo veća. `o`: mjesto u špilu (karte ispod su tamnije).
+ */
+export function CardFace({
+  verse,
+  o = 0,
+  onOpen,
+  onCollapse,
+  actionsZoom,
+}: {
+  verse: Verse
+  o?: number
+  /** "Raširi" — samo prednja karta u špilu */
+  onOpen?: (verse: Verse) => void
+  /** "Skupi" — raširena karta */
+  onCollapse?: () => void
+  /**
+   * Raširena karta: "Sačuvano" i "Podijeli" ispod stiha, kao na ekranu stiha.
+   * Karta je uvećana (CSS `zoom`), pa se dugmad vrate na pravu veličinu ovim.
+   */
+  actionsZoom?: number
+}) {
+  const m = MOODS[verse.mood]
+  const album = albumOf(verse.album)
+  const text = asWritten(verse.text)
+  const look = parseFont(verse.font).look
+  const front = o === 0
+
+  useEffect(() => preloadFonts(verse.font), [verse.font])
+  // karte postoje samo na klijentu (poslije hidratacije) — smije se čitati odmah
+  const [saved] = useState(() => savedDay(verse.id))
+
+  // raširena karta je viša (do dna ekrana), a raspored joj je isti kao na
+  // maloj (gornjih H em) — prvi i zadnji kadar su tačno mala karta. Stih
+  // (i dugmad ispod njega) mekano klizne na sredinu visoke karte (SavedFull,
+  // `data-drop`: koliko em niže kad je raširena)
+  const root = useRef<HTMLDivElement>(null)
+  const mid = useRef<HTMLDivElement>(null)
+  // gramofon je JEDAN: na raširenoj karti ista ploča (s nazivom pjesme)
+  // samo klizne na dno (`data-grow`) — ništa se ne pretapa ni ne uvećava, pa
+  // slova ostaju oštra i ne trepnu
+  const row = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const r = root.current
+    const box = mid.current
+    if (!actionsZoom || !r || !box) return
+    const rr = r.getBoundingClientRect()
+    if (!rr.width) return
+    const em = rr.width / W
+    const tall = rr.height / em
+    box.dataset.drop = String(Math.max(0, Math.round((tall - H) / 2)))
+    const g = row.current
+    if (g) {
+      // donja zona iPhonea (traka za početni ekran), u em karte
+      const probe = document.createElement('div')
+      probe.style.cssText = 'position:fixed;bottom:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden'
+      document.body.appendChild(probe)
+      const safe = (parseFloat(getComputedStyle(probe).paddingBottom) || 0) / em
+      probe.remove()
+      // dno ploče iznad trake za početni ekran
+      const down = tall - H + 18 - 30 - safe
+      g.dataset.grow = `translateY(${down.toFixed(1)}em)`
+    }
+  }, [actionsZoom])
+
+  return (
+    <div
+      ref={root}
+      data-stih={front && onOpen ? verse.id : undefined}
+      // raširena karta ide do dna ekrana — zaobljena samo gore
+      className={`relative h-full w-full select-none overflow-hidden ${onCollapse ? 'rounded-t-[26px]' : 'rounded-[26px]'} ${front && onOpen ? 'cursor-pointer' : ''} shadow-[0_24px_60px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.1)]`}
+      style={{
+        fontSize: `calc(var(--cw) / ${W})`,
+        color: '#f5f5f5',
+        background: m.gradient[0],
+        // font ekrana stiha — i u panelu (koji ima sistemski font) i na
+        // raširenoj karti isti, pa se pri pretapanju slova poklope slovo u slovo
+        fontFamily: 'var(--font-sans), sans-serif',
+      }}
+    >
+      {/* atmosfera je uvijek visoka kao karta u špilu (H em) — raširena,
+          viša karta je ima istu na vrhu, pa prvi kadar uvećanja = mala karta */}
+      <div className="absolute inset-x-0 top-0" style={{ height: `${H}em`, maskImage: STILL_MASK, WebkitMaskImage: STILL_MASK }}>
         <MoodStill mood={verse.mood} w={W} h={H} cover={album?.cover} lift={album?.lift} />
         <Notes
           accent={m.accent}
+          // note sa strane, ne preko stiha ni dugmadi (ni na raširenoj karti)
           spots={[
-            [12, 58, 28, '♫'],
-            [80, 66, 20, '♪'],
-            [84, 26, 16, '♩'],
+            [8, 36, 26, '♫'],
+            [88, 50, 18, '♪'],
+            [84, 22, 16, '♩'],
           ]}
         />
+      </div>
 
-        <div className="absolute inset-0 flex flex-col justify-between" style={{ padding: '26em 20em 18em' }}>
-          {/* zaglavlje — potpis | Magaza, kao na ekranu stiha; desno srce */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center" style={{ gap: '14em' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/signature.webp?v=2" alt="" draggable={false} style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
-              <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
-              <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
-            </div>
+      <div
+        className={`absolute inset-x-0 top-0 flex flex-col justify-between ${actionsZoom ? '' : 'bottom-0'}`}
+        // zraka od lijeve i desne ivice karte (isto za zaglavlje, stih i gramofon)
+        style={{ padding: `26em ${SIDE_PAD}em 18em`, height: actionsZoom ? `${H}em` : undefined }}
+      >
+        {/* zaglavlje — potpis | Magaza, kao na ekranu stiha; desno raširi i srce */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center" style={{ gap: '14em' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/signature.webp?v=2" alt="" draggable={false} style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
+            <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
+            <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
+          </div>
+          <div data-shrink className="flex items-center gap-2" style={{ transformOrigin: 'right center' }}>
+            {/* raširi kartu preko cijelog ekrana / skupi je nazad */}
+            {(onOpen || onCollapse) && (
+              <button
+                data-nodrag
+                onClick={() => (onCollapse ? onCollapse() : onOpen?.(verse))}
+                aria-label={onCollapse ? 'Skupi' : 'Raširi'}
+                title={onCollapse ? 'Skupi' : 'Raširi'}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80 transition-transform active:scale-90"
+              >
+                {/* na raširenoj karti obje ikone, jedna preko druge — pretapaju se dok
+                    karta raste (components/SavedFull.tsx `data-small` / `data-big`) */}
+                <span className="relative block h-[15px] w-[15px]">
+                  <span data-small className="absolute inset-0">
+                    <ExpandIcon />
+                  </span>
+                  {onCollapse && (
+                    <span data-big className="absolute inset-0" style={{ opacity: 0 }}>
+                      <ExpandIcon collapse />
+                    </span>
+                  )}
+                </span>
+              </button>
+            )}
+            {/* srce — i na raširenoj karti */}
             <button
               data-nodrag
               onClick={() => toggleFavorite(verse.id)}
               aria-label="Ukloni iz sačuvanih"
               title="Ukloni iz sačuvanih"
-              className="flex h-9 w-9 items-center justify-center rounded-full border transition-transform active:scale-90"
+              className="flex h-8 w-8 items-center justify-center rounded-full border transition-transform active:scale-90"
               style={{ borderColor: `${m.accent}55`, background: `${m.accent}1a`, color: m.accent }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -243,52 +434,83 @@ function Card({
               </svg>
             </button>
           </div>
+        </div>
 
-          {/* dan kad je sačuvan → stih (kao datum na ekranu stiha) */}
-          <div className="flex flex-1 flex-col items-center justify-center" style={{ gap: '22em' }}>
-            <p
-              style={{
-                fontSize: '11em',
-                fontWeight: 600,
-                letterSpacing: '0.3em',
-                textTransform: 'uppercase',
-                color: m.accent,
-                textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.65)',
-              }}
-            >
-              {saved ? formatFullDateBs(saved) : m.label}
-            </p>
-            <p
-              className="verse"
-              style={{
-                ...lookCss(look, m.accent),
-                fontSize: `${verseSize(text) * lookScale(look)}em`,
-                color: m.text,
-                textShadow: `0 0.07em 1em rgba(0,0,0,0.5), 0 0 1.6em ${m.accent}2e`,
-                alignSelf: 'stretch',
-              }}
-            >
-              <FitLines>
-                <FontedLines text={text} font={verse.font} />
-              </FitLines>
-            </p>
-          </div>
-
-          {/* pjesma — pravi plejer, kao ispod stiha */}
-          <div data-nodrag className="flex items-center gap-3" style={{ padding: '0 10em 10em 18em' }}>
-            <SongRow verse={verse} accent={m.accent} fit />
+        {/* dan kad je sačuvan → stih — datum isti kao na ekranu stiha */}
+        <div ref={mid} className="flex flex-1 flex-col items-center justify-center" style={{ gap: '22em' }}>
+          <p
+            className="tabular"
+            style={{
+              fontSize: '11em',
+              fontWeight: 700,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              color: m.accent,
+              textShadow: '0 1px 2px rgba(0,0,0,0.85), 0 0 14px rgba(0,0,0,0.65)',
+              alignSelf: 'stretch',
+              textAlign: 'center',
+            }}
+          >
+            {/* dug dan (ČETVRTAK, SEPTEMBAR) se smanji — ne izlazi iz razmaka */}
+            <FitLines>
+              <span>{formatFullDateBs(saved)}</span>
+            </FitLines>
+          </p>
+          <p
+            className="verse"
+            style={{
+              ...lookCss(look, m.accent),
+              fontSize: `${verseSize(text) * lookScale(look)}em`,
+              color: m.text,
+              textShadow: `0 0.07em 1em rgba(0,0,0,0.5), 0 0 1.6em ${m.accent}2e`,
+              alignSelf: 'stretch',
+            }}
+          >
+            <FitLines>
+              <FontedLines text={text} font={verse.font} />
+            </FitLines>
+          </p>
+          {/* radnje stiha — mjesto je i na maloj karti, pa se pri uvećanju ništa ne pomjeri */}
+          <div className="flex items-center justify-center" style={{ height: '46em' }}>
+            {actionsZoom && (
+              <div data-nodrag data-big className="flex items-center gap-2.5" style={{ zoom: actionsZoom, opacity: 0 }}>
+                <FavoriteButton id={verse.id} accent={m.accent} />
+                <ShareButton verse={verse} accent={m.accent} date={saved} pill />
+              </div>
+            )}
           </div>
         </div>
 
-        {/* karte ispod su tamnije — prednja se ističe */}
-        <motion.div
-          className="pointer-events-none absolute inset-0 bg-black"
-          initial={false}
-          animate={{ opacity: front ? 0 : Math.min(Math.abs(o) * 0.07, 0.2) }}
-          transition={{ duration: 0.3 }}
-          aria-hidden
-        />
+        {/* pjesma — pravi plejer, kao ispod stiha; u špilu manja ploča (raširena ima punu) */}
+        {/* isti razmak od lijeve i desne ivice kao zaglavlje i stih */}
+        <div ref={row} data-nodrag className="flex items-center gap-2.5" style={{ padding: '0 0 10em', transformOrigin: 'center bottom' }}>
+          <SongRow verse={verse} accent={m.accent} fit vinyl={SMALL_VINYL} />
+        </div>
       </div>
-    </motion.div>
+
+
+      {/* rub male karte (i na raširenoj u prvom kadru) — pretopi se u rub velike */}
+      <span
+        data-small
+        className={`pointer-events-none absolute inset-x-0 top-0 rounded-[26px] border ${front ? 'border-white/15' : 'border-white/30'}`}
+        style={{ height: `${H}em` }}
+        aria-hidden
+      />
+      <span
+        data-big
+        className="pointer-events-none absolute inset-0 rounded-[inherit] border border-b-0 border-white/15"
+        style={{ opacity: 0 }}
+        aria-hidden
+      />
+
+      {/* karte ispod su tamnije — prednja se ističe */}
+      <motion.div
+        className="pointer-events-none absolute inset-0 bg-black"
+        initial={false}
+        animate={{ opacity: front ? 0 : Math.min(Math.abs(o) * 0.07, 0.2) }}
+        transition={{ duration: 0.3 }}
+        aria-hidden
+      />
+    </div>
   )
 }
