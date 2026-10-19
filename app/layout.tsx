@@ -22,6 +22,7 @@ import {
   Rubik,
 } from 'next/font/google'
 import { SITE_URL } from '@/lib/site'
+import { Toaster } from '@/components/Toast'
 import './globals.css'
 import { HOME_IMAGE, OG_BASE } from '@/lib/og'
 
@@ -134,7 +135,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             zahtjevom tek kad se tombola pojavi; ovako stigne s HTML-om i stoji od prvog kadra */}
         <link rel="preload" as="image" href="/brand/signature.webp?v=2" crossOrigin="anonymous" fetchPriority="high" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* poruke (nova verzija, obavijesti, dijeljenje) — components/Toast.tsx */}
+        <Toaster />
+      </body>
     </html>
   )
 }

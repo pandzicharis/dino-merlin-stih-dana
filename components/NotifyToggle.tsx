@@ -1,8 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'motion/react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import {
   ensurePermission,
   getSubscription,
@@ -18,6 +16,7 @@ import { SEND_HOUR, SEND_TIME } from '@/lib/date'
 import { useNotifyIntent } from '@/lib/client-store'
 import { getNotifyIntent, setNotifyIntent } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
+import { Icon, TOAST_BAD, TOAST_OK, toast } from './Toast'
 
 type State = 'off' | 'on' | 'denied' | 'install' | 'unsupported' | 'busy'
 
@@ -39,9 +38,9 @@ function resolve(permission: string, intent: boolean): State {
   return intent ? 'on' : 'off'
 }
 
-const HINTS: Partial<Record<State, string>> = {
-  denied: 'Obavijesti su blokirane u postavkama telefona',
-  install: 'Dodaj aplikaciju na početni ekran da bi obavijesti radile',
+const HINTS: Partial<Record<State, { title: string; sub: string }>> = {
+  denied: { title: 'Obavijesti su blokirane', sub: 'Uključi ih u postavkama telefona' },
+  install: { title: 'Dodaj na početni ekran', sub: 'Tek tada obavijesti rade' },
 }
 
 const ARIA: Record<Exclude<State, 'unsupported'>, string> = {
@@ -71,9 +70,6 @@ export function NotifyToggle() {
   const intent = useNotifyIntent()
   /** Privremeno stanje dok traje sistemski dijalog. */
   const [pending, setPending] = useState<State | null>(null)
-  /** Poruka dole, u obliku dugmeta za novu verziju. */
-  const [toast, setToast] = useState<{ text: string; color: string } | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const state = pending ?? resolve(permission, intent)
 
@@ -96,20 +92,16 @@ export function NotifyToggle() {
     }
   }, [])
 
-  const show = (text: string, color = '#D9D9D9') => {
-    clearTimeout(timer.current)
-    setToast({ text, color })
-    timer.current = setTimeout(() => setToast(null), 2600)
-  }
+  const show = (t: Omit<Parameters<typeof toast>[0], 'id'>) => toast({ id: 'notify', ...t })
 
   const onClick = async () => {
     if (state === 'busy') return
-    if (HINTS[state]) return show(HINTS[state]!)
+    if (HINTS[state]) return show({ ...HINTS[state]!, icon: <Icon.info /> })
 
     if (state === 'on') {
       // Prekidač se pomjera odmah; odjava ide u pozadini.
       setNotifyIntent(false)
-      show('Obavijesti isključene', NO)
+      show({ title: 'Obavijesti isključene', color: TOAST_BAD, icon: <Icon.bellOff /> })
       void unsubscribeFromPush()
       return
     }
@@ -124,13 +116,13 @@ export function NotifyToggle() {
 
     setNotifyIntent(true)
     haptic([8, 40, 8])
-    show(`Obavijesti uključene — stih u ${SEND_TIME}`, OK)
+    show({ title: 'Obavijesti uključene', sub: `Stih stiže u ${SEND_TIME}`, color: TOAST_OK, icon: <Icon.bell /> })
 
     // Prijava servera ide poslije; ako padne, prekidač se vraća.
     const r = await subscribeToPush(SEND_HOUR)
     if (r !== 'ok') {
       setNotifyIntent(false)
-      show('Nije uspjelo — pokušaj ponovo', NO)
+      show({ title: 'Nije uspjelo', sub: 'Pokušaj ponovo', color: TOAST_BAD, icon: <Icon.bad /> })
     }
   }
 
@@ -158,31 +150,6 @@ export function NotifyToggle() {
         <Bell on={on} muted={state === 'denied'} />
       </button>
 
-      {/* Portal: roditelji s `transform` bi `fixed` vezali za sebe. */}
-      {typeof document !== 'undefined' &&
-        createPortal(
-          <AnimatePresence>
-            {toast && (
-              <motion.div
-                key={toast.text}
-                className="pointer-events-none fixed inset-x-0 bottom-0 z-[65] flex justify-center px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))]"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 16 }}
-                transition={{ type: 'spring', damping: 26, stiffness: 240 }}
-              >
-                <p
-                  role="status"
-                  className="rounded-full border px-5 py-3 text-[10.5px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl"
-                  style={{ color: toast.color, borderColor: `${toast.color}4D`, backgroundColor: 'rgba(0,0,0,0.55)' }}
-                >
-                  {toast.text}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
     </div>
   )
 }

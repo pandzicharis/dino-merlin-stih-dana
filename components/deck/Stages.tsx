@@ -308,49 +308,72 @@ function Simulated({
       {sim === 'update' && (
         <motion.div
           key="update"
-          initial={{ opacity: 0, y: '16em' }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: '16em' }}
-          transition={{ type: 'spring', damping: 26, stiffness: 240 }}
+          initial={{ transform: 'translateY(-100%)' }}
+          animate={{ transform: 'translateY(0%)', transition: { duration: 0.5, ease: [0.32, 0.72, 0, 1] } }}
+          exit={{ transform: 'translateY(-100%)', transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } }}
           style={{
             position: 'absolute',
             left: 0,
             right: 0,
-            bottom: 0,
+            top: 0,
             zIndex: 50,
             display: 'flex',
             justifyContent: 'center',
-            padding: '80em 24em 34em',
-            background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.7) 45%, transparent 100%)',
+            padding: `${bar + 6}em 16em 0`,
           }}
         >
-          {/* isto dugme kao UpdatePrompt u aplikaciji */}
-          <button
-            type="button"
-            onClick={() => onSim('open')}
+          {/* ista kartica kao poruka u aplikaciji (components/Toast.tsx) */}
+          <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10em',
-              padding: '12em 20em',
-              borderRadius: '99em',
-              border: `1em solid ${BRAND.gold}4D`,
-              background: 'rgba(0,0,0,0.55)',
-              boxShadow: '0 10em 30em rgba(0,0,0,0.5)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              color: BRAND.gold,
-              cursor: 'pointer',
+              gap: '12em',
+              minHeight: '52em',
+              padding: '8em 8em 8em 8em',
+              borderRadius: '26em',
+              border: '1em solid rgba(255,255,255,0.1)',
+              background: 'rgba(20,18,18,0.82)',
+              boxShadow: '0 14em 40em rgba(0,0,0,0.55)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
             }}
           >
-            <svg viewBox="0 0 24 24" style={{ width: '13em', height: '13em' }} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-              <path d="M21 3v6h-6" />
-            </svg>
-            <span style={{ fontSize: '10.5em', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-              Nova verzija — osvježi
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '36em',
+                height: '36em',
+                borderRadius: '99em',
+                color: BRAND.gold,
+                background: `${BRAND.gold}1F`,
+              }}
+              aria-hidden
+            >
+              <svg viewBox="0 0 24 24" style={{ width: '18em', height: '18em' }} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                <path d="M21 3v6h-6" />
+              </svg>
             </span>
-          </button>
+            <span style={{ fontSize: '14em', fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>Nova verzija</span>
+            <button
+              type="button"
+              onClick={() => onSim('open')}
+              style={{
+                height: '36em',
+                marginLeft: '4em',
+                padding: '0 16em',
+                borderRadius: '99em',
+                border: 0,
+                background: BRAND.gold,
+                color: '#000',
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ fontSize: '13em', fontWeight: 600 }}>Osvježi</span>
+            </button>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

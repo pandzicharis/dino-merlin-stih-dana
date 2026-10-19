@@ -6,6 +6,29 @@ import { TIPS_ON, startTips } from './Tips'
 import { playIntro, playTombola } from './IntroSplash'
 import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
 import { redraw } from '@/lib/draw'
+import { Icon, TOAST_BAD, TOAST_OK, dismissToast, toast, type Toast } from './Toast'
+
+/** Sve poruke aplikacije redom — svaki klik na "poruke" pokaže sljedeću. */
+const SAMPLES: Toast[] = [
+  { id: 'update', title: 'Nova verzija', color: '#D9C3A0', icon: <Icon.refresh />, sticky: true, action: { label: 'Osvježi', onClick: () => dismissToast('update') } },
+  { id: 'notify', title: 'Obavijesti uključene', sub: 'Stih stiže u 12:00', color: TOAST_OK, icon: <Icon.bell /> },
+  { id: 'notify', title: 'Obavijesti isključene', color: TOAST_BAD, icon: <Icon.bellOff /> },
+  { id: 'notify', title: 'Obavijesti su blokirane', sub: 'Uključi ih u postavkama telefona', icon: <Icon.info /> },
+  { id: 'notify', title: 'Dodaj na početni ekran', sub: 'Tek tada obavijesti rade', icon: <Icon.info /> },
+  { id: 'share', title: 'Slika je sačuvana', color: TOAST_OK, icon: <Icon.ok /> },
+  { id: 'share', title: 'Slika je preuzeta', sub: 'Dijeljenje nije podržano', icon: <Icon.download /> },
+  { id: 'share', title: 'Nije uspjelo', sub: 'Pokušaj ponovo', color: TOAST_BAD, icon: <Icon.bad /> },
+]
+let sample = 0
+
+/** Okidač za poruke — u obje dev trake (ova i ona na uvodu). */
+export function DevToastsButton() {
+  return (
+    <button onClick={() => toast(SAMPLES[sample++ % SAMPLES.length])} className="px-1.5 text-white/50 hover:text-white">
+      poruke
+    </button>
+  )
+}
 
 /**
  * Ručno pomjeranje datuma — samo u dev modu (ili uz NEXT_PUBLIC_DATE_OVERRIDE=1).
@@ -103,6 +126,8 @@ export function DevDateBar({
       <button onClick={() => playIntro(true)} className="px-1.5 text-white/50 hover:text-white">
         splash
       </button>
+      {/* nova verzija, obavijesti, dijeljenje — redom (components/Toast.tsx) */}
+      <DevToastsButton />
       {/* zaboravi današnji (i dalje) — izvuče se ponovo, s animacijom */}
       <button onClick={() => redraw(date)} className="px-1.5 text-white/50 hover:text-white" title="i">
         izvuci

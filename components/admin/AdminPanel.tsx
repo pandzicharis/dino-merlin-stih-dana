@@ -16,6 +16,7 @@ import { VerseDesigner } from './VerseDesigner'
 import { SongEdit, SongPicker, SongPlayer, type KnownSong } from './SongPicker'
 import { audioFile } from '@/lib/audio-name'
 import { DrawerIcon } from '../DrawerIcon'
+import { Icon, TOAST_BAD, TOAST_OK, toast } from '../Toast'
 
 type AdminVerse = Verse & { active: boolean }
 type Snapshot = {
@@ -59,7 +60,6 @@ export function AdminPanel() {
   const router = useRouter()
   const [data, setData] = useState<Snapshot | null>(null)
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<{ text: string; bad?: boolean } | null>(null)
   const [editor, setEditor] = useState<{ verse?: AdminVerse } | null>(null)
   const [archiving, setArchiving] = useState<AdminVerse | null>(null)
   // papirići za štampu (modal)
@@ -67,8 +67,12 @@ export function AdminPanel() {
   const [printCount, setPrintCount] = useState(0)
 
   const flash = useCallback((text: string, bad = false) => {
-    setToast({ text, bad })
-    setTimeout(() => setToast(null), 3200)
+    toast(
+      bad
+        ? { id: 'admin', title: text, color: TOAST_BAD, icon: <Icon.bad /> }
+        : { id: 'admin', title: text, color: TOAST_OK, icon: <Icon.ok /> },
+      3200,
+    )
   }, [])
   const songs = useSongs(Boolean(data), flash)
 
@@ -280,31 +284,6 @@ export function AdminPanel() {
         </>
       )}
 
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            key={toast.text}
-            className="pointer-events-none fixed inset-x-0 bottom-0 z-[140] flex justify-center px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))]"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 16 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 240 }}
-          >
-            {/* isti oblik kao dugme "Nova verzija — osvježi" */}
-            <p
-              role="status"
-              className="max-w-[90vw] rounded-full border px-5 py-3 text-center text-[10.5px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl"
-              style={{
-                color: toast.bad ? '#fda4af' : BRAND.gold,
-                borderColor: toast.bad ? 'rgba(253,164,175,0.3)' : `${BRAND.gold}4D`,
-                backgroundColor: 'rgba(0,0,0,0.55)',
-              }}
-            >
-              {toast.text}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </PageShell>
   )
 }

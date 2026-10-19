@@ -21,6 +21,7 @@ import { setNotifyIntent } from '@/lib/storage'
 import { deckParam, inDeck } from '@/lib/deck'
 import { BrandLockup } from './BrandLockup'
 import { playIntro, setGateOpen } from './IntroSplash'
+import { DevToastsButton } from './DevDateBar'
 
 type Platform = 'ios' | 'android' | 'desktop'
 
@@ -351,6 +352,8 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
                   <DevChip on={devStage === 'auto'} onClick={() => setDevStage('auto')}>
                     auto
                   </DevChip>
+                  <span className="text-white/20">·</span>
+                  <DevToastsButton />
                   <button
                     onClick={() => setSkipped(true)}
                     className="ml-auto px-1.5 text-white/50 hover:text-white"

@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
 import { registerSW } from '@/lib/push-client'
+import { Icon, dismissToast, toast } from './Toast'
 
 /** Koliko često se traži nova verzija dok aplikacija stoji otvorena. */
 const CHECK_EVERY = 30 * 60 * 1000
@@ -113,54 +113,19 @@ export function UpdatePrompt({ accent }: { accent: string }) {
     setTimeout(() => window.location.reload(), 3000)
   }, [waiting])
 
-  return (
-    <AnimatePresence>
-      {waiting && (
-        <motion.div
-          // iznad uvodne kapije (z-60) — nadogradnja se nudi i onome ko je
-          // zaglavio na uvodu, jer je popravka mozda bas u novoj verziji
-          className="fixed inset-x-0 bottom-0 z-[70] flex justify-center px-6 pt-20 pb-[max(1.75rem,env(safe-area-inset-bottom))]"
-          // tamni prelaz odozdo: dno ekrana (potpis pjesme, logo) se povuče iza dugmeta
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.7) 45%, transparent 100%)' }}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 16 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 240 }}
-        >
-          <button
-            onClick={apply}
-            disabled={busy}
-            className="flex items-center gap-2.5 rounded-full border px-5 py-3 text-[10.5px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-opacity active:opacity-80 disabled:opacity-60"
-            style={{
-              color: accent,
-              borderColor: `${accent}4D`,
-              backgroundColor: 'rgba(0,0,0,0.55)',
-            }}
-          >
-            <Arrow />
-            {busy ? 'Trenutak…' : 'Nova verzija — osvježi'}
-          </button>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
+  // ista poruka kao sve ostale (components/Toast.tsx) — ostaje dok se ne dodirne
+  useEffect(() => {
+    if (!waiting) return dismissToast('update')
+    toast({
+      id: 'update',
+      title: 'Nova verzija',
+      color: accent,
+      icon: <Icon.refresh />,
+      action: { label: 'Osvježi', onClick: apply, busy },
+      sticky: true,
+    })
+  }, [waiting, busy, accent, apply])
+
+  return null
 }
 
-function Arrow() {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-      <path d="M21 3v6h-6" />
-    </svg>
-  )
-}

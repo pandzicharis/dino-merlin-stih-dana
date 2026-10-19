@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
@@ -15,6 +15,7 @@ import {
 import { getSharePrefs, setSharePrefs } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
 import { DrawerIcon } from './DrawerIcon'
+import { Icon, TOAST_BAD, TOAST_OK, toast } from './Toast'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
 type Target = 'share' | 'save'
@@ -40,7 +41,6 @@ export default function SharePanel({
   })
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState<Target | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || !canvasRef.current) return
@@ -68,11 +68,6 @@ export default function SharePanel({
       window.removeEventListener('keydown', onKey)
     }
   }, [open, onClose])
-
-  const flash = useCallback((text: string) => {
-    setToast(text)
-    setTimeout(() => setToast(null), 2600)
-  }, [])
 
   const choose = (f: ShareFormat) => {
     haptic(5)
@@ -120,7 +115,7 @@ export default function SharePanel({
           const file = await imageFile()
           if (file) {
             download(file)
-            flash('Dijeljenje nije podržano — slika je preuzeta')
+            toast({ id: 'share', title: 'Slika je preuzeta', sub: 'Dijeljenje nije podržano', icon: <Icon.download /> })
           }
           break
         }
@@ -132,14 +127,14 @@ export default function SharePanel({
           const file = await imageFile()
           if (file) {
             download(file)
-            flash('Slika je sačuvana')
+            toast({ id: 'share', title: 'Slika je sačuvana', color: TOAST_OK, icon: <Icon.ok /> })
           }
           break
         }
       }
     } catch (e) {
       // korisnik je zatvorio sistemski share — to nije greška
-      if ((e as Error)?.name !== 'AbortError') flash('Nešto nije uspjelo, pokušaj ponovo')
+      if ((e as Error)?.name !== 'AbortError') toast({ id: 'share', title: 'Nije uspjelo', sub: 'Pokušaj ponovo', color: TOAST_BAD, icon: <Icon.bad /> })
     } finally {
       setBusy(null)
     }
@@ -264,19 +259,6 @@ export default function SharePanel({
               Sačuvaj sliku
             </button>
 
-            <AnimatePresence>
-              {toast && (
-                <motion.p
-                  className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit rounded-full border border-white/10 bg-black/90 px-4 py-2 text-[12px] text-white/90 shadow-lg"
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  role="status"
-                >
-                  {toast}
-                </motion.p>
-              )}
-            </AnimatePresence>
           </motion.div>
           </SheetSlide>
         </SheetLayer>
