@@ -1,14 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Activity, useCallback, useEffect, useMemo, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { useFavorites, useLovedIds, useMounted } from '@/lib/client-store'
 import { BRAND } from '@/lib/brand'
 import { useSavedFull } from './SavedFull'
 import { SavedCarousel } from './SavedCarousel'
 import { SAVED_TRACK, closeSaved, setSavedPlaylist } from '@/lib/player'
-import { SavedAlbums, SavedList, SavedLoved, SavedPlayer, type View } from './SavedPlayer'
+import { SavedAlbums, SavedList, SavedLoved, SavedPlayer, keyOf, type View } from './SavedPlayer'
 
 /** Kako se sačuvani prikazuju iznad plejera: špil karata, lista ili albumi. */
 export type SavedView = View
@@ -75,13 +75,25 @@ export function SavedVerses({
       return verse ? [verse] : []
     })
   }, [verses, ids])
+  // pjesme — svaka jednom (dva sačuvana stiha iste pjesme su jedna pjesma);
+  // u "Stihovi" ostaju svi stihovi, u Pjesmama, Albumima i Omiljenim pjesme
+  const songs = useMemo(() => {
+    const seen = new Set<string>()
+    return list.filter((v) => {
+      const k = keyOf(v)
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+  }, [list])
   // red plejera — u svakom prikazu (ne samo u špilu): sljedeća pjesma, mini
   // plejer i zaključan ekran znaju šta svira. U albumima: samo pjesme albuma
   // koji se sluša (SavedAlbums javi koji je)
   const [queue, setQueue] = useState<Verse[] | null>(null)
-  // (prazne Omiljene — plejer ostaje na svim sačuvanim)
+  // (prazne Omiljene — plejer ostaje na pjesmama)
   const albums = (view === 'albums' || view === 'loved') && queue?.length ? queue : null
-  useEffect(() => setSavedPlaylist(albums ?? list), [albums, list])
+  const order = albums ?? (view === 'cards' ? list : songs)
+  useEffect(() => setSavedPlaylist(order), [order])
   // "Raširi" na karti: ista karta, uvećana; ostale vire iza (components/SavedFull.tsx)
   const full = useSavedFull(list)
   // prednja karta (ili pjesma na koju je plejer prešao) — plejer je pokazuje
@@ -94,7 +106,7 @@ export function SavedVerses({
   }, [])
   const front = list.find((v) => v.id === frontId) ?? list[0] ?? null
   const lovedIds = useLovedIds()
-  const loved = list.filter((v) => lovedIds.includes(v.id)).length
+  const loved = songs.filter((v) => lovedIds.includes(keyOf(v))).length
   // prikaz se složi kad se prvi put otvori, ostali u tišini poslije — dalje
   // ostaju montirani: prebacivanje je samo pretapanje, bez ponovnog slaganja
   const [made, setMade] = useState<SavedView[]>(() => [view])
@@ -126,7 +138,7 @@ export function SavedVerses({
             izabrani (pretopi se). isolate: karte ostaju ispod plejera */}
         <div
           className="relative isolate min-h-0 shrink"
-          style={{ height: paneHeight(view, list.length, loved, !onClose), transition: 'height 0.45s cubic-bezier(0.32, 0.72, 0, 1)' }}
+          style={{ height: paneHeight(view, songs.length, loved, !onClose), transition: 'height 0.45s cubic-bezier(0.32, 0.72, 0, 1)' }}
         >
           {VIEWS.filter((v) => made.includes(v)).map((v) => {
             const on = v === view
@@ -142,18 +154,22 @@ export function SavedVerses({
                   transition: on ? 'opacity 0.26s ease' : 'opacity 0.16s ease, visibility 0s linear 0.16s',
                   // pjesme se blago gube prema plejeru (i ispod zaglavlja) dok se
                   // skrola — samo kad ih ima više od dvije (jedna-dvije stoje čiste)
-                  ...((v === 'list' && list.length > 2) || (v === 'loved' && loved > 2) ? { maskImage: LIST_FADE, WebkitMaskImage: LIST_FADE } : {}),
+                  ...((v === 'list' && songs.length > 2) || (v === 'loved' && loved > 2) ? { maskImage: LIST_FADE, WebkitMaskImage: LIST_FADE } : {}),
                 }}
               >
-                {v === 'list' ? (
-                  <SavedList verses={list} front={front} active={on} />
-                ) : v === 'albums' ? (
-                  <SavedAlbums verses={list} front={front} onQueue={setQueue} active={on} />
-                ) : v === 'loved' ? (
-                  <SavedLoved verses={list} front={front} onQueue={setQueue} active={on} />
-                ) : (
-                  <SavedCarousel verses={list} size={onClose ? FIT : 'min(56dvh, 560px)'} onOpen={full.open} onFront={onFront} dots={false} />
-                )}
+                {/* sakriven prikaz se ne crta iznova (Activity) — promjena pjesme
+                    osvježi samo ono što se vidi; stanje (mjesto u špilu, skrol) ostaje */}
+                <Activity mode={on ? 'visible' : 'hidden'}>
+                  {v === 'list' ? (
+                    <SavedList verses={songs} front={front} active={on} />
+                  ) : v === 'albums' ? (
+                    <SavedAlbums verses={songs} front={front} onQueue={setQueue} active={on} />
+                  ) : v === 'loved' ? (
+                    <SavedLoved verses={songs} front={front} onQueue={setQueue} active={on} />
+                  ) : (
+                    <SavedCarousel verses={list} size={onClose ? FIT : 'min(56dvh, 560px)'} onOpen={full.open} onFront={onFront} dots={false} />
+                  )}
+                </Activity>
               </div>
             )
           })}
@@ -161,7 +177,7 @@ export function SavedVerses({
         {/* plejer uz dno panela — karta se pretapa u njega (prekrije joj dno);
             uvijek isto mjesto, pa se ništa ne pomjera pri prebacivanju */}
         <div className="relative z-10 -mt-20 shrink-0">
-          <SavedPlayer verses={albums ?? list} front={front} view={view} onView={setView} />
+          <SavedPlayer verses={order} front={front} view={view} onView={setView} />
         </div>
         {full.view}
       </div>

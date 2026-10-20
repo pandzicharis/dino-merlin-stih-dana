@@ -370,7 +370,12 @@ function load(verse: Verse): Player | null {
   const s = sourceFor(verse)
   if (!s) return null
   const a = carrierEl()
-  if (loaded?.src === s.src) return a
+  if (loaded?.src === s.src) {
+    // drugi stih iste pjesme — isti zvuk, samo se zna koji je stih
+    loaded.id = verse.id
+    playing = verse
+    return a
+  }
   if (loaded) {
     shared.delete(loaded.src)
     window.dispatchEvent(new CustomEvent(SHARED_GONE, { detail: loaded.src }))
@@ -393,13 +398,14 @@ export function sharedFor(verse: Verse): Player | null {
 
 /** Pusti sačuvani stih — iz dodira (karta, plejer) ili sam, kad prethodni završi. */
 export function playSaved(verse: Verse): boolean {
-  const switching = loaded?.id !== verse.id
+  // druga pjesma = drugi fajl; drugi stih iste pjesme nastavlja gdje je stala
+  const switching = !loaded || loaded.src !== sourceFor(verse)?.src
   const a = load(verse)
   if (!a) return false
   cancelSoft(a)
   // druga pjesma kreće ispočetka
   // nova pjesma — jedno slušanje više (Omiljene se slažu po tome)
-  if (switching) countPlay(verse.id)
+  if (switching) countPlay(audioFile(verse.song))
   if (switching) {
     try {
       a.currentTime = 0

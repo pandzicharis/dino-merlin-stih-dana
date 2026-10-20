@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { motion, useDragControls, useMotionValue, useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { ExpandIcon } from './ExpandIcon'
@@ -18,7 +18,7 @@ import { FontedLines, MagazaMark, MoodStill, Notes } from './deck/Screens'
 import { FitLines } from './deck/FitLines'
 import { LoveButton } from './SavedPlayer'
 import { SongRow } from './SongCredit'
-import { SAVED_TRACK, playSaved, setSavedPlaylist, useSavedPlayer } from '@/lib/player'
+import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayer } from '@/lib/player'
 
 /**
  * Sačuvani kao špil karata: svaka karta je ekran aplikacije u malom (isti
@@ -119,10 +119,21 @@ export function SavedCarousel({
     const v = verses[at]
     if (player.playing && v && v.id !== player.id) playSaved(v)
   }, [at, verses, player.playing, player.id])
+  // prikaz opet vidljiv (Activity) — prednja je pjesma koja sad svira
+  useEffect(() => {
+    const i = verses.findIndex((v) => v.id === savedVerse()?.id)
+    if (i < 0) return
+    const r = requestAnimationFrame(() => setIndex(i))
+    return () => cancelAnimationFrame(r)
+    // samo pri pokazivanju prikaza
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => {
     const onTrack = (e: Event) => {
       const i = verses.findIndex((v) => v.id === (e as CustomEvent).detail)
-      if (i >= 0) go(i, true)
+      // kadar poslije: prvo se složi plejer (nova pjesma), pa špil krene — dva
+      // posla u dva kadra, ne jedan dug
+      if (i >= 0) requestAnimationFrame(() => go(i, true))
     }
     window.addEventListener(SAVED_TRACK, onTrack)
     return () => window.removeEventListener(SAVED_TRACK, onTrack)
@@ -321,7 +332,7 @@ function Card({
  * Sve je u `em` od `--cw` (širina karte), pa raširena karta izgleda isto,
  * samo veća. `o`: mjesto u špilu (karte ispod su tamnije).
  */
-export function CardFace({
+function CardFaceView({
   verse,
   o = 0,
   onOpen,
@@ -538,7 +549,7 @@ export function CardFace({
       >
         {/* zvjezdica — pjesma u "Omiljene" (isto kao u plejeru), na sredini iznad naziva */}
         <span data-nodrag className="pointer-events-auto" style={{ marginBottom: '2em' }}>
-          <LoveButton id={verse.id} accent={m.accent} size={30} icon={16} />
+          <LoveButton song={verse.song} accent={m.accent} size={30} icon={16} />
         </span>
         <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '12.5em', letterSpacing: '0.2em', color: m.accent }}>
           {verse.song}
@@ -582,3 +593,22 @@ export function CardFace({
     </div>
   )
 }
+
+/** tamnjenje karte ispod prednje (0, 0.07, 0.14, 0.2) — od mjesta u špilu */
+const dimOf = (o: number) => Math.min(Math.abs(o) * 0.07, 0.2)
+
+/**
+ * Lice karte, memoizovano: pri promjeni pjesme svaka karta promijeni mjesto u
+ * špilu (`o`), ali se iscrta iznova samo ako joj se stvarno nešto vidljivo
+ * promijenilo (prednja ili tamnjenje) — atmosfera i stih su skupi za crtanje.
+ */
+export const CardFace = memo(
+  CardFaceView,
+  (a, b) =>
+    a.verse === b.verse &&
+    (a.o === 0) === (b.o === 0) &&
+    dimOf(a.o ?? 0) === dimOf(b.o ?? 0) &&
+    a.onOpen === b.onOpen &&
+    a.onCollapse === b.onCollapse &&
+    a.actionsZoom === b.actionsZoom,
+)

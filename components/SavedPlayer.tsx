@@ -9,6 +9,7 @@ import { haptic } from '@/lib/haptic'
 import { asWritten } from '@/lib/text'
 import { EqBars } from './EqBars'
 import { toggleLoved } from '@/lib/storage'
+import { audioFile } from '@/lib/audio-name'
 import { useLoved, useLovedIds } from '@/lib/client-store'
 import {
   SAVED_TRACK,
@@ -94,6 +95,13 @@ const VIEWS: [View, string, ReactNode][] = [
 export type View = 'cards' | 'list' | 'albums' | 'loved'
 
 const hasSong = (v: Verse) => Boolean(v.youtube && playable(v))
+/** pjesma (fajl) — dva stiha iste pjesme su ista pjesma */
+export const keyOf = (v: Verse) => audioFile(v.song)
+/** ključ pjesme koja je u plejeru (ili null) */
+const nowKeyOf = (id: string | null) => {
+  const v = id ? savedVerse() : null
+  return v ? keyOf(v) : null
+}
 /** stih u jednom komadu — redovi spojeni razmakom */
 const oneLine = (text: string) => {
   // u jednom komadu, kao rečenica: prvo slovo veliko, sve ostalo malo
@@ -133,8 +141,8 @@ function useProgress(
     let lastLeft = ''
     const tick = () => {
       const v = savedVerse()
-      const a = v && v.id === id ? currentSaved() : null
-      const d = a && Number.isFinite(a.duration) && a.duration > 0 ? a.duration : v && v.id === id ? knownDuration(v) : known
+      const a = v && keyOf(v) === id ? currentSaved() : null
+      const d = a && Number.isFinite(a.duration) && a.duration > 0 ? a.duration : v && keyOf(v) === id ? knownDuration(v) : known
       const t = a ? a.currentTime : 0
       const f = d ? Math.min(1, t / d) : 0
       if (Math.abs(f - lastF) > 0.0015) {
@@ -216,7 +224,9 @@ function Btn({
 }
 
 /** Zvjezdica — pjesma u "Omiljene" (ili van). */
-export function LoveButton({ id, accent, size = 34, icon = 17 }: { id: string; accent: string; size?: number; icon?: number }) {
+export function LoveButton({ song, accent, size = 34, icon = 17 }: { song: string; accent: string; size?: number; icon?: number }) {
+  // omiljena je PJESMA (svi njeni stihovi), ne jedan stih
+  const id = audioFile(song)
   const on = useLovedIds().includes(id)
   return (
     <motion.button
@@ -345,18 +355,19 @@ export function SavedPlayer({
   onView: (v: View) => void
 }) {
   const p = useSavedPlayer()
-  const loaded = verses.find((v) => v.id === p.id) ?? null
-  const inQueue = front && verses.some((v) => v.id === front.id) ? front : null
+  const nowKey = nowKeyOf(p.id)
+  const loaded = verses.find((v) => v.id === p.id) ?? (nowKey ? verses.find((v) => keyOf(v) === nowKey) : undefined) ?? null
+  const inQueue = front && verses.some((v) => v.id === front.id) ? front : front && verses.find((v) => keyOf(v) === keyOf(front))
   // u "Stihovi" plejer je uvijek pjesma prednje karte — "Pusti" pusti nju;
   // inače pjesma koja je u plejeru (pa prednja / prva)
   const cur = (view === 'cards' ? (inQueue ?? loaded) : (loaded ?? inQueue)) ?? verses[0] ?? null
-  const isLoaded = Boolean(cur && p.id === cur.id)
+  const isLoaded = Boolean(cur && nowKey && keyOf(cur) === nowKey)
   const fill = useRef<HTMLSpanElement>(null)
   const dot = useRef<HTMLSpanElement>(null)
   const now = useRef<HTMLSpanElement>(null)
   const left = useRef<HTMLSpanElement>(null)
   const track = useRef<HTMLDivElement>(null)
-  useProgress(isLoaded && cur ? cur.id : null, fill, now, left, !isLoaded && cur && hasSong(cur) ? knownDuration(cur) : 0, dot)
+  useProgress(isLoaded && cur ? keyOf(cur) : null, fill, now, left, !isLoaded && cur && hasSong(cur) ? knownDuration(cur) : 0, dot)
   // pjesma koju plejer pokazuje — spušten bez puštanja, ostaje u mini plejeru
   useEffect(() => setShownSaved(cur && hasSong(cur) ? cur : null), [cur])
   if (!cur) return null
@@ -406,7 +417,7 @@ export function SavedPlayer({
             <span className="tabular text-[10px] tracking-[0.18em] text-white/45">
               {i + 1} / {n}
             </span>
-            <LoveButton id={cur.id} accent={m.accent} size={30} />
+            <LoveButton song={cur.song} accent={m.accent} size={30} />
           </div>
         </div>
 
@@ -470,8 +481,7 @@ export function SavedPlayer({
 
         {/* pogled iznad plejera: karte, lista pjesama (cijeli stih) ili albumi */}
         <div className="mt-4 flex justify-center">
-          {/* staklo kao na iPhoneu: zamućenje, odsjaj odozgo, tanak svijetli rub */}
-          <div className="glass-seg relative flex rounded-full p-[3px]" role="tablist" aria-label="Prikaz">
+          <div className="relative flex rounded-full bg-black/25 p-[3px]" role="tablist" aria-label="Prikaz">
             {VIEWS.map(([v, label, icon]) => (
               <button
                 key={v}
@@ -487,13 +497,7 @@ export function SavedPlayer({
                 style={{ color: view === v ? '#14100A' : 'rgba(255,255,255,0.65)' }}
               >
                 {view === v && (
-                  // izabrani: sjajna kapsula u boji stiha — odsjaj gore, mekana sjena
-                  <motion.span
-                    layoutId="saved-view"
-                    className="glass-pill absolute inset-0 rounded-full"
-                    style={{ background: `linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.05) 48%, rgba(255,255,255,0) 52%), ${m.accent}` }}
-                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                  />
+                  <motion.span layoutId="saved-view" className="absolute inset-0 rounded-full" style={{ background: m.accent }} transition={{ type: 'spring', stiffness: 420, damping: 34 }} />
                 )}
                 <svg className="relative" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   {icon}
@@ -556,7 +560,7 @@ const SongItem = memo(function SongItem({ v, on, playing }: { v: Verse; on: bool
           <span className="mt-1 block text-[12.5px] leading-snug text-white/50">{oneLine(v.text)}</span>
         </span>
       </button>
-      <LoveButton id={v.id} accent={m.accent} />
+      <LoveButton song={v.song} accent={m.accent} />
     </div>
   )
 })
@@ -587,7 +591,9 @@ function useFocusPlaying(list: React.RefObject<HTMLElement | null>, active = tru
 /** Pjesme: lista sačuvanih (najnovija prva). */
 export function SavedList({ verses, front, active = true }: { verses: Verse[]; front: Verse | null; active?: boolean }) {
   const p = useSavedPlayer()
-  const cur = verses.find((v) => v.id === p.id) ?? front
+  // po pjesmi: red pjesme je "trenutni" i kad svira drugi njen stih
+  const nowKey = nowKeyOf(p.id)
+  const curKey = nowKey ?? (front ? keyOf(front) : null)
   const ul = useRef<HTMLUListElement>(null)
   useFocusPlaying(ul, active)
   return (
@@ -595,8 +601,8 @@ export function SavedList({ verses, front, active = true }: { verses: Verse[]; f
     // podloga reda viri malo van
     <ul ref={ul} className="-mx-2 flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
       {verses.map((v, k) => (
-        <motion.li key={v.id} data-now={p.id === v.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
-          <SongItem v={v} on={cur?.id === v.id} playing={cur?.id === v.id && p.id === v.id && p.playing} />
+        <motion.li key={v.id} data-now={keyOf(v) === nowKey} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
+          <SongItem v={v} on={keyOf(v) === curKey} playing={p.playing && keyOf(v) === nowKey} />
         </motion.li>
       ))}
     </ul>
@@ -685,7 +691,7 @@ const AlbumCard = memo(
         <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-2 pb-2 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
           {list.map((v) => (
             <div key={v.id}>
-              <SongItem v={v} on={curId === v.id} playing={playingId === v.id} />
+              <SongItem v={v} on={curId === keyOf(v)} playing={playingId === keyOf(v)} />
             </div>
           ))}
         </div>
@@ -707,7 +713,6 @@ const AlbumCard = memo(
  */
 export function SavedLoved({
   verses,
-  front,
   onQueue,
   active = true,
 }: {
@@ -721,9 +726,9 @@ export function SavedLoved({
   const list = useMemo(
     () =>
       verses
-        .filter((v) => ids.includes(v.id))
+        .filter((v) => ids.includes(keyOf(v)))
         .map((v, k) => ({ v, k }))
-        .sort((a, b) => (plays[b.v.id] ?? 0) - (plays[a.v.id] ?? 0) || a.k - b.k)
+        .sort((a, b) => (plays[keyOf(b.v)] ?? 0) - (plays[keyOf(a.v)] ?? 0) || a.k - b.k)
         .map(({ v }) => v),
     [verses, ids, plays],
   )
@@ -734,7 +739,8 @@ export function SavedLoved({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, onQueue, active])
   // ista pjesma kao u plejeru ispod: ona koja svira, inače prva
-  const cur = list.find((v) => v.id === p.id) ?? (front && list.find((v) => v.id === front.id)) ?? list[0] ?? null
+  const nowKey = nowKeyOf(p.id)
+  const curKey = (nowKey && list.some((v) => keyOf(v) === nowKey) ? nowKey : null) ?? (list[0] ? keyOf(list[0]) : null)
   const ul = useRef<HTMLUListElement>(null)
   useFocusPlaying(ul, active)
 
@@ -756,8 +762,8 @@ export function SavedLoved({
     // podloga reda viri malo van
     <ul ref={ul} className="-mx-2 flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
       {list.map((v, k) => (
-        <motion.li key={v.id} data-now={p.id === v.id} layout="position" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
-          <SongItem v={v} on={cur?.id === v.id} playing={cur?.id === v.id && p.id === v.id && p.playing} />
+        <motion.li key={v.id} data-now={keyOf(v) === nowKey} layout="position" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
+          <SongItem v={v} on={keyOf(v) === curKey} playing={p.playing && keyOf(v) === nowKey} />
         </motion.li>
       ))}
     </ul>
@@ -789,11 +795,12 @@ export function SavedAlbums({
   active?: boolean
 }) {
   const p = useSavedPlayer()
-  const cur = verses.find((v) => v.id === p.id) ?? front
+  const nowKey = nowKeyOf(p.id)
+  const cur = (nowKey ? verses.find((v) => keyOf(v) === nowKey) : undefined) ?? front
   const albums = useMemo(() => byAlbum(verses), [verses])
   const n = albums.length
   // na početku je ispred album pjesme koja svira — inače prvi album
-  const [at, setAt] = useState(() => Math.max(0, albums.findIndex((a) => a.list.some((v) => v.id === p.id))))
+  const [at, setAt] = useState(() => Math.max(0, albums.findIndex((a) => a.list.some((v) => keyOf(v) === nowKey))))
   const i = Math.min(at, n - 1)
   const box = useRef<HTMLDivElement>(null)
   const moved = useRef(false)
@@ -815,13 +822,22 @@ export function SavedAlbums({
     setAt(t)
   }
 
+  // prikaz opet vidljiv (Activity) — ispred je album pjesme koja sad svira
+  useEffect(() => {
+    const k = byAlbum(verses).findIndex((a) => a.list.some((v) => keyOf(v) === nowKeyOf(savedVerse()?.id ?? null)))
+    if (k < 0) return
+    const r = requestAnimationFrame(() => setAt(k))
+    return () => cancelAnimationFrame(r)
+    // samo pri pokazivanju prikaza
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // pjesma se promijenila (naprijed/natrag, kraj pjesme) — ispred dođe album
   // koji se sluša, i kad je gledan neki drugi
   const names = albums.map((a) => a.name).join('|')
   useEffect(() => {
     const onTrack = (e: Event) => {
-      const id = String((e as CustomEvent).detail)
-      const k = byAlbum(verses).findIndex((a) => a.list.some((v) => v.id === id))
+      const key = nowKeyOf(String((e as CustomEvent).detail))
+      const k = byAlbum(verses).findIndex((a) => a.list.some((v) => keyOf(v) === key))
       if (k >= 0) setAt(k)
     }
     window.addEventListener(SAVED_TRACK, onTrack)
@@ -831,7 +847,7 @@ export function SavedAlbums({
 
   // red za plejer: album pjesme koja svira, inače album ispred — i spušten
   // (mini plejer) ide samo kroz njega
-  const playingAlbum = albums.findIndex((a) => a.list.some((v) => v.id === p.id))
+  const playingAlbum = albums.findIndex((a) => a.list.some((v) => keyOf(v) === nowKey))
   const queue = albums[playingAlbum >= 0 ? playingAlbum : i]?.list
   const queueKey = queue?.map((v) => v.id).join('|') ?? ''
   useEffect(() => {
@@ -875,8 +891,8 @@ export function SavedAlbums({
               list={list}
               width={card}
               ahead={k === i}
-              curId={cur?.id ?? null}
-              playingId={p.playing ? p.id : null}
+              curId={cur ? keyOf(cur) : null}
+              playingId={p.playing ? nowKeyOf(p.id) : null}
               onBring={() => go(k)}
             />
           ))}
@@ -913,7 +929,7 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
   const fill = useRef<HTMLSpanElement>(null)
   const start = useRef<number | null>(null)
   const swiped = useRef(false)
-  useProgress(v?.id ?? null, fill)
+  useProgress(v ? keyOf(v) : null, fill)
   if (!v) return null
   const m = MOODS[v.mood]
   return (
@@ -929,11 +945,13 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
       variants={{
         hidden: (why?: string) =>
           why === 'open'
-            ? { opacity: 0, y: -18, scale: 1.03, transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } }
+            ? // podiže se zajedno s panelom — ista kriva i trajanje kao drawer (Sheet OPEN)
+              { opacity: 0, y: -48, transition: { duration: 0.5, ease: [0.32, 0.72, 0, 1], opacity: { duration: 0.42, ease: 'easeOut' } } }
             : { opacity: 0, y: 96, transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } },
-        shown: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 360, damping: 30, delay: 0.16 } },
+        // tek kad panel ode s ekrana (0.42 s) — jedno pa drugo, ništa ne preskače
+        shown: { opacity: 1, y: 0, transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1], delay: 0.36 } },
       }}
-      initial={{ opacity: 0, y: 48, scale: 0.94 }}
+      initial={{ opacity: 0, y: 26 }}
       animate="shown"
       exit="hidden"
       onPointerDown={(e) => {
@@ -960,17 +978,9 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
       }}
       onKeyDown={(e) => e.key === 'Enter' && onOpen()}
     >
-      {/* staklo kao na iPhoneu: boja stiha kroz zamućenje, odsjaj odozgo,
-          tanak svijetli rub i meka sjena */}
-      <div className="glass-mini relative overflow-hidden rounded-[24px]">
-        <div className="absolute inset-0 opacity-[0.86]">
-          <Atmosphere verse={v} />
-        </div>
-        <span
-          className="pointer-events-none absolute inset-0"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.025) 42%, rgba(255,255,255,0) 58%)' }}
-          aria-hidden
-        />
+      {/* bez okvira — samo boja stiha i meka sjena */}
+      <div className="relative overflow-hidden rounded-[24px] shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+        <Atmosphere verse={v} />
         {/* jedan red: omot · trenutno slušaš, pjesma i album · natrag, pusti/pauza, naprijed */}
         <div className="relative flex items-center gap-2 py-3 pl-3 pr-2">
           <Cover verse={v} size={52} />

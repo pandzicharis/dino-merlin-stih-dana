@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, animate, motion, useDragControls } from 'motion/react'
+import { AnimatePresence, animate, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { SavedVerses, type SavedView } from './SavedVerses'
@@ -24,9 +24,6 @@ const VIEW = 'stihdana:savedView'
  */
 export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
   const [verses, setVerses] = useState<Verse[] | null>(null)
-  // Povlači se CIJELI panel, ali se hvata samo za zaglavlje — inače bi
-  // skrolanje liste vuklo panel umjesto da skrola.
-  const drag = useDragControls()
 
   useEffect(() => {
     if (verses) return
@@ -128,8 +125,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
               ...sheetDrag.style,
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
-            dragControls={drag}
-            dragListener={false}
           >
             <span
               className="pointer-events-none absolute inset-x-10 top-0 h-px"
@@ -140,7 +135,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
             {/* zaglavlje se povlači za zatvaranje; lista ispod normalno skrola */}
             <div
               className="shrink-0 cursor-grab touch-none px-5 pt-3 active:cursor-grabbing"
-              onPointerDown={(e) => drag.start(e)}
             >
               <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
               <div className="mb-3 flex items-center justify-between">
