@@ -1602,7 +1602,7 @@ function Azuriranje() {
         Kad objavimo izmjenu, aplikacija na početnom ekranu ponudi jedno tiho dugme. Bez App Storea i bez čekanja na
         odobrenje — a ništa se ne mijenja pod prstima dok je korisnik ne prihvati.
       </Text>
-      <Bullets items={['Bez mreže otvara zadnji viđeni stih; otvorena preko ponoći sama pređe na novi dan.']} />
+      <Bullets items={['Bez mreže otvara zadnji viđeni stih. Novi stih dolazi u podne, s obaviješću — otvorena aplikacija sama pređe na njega.']} />
       <Acts>
         <ActionChip onClick={() => simulate('update')}>{Ico.reload} Ponovi</ActionChip>
       </Acts>

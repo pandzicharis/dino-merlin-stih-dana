@@ -1,7 +1,7 @@
 import { DailyVerse } from '@/components/DailyVerse'
 import { catalogVerses, findVerse } from '@/lib/catalog'
 import { DECK_VERSE } from '@/lib/deck'
-import { todayInTz } from '@/lib/date'
+import { verseDayInTz } from '@/lib/date'
 
 /**
  * Stranica se regeneriše na sat vremena (i odmah kad admin nešto promijeni)
@@ -18,5 +18,5 @@ export default async function Page() {
   const [verses, deck] = await Promise.all([catalogVerses(), findVerse(DECK_VERSE)])
   // stih prezentacije ide uz stranicu — telefon u prezentaciji ga ima odmah,
   // bez bljeska drugog stiha dok se ne dohvati
-  return <DailyVerse serverDate={todayInTz()} verses={verses} deckVerse={deck} />
+  return <DailyVerse serverDate={verseDayInTz()} verses={verses} deckVerse={deck} />
 }

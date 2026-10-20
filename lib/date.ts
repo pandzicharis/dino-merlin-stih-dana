@@ -2,8 +2,9 @@
  * Vrijeme i datum.
  *
  * Timezone je FIKSAN na Europe/Sarajevo — namjerno. Svako izvlači svoj stih
- * (lib/draw.ts), ali dan se svima mijenja u isto vrijeme: novi stih u ponoć,
- * obavijest u podne, po sarajevskom satu.
+ * (lib/draw.ts), ali dan se svima mijenja u isto vrijeme: DAN STIHA traje od
+ * obavijesti do obavijesti — od 12:00 do sljedećeg dana u 12:00, po
+ * sarajevskom satu (`verseDayInTz`). Ujutro je još jučerašnji stih.
  */
 
 import { deckParam, inDeck, DECK_VERSE } from './deck'
@@ -31,6 +32,21 @@ export function todayInTz(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(now)
 }
 
+/** Sat (0–23) u Sarajevu. */
+export function hourInTz(now: Date = new Date()): number {
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' }).format(now))
+}
+
+/**
+ * DAN STIHA (YYYY-MM-DD): od obavijesti u 12:00 do sljedeće. Prije podneva je
+ * to još jučerašnji dan — stih se ne mijenja ujutro, nego kad stigne obavijest
+ * (tad i tombola). Sat se čita iz zone, pa ljetno/zimsko vrijeme ne pomjera granicu.
+ */
+export function verseDayInTz(now: Date = new Date()): string {
+  const today = todayInTz(now)
+  return hourInTz(now) < SEND_HOUR ? addDays(today, -1) : today
+}
+
 /**
  * Pomak zone u milisekundama za dati trenutak. Čita se iz same zone, pa
  * ljetno/zimsko vrijeme nije poseban slučaj.
@@ -55,16 +71,17 @@ function tzOffsetMs(at: Date, tz: string): number {
 }
 
 /**
- * Koliko milisekundi do sljedeće ponoći u Sarajevu.
+ * Koliko milisekundi do sljedećeg dana stiha — do idućih 12:00 u Sarajevu.
  *
- * Dva puta godišnje, u satu prelaska na ljetno vrijeme, promaši za sat.
- * To nije problem: ko god ovo koristi ponovo pita `todayInTz()` kad istekne,
- * pa rani okidač ne promijeni ništa i samo se zakaže idući.
+ * Dva puta godišnje, oko prelaska na ljetno vrijeme, zna promašiti za sat.
+ * To nije problem: ko god ovo koristi ponovo pita `verseDayInTz()` kad
+ * istekne, pa rani okidač ne promijeni ništa i samo se zakaže idući.
  */
 export function msUntilNextDay(now: Date = new Date()): number {
   const DAY = 86_400_000
   const local = now.getTime() + tzOffsetMs(now, TZ)
-  return Math.floor(local / DAY) * DAY + DAY - local
+  const noon = Math.floor(local / DAY) * DAY + SEND_HOUR * 3_600_000
+  return noon > local ? noon - local : noon + DAY - local
 }
 
 export function addDays(iso: string, n: number): string {
@@ -142,7 +159,7 @@ export function readDevParams(): DevParams {
   if (d && isValidISODate(d)) {
     date = d
   } else if (off !== null && off !== '' && !Number.isNaN(Number(off))) {
-    date = addDays(todayInTz(), Number(off))
+    date = addDays(verseDayInTz(), Number(off))
   } else {
     const stored = safeGet(KEY)
     if (stored && isValidISODate(stored)) date = stored
@@ -152,9 +169,9 @@ export function readDevParams(): DevParams {
   return { date, verseId: q.get('verse') ?? (inDeck() ? DECK_VERSE : null), mood: q.get('mood') }
 }
 
-/** Datum koji aplikacija smatra "danas" — jedini izvor istine u UI-ju. */
+/** Dan stiha koji aplikacija smatra "danas" — jedini izvor istine u UI-ju. */
 export function getActiveDate(): string {
-  return readDevParams().date ?? todayInTz()
+  return readDevParams().date ?? verseDayInTz()
 }
 
 export function setDevDate(iso: string | null) {

@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from 'react'
 import { MOOD_KEYS, type Mood } from '@/data/moods'
-import { msUntilNextDay, readDevParams, todayInTz } from './date'
+import { msUntilNextDay, readDevParams, verseDayInTz } from './date'
 
 /**
  * URL i localStorage su vanjski store-ovi — čitaju se kroz useSyncExternalStore,
@@ -22,7 +22,7 @@ function subscribeTo(events: string[]) {
 /**
  * "Danas" je vanjski store, ne vrijednost sa servera.
  *
- * Stranica je ISR i servira se s CDN-a, pa poslije ponoći HTML zna do sat
+ * Stranica je ISR i servira se s CDN-a, pa poslije podneva HTML zna do sat
  * vremena nositi jučerašnji datum. Uz to aplikacija s početnog ekrana stoji
  * otvorena danima — bez ovoga bi joj stih ostao zamrznut na danu kad je
  * zadnji put učitana.
@@ -33,7 +33,7 @@ function subscribeTo(events: string[]) {
 function subscribeToday(cb: () => void) {
   let timer: ReturnType<typeof setTimeout>
 
-  // Jedan tajmer do ponoći umjesto stalnog provjeravanja. Kad je aplikacija
+  // Jedan tajmer do podneva (novi dan stiha) umjesto stalnog provjeravanja. Kad je aplikacija
   // u pozadini, tajmere zna prispavati sistem — zato uz njega idu i buđenja.
   const schedule = () => {
     timer = setTimeout(
@@ -55,9 +55,9 @@ function subscribeToday(cb: () => void) {
   }
 }
 
-/** Datum koji aplikacija smatra današnjim. Prati stvarnu ponoć u Sarajevu. */
+/** Dan stiha koji aplikacija smatra današnjim — mijenja se u 12:00 u Sarajevu. */
 export function useToday(serverDate: string): string {
-  return useSyncExternalStore(subscribeToday, todayInTz, () => serverDate)
+  return useSyncExternalStore(subscribeToday, verseDayInTz, () => serverDate)
 }
 
 /* ── dev override (datum / stih / mood) ─────────────────────── */

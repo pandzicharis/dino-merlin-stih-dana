@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { findVerse, getCatalog } from '@/lib/catalog'
 import { oneLine, asWritten } from '@/lib/text'
-import { todayInTz } from '@/lib/date'
+import { verseDayInTz } from '@/lib/date'
 import { VerseScreen } from '@/components/VerseScreen'
 import { BackLink } from '@/components/BackLink'
 import { OG_BASE } from '@/lib/og'
@@ -45,7 +45,7 @@ export default async function StihPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <BackLink />
-      <VerseScreen verse={verse} date={todayInTz()} />
+      <VerseScreen verse={verse} date={verseDayInTz()} />
     </>
   )
 }

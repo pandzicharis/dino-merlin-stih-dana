@@ -11,7 +11,7 @@
  * (globals.css `html[data-cekaj]`).
  */
 
-import { SEND_HOUR, TZ, todayInTz } from './date'
+import { SEND_HOUR, TZ, verseDayInTz } from './date'
 
 /** dan za koji je obavijest već izvučena (tombola poslije podneva) */
 const DONE = 'stihdana:obavijestDan'
@@ -27,7 +27,7 @@ export function mayWait(): boolean {
   try {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false
     if (localStorage.getItem('stihdana:notify') === 'false') return false
-    return hourInTz() >= SEND_HOUR && localStorage.getItem(DONE) !== todayInTz()
+    return hourInTz() >= SEND_HOUR && localStorage.getItem(DONE) !== verseDayInTz()
   } catch {
     return false
   }
@@ -50,7 +50,7 @@ export function uncover() {
 /** Tombola poslije podneva je izvučena — danas više nema zastora. */
 export function markHandled() {
   try {
-    if (hourInTz() >= SEND_HOUR) localStorage.setItem(DONE, todayInTz())
+    if (hourInTz() >= SEND_HOUR) localStorage.setItem(DONE, verseDayInTz())
   } catch {
     /* privatni prozor */
   }
