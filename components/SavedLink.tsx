@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
-import { OPEN_SAVED } from '@/lib/player'
+import { EqBars } from './EqBars'
+import { OPEN_SAVED, useSavedPlayer } from '@/lib/player'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
 const load = () => import('./SavedPanel')
@@ -26,6 +27,7 @@ export function SavedLink() {
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
+  const player = useSavedPlayer()
   // panel se preuzme i SLOŽI u tišini kad se ekran smiri (sklonjen ispod
   // ekrana) — prvi dodir ga samo podigne, bez čekanja i treptaja
   useEffect(() => {
@@ -74,26 +76,21 @@ export function SavedLink() {
               aria-label={`Player pjesama (${count})`}
               title="Player pjesama"
               data-tip="saved"
-              className="relative -m-[10.5px] p-[10.5px] text-white/60 transition-all hover:text-white/85 active:scale-90"
+              data-live={player.playing ? '' : undefined}
+              className="hdr-btn gap-1.5 pl-2.5 pr-3"
             >
-              {/* plejer pjesama: redovi liste i nota */}
-              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M3.5 6h11M3.5 10.5h11M3.5 15h6.5" />
-                <path d="M18 16.5V5.2l3 1.1" />
-                <circle cx="15.7" cy="16.8" r="2.3" fill="currentColor" stroke="none" />
-              </svg>
-              {/* mali brojač, puna zlatna — u boji brenda, ne kao crvena obavijest */}
-              <span
-                className="tabular absolute right-0 top-0.5 inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full px-[3px] text-[8.5px] font-bold leading-none"
-                style={{
-                  background: 'linear-gradient(135deg, #F1E2BF, #BFA87F 55%, #9C8458)',
-                  color: '#16110A',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.5)',
-                }}
-                aria-hidden
-              >
-                {count}
-              </span>
+              {/* dok svira: trake koje titraju; inače ikonica plejera (redovi i nota) */}
+              {player.playing ? (
+                <EqBars accent="currentColor" on h={12} />
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M3.5 6h11M3.5 10.5h11M3.5 15h6.5" />
+                  <path d="M18 16.5V5.2l3 1.1" />
+                  <circle cx="15.7" cy="16.8" r="2.3" fill="currentColor" stroke="none" />
+                </svg>
+              )}
+              {/* broj pjesama — pored ikonice, ne značka u uglu */}
+              <span className="tabular text-[12px] font-semibold leading-none">{count}</span>
             </button>
           </motion.span>
         )}

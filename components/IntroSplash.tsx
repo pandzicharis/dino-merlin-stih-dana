@@ -692,6 +692,7 @@ function Tombola({
 
   return (
     <motion.div
+      data-cover={phase === 'fly' ? undefined : ''}
       className="fixed inset-0 z-[70] touch-none select-none overflow-hidden"
       role="dialog"
       aria-label="Tvoj stih te čeka: drži da zavrtiš, pusti da izvučeš"
@@ -702,6 +703,7 @@ function Tombola({
         if (phase === 'ready' || phase === 'pour') return hold()
         // listić je izvučen — dodir preskače do stiha
         if (out) {
+          setPhase('fly')
           land()
           onDone()
         }
@@ -1292,8 +1294,10 @@ function IntroSplash({
 
   return (
     <motion.div
+      data-cover={phase === 'fly' ? undefined : ''}
       className="fixed inset-0 z-[70] cursor-pointer overflow-hidden"
       onClick={() => {
+        setPhase('fly')
         land()
         onDone()
       }}

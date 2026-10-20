@@ -7,7 +7,7 @@
  * idu iz keša — aplikacija se otvori bez čekanja na njih.
  */
 
-const CACHE = 'stihdana-v17'
+const CACHE = 'stihdana-v18'
 const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2']
 
 /**

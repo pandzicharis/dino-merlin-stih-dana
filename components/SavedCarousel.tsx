@@ -144,8 +144,11 @@ export function SavedCarousel({
     const all = deck.current
     if (!el || !all) return
     const ro = new ResizeObserver(() => {
-      setCw(el.getBoundingClientRect().width)
-      setFw(all.getBoundingClientRect().width)
+      // sakriven prikaz (0) se ne mjeri — karte ostanu gdje su
+      const a = el.getBoundingClientRect().width
+      const b = all.getBoundingClientRect().width
+      if (a) setCw(a)
+      if (b) setFw(b)
     })
     ro.observe(el)
     ro.observe(all)
@@ -268,7 +271,7 @@ function Card({
         zIndex: 50 - Math.abs(o),
         x,
         // svoj sloj (GPU) za vidljive karte — prevlačenje ne crta karte iznova
-        willChange: Math.abs(o) <= 2 ? 'transform' : undefined,
+        willChange: Math.abs(o) <= 3 ? 'transform' : undefined,
         visibility: Math.abs(o) > 3 ? 'hidden' : undefined,
         pointerEvents: front ? undefined : 'none',
         touchAction: 'pan-y',

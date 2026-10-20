@@ -279,9 +279,11 @@ export function VerseMock({
             <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
           </div>
           {/* sačuvani i postavke — kao VerseScreen (obavijesti su u postavkama) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20em', color: 'rgba(255,255,255,0.6)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8em', color: 'rgba(255,255,255,0.82)' }}>
             {savedCount > 0 && <SavedIcon count={savedCount} />}
-            <Gear />
+            <span style={{ ...HDR_BTN, width: '34em' }}>
+              <Gear />
+            </span>
           </div>
         </div>
 
@@ -553,49 +555,36 @@ function StreakPill({ n }: { n: number }) {
 /** Zupčanik postavki — isti kao `SettingsButton` u aplikaciji. */
 function Gear() {
   return (
-    <svg viewBox="0 0 24 24" style={{ width: '23em', height: '23em' }} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg viewBox="0 0 24 24" style={{ width: '16em', height: '16em' }} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   )
 }
 
-/** Ikonica plejera pjesama s brojačem sačuvanih — ista kao `SavedLink` u aplikaciji. */
+/** stakleno dugme u zaglavlju — kao `.hdr-btn` u aplikaciji */
+const HDR_BTN: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '34em',
+  borderRadius: '999em',
+  background: 'radial-gradient(120% 140% at 50% 0%, rgba(241,226,191,0.14) 0%, rgba(255,255,255,0.04) 60%), rgba(12,10,9,0.35)',
+  border: '1em solid rgba(255,255,255,0.12)',
+  boxShadow: 'inset 0 1em 0 rgba(255,255,255,0.1), 0 6em 18em rgba(0,0,0,0.35)',
+}
+
+/** Plejer pjesama u zaglavlju — kapsula: ikonica i broj pjesama pored (kao `SavedLink`). */
 function SavedIcon({ count }: { count: number }) {
   return (
-    <span style={{ position: 'relative', display: 'flex' }}>
-      <svg
-        viewBox="0 0 24 24"
-        style={{ width: '20em', height: '20em' }}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+    <span style={{ ...HDR_BTN, gap: '6em', padding: '0 12em 0 10em' }}>
+      <svg viewBox="0 0 24 24" style={{ width: '16em', height: '16em' }} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3.5 6h11M3.5 10.5h11M3.5 15h6.5" />
         <path d="M18 16.5V5.2l3 1.1" />
         <circle cx="15.7" cy="16.8" r="2.3" fill="currentColor" stroke="none" />
       </svg>
-      <span
-        className="tabular"
-        style={{
-          position: 'absolute',
-          right: '-8em',
-          top: '-6em',
-          height: '14em',
-          minWidth: '14em',
-          padding: '0 3em',
-          borderRadius: '99em',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(191,168,127,0.22)',
-          boxShadow: 'inset 0 0 0 1em rgba(191,168,127,0.45)',
-          color: '#D9C49C',
-        }}
-      >
-        <span style={{ fontSize: '8.5em', fontWeight: 600, lineHeight: 1 }}>{count}</span>
+      <span className="tabular" style={{ fontSize: '12em', fontWeight: 600, lineHeight: 1 }}>
+        {count}
       </span>
     </span>
   )

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Verse } from '@/data/verses'
-import { useFavorites, useMounted } from '@/lib/client-store'
+import { useFavorites, useLovedIds, useMounted } from '@/lib/client-store'
 import { BRAND } from '@/lib/brand'
 import { useSavedFull } from './SavedFull'
 import { SavedCarousel } from './SavedCarousel'
@@ -24,7 +24,32 @@ export type SavedView = View
  */
 const FIT = 'calc(96dvh - 250px - env(safe-area-inset-bottom, 0px))'
 /** blago pretapanje liste pjesama: gore malo, dole prema plejeru više */
-const LIST_FADE = 'linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 72px), rgba(0,0,0,0.15) 100%)'
+const LIST_FADE = 'linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 150px), rgba(0,0,0,0.15) calc(100% - 80px))'
+/** visina reda pjesme (omot 46 + razmak) — liste su visoke koliko pjesama ima */
+const ROW = 70
+/** najviše ovoliko redova se vidi odjednom — ostalo se skrola (pola reda viri) */
+const MAX_ROWS = 5.5
+/** plejer prekriva dno prikaza za ovoliko (-mt-20) */
+const UNDER = 80
+
+/**
+ * Visina prikaza iznad plejera: špil koliko je karta visoka, liste koliko
+ * pjesama ima (najviše 5–6), albumi koliko je kartica. Mijenja se mekano
+ * pri prebacivanju, pa panel ne skače.
+ */
+function paneHeight(view: SavedView, songs: number, loved: number, page: boolean): string {
+  if (view === 'cards') {
+    // karta: visina iz FIT, ili širina panela (do 440) ako je uža
+    return `calc(12px + min(${page ? 'min(56dvh, 560px)' : FIT}, (min(100vw, 440px) - 108px) * ${(620 / 390).toFixed(4)}))`
+  }
+  if (view === 'albums') return `calc(min(46dvh, 400px) + ${44 + UNDER + 8}px)`
+  const n = view === 'loved' ? loved : songs
+  if (!n) return `${200 + UNDER}px`
+  return `${Math.round(Math.min(n, MAX_ROWS) * ROW + 12 + UNDER)}px`
+}
+
+/** prikazi po redu — svi ostaju montirani, pa je prebacivanje samo pretapanje */
+const VIEWS: SavedView[] = ['cards', 'list', 'albums', 'loved']
 
 export function SavedVerses({
   verses,
@@ -68,6 +93,23 @@ export function SavedVerses({
     return () => window.removeEventListener(SAVED_TRACK, onTrack)
   }, [])
   const front = list.find((v) => v.id === frontId) ?? list[0] ?? null
+  const lovedIds = useLovedIds()
+  const loved = list.filter((v) => lovedIds.includes(v.id)).length
+  // prikaz se složi kad se prvi put otvori, ostali u tišini poslije — dalje
+  // ostaju montirani: prebacivanje je samo pretapanje, bez ponovnog slaganja
+  const [made, setMade] = useState<SavedView[]>(() => [view])
+  if (!made.includes(view)) setMade([...made, view])
+  useEffect(() => {
+    let idle = 0
+    const t = window.setTimeout(() => {
+      const all = () => setMade(VIEWS)
+      idle = window.requestIdleCallback?.(all, { timeout: 2500 }) ?? window.setTimeout(all, 0)
+    }, 900)
+    return () => {
+      clearTimeout(t)
+      if (idle) (window.cancelIdleCallback ?? clearTimeout)(idle)
+    }
+  }, [])
   // odlaskom sa stranice /sacuvano njihove pjesme stanu (panel to radi sam — SavedPanel)
   const page = !onClose
   useEffect(() => {
@@ -80,24 +122,45 @@ export function SavedVerses({
   if (list.length)
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        {/* isolate: karte (z-index u špilu) ostaju ispod plejera, ne preko njega */}
+        {/* prikazi jedan preko drugog, svaki sa svojim skrolom; vidi se samo
+            izabrani (pretopi se). isolate: karte ostaju ispod plejera */}
         <div
-          className={`isolate min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 ${view === 'cards' ? 'pt-3' : ''}`}
-          // pjesme se blago gube prema plejeru (i ispod zaglavlja) dok se skrola
-          style={view === 'list' || view === 'loved' ? { maskImage: LIST_FADE, WebkitMaskImage: LIST_FADE } : undefined}
+          className="relative isolate min-h-0 shrink"
+          style={{ height: paneHeight(view, list.length, loved, !onClose), transition: 'height 0.45s cubic-bezier(0.32, 0.72, 0, 1)' }}
         >
-          {view === 'list' ? (
-            <SavedList verses={list} front={front} />
-          ) : view === 'albums' ? (
-            <SavedAlbums verses={list} front={front} onQueue={setQueue} />
-          ) : view === 'loved' ? (
-            <SavedLoved verses={list} front={front} onQueue={setQueue} />
-          ) : (
-            <SavedCarousel verses={list} size={onClose ? FIT : 'min(56dvh, 560px)'} onOpen={full.open} onFront={onFront} dots={false} />
-          )}
+          {VIEWS.filter((v) => made.includes(v)).map((v) => {
+            const on = v === view
+            return (
+              <div
+                key={v}
+                data-pane={v}
+                aria-hidden={!on}
+                className={`absolute inset-0 overflow-y-auto overscroll-contain px-5 ${v === 'cards' ? 'pt-3' : 'pb-20'} ${
+                  on ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'
+                }`}
+                style={{
+                  transition: on ? 'opacity 0.26s ease' : 'opacity 0.16s ease, visibility 0s linear 0.16s',
+                  // pjesme se blago gube prema plejeru (i ispod zaglavlja) dok se
+                  // skrola — samo kad ih ima više od dvije (jedna-dvije stoje čiste)
+                  ...((v === 'list' && list.length > 2) || (v === 'loved' && loved > 2) ? { maskImage: LIST_FADE, WebkitMaskImage: LIST_FADE } : {}),
+                }}
+              >
+                {v === 'list' ? (
+                  <SavedList verses={list} front={front} active={on} />
+                ) : v === 'albums' ? (
+                  <SavedAlbums verses={list} front={front} onQueue={setQueue} active={on} />
+                ) : v === 'loved' ? (
+                  <SavedLoved verses={list} front={front} onQueue={setQueue} active={on} />
+                ) : (
+                  <SavedCarousel verses={list} size={onClose ? FIT : 'min(56dvh, 560px)'} onOpen={full.open} onFront={onFront} dots={false} />
+                )}
+              </div>
+            )
+          })}
         </div>
-        {/* plejer uz dno panela — karta se pretapa u njega (prekrije joj dno) */}
-        <div className={`relative z-10 shrink-0 ${view === 'cards' ? '-mt-20' : '-mt-6'}`}>
+        {/* plejer uz dno panela — karta se pretapa u njega (prekrije joj dno);
+            uvijek isto mjesto, pa se ništa ne pomjera pri prebacivanju */}
+        <div className="relative z-10 -mt-20 shrink-0">
           <SavedPlayer verses={albums ?? list} front={front} view={view} onView={setView} />
         </div>
         {full.view}

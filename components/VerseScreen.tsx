@@ -121,7 +121,7 @@ export function VerseScreen({
           )}
           {!compact && (
             <motion.div
-              className="flex items-center gap-5"
+              className="flex items-center gap-2"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.7, delay: 0.7, ease: 'easeOut' }}

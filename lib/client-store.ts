@@ -137,6 +137,26 @@ const lovedSnapshot = () => {
   }
 }
 
+const lovedIdsSnapshot = () => {
+  try {
+    return localStorage.getItem('stihdana:omiljene') ?? '[]'
+  } catch {
+    return '[]'
+  }
+}
+/** Samo omiljene (bez brojanja slušanja) — za zvjezdice: ne crtaju se iznova kad pjesma krene. */
+export function useLovedIds(): string[] {
+  const snap = useSyncExternalStore(subscribeLoved, lovedIdsSnapshot, () => '[]')
+  return useMemo(() => {
+    try {
+      const v: unknown = JSON.parse(snap)
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+    } catch {
+      return []
+    }
+  }, [snap])
+}
+
 /** Omiljene pjesme (id-evi stihova) i koliko je koja slušana. Na serveru prazno. */
 export function useLoved(): { ids: string[]; plays: Record<string, number> } {
   const snap = useSyncExternalStore(subscribeLoved, lovedSnapshot, () => '[]|{}')

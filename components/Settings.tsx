@@ -33,9 +33,9 @@ export function SettingsButton() {
         title="Postavke"
         // stari savjet za obavijesti (i prezentacija) traži ovaj znak — prekidač je sad ovdje
         data-tip="notify"
-        className="-m-[10.5px] p-[10.5px] text-white/60 transition-all hover:text-white/85 active:scale-90"
+        className="hdr-btn w-[34px]"
       >
-        <GearIcon size={23} />
+        <GearIcon size={16} />
       </button>
       {used && <SettingsPanel open={open} onClose={() => setOpen(false)} />}
     </>

@@ -245,6 +245,7 @@ export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
       {show && (
         <motion.div
           // `isolate` drži MoodBackground (z-index -10) iznad vlastite podloge
+          data-cover
           className="fixed inset-0 isolate z-[60] overflow-y-auto"
           style={{ backgroundColor: MOODS[mood].gradient[0] }}
           initial={false}

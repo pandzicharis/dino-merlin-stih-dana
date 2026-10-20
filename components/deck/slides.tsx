@@ -1417,7 +1417,8 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     // pjesme (cijeli stih), zvjezdica — u omiljene, albumi
     if (alive()) await press('[data-view="list"]')
     await wait(1600)
-    if (alive()) await press('[role="dialog"] [aria-label="Dodaj u omiljene"]')
+    // zvjezdica u listi (ne na karti u sakrivenom špilu)
+    if (alive()) await press('[data-pane="list"] [aria-label="Dodaj u omiljene"]')
     await wait(1200)
     if (alive()) await press('[data-view="albums"]')
     await wait(2200)

@@ -365,3 +365,83 @@ html[data-deck] .dev-pad .peek-space {
 [data-moving] *::after {
   animation-play-state: paused !important;
 }
+
+/* dugmad u zaglavlju (plejer, postavke): staklena kapsula — toplo svjetlo
+   odozgo, tanak rub, mekana sjena; pod prstom malo zasvijetli */
+.hdr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.82);
+  background: radial-gradient(120% 140% at 50% 0%, rgba(241, 226, 191, 0.14) 0%, rgba(255, 255, 255, 0.04) 60%), rgba(12, 10, 9, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 6px 18px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: color 0.25s, border-color 0.25s, transform 0.15s;
+}
+.hdr-btn:hover {
+  color: #fff;
+  border-color: rgba(241, 226, 191, 0.35);
+}
+.hdr-btn:active {
+  transform: scale(0.92);
+}
+/* muzika svira — kapsula tinja u zlatu, kao žar */
+.hdr-btn[data-live] {
+  color: #f1e2bf;
+  border-color: rgba(191, 168, 127, 0.55);
+  animation: hdr-ember 2.4s ease-in-out infinite;
+}
+@keyframes hdr-ember {
+  0%,
+  100% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 0 0 rgba(191, 168, 127, 0), 0 0 14px rgba(191, 168, 127, 0.22);
+  }
+  50% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 3px rgba(191, 168, 127, 0.12), 0 0 24px rgba(191, 168, 127, 0.42);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hdr-btn[data-live] {
+    animation: none;
+    box-shadow: 0 0 18px rgba(191, 168, 127, 0.35);
+  }
+}
+
+/* izbor prikaza u plejeru — staklo kao na iPhoneu */
+.glass-seg {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 8px 24px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+}
+.glass-pill {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 1px rgba(0, 0, 0, 0.18), 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* tombola, uvod i zastor dok se čeka obavijest — mini plejer se ne vidi;
+   čim papir poleti (stih se pojavljuje), mini plejer se pretopi zajedno s ekranom */
+[data-mini] > div {
+  transition: opacity 0.6s ease 0.15s;
+}
+html[data-cekaj] [data-mini],
+body:has([data-cover]) [data-mini] {
+  pointer-events: none !important;
+}
+html[data-cekaj] [data-mini] > div,
+body:has([data-cover]) [data-mini] > div {
+  opacity: 0;
+  transition: none;
+}
+
+/* mini plejer — staklo kao na iPhoneu */
+.glass-mini {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 12px 32px rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+}
