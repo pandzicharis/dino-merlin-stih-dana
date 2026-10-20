@@ -18,8 +18,9 @@ export function unlockVinyl() {
   try {
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AC) return
-    ctx ??= new AC()
-    if (ctx.state === 'suspended') void ctx.resume()
+    if (!ctx || ctx.state === 'closed') ctx = new AC()
+    // iOS poslije pozadine ostavi kontekst "interrupted" — i njega probudi
+    if (ctx.state !== 'running') void ctx.resume().catch(() => {})
   } catch {
     /* bez pucketanja — pjesma svira i dalje */
   }

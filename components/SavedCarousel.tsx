@@ -114,8 +114,13 @@ export function SavedCarousel({
     const v = verses[at]
     if (v) onFront?.(v)
   }, [at, verses, onFront])
-  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma
+  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma. Samo
+  // kad se ŠPIL pomjeri (prst, tačkice); kad plejer pređe na drugu pjesmu,
+  // špil je stiže kadar kasnije — tad se ništa ne pušta (inače bi vratio staru)
+  const lastAt = useRef(at)
   useEffect(() => {
+    if (lastAt.current === at) return
+    lastAt.current = at
     const v = verses[at]
     if (player.playing && v && v.id !== player.id) playSaved(v)
   }, [at, verses, player.playing, player.id])

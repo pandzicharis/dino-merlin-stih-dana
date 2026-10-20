@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useDeck } from './context'
 import type { DeviceKind } from './Devices'
@@ -40,6 +40,10 @@ export function FeatureSlide({
   d: DeckData
 }) {
   const { step, setStep, phoneSrc } = useDeck()
+  // svaki ulazak u stavku je nov: otvaranje ide ispočetka, ne nastavlja se
+  // na zatvaranje prethodnog (ni kad se ista otvori dok se još zatvara)
+  const [entry, setEntry] = useState({ step, n: 0 })
+  if (entry.step !== step) setEntry({ step, n: entry.n + 1 })
   return (
     <div>
       <R i={0}>
@@ -88,7 +92,7 @@ export function FeatureSlide({
                 <AnimatePresence initial={false}>
                   {on && (
                     <motion.div
-                      key="body"
+                      key={`body-${entry.n}`}
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}

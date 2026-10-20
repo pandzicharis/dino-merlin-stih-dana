@@ -170,7 +170,8 @@ export function LivePhone({
             />
           )}
           {tap && (
-            <div className="pointer-events-none absolute inset-0" style={{ zIndex: 21 }}>
+            // iznad simuliranih poruka (nova verzija), da se dodir na "Osvježi" vidi
+            <div className="pointer-events-none absolute inset-0" style={{ zIndex: 70 }}>
               <Tap key={tap.n} platform={kind === 'galaxy' ? 'android' : 'ios'} x={tap.x} y={tap.y} />
             </div>
           )}
@@ -361,6 +362,7 @@ function Simulated({
             <span style={{ fontSize: '14em', fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>Nova verzija</span>
             <button
               type="button"
+              data-sim="update"
               onClick={() => onSim('open')}
               style={{
                 height: '36em',

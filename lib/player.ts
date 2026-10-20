@@ -57,10 +57,16 @@ export function createPlayer(src: string, fallback: string): Player {
   const a: Player = new Audio(src)
   a.preload = 'none'
   a.fails = new Set()
+  let retried = false
   a.addEventListener('error', () => {
-    // statičnog fajla nema (nova pjesma iz admina) → pokušaj preko servera
+    // statični fajl zapeo (mreža pukla, aplikacija bila u pozadini) — još
+    // jednom isti; tek onda ga nema (nova pjesma iz admina) → preko servera
     if (a.src.endsWith(src)) {
-      a.src = fallback
+      if (retried) a.src = fallback
+      else {
+        retried = true
+        a.src = src
+      }
       if (a.dataset.want) a.play().catch(() => {})
       return
     }
@@ -274,9 +280,14 @@ let playing: Verse | null = null
 
 /** Zvuk sačuvanog stiha koji je u plejeru (ako ga ima). */
 export function currentSaved(): Player | null {
-  const v = playlist.find((x) => x.id === state.id)
-  const s = v && sourceFor(v)
-  return (s && shared.get(s.src)) || null
+  // i kad pjesma nije u trenutnom redu (Omiljene, album)
+  return loaded ? carrier : null
+}
+
+/** Pjesma iz plejera stvarno svira (ne samo dugme) — iOS je zna utišati u pozadini bez javljanja. */
+export function savedSounding(): boolean {
+  const a = currentSaved()
+  return Boolean(a && !a.paused && a.dataset.want)
 }
 
 /* ── jedan element ── */
@@ -286,6 +297,8 @@ let carrier: Player | null = null
 let loaded: { src: string; fallback: string; id: string } | null = null
 /** zaredom pjesme koje se nisu dale pustiti — da preskakanje ne ide u krug */
 let misses = 0
+/** statični fajl pjesme u plejeru je već jednom ponovo tražen */
+let retried = false
 
 function carrierEl(): Player {
   if (carrier) return carrier
@@ -294,6 +307,7 @@ function carrierEl(): Player {
   a.fails = new Set()
   a.addEventListener('playing', () => {
     misses = 0
+    retried = false
     if (loaded) setState({ id: loaded.id, playing: true })
     // pucketanje ploče dok svira (kontekst je otvoren iz dodira)
     startCrackle(a)
@@ -315,6 +329,16 @@ function carrierEl(): Player {
   })
   a.addEventListener('error', () => {
     if (!loaded) return
+    // statični fajl zapeo (mreža pukla, aplikacija bila u pozadini) — još jednom isti
+    if (!a.src.includes('/api/audio/') && !retried) {
+      retried = true
+      // nastavi gdje je stala
+      const t = a.currentTime
+      a.src = loaded.src
+      if (t) a.addEventListener('loadedmetadata', () => void (a.currentTime = t), { once: true })
+      if (a.dataset.want) a.play().catch(() => {})
+      return
+    }
     // statičnog fajla nema (nova pjesma iz admina) → pokušaj preko servera
     if (!a.src.includes('/api/audio/')) {
       a.src = loaded.fallback
@@ -387,6 +411,7 @@ function load(verse: Verse): Player | null {
   stopCrackle(a)
   loaded = { src: s.src, fallback: s.fallback, id: verse.id }
   playing = verse
+  retried = false
   a.src = s.src
   shared.set(s.src, a)
   window.dispatchEvent(new CustomEvent(SHARED, { detail: s.src }))
@@ -409,6 +434,12 @@ export function playSaved(verse: Verse): boolean {
   // druga pjesma kreće ispočetka
   // nova pjesma — jedno slušanje više (Omiljene se slažu po tome)
   if (switching) countPlay(audioFile(verse.song))
+  // zvuk je zapeo (greška — npr. mreža pukla dok je aplikacija bila u
+  // pozadini): pjesma se učita iznova, dodir mora pustiti
+  if (a.error && loaded) {
+    retried = false
+    a.src = loaded.src
+  }
   if (switching) {
     try {
       a.currentTime = 0
@@ -431,7 +462,8 @@ export function playSaved(verse: Verse): boolean {
 /** Pauza — dugme i ploča odmah stanu, zvuk se utiša (gdje se može) pa stane. */
 export function pauseSaved() {
   const a = currentSaved()
-  if (!a || a.paused) return
+  // zvuk je već stao, a dugme to ne zna — samo se uskladi
+  if (!a || a.paused) return setState({ playing: false })
   a.dataset.want = ''
   setState({ playing: false })
   stopCrackle(a)
@@ -515,4 +547,11 @@ if (typeof window !== 'undefined') {
     if (state.playing && a !== carrier) pauseSaved()
   })
   window.addEventListener('stihdana:stop-audio', () => state.id && stopSaved())
+  // povratak u aplikaciju: iOS zna zaustaviti zvuk u pozadini bez "pause" —
+  // dugme i ploča se usklade sa stvarnim stanjem
+  const sync = () => {
+    if (!document.hidden && carrier && state.playing && carrier.paused) setState({ playing: false })
+  }
+  document.addEventListener('visibilitychange', sync)
+  window.addEventListener('pageshow', sync)
 }

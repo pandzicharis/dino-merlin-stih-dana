@@ -322,7 +322,8 @@ function useSong({
       return
     }
     if (a.paused) {
-      if (isRouted(a)) a = renew(a)
+      // prošao kroz Web Audio, ili zapeo (greška) — dolazi svjež
+      if (isRouted(a) || a.error) a = renew(a)
       a.dataset.want = '1'
       // zvuk gramofona: kontekst se otvara iz dodira, tup kad igla legne
       unlockVinyl()

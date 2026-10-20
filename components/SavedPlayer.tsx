@@ -20,6 +20,7 @@ import {
   playSaved,
   playable,
   prevSaved,
+  savedSounding,
   savedVerse,
   seekSaved,
   setShownSaved,
@@ -269,7 +270,8 @@ export { EqBars } from './EqBars'
 /** Šta pusti/pauza radi za pjesmu `cur` (ona u plejeru ili prednja karta). */
 function toggle(cur: Verse, playing: boolean) {
   haptic(6)
-  if (playing) return pauseSaved()
+  // dugme kaže "svira", a zvuk je stao (iOS u pozadini) — dodir pusti
+  if (playing && savedSounding()) return pauseSaved()
   if (!playSaved(cur)) nextSaved()
 }
 

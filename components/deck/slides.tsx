@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
-import { motion } from 'motion/react'
+import { motion, useIsPresent } from 'motion/react'
 import { MOODS } from '@/data/moods'
 import { albumOf, ALBUMS } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
@@ -656,7 +656,11 @@ type Scene = {
  */
 function useScene(run: (s: Scene) => Promise<void>, always = false) {
   const { phone, tapAt, manual } = useDeck()
+  // korak se gasi (izlazna animacija) — scena staje odmah, ne tek kad nestane,
+  // da ne dira ono što je sljedeći korak već pokrenuo
+  const present = useIsPresent()
   useEffect(() => {
+    if (!present) return
     let alive = true
     const timers: number[] = []
     const wait = (ms: number) => new Promise<void>((r) => timers.push(window.setTimeout(r, ms)))
@@ -731,7 +735,7 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
     }
     // scena se igra jednom po ulasku na korak (i ispočetka kad se promijeni Auto/Ručno)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manual])
+  }, [manual, present])
 }
 
 /** Savjeti iz aplikacije: ekran se zatamni, u fokusu je jedno dugme. Auto ih lista sam, Ručno klikom. */
@@ -1365,18 +1369,19 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
 function Plejer() {
   const { os, setOs, manual, phone } = useDeck()
   useKeepSaved()
-  // odlaskom s koraka muzika stane (i sačuvani na početnoj)
-  useEffect(
-    () => () => {
+  // odlaskom s koraka muzika stane (i sačuvani na početnoj) — odmah, ne tek kad nestane
+  const present = useIsPresent()
+  useEffect(() => {
+    if (!present) return
+    return () => {
       try {
         const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
         w?.dispatchEvent(new w.Event('stihdana:stop-audio'))
       } catch {
         /* tuđa adresa */
       }
-    },
-    [phone],
-  )
+    }
+  }, [phone, present])
   return (
     <>
       <PlejerScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
@@ -1489,7 +1494,9 @@ function Dijeljenje() {
 function Slusanje() {
   const { phone, manual } = useDeck()
   useKeepSaved()
+  const present = useIsPresent()
   useEffect(() => {
+    if (!present) return
     let alive = !manual // Ručno: pjesmu pušta prezenter — ali i tad stane na odlasku
     let t = 0
     const btn = () => {
@@ -1517,7 +1524,7 @@ function Slusanje() {
         /* tuđa adresa */
       }
     }
-  }, [phone, manual])
+  }, [phone, manual, present])
   return (
     <Text>
       Plejer je gramofon ispod stiha: dodir na ploču spusti iglu, ploča se zavrti i pjesma svira uz tiho pucketanje
@@ -1582,8 +1589,30 @@ function Obavijest({ d }: { d: DeckData }) {
 }
 
 function Azuriranje() {
-  const { simulate, phone } = useDeck()
+  const { simulate, phone, tapAt, manual } = useDeck()
   useKeepSaved()
+  // svaka ponuda (ulazak, "Ponovi") — u Auto se i prihvati sama
+  const [offered, setOffered] = useState(0)
+  const offer = () => {
+    simulate('update')
+    setOffered((n) => n + 1)
+  }
+  const present = useIsPresent()
+  useEffect(() => {
+    if (!offered || manual || !present) return
+    // dodir na "Osvježi" (nacrtan preko telefona), pa aplikacija učita novu verziju
+    let t = window.setTimeout(() => {
+      const btn = document.querySelector<HTMLElement>('[data-sim="update"]')
+      const f = phone()
+      if (!btn || !f) return
+      const fr = f.getBoundingClientRect()
+      const k = fr.width / (f.offsetWidth || 1)
+      const r = btn.getBoundingClientRect()
+      tapAt((r.left + r.width / 2 - fr.left) / k, (r.top + r.height / 2 - fr.top) / k)
+      t = window.setTimeout(() => btn.click(), 260)
+    }, 2600)
+    return () => clearTimeout(t)
+  }, [offered, manual, present, phone, tapAt])
   // ponuda nove verzije stigne tek kad je aplikacija učitana i na ekranu
   useScene(async ({ wait, find, alive }) => {
     for (let t = 0; t < 80 && alive(); t++) {
@@ -1598,7 +1627,7 @@ function Azuriranje() {
     if (!(await find('[data-tip="song"]', 15000)) || !alive()) return
     // na ulasku nema ničega — ponuda iskoči tek za 2 s, kao da je baš stigla
     await wait(2000)
-    if (alive()) simulate('update')
+    if (alive()) offer()
   }, true)
   return (
     <>
@@ -1608,7 +1637,7 @@ function Azuriranje() {
       </Text>
       <Bullets items={['Bez mreže otvara zadnji viđeni stih. Novi stih dolazi u podne, s obaviješću — otvorena aplikacija sama pređe na njega.']} />
       <Acts>
-        <ActionChip onClick={() => simulate('update')}>{Ico.reload} Ponovi</ActionChip>
+        <ActionChip onClick={offer}>{Ico.reload} Ponovi</ActionChip>
       </Acts>
     </>
   )
