@@ -569,9 +569,9 @@ const HDR_BTN: React.CSSProperties = {
   justifyContent: 'center',
   height: '34em',
   borderRadius: '999em',
-  background: 'radial-gradient(120% 140% at 50% 0%, rgba(241,226,191,0.14) 0%, rgba(255,255,255,0.04) 60%), rgba(12,10,9,0.35)',
-  border: '1em solid rgba(255,255,255,0.12)',
-  boxShadow: 'inset 0 1em 0 rgba(255,255,255,0.1), 0 6em 18em rgba(0,0,0,0.35)',
+  background: 'radial-gradient(120% 140% at 50% 0%, rgba(241,226,191,0.09) 0%, rgba(255,255,255,0.03) 60%), rgba(12,10,9,0.35)',
+  border: '1em solid rgba(255,255,255,0.1)',
+  boxShadow: 'inset 0 1em 0 rgba(255,255,255,0.07), 0 6em 18em rgba(0,0,0,0.32)',
 }
 
 /** Plejer pjesama u zaglavlju — kapsula: ikonica i broj pjesama pored (kao `SavedLink`). */

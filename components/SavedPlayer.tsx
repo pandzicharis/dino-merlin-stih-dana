@@ -491,7 +491,7 @@ export function SavedPlayer({
                   <motion.span
                     layoutId="saved-view"
                     className="glass-pill absolute inset-0 rounded-full"
-                    style={{ background: `linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.08) 48%, rgba(255,255,255,0) 52%), ${m.accent}` }}
+                    style={{ background: `linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.05) 48%, rgba(255,255,255,0) 52%), ${m.accent}` }}
                     transition={{ type: 'spring', stiffness: 420, damping: 34 }}
                   />
                 )}
@@ -968,7 +968,7 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
         </div>
         <span
           className="pointer-events-none absolute inset-0"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 42%, rgba(255,255,255,0) 58%)' }}
+          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.025) 42%, rgba(255,255,255,0) 58%)' }}
           aria-hidden
         />
         {/* jedan red: omot · trenutno slušaš, pjesma i album · natrag, pusti/pauza, naprijed */}
