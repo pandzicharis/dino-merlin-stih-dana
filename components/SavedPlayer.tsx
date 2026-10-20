@@ -756,7 +756,8 @@ export function SavedLoved({
 
   if (!list.length)
     return (
-      <div className="flex flex-col items-center px-6 pb-6 pt-8 text-center">
+      // na sredini vidljivog dijela prikaza (iznad plejera)
+      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
         <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 text-white/45">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden>
             <path d={STAR} />

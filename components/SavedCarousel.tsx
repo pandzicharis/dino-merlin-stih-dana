@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { memo, startTransition, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { motion, useDragControls, useMotionValue, useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { ExpandIcon } from './ExpandIcon'
@@ -111,20 +111,30 @@ export function SavedCarousel({
   )
   // plejer sačuvanih svira ovim redom; kad pređe na drugu pjesmu, špil klizi za njom
   useEffect(() => setSavedPlaylist(verses), [verses])
+  // plejer ispod (pjesma, atmosfera) se slaže kao prelaz — karta krene odmah
   useEffect(() => {
     const v = verses[at]
-    if (v) onFront?.(v)
+    if (v) startTransition(() => onFront?.(v))
   }, [at, verses, onFront])
   // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma. Samo
   // kad se ŠPIL pomjeri (prst, tačkice); kad plejer pređe na drugu pjesmu,
   // špil je stiže kadar kasnije — tad se ništa ne pušta (inače bi vratio staru)
+  // Pjesma karte krene kad špil stane — ne usred kretnje, i ne za svaku kartu
+  // pri brzom prevlačenju (kao Apple Music)
   const lastAt = useRef(at)
+  const live = useRef({ playing: player.playing, verses })
+  useEffect(() => {
+    live.current = { playing: player.playing, verses }
+  }, [player.playing, verses])
   useEffect(() => {
     if (lastAt.current === at) return
     lastAt.current = at
-    const v = verses[at]
-    if (player.playing && v && v.id !== player.id) playSaved(v)
-  }, [at, verses, player.playing, player.id])
+    const t = window.setTimeout(() => {
+      const v = live.current.verses[at]
+      if (live.current.playing && v && v.id !== savedVerse()?.id) playSaved(v)
+    }, 380)
+    return () => clearTimeout(t)
+  }, [at])
   // prikaz opet vidljiv (Activity) — prednja je pjesma koja sad svira
   useEffect(() => {
     const i = verses.findIndex((v) => v.id === savedVerse()?.id)
@@ -146,10 +156,21 @@ export function SavedCarousel({
   }, [verses, go])
 
   /** mjesto karte u odnosu na prednju, u krug: lijevo prethodne, desno sljedeće */
-  const rel = (i: number) => {
-    const o = wrap(i - at)
+  const rel = (i: number, from = at) => {
+    const o = wrap(i - from)
     return o > n / 2 ? o - n : o
   }
+  // u DOM-u su samo karte koje se vide (do dvije sa svake strane) i po jedna
+  // skrivena iza njih — špil od 5 i od 500 sačuvanih je isto lak. Nova skrivena
+  // se složi tek poslije (useDeferredValue), ne u kadru u kojem špil krene
+  const later = useDeferredValue(at)
+  const shown = (i: number) => Math.abs(rel(i)) <= 2 || (Math.abs(rel(i)) <= 3 && Math.abs(rel(i, later)) <= 3)
+  // ulaz (karte izlete iz plejera) samo pri prvom slaganju — kasnije karte stoje na mjestu
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    const r = requestAnimationFrame(() => setSettled(true))
+    return () => cancelAnimationFrame(r)
+  }, [])
 
   // širina karte i cijelog špila u pikselima — koliko daleko odleti i koliko vire susjede
   const box = useRef<HTMLDivElement>(null)
@@ -204,9 +225,11 @@ export function SavedCarousel({
       >
         {/* mjera karte, nevidljiva */}
         <div ref={box} className="pointer-events-none invisible absolute" style={{ width: 'var(--cw)' }} aria-hidden />
-        {verses.map((v, i) => (
-          <Card key={v.id} verse={v} o={rel(i)} cw={cw} side={side} glide={glide} onNext={() => go(at + 1)} onPrev={() => go(at - 1)} onOpen={onOpen} />
-        ))}
+        {verses.map((v, i) =>
+          shown(i) ? (
+            <Card key={v.id} verse={v} o={rel(i)} cw={cw} side={side} glide={glide} enter={!settled} onNext={() => go(at + 1)} onPrev={() => go(at - 1)} onOpen={onOpen} />
+          ) : null,
+        )}
       </div>
 
       {dots &&
@@ -238,6 +261,9 @@ export function SavedCarousel({
   )
 }
 
+/** tamnjenje karte ispod prednje (0, 0.07, 0.14, 0.2) — od mjesta u špilu */
+const dimOf = (o: number) => Math.min(Math.abs(o) * 0.07, 0.2)
+
 function Card({
   verse,
   o,
@@ -247,6 +273,7 @@ function Card({
   onPrev,
   onOpen,
   glide = false,
+  enter = false,
 }: {
   verse: Verse
   /** mjesto u špilu u odnosu na prednju kartu */
@@ -256,6 +283,8 @@ function Card({
   side: number
   /** mekano klizanje (povratak na pjesmu, tačkice) umjesto opruge */
   glide?: boolean
+  /** prvo slaganje špila — karta izleti iz plejera ispod */
+  enter?: boolean
   onNext: () => void
   onPrev: () => void
   onOpen?: (verse: Verse) => void
@@ -266,6 +295,9 @@ function Card({
   const x = useMotionValue(0)
 
   const to = place(o, cw, side)
+  // mjesto u špilu kao `transform` string — Motion ga pušta kroz WAAPI, na
+  // grafičkom procesoru: karte klize glatko i dok se plejer ispod slaže
+  const slot = `translateX(${to.x}px) scale(${to.scale})`
   // dodir (ne povlačenje) na prednju kartu je otvara — dugmad i plejer rade svoje
   const down = useRef<{ x: number; y: number } | null>(null)
   const tap = (e: React.MouseEvent) => {
@@ -278,6 +310,7 @@ function Card({
     onOpen(verse)
   }
   return (
+    // ulaz: karte izlete iz plejera ispod — odozdo, iz magle, prednja prva
     <motion.div
       className="absolute top-0"
       style={{
@@ -286,49 +319,66 @@ function Card({
         width: 'var(--cw)',
         aspectRatio: `${W} / ${H}`,
         zIndex: 50 - Math.abs(o),
-        x,
-        // svoj sloj (GPU) za vidljive karte — prevlačenje ne crta karte iznova
-        willChange: Math.abs(o) <= 3 ? 'transform' : undefined,
-        visibility: Math.abs(o) > 3 ? 'hidden' : undefined,
         pointerEvents: front ? undefined : 'none',
-        touchAction: 'pan-y',
       }}
-      // karte izlete iz plejera ispod: odozdo, iz magle, prednja prva
-      initial={reduced ? false : { x: to.x, y: 60, scale: to.scale * 0.95, opacity: 0 }}
-      animate={{ x: to.x, y: 0, scale: to.scale, opacity: to.opacity }}
+      initial={reduced || !enter ? false : { y: 60, scale: 0.95, opacity: 0 }}
+      animate={{ y: 0, scale: 1, opacity: 1 }}
       transition={
         reduced
           ? { duration: 0 }
-          : glide
-            ? { duration: 0.8, ease: [0.45, 0, 0.15, 1] }
-            : {
-                type: 'spring',
-                stiffness: 320,
-                damping: 32,
-                y: { duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.05 * Math.abs(o) },
-                opacity: { duration: 0.35, ease: 'easeOut', delay: 0.05 * Math.abs(o) },
-              }
+          : {
+              type: 'spring',
+              stiffness: 320,
+              damping: 32,
+              y: { duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.05 * Math.abs(o) },
+              opacity: { duration: 0.35, ease: 'easeOut', delay: 0.05 * Math.abs(o) },
+            }
       }
-      drag={front ? 'x' : false}
-      dragControls={drag}
-      dragListener={false}
-      dragSnapToOrigin
-      dragElastic={0.9}
-      onPointerDown={(e) => {
-        down.current = { x: e.clientX, y: e.clientY }
-        // plejer se ne vuče — premotavanje i ploča rade svoje
-        if (front && !(e.target as Element).closest('[data-nodrag]')) drag.start(e)
-      }}
-      onClick={tap}
-      onDragEnd={(_, info) => {
-        const swipe = Math.abs(info.offset.x) > cw * 0.28 || Math.abs(info.velocity.x) > 450
-        if (!swipe) return
-        if (info.offset.x < 0) onNext()
-        else onPrev()
-      }}
       aria-hidden={!front}
     >
-      <CardFace verse={verse} o={o} onOpen={onOpen} />
+      {/* mjesto u špilu: svoj sloj (GPU), pomjeranje ne crta kartu iznova */}
+      <motion.div
+        className="absolute inset-0"
+        style={{ willChange: 'transform' }}
+        initial={{ transform: slot, opacity: to.opacity }}
+        animate={{ transform: slot, opacity: to.opacity }}
+        transition={reduced ? { duration: 0 } : glide ? { duration: 0.8, ease: [0.45, 0, 0.15, 1] } : { type: 'spring', stiffness: 320, damping: 32 }}
+      >
+        {/* prednja karta prati prst */}
+        <motion.div
+          className="absolute inset-0"
+          style={{ x, touchAction: 'pan-y' }}
+          drag={front ? 'x' : false}
+          dragControls={drag}
+          dragListener={false}
+          dragSnapToOrigin
+          dragElastic={0.9}
+          onPointerDown={(e) => {
+            down.current = { x: e.clientX, y: e.clientY }
+            // plejer se ne vuče — premotavanje i ploča rade svoje
+            if (front && !(e.target as Element).closest('[data-nodrag]')) drag.start(e)
+          }}
+          onClick={tap}
+          onDragEnd={(_, info) => {
+            const swipe = Math.abs(info.offset.x) > cw * 0.28 || Math.abs(info.velocity.x) > 450
+            if (!swipe) return
+            if (info.offset.x < 0) onNext()
+            else onPrev()
+          }}
+        >
+          <CardFace verse={verse} o={o} onOpen={onOpen} />
+          {/* karte ispod su tamnije — prednja se ističe. Van lica karte, pa se
+              lice pri prevlačenju ne crta iznova; ista maska i zaobljenje */}
+          <motion.div
+            className="pointer-events-none absolute inset-0 rounded-[26px] bg-black"
+            style={{ maskImage: CARD_MASK, WebkitMaskImage: CARD_MASK }}
+            initial={false}
+            animate={{ opacity: dimOf(o) }}
+            transition={{ duration: 0.3 }}
+            aria-hidden
+          />
+        </motion.div>
+      </motion.div>
     </motion.div>
   )
 }
@@ -588,32 +638,20 @@ function CardFaceView({
         aria-hidden
       />
 
-      {/* karte ispod su tamnije — prednja se ističe */}
-      <motion.div
-        className="pointer-events-none absolute inset-0 bg-black"
-        initial={false}
-        animate={{ opacity: front ? 0 : Math.min(Math.abs(o) * 0.07, 0.2) }}
-        transition={{ duration: 0.3 }}
-        aria-hidden
-      />
     </div>
   )
 }
 
-/** tamnjenje karte ispod prednje (0, 0.07, 0.14, 0.2) — od mjesta u špilu */
-const dimOf = (o: number) => Math.min(Math.abs(o) * 0.07, 0.2)
-
 /**
- * Lice karte, memoizovano: pri promjeni pjesme svaka karta promijeni mjesto u
- * špilu (`o`), ali se iscrta iznova samo ako joj se stvarno nešto vidljivo
- * promijenilo (prednja ili tamnjenje) — atmosfera i stih su skupi za crtanje.
+ * Lice karte, memoizovano: pri prevlačenju svaka karta promijeni mjesto u
+ * špilu (`o`), ali se iscrta iznova samo kad postane (ili prestane biti)
+ * prednja — atmosfera i stih su skupi za crtanje; tamnjenje je van lica.
  */
 export const CardFace = memo(
   CardFaceView,
   (a, b) =>
     a.verse === b.verse &&
-    (a.o === 0) === (b.o === 0) &&
-    dimOf(a.o ?? 0) === dimOf(b.o ?? 0) &&
+    ((a.o ?? 0) === 0) === ((b.o ?? 0) === 0) &&
     a.onOpen === b.onOpen &&
     a.onCollapse === b.onCollapse &&
     a.actionsZoom === b.actionsZoom,
