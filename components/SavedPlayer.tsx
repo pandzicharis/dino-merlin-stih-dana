@@ -575,7 +575,9 @@ export function SavedList({ verses, front }: { verses: Verse[]; front: Verse | n
   const ul = useRef<HTMLUListElement>(null)
   useFocusPlaying(ul)
   return (
-    <ul ref={ul} className="flex flex-col pb-12 pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
+    // -mx-2: omot i zvjezdica stoje u liniji sa zaglavljem (ikonica, ×), a
+    // podloga reda viri malo van
+    <ul ref={ul} className="-mx-2 flex flex-col pb-12 pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
       {verses.map((v, k) => (
         <motion.li key={v.id} data-now={p.id === v.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
           <SongItem v={v} on={cur?.id === v.id} playing={cur?.id === v.id && p.id === v.id && p.playing} />
@@ -723,7 +725,9 @@ export function SavedLoved({ verses, front, onQueue }: { verses: Verse[]; front:
     )
 
   return (
-    <ul ref={ul} className="flex flex-col pb-12 pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
+    // -mx-2: omot i zvjezdica stoje u liniji sa zaglavljem (ikonica, ×), a
+    // podloga reda viri malo van
+    <ul ref={ul} className="-mx-2 flex flex-col pb-12 pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
       {list.map((v, k) => (
         <motion.li key={v.id} data-now={p.id === v.id} layout="position" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
           <SongItem v={v} on={cur?.id === v.id} playing={cur?.id === v.id && p.id === v.id && p.playing} />
