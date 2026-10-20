@@ -25,7 +25,7 @@ Magazi ([`lib/draw.ts`](lib/draw.ts)):
   stih se izvlači na uređaju, pa server ne radi ništa više po korisniku
 - **bez ponavljanja**: dok ne prođeš kroz sve aktivne stihove, nijedan se ne
   vrati; onda novi krug, a zadnjih nekoliko iz starog ne mogu odmah opet
-- izvučen stih se pamti za taj dan — isti je do ponoći, i izmjena u adminu
+- izvučen stih se pamti za taj dan stiha — dan traje od obavijesti u 12:00 do sljedeće (ujutro je još jučerašnji), i izmjena u adminu
   ga ne dira
 - **izvlačenje jednom dnevno**, pri prvom otvaranju, kao pult ispred Magaze:
   „Tvoj stih te čeka“ i tombola — staklena kugla puna presavijenih šarenih

@@ -280,7 +280,12 @@ html[data-sheet] .bg-blob:not([data-full] *),
 html[data-sheet] .bg-breathe:not([data-full] *),
 html[data-sheet] .bg-bloom:not([data-full] *),
 html[data-sheet] .bg-grain:not([data-full] *),
-html[data-sheet] .note-float:not([data-full] *) {
+html[data-sheet] .note-float:not([data-full] *),
+/* i sve ostalo na ekranu stiha iza zatamnjenja (ploča, trake, žar dugmeta) —
+   inače telefon zamućenje ispod panela računa iznova u svakom kadru */
+html[data-sheet] main *,
+html[data-sheet] main *::before,
+html[data-sheet] main *::after {
   animation-play-state: paused !important;
 }
 
@@ -389,25 +394,48 @@ html[data-deck] .dev-pad .peek-space {
 .hdr-btn:active {
   transform: scale(0.92);
 }
-/* muzika svira — kapsula tinja u zlatu, kao žar */
+/* muzika svira — kapsula tinja u zlatu, kao žar. Dvije gotove sjene (tiha i
+   puna) se pretapaju — mijenja se samo prozirnost (grafički procesor), a ne
+   sjena iz kadra u kadar, pa se dugme ne iscrtava iznova 60 puta u sekundi */
 .hdr-btn[data-live] {
+  position: relative;
   color: #f1e2bf;
   border-color: rgba(191, 168, 127, 0.55);
+}
+.hdr-btn[data-live]::before,
+.hdr-btn[data-live]::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  will-change: opacity;
   animation: hdr-ember 2.4s ease-in-out infinite;
+}
+.hdr-btn[data-live]::before {
+  box-shadow: 0 0 14px rgba(191, 168, 127, 0.22);
+  animation-direction: reverse;
+}
+.hdr-btn[data-live]::after {
+  box-shadow: 0 0 0 3px rgba(191, 168, 127, 0.12), 0 0 24px rgba(191, 168, 127, 0.42);
 }
 @keyframes hdr-ember {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(191, 168, 127, 0), 0 0 14px rgba(191, 168, 127, 0.22);
+    opacity: 0;
   }
   50% {
-    box-shadow: 0 0 0 3px rgba(191, 168, 127, 0.12), 0 0 24px rgba(191, 168, 127, 0.42);
+    opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .hdr-btn[data-live] {
-    animation: none;
     box-shadow: 0 0 18px rgba(191, 168, 127, 0.35);
+  }
+  .hdr-btn[data-live]::before,
+  .hdr-btn[data-live]::after {
+    display: none;
   }
 }
 

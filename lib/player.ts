@@ -202,11 +202,14 @@ export function setShownSaved(v: Verse | null) {
   shown = v
 }
 
-/** Pjesma u plejeru, a ne svira — mini plejer je pokazuje, "pusti" je pokrene. */
+/**
+ * Pjesma u plejeru, a ne svira — mini plejer je pokazuje, "pusti" je pokrene.
+ * Zvuk se tad ne učitava (to je posao za mrežu i dekoder baš usred spuštanja
+ * panela) — učita ga tek "pusti" (playSaved).
+ */
 function cueSaved(verse: Verse): boolean {
-  const a = load(verse)
-  if (!a) return false
-  a.dataset.want = ''
+  if (!sourceFor(verse)) return false
+  playing = verse
   setState({ id: verse.id, playing: false })
   return true
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { Verse } from '@/data/verses'
-import { todayInTz } from '@/lib/date'
+import { verseDayInTz } from '@/lib/date'
 import { VerseScreen } from './VerseScreen'
 
 /** `instant`: admin — stih odmah, bez ispisa (prezentacija ga izostavi i zadrži ispis) */
@@ -38,7 +38,7 @@ export function PreviewScreen() {
   const top = Number(new URLSearchParams(location.search).get('top')) || 0
   return (
     <div inert style={top ? ({ '--sat': `${top}px` } as React.CSSProperties) : undefined}>
-      <VerseScreen verse={msg.verse} date={msg.date ?? todayInTz()} instant={msg.instant} preview />
+      <VerseScreen verse={msg.verse} date={msg.date ?? verseDayInTz()} instant={msg.instant} preview />
     </div>
   )
 }
