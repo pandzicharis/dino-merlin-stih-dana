@@ -18,7 +18,7 @@ import { FontedLines, MagazaMark, MoodStill, Notes } from './deck/Screens'
 import { FitLines } from './deck/FitLines'
 import { LoveButton } from './SavedPlayer'
 import { SongRow } from './SongCredit'
-import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayer } from '@/lib/player'
+import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayerSelect } from '@/lib/player'
 
 /**
  * Sačuvani kao špil karata: svaka karta je ekran aplikacije u malom (isti
@@ -91,7 +91,8 @@ export function SavedCarousel({
   dots?: boolean
 }) {
   const n = verses.length
-  const player = useSavedPlayer()
+  // samo pjesma i svira li — spuštanje i podizanje panela ne crtaju špil iznova
+  const player = { id: useSavedPlayerSelect((s) => s.id), playing: useSavedPlayerSelect((s) => s.playing) }
   // otvoren dok sačuvani sviraju (s početne) — prednja je pjesma koja svira
   const [index, setIndex] = useState(() => Math.max(0, verses.findIndex((v) => v.id === player.id)))
   // povratak na pjesmu koja svira klizi mekano preko više karata; prevlačenje ostaje opruga

@@ -11,6 +11,7 @@
     "prebuild": "tsx scripts/check-verses.ts --strict",
     "brand:signature": "tsx scripts/make-signature.ts",
     "brand:icons": "tsx scripts/make-icons.ts",
+    "brand:covers": "tsx scripts/make-covers.ts",
     "promo:video": "node scripts/export-video.mjs",
     "catalog:push": "tsx --env-file-if-exists=.env.local scripts/push-catalog.ts",
     "audio": "STIH_AUDIO_FETCH=1 tsx scripts/audio-sync.ts",

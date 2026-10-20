@@ -156,6 +156,32 @@ export function DailyVerse({
     window.history.replaceState(null, '', url)
   }, [])
 
+  // Paneli (sačuvani, postavke, dijeljenje, uputstvo) i crtanje slike se
+  // učitavaju tek kad zatrebaju — ovako im dijelovi stignu u keš service
+  // workera, pa je i početna iz keša (spora mreža) poslije cijela
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') return
+    let idle = 0
+    const all = () => {
+      // bez mreže bi pukli (i stranica bi se osvježila — app/layout.tsx)
+      if (!navigator.onLine) return
+      void Promise.all([
+        import('./SavedPanel'),
+        import('./SettingsPanel'),
+        import('./SharePanel'),
+        import('./InstallHowTo'),
+        import('@/lib/share-image'),
+      ]).catch(() => {})
+    }
+    const t = setTimeout(() => {
+      idle = window.requestIdleCallback?.(all, { timeout: 4000 }) ?? window.setTimeout(all, 0)
+    }, 6000)
+    return () => {
+      clearTimeout(t)
+      if (idle) (window.cancelIdleCallback ?? clearTimeout)(idle)
+    }
+  }, [])
+
   // panel sačuvanih i "Player pjesama" ne traže ponovo listu — stranica ju
   // je već donijela. Odmah u renderu (ne u efektu): efekti djece idu prije
   // roditeljevih, pa bi footer s plejerom čekao poseban fetch i kasnio

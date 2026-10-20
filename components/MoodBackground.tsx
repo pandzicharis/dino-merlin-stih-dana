@@ -3,7 +3,8 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, useSpring } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
-import { ALBUMS } from '@/data/albums'
+import { ALBUMS, blurOf } from '@/data/albums'
+import { msUntilNextDay } from '@/lib/date'
 import { FloatingNotes } from './FloatingNotes'
 
 /**
@@ -41,6 +42,9 @@ export function MoodBackground({
 }) {
   const m = MOODS[mood]
   const coverFill = cover ? ALBUMS.find((a) => a.cover === cover)?.fill : undefined
+  // atmosfera na telefonu: omot unaprijed zamućen (blur(56px) na omotu visokom
+  // 1.3 × 844 px) — bez filtera i bez dekodiranja velikog omota za nju
+  const soft = blurOf(cover, 56 / (844 * 1.3))
   const reduced = useReducedMotion()
   const dur = (base: number) => base / m.speed
 
@@ -60,6 +64,16 @@ export function MoodBackground({
     window.addEventListener('pointermove', onMove, { passive: true })
     return () => window.removeEventListener('pointermove', onMove)
   }, [still, reduced, mx, my])
+
+  // omot za skriptu u <head> — pri sljedećem otvaranju ga predučita, ali samo
+  // do kraja ovog dana stiha (u podne dolazi drugi). Samo s početne — ne iz
+  // prezentacije, admina ni dijeljenog stiha
+  useEffect(() => {
+    if (!cover || location.pathname !== '/' || 'deck' in document.documentElement.dataset) return
+    try {
+      localStorage.setItem('stihdana:cover', JSON.stringify({ c: cover, until: Date.now() + msUntilNextDay() }))
+    } catch {}
+  }, [cover])
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
@@ -104,8 +118,16 @@ export function MoodBackground({
           {cover && (
             <>
               {/* album miruje — ne prati pokazivač i ne diše, da ne odvlači od stiha */}
+              {soft && (
+                // telefon: ista slika, zamućenje (i saturate) već u njoj
+                <div
+                  className="absolute -inset-[15%] scale-110 bg-cover bg-center md:hidden"
+                  style={{ backgroundImage: `url(${soft})`, opacity: 0.32 }}
+                />
+              )}
+              {/* šire od telefona omot je veći, pa blur(56px) manje muti — tu ostaje CSS */}
               <div
-                className="absolute -inset-[15%] scale-110 bg-cover bg-center"
+                className={`absolute -inset-[15%] scale-110 bg-cover bg-center ${soft ? 'max-md:hidden' : ''}`}
                 style={{
                   backgroundImage: `url(${cover})`,
                   filter: 'blur(56px) saturate(1.2)',

@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { SavedVerses, type SavedView } from './SavedVerses'
-import { closeSaved, dismissSaved, expandSaved, stopSaved, useSavedPlayer } from '@/lib/player'
+import { closeSaved, dismissSaved, expandSaved, stopSaved, useSavedPlayerSelect } from '@/lib/player'
 import { MiniPlayer, PlayerIconPaths } from './SavedPlayer'
 import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
@@ -40,12 +40,17 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   }, [verses])
 
   useSheetOpen(open)
+  // spušten (strelica, povlačenje, dodir pored) — stanje plejera se sredi kadar
+  // poslije (dismiss), pa ga ovdje ne treba gasiti; ponovo otvoren prije toga — ništa
+  const dismissing = useRef(false)
   // otvoren — mini plejer na dnu se sklopi u njega; zatvoren bez pjesme — sve
   // stane (samo pri zatvaranju — panel se montira unaprijed, zatvoren)
   const wasOpen = useRef(false)
   useEffect(() => {
-    if (open) expandSaved()
-    else if (wasOpen.current) closeSaved()
+    if (open) {
+      dismissing.current = false
+      expandSaved()
+    } else if (wasOpen.current && !dismissing.current) closeSaved()
     wasOpen.current = open
   }, [open])
   const [view, setView] = useState<SavedView>(() => {
@@ -56,33 +61,44 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
       return 'cards'
     }
   })
-  const pick = (v: SavedView) => {
+  // stalan (useCallback) — sadržaj (SavedVerses, memo) se ne crta iznova pri otvaranju
+  const pick = useCallback((v: SavedView) => {
     setView(v)
     try {
       localStorage.setItem(VIEW, v)
     } catch {
       /* privatni prozor */
     }
-  }
-  // spušten: panel stoji dolje, viri samo mini plejer
-  const player = useSavedPlayer()
+  }, [])
+  // spušten: panel stoji dolje, viri samo mini plejer. Sluša se samo ovo — promjena
+  // pjesme ili pauza ne crta panel iznova
+  const hasId = useSavedPlayerSelect((s) => Boolean(s.id))
+  const mini = useSavedPlayerSelect((s) => s.mini)
   // otvoren, a ništa ne svira — počinje od "Stihovi" (zapamćen pogled važi
   // dok se sluša)
-  const idle = !player.id
+  const idle = !hasId
   const [shown, setShown] = useState(open)
   // otvoren iz mini plejera — panel se podiže sporije, kao da izraste iz njega
   const [rise, setRise] = useState(false)
   if (shown !== open) {
     setShown(open)
     if (open && idle) setView('cards')
-    setRise(open && player.mini && Boolean(player.id))
+    setRise(open && mini && hasId)
   }
-  const peek = !open && Boolean(player.mini && player.id)
+  const peek = !open && mini && hasId
   // strelica, povlačenje dolje, dodir pored, Escape — panel se spusti; ima li
-  // pjesmu, ona svira dalje i na dnu početne viri mini plejer
+  // pjesmu, ona svira dalje i na dnu početne viri mini plejer. Prvo kretnja,
+  // pa stanje plejera kadar poslije — mini plejer i mjesto za njega ionako
+  // kreću tek kad panel prođe (0.36 s), a prvi kadar spuštanja ostaje lak
   const dismiss = useCallback(() => {
-    dismissSaved()
+    dismissing.current = true
     onClose()
+    requestAnimationFrame(() => {
+      if (!dismissing.current) return
+      dismissing.current = false
+      dismissSaved()
+      closeSaved()
+    })
   }, [onClose])
   const sheetDrag = useSheetDrag(dismiss, open)
 

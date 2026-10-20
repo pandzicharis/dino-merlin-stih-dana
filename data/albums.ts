@@ -4,6 +4,8 @@
  * (izoštrene verzije originala iz `public/albumi`, 1200+ px).
  * Admin bira album s ove liste, pa naziv uvijek tačno odgovara.
  */
+import made from '../public/albumi/precache.json'
+
 export type Album = {
   id: string
   title: string
@@ -58,4 +60,48 @@ export function albumOf(name?: string | null): Album | undefined {
   const k = key(name)
   // skraćeni naziv dužeg albuma ("Teško meni sa tobom") — samo za duge, da "Mi" ne uhvati sve
   return ALBUMS.find((a) => a.id === k || key(a.title) === k) ?? ALBUMS.find((a) => a.id.length > 8 && k.startsWith(a.id))
+}
+
+/*
+ * Male i unaprijed zamućene varijante omota — `npm run brand:covers`
+ * (scripts/make-covers.ts; poslije svakog novog albuma). Omot `.cover` i dalje
+ * ostaje hq (oštri omot, dijeljenje, admin, prezentacija, MediaSession).
+ */
+
+/** varijante koje je skripta stvarno napravila — album bez njih ostaje na hq/CSS blur */
+const MADE = new Set<string>(made)
+
+/** Id omota iz '/albumi/hq/<id>.webp' — samo za omote s ove liste. */
+function coverId(cover?: string): string | undefined {
+  if (!cover || !ALBUMS.some((a) => a.cover === cover)) return undefined
+  return cover.match(/^\/albumi\/hq\/([a-z0-9-]+)\.webp$/)?.[1]
+}
+
+/** Omot za sličice (46–72 px): 240 px umjesto 1200+. Nepoznat → undefined (ostaje stari). */
+export function thumbOf(cover?: string): string | undefined {
+  const id = coverId(cover)
+  const url = id && `/albumi/sm/${id}.webp`
+  return url && MADE.has(url) ? url : undefined
+}
+
+/**
+ * Zamućene varijante (blur pa saturate(1.2), zapečeno). `sigma` = CSS blur
+ * podijeljen s prikazanom stranicom omota (račun u scripts/make-covers.ts).
+ */
+export const COVER_BLURS = [
+  // MoodBackground, telefon 390×844: blur(56px), omot 1.3 × 844 px
+  { dir: 'blur', sigma: 56 / (844 * 1.3) },
+  // MoodStill karte u panelu (390×620 em): blur(55em), omot 1.3 × 620 em
+  { dir: 'blur-card', sigma: 55 / (620 * 1.3) },
+] as const
+
+/**
+ * Unaprijed zamućen omot za `blur(...) saturate(1.2)` čije je zamućenje `sigma`
+ * (dio prikazane stranice omota). Nema varijante unutar ±10% → undefined (ostaje CSS blur).
+ */
+export function blurOf(cover: string | undefined, sigma: number): string | undefined {
+  const id = coverId(cover)
+  const b = COVER_BLURS.find((b) => Math.abs(b.sigma / sigma - 1) < 0.1)
+  const url = id && b && `/albumi/${b.dir}/${id}.webp`
+  return url && MADE.has(url) ? url : undefined
 }

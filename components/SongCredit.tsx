@@ -8,6 +8,7 @@ import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
 import { SHARED, SHARED_GONE, SOLO, createPlayer, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
+import { listener, warmAudio } from '@/lib/sw-cache'
 import { FitLines } from './deck/FitLines'
 
 /**
@@ -233,9 +234,14 @@ function useSong({
       const a = shared.get(src)
       if (a) attach(a)
     }
-    // plejer ispod stiha: početak pjesme se preuzme kad se ekran smiri
+    // plejer ispod stiha: početak pjesme se preuzme kad se ekran smiri — a
+    // cijela (u keš service workera) samo onome ko pjesme sluša
     const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
-    const t = preload && !conn?.saveData ? window.setTimeout(prime, 1500) : 0
+    const ready = () => {
+      if (listener()) warmAudio([src])
+      prime()
+    }
+    const t = preload && !conn?.saveData ? window.setTimeout(ready, 1500) : 0
     return () => {
       leaving.current = true
       clearTimeout(t)
@@ -322,6 +328,8 @@ function useSong({
       return
     }
     if (a.paused) {
+      // pjesma se sluša — service worker je zadrži (javi mu se prije nego zvuk krene)
+      warmAudio([src])
       // prošao kroz Web Audio, ili zapeo (greška) — dolazi svjež
       if (isRouted(a) || a.error) a = renew(a)
       a.dataset.want = '1'
@@ -415,12 +423,12 @@ function Vinyl({
       <svg width={size} height={size} viewBox="0 0 60 60" className="absolute inset-0" aria-hidden>
         <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}47`} strokeWidth="1.5" />
       </svg>
-      {/* ploča — vrti se i stane tačno gdje je pauzirana */}
+      {/* ploča — vrti se i stane tačno gdje je pauzirana (vinyl-disc: i dok je panel otvoren, globals.css) */}
       <svg
         width={disc}
         height={disc}
         viewBox="0 0 52 52"
-        className="relative drop-shadow-[0_4px_12px_rgba(0,0,0,0.7)]"
+        className="vinyl-disc relative drop-shadow-[0_4px_12px_rgba(0,0,0,0.7)]"
         style={{ animation: 'vinyl-spin 3.6s linear infinite', animationPlayState: spinning ? 'running' : 'paused' }}
         aria-hidden
       >

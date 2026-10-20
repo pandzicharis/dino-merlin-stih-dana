@@ -19,6 +19,7 @@ import { BRAND } from './brand'
 import { youtubeId } from './text'
 import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from './vinyl'
 import { countPlay } from './storage'
+import { warmAudio } from './sw-cache'
 
 /** Svira jedna pjesma u isto vrijeme: kad krene nova, ostale stanu. */
 export const SOLO = 'stihdana:solo'
@@ -32,11 +33,17 @@ export const OPEN_SAVED = 'stihdana:open-saved'
 /** trajanja pjesama iz public/audio — lib/audio-files.ts (admin, `npm run audio`) */
 const DURATIONS: Record<string, number> = AUDIO
 
-export const sourceOf = (verse: Verse, id: string) => ({
-  src: `/audio/${audioFile(verse.song)}.m4a`,
-  fallback: `/api/audio/${id}?s=${audioFile(verse.song)}`,
-  dur: DURATIONS[audioFile(verse.song)],
-})
+export const sourceOf = (verse: Verse, id: string) => {
+  const file = audioFile(verse.song)
+  const dur = DURATIONS[file]
+  return {
+    // `?v=<trajanje>`: ključ u kešu service workera — nova pjesma pod istim
+    // imenom (admin) je novi ključ, ne stara iz keša
+    src: `/audio/${file}.m4a${dur ? `?v=${dur}` : ''}`,
+    fallback: `/api/audio/${id}?s=${file}`,
+    dur,
+  }
+}
 
 /** Trajanje pjesme iz public/audio (prije nego se učita), ili 0. */
 export const knownDuration = (verse: Verse) => DURATIONS[audioFile(verse.song)] ?? 0
@@ -247,16 +254,22 @@ export function openSaved() {
   window.dispatchEvent(new Event(OPEN_SAVED))
 }
 
+const subscribe = (f: () => void) => {
+  subs.add(f)
+  return () => void subs.delete(f)
+}
+
 /** Koji sačuvani stih je u plejeru (zadnji pušten), svira li, i kako ide red. */
 export function useSavedPlayer(): SavedState {
-  return useSyncExternalStore(
-    (f) => {
-      subs.add(f)
-      return () => subs.delete(f)
-    },
-    () => state,
-    () => EMPTY,
-  )
+  return useSyncExternalStore(subscribe, () => state, () => EMPTY)
+}
+
+/**
+ * Samo dio stanja plejera (`sel` vraća primitivu) — komponenta se crta iznova
+ * tek kad se baš on promijeni, ne pri svakom spuštanju, podizanju ili pauzi.
+ */
+export function useSavedPlayerSelect<T extends string | number | boolean | null>(sel: (s: SavedState) => T): T {
+  return useSyncExternalStore(subscribe, () => sel(state), () => sel(EMPTY))
 }
 
 /** Sačuvani redom, kako su u špilu — iz njih plejer bira sljedeću. */
@@ -299,6 +312,8 @@ let loaded: { src: string; fallback: string; id: string } | null = null
 let misses = 0
 /** statični fajl pjesme u plejeru je već jednom ponovo tražen */
 let retried = false
+/** sljedeća pjesma se preuzima tek kad ova svira par sekundi */
+let warming = 0
 
 function carrierEl(): Player {
   if (carrier) return carrier
@@ -311,8 +326,12 @@ function carrierEl(): Player {
     if (loaded) setState({ id: loaded.id, playing: true })
     // pucketanje ploče dok svira (kontekst je otvoren iz dodira)
     startCrackle(a)
+    // svira već par sekundi — sljedeća u redu se preuzme, kreće bez čekanja
+    clearTimeout(warming)
+    warming = window.setTimeout(warmNext, 5000)
   })
   a.addEventListener('pause', () => {
+    clearTimeout(warming)
     stopCrackle(a)
     setState({ playing: false })
   })
@@ -427,7 +446,10 @@ export function sharedFor(verse: Verse): Player | null {
 /** Pusti sačuvani stih — iz dodira (karta, plejer) ili sam, kad prethodni završi. */
 export function playSaved(verse: Verse): boolean {
   // druga pjesma = drugi fajl; drugi stih iste pjesme nastavlja gdje je stala
-  const switching = !loaded || loaded.src !== sourceFor(verse)?.src
+  const s = sourceFor(verse)
+  const switching = !loaded || loaded.src !== s?.src
+  // pjesma se sluša — service worker je zadrži (javi mu se prije nego zvuk krene)
+  if (s) warmAudio([s.src])
   const a = load(verse)
   if (!a) return false
   cancelSoft(a)
@@ -475,6 +497,31 @@ function go(v: Verse) {
   playSaved(v)
 }
 
+/** Sljedeća/prethodna sačuvana koja ima zvuk, u krug. */
+function neighbour(dir: 1 | -1): Verse | null {
+  const n = playlist.length
+  const i = Math.max(0, playlist.findIndex((x) => x.id === state.id))
+  for (let k = 1; k <= n; k++) {
+    const v = playlist[(((i + dir * k) % n) + n) % n]
+    if (sourceFor(v)) return v
+  }
+  return null
+}
+
+/**
+ * Nasumično: sljedeća se izabere unaprijed (da se preuzme dok ova svira) i
+ * zapamti — "naprijed" pusti nju ako je i dalje u redu, inače novu.
+ */
+let upcoming: string | null = null
+function shuffled(ok: Verse[]): Verse {
+  const next = upcoming !== state.id ? ok.find((v) => v.id === upcoming) : undefined
+  if (next) return next
+  const others = ok.filter((v) => v.id !== state.id)
+  const v = others.length ? others[Math.floor(Math.random() * others.length)] : ok[0]
+  upcoming = v.id
+  return v
+}
+
 /** Sljedeća/prethodna sačuvana koja ima zvuk (u krug, ili nasumično). */
 function step(dir: 1 | -1) {
   const n = playlist.length
@@ -487,14 +534,21 @@ function step(dir: 1 | -1) {
       const back = playlist.find((v) => v.id === history[history.length - 1])
       if (back) return go(back)
     }
-    const others = ok.filter((v) => v.id !== state.id)
-    return go(others.length ? others[Math.floor(Math.random() * others.length)] : ok[0])
+    const v = shuffled(ok)
+    upcoming = null
+    return go(v)
   }
-  const i = Math.max(0, playlist.findIndex((x) => x.id === state.id))
-  for (let k = 1; k <= n; k++) {
-    const v = playlist[(((i + dir * k) % n) + n) % n]
-    if (sourceFor(v)) return go(v)
-  }
+  const v = neighbour(dir)
+  if (v) go(v)
+}
+
+/** Sljedeća u redu ide u keš service workera dok ova svira (ponavljanje: ista ide ispočetka). */
+function warmNext() {
+  if (!carrier || carrier.paused || state.repeat) return
+  const ok = playlist.filter((v) => sourceFor(v))
+  const v = !ok.length ? null : state.shuffle ? shuffled(ok) : neighbour(1)
+  const s = v && sourceFor(v)
+  if (s && s.src !== loaded?.src) warmAudio([s.src])
 }
 export function nextSaved() {
   step(1)
@@ -534,6 +588,7 @@ export function stopSaved() {
   // i pucketanje koje je ostalo
   if (state.id) stopCrackle()
   history = []
+  upcoming = null
   // nasumično i ponavljanje ostaju kako ih je korisnik ostavio
   state = { ...EMPTY, shuffle: state.shuffle, repeat: state.repeat }
   subs.forEach((f) => f())

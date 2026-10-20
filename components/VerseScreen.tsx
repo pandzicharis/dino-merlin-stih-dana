@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef } from 'react'
 import { motion } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
@@ -18,7 +18,7 @@ import { FavoriteButton } from './FavoriteButton'
 import { SavedLink } from './SavedLink'
 import { MagazaLogo } from './MagazaLogo'
 import { StreakLine } from './Streak'
-import { useSavedPlayer } from '@/lib/player'
+import { useSavedPlayerSelect } from '@/lib/player'
 
 /**
  * Čista prezentacija — datum i stih dolaze izvana.
@@ -53,9 +53,29 @@ export function VerseScreen({
   const m = MOODS[mood ?? verse.mood]
   // mini plejer pjesama pluta na dnu — sadržaj se podigne iznad njega. Mjesto
   // stoji dok god je pjesma u plejeru (i dok je panel otvoren), pa se početna
-  // ne preslaže usred otvaranja i zatvaranja panela
-  const player = useSavedPlayer()
-  const peek = !compact && Boolean(player.id)
+  // ne preslaže usred otvaranja i zatvaranja panela. Sluša se samo to (ima li
+  // pjesme) — spuštanje, podizanje i pauza ne crtaju početnu iznova
+  const peek = useSavedPlayerSelect((s) => Boolean(s.id)) && !compact
+
+  // mjesto za mini plejer se otvori/zatvori odmah, a stih i podnožje kliznu
+  // za njim transformacijom (vidi `slide`)
+  const mainRef = useRef<HTMLElement>(null)
+  const midRef = useRef<HTMLDivElement>(null)
+  const footRef = useRef<HTMLDivElement>(null)
+  const slotRef = useRef<HTMLDivElement>(null)
+  const slid = useRef<Animation[]>([])
+  const wasPeek = useRef(peek)
+  useLayoutEffect(() => {
+    if (wasPeek.current === peek) return
+    wasPeek.current = peek
+    const main = mainRef.current
+    const slot = slotRef.current
+    const mid = midRef.current
+    const foot = footRef.current
+    const top = mid?.firstElementChild
+    if (!main || !slot || !mid || !foot || !(top instanceof HTMLElement)) return
+    slid.current = slide(main, slot, [mid, foot], [top, foot], peek, slid.current)
+  }, [peek])
 
   // Sve na ekranu ide po JEDNOM rasporedu izvedenom iz dužine stiha.
   // Ranije se čekalo da zadnja riječ javi da je gotova, pa se osjećao zastoj
@@ -90,6 +110,7 @@ export function VerseScreen({
       </div>
 
       <main
+        ref={mainRef}
         className={
           compact
             ? 'flex min-h-[260px] flex-col justify-between p-5'
@@ -136,6 +157,7 @@ export function VerseScreen({
 
         {/* datum → stih → nota */}
         <div
+          ref={midRef}
           className={
             compact
               ? 'flex flex-col items-center gap-3 py-4'
@@ -182,50 +204,92 @@ export function VerseScreen({
           )}
         </div>
 
-        {/* podnožje — uvijek prisutno, samo se stiša */}
-        <motion.footer
-          key={`f-${verse.id}-${replay}`}
-          className="flex flex-col items-center gap-6 text-center"
-          initial={settled ? false : { opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          // podnožje (gramofon, plejer) ne čeka da stih sjedne — ulazi dok se još ispisuje
-          transition={{ duration: 0.75, delay: compact ? 0 : Math.max(0.3, tail - 0.3), ease: [0.22, 1, 0.36, 1] }}
-        >
-          {compact ? (
-            <div>
-              <p
-                className="text-[0.8rem] font-semibold uppercase tracking-[0.18em]"
-                style={{ color: BRAND.gold }}
-              >
-                {verse.song}
-              </p>
-              <p className="mt-1.5 text-[10px] uppercase tracking-[0.22em] text-white/50">
-                {verse.album} &middot; {verse.year}
-              </p>
-            </div>
-          ) : (
-            <>
-              <SongCredit verse={verse} preview={preview} />
-              {/* crtica ispod gramofona — uvijek na mjestu (ne mijenja raspored),
-                  samo se pretopi: dok pluta mini plejer, nje nema */}
-              <span
-                className="h-px w-16 shrink-0 transition-opacity duration-500"
-                style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`, opacity: peek ? 0 : 1 }}
-                aria-hidden
-              />
-            </>
-          )}
-        </motion.footer>
+        {/* podnožje — uvijek prisutno, samo se stiša. Omotač klizne za mjestom
+            mini plejera (slide), a podnožje u njemu ulazi svojim y — ne smetaju se */}
+        <div ref={footRef}>
+          <motion.footer
+            key={`f-${verse.id}-${replay}`}
+            className="flex flex-col items-center gap-6 text-center"
+            initial={settled ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            // podnožje (gramofon, plejer) ne čeka da stih sjedne — ulazi dok se još ispisuje
+            transition={{ duration: 0.75, delay: compact ? 0 : Math.max(0.3, tail - 0.3), ease: [0.22, 1, 0.36, 1] }}
+          >
+            {compact ? (
+              <div>
+                <p
+                  className="text-[0.8rem] font-semibold uppercase tracking-[0.18em]"
+                  style={{ color: BRAND.gold }}
+                >
+                  {verse.song}
+                </p>
+                <p className="mt-1.5 text-[10px] uppercase tracking-[0.22em] text-white/50">
+                  {verse.album} &middot; {verse.year}
+                </p>
+              </div>
+            ) : (
+              <>
+                <SongCredit verse={verse} preview={preview} />
+                {/* crtica ispod gramofona — uvijek na mjestu (ne mijenja raspored),
+                    samo se pretopi: dok pluta mini plejer, nje nema */}
+                <span
+                  className="h-px w-16 shrink-0 transition-opacity duration-500"
+                  style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`, opacity: peek ? 0 : 1 }}
+                  aria-hidden
+                />
+              </>
+            )}
+          </motion.footer>
+        </div>
         {/* mjesto za spušten plejer na dnu — gramofon ostane odvojen od njega */}
-        {/* mini plejer ode — gramofon se mekano spusti (visina se pretapa), ne skoči */}
-        {!compact && <div aria-hidden className={`peek-slot shrink-0 ${peek ? 'peek-space' : 'h-0'}`} />}
+        {/* mini plejer ode — gramofon se mekano spusti (klizne), ne skoči */}
+        {!compact && <div ref={slotRef} aria-hidden className={`peek-slot shrink-0 ${peek ? 'peek-space' : 'h-0'}`} />}
       </main>
     </div>
   )
 }
 
-/** U compact modu pozadina se ne smije fiksirati preko cijelog ekrana. */
-function MoodBackgroundSlot({
+/** mjesto se otvara kad panel ode (s mini plejerom), ne dok se spušta */
+const SLOT_IN: KeyframeAnimationOptions = { duration: 450, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', delay: 360, fill: 'backwards' }
+const SLOT_OUT: KeyframeAnimationOptions = { duration: 700, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' }
+
+/**
+ * Mjesto za mini plejer (`peek-slot`) je već promijenilo visinu; stih (`move[0]`)
+ * i podnožje krenu sa starog mjesta i kliznu na novo — transform na grafičkom
+ * procesoru, isto kretanje kao kad se visina pretapala, ali bez slaganja
+ * rasporeda u svakom kadru. `probe`: po čemu se mjeri (sadržaj srednjeg bloka
+ * se pomjeri, ne sam blok). Prekinuta kretnja nastavlja odakle je stala.
+ */
+function slide(main: HTMLElement, slot: HTMLElement, move: HTMLElement[], probe: HTMLElement[], open: boolean, running: Animation[]): Animation[] {
+  const at = () => {
+    const top = main.getBoundingClientRect().top
+    return probe.map((p) => p.getBoundingClientRect().top - top)
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    running.forEach((a) => a.cancel())
+    return []
+  }
+  // gdje se vide sad (novi raspored + kretnja koja još traje), novi i stari raspored
+  const seen = at()
+  running.forEach((a) => a.cancel())
+  const last = at()
+  slot.classList.toggle('peek-space')
+  slot.classList.toggle('h-0')
+  const first = at()
+  slot.classList.toggle('peek-space')
+  slot.classList.toggle('h-0')
+  return move.flatMap((el, i) => {
+    const d = first[i] + seen[i] - 2 * last[i]
+    if (Math.abs(d) < 0.5) return []
+    return [el.animate([{ transform: `translateY(${d}px)` }, { transform: 'translateY(0px)' }], open ? SLOT_IN : SLOT_OUT)]
+  })
+}
+
+/**
+ * U compact modu pozadina se ne smije fiksirati preko cijelog ekrana.
+ * Memo: početna se crta iznova (mini plejer došao/otišao), a pozadina ostaje.
+ */
+const MoodBackgroundSlot = memo(function MoodBackgroundSlot({
   mood,
   compact,
   seed,
@@ -267,4 +331,4 @@ function MoodBackgroundSlot({
       />
     </div>
   )
-}
+})

@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { EqBars } from './EqBars'
-import { OPEN_SAVED, useSavedPlayer } from '@/lib/player'
+import { OPEN_SAVED, useSavedPlayerSelect } from '@/lib/player'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
 const load = () => import('./SavedPanel')
@@ -27,7 +27,11 @@ export function SavedLink() {
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
-  const player = useSavedPlayer()
+  // samo svira li — otvaranje i spuštanje panela ne crtaju zaglavlje iznova
+  const playing = useSavedPlayerSelect((s) => s.playing)
+  // stalni (useCallback) — panel i sadržaj (memo) se ne crtaju iznova zbog njih
+  const onOpen = useCallback(() => setOpen(true), [])
+  const onClose = useCallback(() => setOpen(false), [])
   // panel se preuzme i SLOŽI u tišini kad se ekran smiri (sklonjen ispod
   // ekrana) — prvi dodir ga samo podigne, bez čekanja i treptaja
   useEffect(() => {
@@ -76,11 +80,11 @@ export function SavedLink() {
               aria-label={`Player pjesama (${count})`}
               title="Player pjesama"
               data-tip="saved"
-              data-live={player.playing ? '' : undefined}
+              data-live={playing ? '' : undefined}
               className="hdr-btn gap-1.5 pl-2.5 pr-3"
             >
               {/* dok svira: trake koje titraju; inače ikonica plejera (redovi i nota) */}
-              {player.playing ? (
+              {playing ? (
                 <EqBars accent="currentColor" on h={12} />
               ) : (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -96,7 +100,7 @@ export function SavedLink() {
         )}
       </AnimatePresence>
       {/* jednom otvoren ostaje montiran — spušten viri kao mini plejer */}
-      {used && <SavedPanel open={open} onOpen={() => setOpen(true)} onClose={() => setOpen(false)} />}
+      {used && <SavedPanel open={open} onOpen={onOpen} onClose={onClose} />}
     </>
   )
 }

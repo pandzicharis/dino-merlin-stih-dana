@@ -4,7 +4,7 @@ import { memo, useEffect, useMemo, useRef, useState, type PointerEvent as ReactP
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
-import { albumOf } from '@/data/albums'
+import { albumOf, thumbOf } from '@/data/albums'
 import { haptic } from '@/lib/haptic'
 import { asWritten } from '@/lib/text'
 import { EqBars } from './EqBars'
@@ -27,7 +27,7 @@ import {
   stopSaved,
   toggleRepeat,
   toggleShuffle,
-  useSavedPlayer,
+  useSavedPlayerSelect,
 } from '@/lib/player'
 
 /*
@@ -176,7 +176,8 @@ function Cover({ verse, size }: { verse: Verse; size: number }) {
       style={{
         width: size,
         height: size,
-        backgroundImage: cover ? `url(${cover})` : undefined,
+        // sličica od 240 px (data/albums.ts), ne omot od 1200+
+        backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined,
         backgroundColor: m.gradient[1],
         boxShadow: '0 6px 18px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.08)',
       }}
@@ -299,10 +300,10 @@ function Atmosphere({ verse }: { verse: Verse }) {
       >
         <div className="absolute inset-0" style={{ background: moodBg(verse) }} />
         {cover && (
-          // mali sloj uvećan — izgleda kao jako zamućen, a crta se jeftino
+          // mali sloj uvećan — izgleda kao jako zamućen, a crta se jeftino (i sličica je dovoljna)
           <div
             className="absolute left-0 top-0 h-[30%] w-[30%] origin-top-left bg-cover bg-center opacity-25"
-            style={{ backgroundImage: `url(${cover})`, filter: 'blur(6px)', transform: 'scale(3.5)' }}
+            style={{ backgroundImage: `url(${thumbOf(cover) ?? cover})`, filter: 'blur(6px)', transform: 'scale(3.5)' }}
           />
         )}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.4) 100%)' }} />
@@ -356,7 +357,13 @@ export function SavedPlayer({
   view: View
   onView: (v: View) => void
 }) {
-  const p = useSavedPlayer()
+  // samo ono što plejer pokazuje — spuštanje i podizanje panela ga ne crtaju iznova
+  const p = {
+    id: useSavedPlayerSelect((s) => s.id),
+    playing: useSavedPlayerSelect((s) => s.playing),
+    shuffle: useSavedPlayerSelect((s) => s.shuffle),
+    repeat: useSavedPlayerSelect((s) => s.repeat),
+  }
   const nowKey = nowKeyOf(p.id)
   const loaded = verses.find((v) => v.id === p.id) ?? (nowKey ? verses.find((v) => keyOf(v) === nowKey) : undefined) ?? null
   const inQueue = front && verses.some((v) => v.id === front.id) ? front : front && verses.find((v) => keyOf(v) === keyOf(front))
@@ -542,7 +549,7 @@ const SongItem = memo(function SongItem({ v, on, playing }: { v: Verse; on: bool
       >
         <span
           className="relative flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-cover bg-center"
-          style={{ backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+          style={{ backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
         >
           {on && (
             <span className="absolute inset-0 flex items-center justify-center bg-black/50">
@@ -593,7 +600,7 @@ function useFocusPlaying(list: React.RefObject<HTMLElement | null>, active = tru
 
 /** Pjesme: lista sačuvanih (najnovija prva). */
 export function SavedList({ verses, front, active = true }: { verses: Verse[]; front: Verse | null; active?: boolean }) {
-  const p = useSavedPlayer()
+  const p = { id: useSavedPlayerSelect((s) => s.id), playing: useSavedPlayerSelect((s) => s.playing) }
   // po pjesmi: red pjesme je "trenutni" i kad svira drugi njen stih
   const nowKey = nowKeyOf(p.id)
   const curKey = nowKey ?? (front ? keyOf(front) : null)
@@ -665,7 +672,7 @@ const AlbumCard = memo(
         {cover && (
           <div
             className="absolute left-0 top-0 h-[30%] w-[30%] origin-top-left bg-cover bg-center opacity-35"
-            style={{ backgroundImage: `url(${cover})`, filter: 'blur(5px)', transform: 'scale(3.5)' }}
+            style={{ backgroundImage: `url(${thumbOf(cover) ?? cover})`, filter: 'blur(5px)', transform: 'scale(3.5)' }}
             aria-hidden
           />
         )}
@@ -676,7 +683,7 @@ const AlbumCard = memo(
         <div className="relative flex shrink-0 items-center gap-3 px-2 pb-3 pt-2">
           <span
             className="block h-[72px] w-[72px] shrink-0 rounded-[14px] bg-cover bg-center"
-            style={{ backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: '0 10px 26px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.1)' }}
+            style={{ backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: '0 10px 26px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.1)' }}
             aria-hidden
           />
           <div className="min-w-0">
@@ -724,7 +731,7 @@ export function SavedLoved({
   onQueue?: (list: Verse[]) => void
   active?: boolean
 }) {
-  const p = useSavedPlayer()
+  const p = { id: useSavedPlayerSelect((s) => s.id), playing: useSavedPlayerSelect((s) => s.playing) }
   const { ids, plays } = useLoved()
   const list = useMemo(
     () =>
@@ -796,7 +803,7 @@ export function SavedAlbums({
   onQueue?: (list: Verse[]) => void
   active?: boolean
 }) {
-  const p = useSavedPlayer()
+  const p = { id: useSavedPlayerSelect((s) => s.id), playing: useSavedPlayerSelect((s) => s.playing) }
   const nowKey = nowKeyOf(p.id)
   const cur = (nowKey ? verses.find((v) => keyOf(v) === nowKey) : undefined) ?? front
   const albums = useMemo(() => byAlbum(verses), [verses])
@@ -927,8 +934,8 @@ export function SavedAlbums({
  * on se pretopi (`custom`: "open" | "stop" iz AnimatePresence).
  */
 export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
-  const p = useSavedPlayer()
-  const v = savedVerse()
+  const p = { id: useSavedPlayerSelect((s) => s.id), playing: useSavedPlayerSelect((s) => s.playing) }
+  const v = p.id ? savedVerse() : null
   const fill = useRef<HTMLSpanElement>(null)
   const start = useRef<number | null>(null)
   const swiped = useRef(false)
@@ -947,16 +954,19 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
       // iznad trake za početni ekran (iPhone), inače malo zraka od dna; na
       // localhostu i iznad razvojne trake
       style={{ bottom: 'calc(max(14px, calc(env(safe-area-inset-bottom, 0px) + 4px)) + var(--dev-bar, 0px))' }}
+      // `transform` kao string (ne y/scale) — Motion ga pusti kroz WAAPI, na
+      // grafičkom procesoru, dok je glavna nit zauzeta panelom. Svuda iste
+      // funkcije (translateY + scale), da prekinuta kretnja nastavi odakle je stala
       variants={{
         hidden: (why?: string) =>
           why === 'open'
             ? // panel se podiže preko njega — mini se blago podigne i ugasi ispod
-              { opacity: 0, y: -22, scale: 0.97, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } }
-            : { opacity: 0, y: 96, transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } },
+              { opacity: 0, transform: 'translateY(-22px) scale(0.97)', transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } }
+            : { opacity: 0, transform: 'translateY(96px) scale(1)', transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } },
         // tek kad panel ode s ekrana (0.42 s) — jedno pa drugo, ništa ne preskače
-        shown: { opacity: 1, y: 0, transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1], delay: 0.36 } },
+        shown: { opacity: 1, transform: 'translateY(0px) scale(1)', transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1], delay: 0.36 } },
       }}
-      initial={{ opacity: 0, y: 26 }}
+      initial={{ opacity: 0, transform: 'translateY(26px) scale(1)' }}
       animate="shown"
       exit="hidden"
       onPointerDown={(e) => {

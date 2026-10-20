@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Activity, useCallback, useEffect, useMemo, useState } from 'react'
+import { Activity, memo, useCallback, useEffect, useMemo, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { useFavorites, useLovedIds, useMounted } from '@/lib/client-store'
 import { BRAND } from '@/lib/brand'
@@ -51,7 +51,11 @@ function paneHeight(view: SavedView, songs: number, loved: number, page: boolean
 /** prikazi po redu — svi ostaju montirani, pa je prebacivanje samo pretapanje */
 const VIEWS: SavedView[] = ['cards', 'list', 'albums', 'loved']
 
-export function SavedVerses({
+/**
+ * Memo: otvaranje i spuštanje panela (SavedPanel) ga ne crta iznova — props
+ * su stalni (stihovi, pogled, useCallback), a sve ostalo sluša sam.
+ */
+export const SavedVerses = memo(function SavedVerses({
   verses,
   onClose,
   view: shown,
@@ -218,4 +222,4 @@ export function SavedVerses({
       )}
     </div>
   )
-}
+})

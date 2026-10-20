@@ -281,11 +281,15 @@ html[data-sheet] .bg-breathe:not([data-full] *),
 html[data-sheet] .bg-bloom:not([data-full] *),
 html[data-sheet] .bg-grain:not([data-full] *),
 html[data-sheet] .note-float:not([data-full] *),
-/* i sve ostalo na ekranu stiha iza zatamnjenja (ploča, trake, žar dugmeta) —
-   inače telefon zamućenje ispod panela računa iznova u svakom kadru */
-html[data-sheet] main *,
-html[data-sheet] main *::before,
-html[data-sheet] main *::after {
+/* i sve ostalo na ekranu stiha iza zatamnjenja što se vrti CSS-om (ploča, njen
+   sjaj, trake, žar dugmeta) — inače telefon zamućenje ispod panela računa
+   iznova u svakom kadru. Baš te klase, ne `main *`: otvaranje i zatvaranje
+   panela ne preračunava stilove cijelog ekrana */
+html[data-sheet] main .vinyl-disc,
+html[data-sheet] main .vinyl-glow,
+html[data-sheet] main .eq-bar,
+html[data-sheet] main .hdr-btn[data-live]::before,
+html[data-sheet] main .hdr-btn[data-live]::after {
   animation-play-state: paused !important;
 }
 
@@ -329,14 +333,9 @@ html[data-sheet] main *::after {
 .peek-space {
   height: calc(90px + max(12px, env(safe-area-inset-bottom, 0px)));
 }
-/* mjesto za mini plejer: dolazi i odlazi mekano — gramofon klizne, ne skoči */
-.peek-slot {
-  transition: height 0.7s cubic-bezier(0.32, 0.72, 0, 1);
-}
-/* mjesto za mini plejer se otvara kad panel ode (s mini plejerom), ne dok se spušta */
-.peek-slot.peek-space {
-  transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.36s;
-}
+/* mjesto za mini plejer (.peek-slot) se mijenja odmah, bez prelaza visine —
+   gramofon i stih kliznu transformacijom (components/VerseScreen.tsx `slide`),
+   pa se raspored ne slaže u svakom kadru */
 /* localhost: mini plejer pluta iznad razvojne trake (--dev-bar); donji razmak je pb-16 */
 .dev-pad .peek-space {
   height: 102px;
@@ -348,7 +347,6 @@ html .dev-pad {
 html[data-deck] .dev-pad .peek-space {
   height: calc(90px + max(12px, env(safe-area-inset-bottom, 0px)));
 }
-/* mjesto za mini plejer: dolazi i odlazi mekano — gramofon klizne, ne skoči */
 
 /* "Player pjesama" (components/Listening.tsx) — trake titraju kao muzika */
 @keyframes eq-bar {

@@ -3,7 +3,7 @@ import { FitLines } from './FitLines'
 import { Fragment, type CSSProperties } from 'react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
-import { albumOf, ALBUMS } from '@/data/albums'
+import { albumOf, ALBUMS, blurOf } from '@/data/albums'
 import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
 import { MAGAZA_PATH } from '@/lib/magaza-path'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
@@ -57,6 +57,10 @@ export function MoodStill({
   const blob = Math.max(w, h) * 0.85
   const art = Math.min(w, h * 0.74)
   const coverFill = cover ? ALBUMS.find((a) => a.cover === cover)?.fill : undefined
+  // atmosfera: omot unaprijed zamućen (data/albums.ts) kad postoji za ovo
+  // zamućenje — omot je 1.3 × duža stranica; inače CSS blur
+  const blur = Number((w * 0.14).toFixed(0))
+  const soft = blurOf(cover, blur / (1.3 * Math.max(w, h)))
   return (
     <div aria-hidden style={{ ...fill, overflow: 'hidden', background: m.gradient[0] }}>
       {m.gradient.map((c, i) => (
@@ -80,10 +84,10 @@ export function MoodStill({
             style={{
               position: 'absolute',
               inset: '-15%',
-              backgroundImage: `url(${cover})`,
+              backgroundImage: `url(${soft ?? cover})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              filter: `blur(${(w * 0.14).toFixed(0)}em) saturate(1.2)`,
+              filter: soft ? undefined : `blur(${blur}em) saturate(1.2)`,
               opacity: 0.32,
               transform: 'scale(1.1)',
             }}

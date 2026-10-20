@@ -29,8 +29,13 @@ const CLOSE = { duration: 0.42, ease: [0.4, 0, 0.75, 0.35] as const }
  */
 export function useSheetDrag(onClose: () => void, open: boolean) {
   const y = useMotionValue(0)
+  // spuštanje poslije povlačenja (WAAPI, ostaje dolje) — otkaže se pri otvaranju
+  const fly = useRef<Animation | null>(null)
   useLayoutEffect(() => {
-    if (open) y.set(0)
+    if (!open) return
+    fly.current?.cancel()
+    fly.current = null
+    y.set(0)
   }, [open, y])
   const closeRef = useRef(onClose)
   useEffect(() => {
@@ -48,9 +53,16 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
     if (!el) return
     // pušten dovoljno nisko (ili brzo): panel NASTAVI dolje odatle gdje ga je
     // prst ostavio, brzinom prsta (bez vraćanja gore), dok se zatvaranje odvija;
-    // pri sljedećem otvaranju pomak se vrati na nulu (gore, useLayoutEffect)
+    // pri sljedećem otvaranju pomak se vrati na nulu (gore, useLayoutEffect).
+    // Kroz WAAPI na grafičkom procesoru, ne motion value iz JavaScripta — glavna
+    // nit je baš tad zauzeta zatvaranjem; `fill` ga drži dolje do otvaranja
     const fling = () => {
-      void animate(y, y.get() + window.innerHeight * 0.6, { duration: 0.42, ease: [0.22, 0.75, 0.2, 1] })
+      const from = y.get()
+      fly.current?.cancel()
+      fly.current = el.animate(
+        [{ transform: `translateY(${from}px)` }, { transform: `translateY(${from + window.innerHeight * 0.6}px)` }],
+        { duration: 420, easing: 'cubic-bezier(0.22, 0.75, 0.2, 1)', fill: 'forwards' },
+      )
       closeRef.current()
     }
     let g: { x0: number; y0: number; scroller: HTMLElement | null; pull: boolean; off: boolean; last: [number, number][] } | null = null
