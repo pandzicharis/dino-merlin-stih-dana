@@ -707,15 +707,19 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
       }
       return false
     }
+    // svaki korak kreće ispočetka: raširena karta se skupi, plejer pjesama se
+    // zatvori DO KRAJA (×, ne spusti u mini), ostali paneli dolje, muzika stane
     const close = () => {
-      // plejer pjesama: muzika stane (i mini plejer ode), pa panel dolje
       try {
         const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
+        if (q('[data-full]')) w?.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }))
+        const x = q('[aria-label="Zatvori plejer"]')
+        if (x) x.click()
+        else if (q('[role="dialog"][aria-modal="true"]')) q('button[aria-label="Zatvori"]')?.click()
         w?.dispatchEvent(new w.Event('stihdana:stop-audio'))
       } catch {
         /* tuđa adresa */
       }
-      if (q('[role="dialog"][aria-modal="true"]')) q('button[aria-label="Zatvori"]')?.click()
     }
     close()
     // Ručno: prezenter sam klikće po telefonu

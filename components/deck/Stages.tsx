@@ -126,7 +126,9 @@ export function LivePhone({
             src={src}
             onLoad={onLoad}
             title="Stih dana — aplikacija uživo"
-            allow="web-share; clipboard-write"
+            // autoplay: pjesma koju scena pusti (Poslušaj pjesmu, plejer) smije
+            // svirati — dodir prezentera na prezentaciji važi i za telefon u njoj
+            allow="autoplay; web-share; clipboard-write"
             style={{
               position: 'absolute',
               left: 0,

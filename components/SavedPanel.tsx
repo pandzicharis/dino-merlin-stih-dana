@@ -70,9 +70,12 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   // dok se sluša)
   const idle = !player.id
   const [shown, setShown] = useState(open)
+  // otvoren iz mini plejera — panel se podiže sporije, kao da izraste iz njega
+  const [rise, setRise] = useState(false)
   if (shown !== open) {
     setShown(open)
     if (open && idle) setView('cards')
+    setRise(open && player.mini && Boolean(player.id))
   }
   const peek = !open && Boolean(player.mini && player.id)
   // strelica, povlačenje dolje, dodir pored, Escape — panel se spusti; ima li
@@ -106,7 +109,7 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
           <AnimatePresence custom={open ? 'open' : 'stop'}>{peek && <MiniPlayer key="mini" onOpen={onOpen} />}</AnimatePresence>
           <AnimatePresence>{open && <SheetBackdrop key="backdrop" onClose={dismiss} />}</AnimatePresence>
 
-          <SheetSlide away={!open}>
+          <SheetSlide away={!open} rise={rise}>
           <motion.div
             role="dialog"
             aria-modal={open}

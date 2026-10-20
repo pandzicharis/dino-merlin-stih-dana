@@ -948,8 +948,8 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
       variants={{
         hidden: (why?: string) =>
           why === 'open'
-            ? // panel se podiže preko njega — samo se tiho ugasi ispod
-              { opacity: 0, transition: { duration: 0.3, ease: 'easeOut' } }
+            ? // panel se podiže preko njega — mini se blago podigne i ugasi ispod
+              { opacity: 0, y: -22, scale: 0.97, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } }
             : { opacity: 0, y: 96, transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } },
         // tek kad panel ode s ekrana (0.42 s) — jedno pa drugo, ništa ne preskače
         shown: { opacity: 1, y: 0, transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1], delay: 0.36 } },

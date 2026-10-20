@@ -7,7 +7,7 @@
  * idu iz keša — aplikacija se otvori bez čekanja na njih.
  */
 
-const CACHE = 'stihdana-v23'
+const CACHE = 'stihdana-v24'
 const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2']
 
 /**
@@ -53,7 +53,13 @@ self.addEventListener('activate', (e) => {
  */
 const STATIC = /^\/(_next\/static|brand)\//
 
-/** Network-first za navigaciju: uvijek svjež stih, cache samo kad nema mreže. */
+/**
+ * Početna (`/`) — odmah iz keša, a svježa se preuzme u pozadini za sljedeće
+ * otvaranje (stale-while-revalidate). Instalirana aplikacija se tako otvara
+ * odmah, bez čekanja mreže; stih se ionako izvlači na uređaju, a lista
+ * stihova u stranici zaostaje najviše jedno otvaranje.
+ * Ostale stranice (prezentacija, admin, stih po linku) — mreža prvo.
+ */
 self.addEventListener('fetch', (e) => {
   const req = e.request
   const url = new URL(req.url)
@@ -76,15 +82,26 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone()
-          caches.open(CACHE).then((c) => c.put('/', copy))
-          return res
-        })
-        .catch(() => caches.match('/').then((r) => r || Response.error())),
-    )
+    // pod ključem "/" smije biti samo početna (ne prezentacija ni admin)
+    const home = url.pathname === '/'
+    const fresh = fetch(req).then((res) => {
+      if (home && res.ok && res.type === 'basic' && !res.redirected) {
+        const copy = res.clone()
+        caches.open(CACHE).then((c) => c.put('/', copy))
+      }
+      return res
+    })
+    if (home) {
+      e.respondWith(
+        caches.match('/').then((hit) => {
+          if (!hit) return fresh.catch(() => Response.error())
+          e.waitUntil(fresh.catch(() => {}))
+          return hit
+        }),
+      )
+      return
+    }
+    e.respondWith(fresh.catch(() => caches.match('/').then((r) => r || Response.error())))
   }
 })
 

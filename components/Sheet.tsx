@@ -205,7 +205,10 @@ export function SheetBackdrop({ onClose }: { onClose: () => void }) {
  * `away`: panel ostaje montiran, sklonjen ispod ekrana (plejer pjesama) —
  * otvaranje je samo kretnja, bez ponovnog slaganja sadržaja.
  */
-export function SheetSlide({ children, away = false }: { children: ReactNode; away?: boolean }) {
+/** podizanje iz mini plejera — sporije i mekše, panel "izraste" iz njega */
+const RISE = { duration: 0.72, ease: [0.22, 1, 0.36, 1] as const }
+
+export function SheetSlide({ children, away = false, rise = false }: { children: ReactNode; away?: boolean; rise?: boolean }) {
   const [wide] = useState(() => window.matchMedia('(min-width: 640px)').matches)
   const hidden = wide ? { transform: 'translateY(48px)', opacity: 0 } : { transform: 'translateY(100%)' }
   const shown = wide ? { transform: 'translateY(0px)', opacity: 1 } : { transform: 'translateY(0%)' }
@@ -217,7 +220,7 @@ export function SheetSlide({ children, away = false }: { children: ReactNode; aw
       // dolje, ne crta se (visibility), a otvara se bez ikakvog slaganja
       variants={{
         hidden: { ...hidden, transition: CLOSE, ...(away ? { transitionEnd: { visibility: 'hidden' } } : {}) },
-        shown: { ...shown, visibility: 'visible', transition: OPEN },
+        shown: { ...shown, visibility: 'visible', transition: rise ? RISE : OPEN },
       }}
       initial={away ? { ...hidden, visibility: 'hidden' } : 'hidden'}
       animate={away ? 'hidden' : 'shown'}
