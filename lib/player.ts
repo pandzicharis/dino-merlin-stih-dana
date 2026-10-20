@@ -312,8 +312,6 @@ let loaded: { src: string; fallback: string; id: string } | null = null
 let misses = 0
 /** statični fajl pjesme u plejeru je već jednom ponovo tražen */
 let retried = false
-/** sljedeća pjesma se preuzima tek kad ova svira par sekundi */
-let warming = 0
 
 function carrierEl(): Player {
   if (carrier) return carrier
@@ -326,12 +324,8 @@ function carrierEl(): Player {
     if (loaded) setState({ id: loaded.id, playing: true })
     // pucketanje ploče dok svira (kontekst je otvoren iz dodira)
     startCrackle(a)
-    // svira već par sekundi — sljedeća u redu se preuzme, kreće bez čekanja
-    clearTimeout(warming)
-    warming = window.setTimeout(warmNext, 5000)
   })
   a.addEventListener('pause', () => {
-    clearTimeout(warming)
     stopCrackle(a)
     setState({ playing: false })
   })
@@ -497,31 +491,6 @@ function go(v: Verse) {
   playSaved(v)
 }
 
-/** Sljedeća/prethodna sačuvana koja ima zvuk, u krug. */
-function neighbour(dir: 1 | -1): Verse | null {
-  const n = playlist.length
-  const i = Math.max(0, playlist.findIndex((x) => x.id === state.id))
-  for (let k = 1; k <= n; k++) {
-    const v = playlist[(((i + dir * k) % n) + n) % n]
-    if (sourceFor(v)) return v
-  }
-  return null
-}
-
-/**
- * Nasumično: sljedeća se izabere unaprijed (da se preuzme dok ova svira) i
- * zapamti — "naprijed" pusti nju ako je i dalje u redu, inače novu.
- */
-let upcoming: string | null = null
-function shuffled(ok: Verse[]): Verse {
-  const next = upcoming !== state.id ? ok.find((v) => v.id === upcoming) : undefined
-  if (next) return next
-  const others = ok.filter((v) => v.id !== state.id)
-  const v = others.length ? others[Math.floor(Math.random() * others.length)] : ok[0]
-  upcoming = v.id
-  return v
-}
-
 /** Sljedeća/prethodna sačuvana koja ima zvuk (u krug, ili nasumično). */
 function step(dir: 1 | -1) {
   const n = playlist.length
@@ -534,21 +503,14 @@ function step(dir: 1 | -1) {
       const back = playlist.find((v) => v.id === history[history.length - 1])
       if (back) return go(back)
     }
-    const v = shuffled(ok)
-    upcoming = null
-    return go(v)
+    const others = ok.filter((v) => v.id !== state.id)
+    return go(others.length ? others[Math.floor(Math.random() * others.length)] : ok[0])
   }
-  const v = neighbour(dir)
-  if (v) go(v)
-}
-
-/** Sljedeća u redu ide u keš service workera dok ova svira (ponavljanje: ista ide ispočetka). */
-function warmNext() {
-  if (!carrier || carrier.paused || state.repeat) return
-  const ok = playlist.filter((v) => sourceFor(v))
-  const v = !ok.length ? null : state.shuffle ? shuffled(ok) : neighbour(1)
-  const s = v && sourceFor(v)
-  if (s && s.src !== loaded?.src) warmAudio([s.src])
+  const i = Math.max(0, playlist.findIndex((x) => x.id === state.id))
+  for (let k = 1; k <= n; k++) {
+    const v = playlist[(((i + dir * k) % n) + n) % n]
+    if (sourceFor(v)) return go(v)
+  }
 }
 export function nextSaved() {
   step(1)
@@ -588,7 +550,6 @@ export function stopSaved() {
   // i pucketanje koje je ostalo
   if (state.id) stopCrackle()
   history = []
-  upcoming = null
   // nasumično i ponavljanje ostaju kako ih je korisnik ostavio
   state = { ...EMPTY, shuffle: state.shuffle, repeat: state.repeat }
   subs.forEach((f) => f())

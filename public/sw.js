@@ -1,17 +1,16 @@
 /**
  * Service worker — namjerno minimalan.
  *
- * Sadržaj se mijenja svaki dan, pa se stranica uvijek traži s mreže (početna
- * iz keša samo kad mreža kasni); offline fallback za zadnji viđeni ekran +
- * push notifikacije.
- * JS/CSS/fontovi (imena s hešom, nikad se ne mijenjaju) i logotipi idu iz
- * keša — aplikacija se otvori bez čekanja na njih. Pjesme (kad se slušaju) i
- * omoti albuma imaju svoje trajne keševe: pjesma se ne skida iznova pri
- * svakom puštanju, nastavku i povratku u aplikaciju.
+ * Sadržaj se mijenja svaki dan, pa se stranica uvijek traži s mreže;
+ * offline fallback za zadnji viđeni ekran + push notifikacije.
+ * Jedino JS/CSS/fontovi (imena s hešom, nikad se ne mijenjaju) i logotipi
+ * idu iz keša — aplikacija se otvori bez čekanja na njih. Pjesma koja se
+ * pusti ostaje u svom kešu: nastavak i povratak u aplikaciju je ne skidaju
+ * iznova. Ništa se ne preuzima unaprijed, u pozadini.
  */
 
-const CACHE = 'stihdana-v26'
-const OFFLINE = ['/manifest.webmanifest', '/icons/icon-192.png?v=2']
+const CACHE = 'stihdana-v27'
+const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2']
 
 /**
  * Oznaka "stigla je obavijest" — aplikacija je pročita pri otvaranju i
@@ -25,16 +24,14 @@ const markDraw = () =>
   caches.open(MARK).then((c) => c.put(MARK_KEY, new Response('1'))).catch(() => {})
 
 /**
- * Pjesme i omoti — trajni keševi, nova verzija ih ne briše (kao MARK).
- * Pjesma je pod ključem s `?v=<trajanje>` (lib/player.ts `sourceOf`): nova
- * pjesma pod istim imenom dobije novi ključ, a stara se obriše.
+ * Pjesme — trajni keš, nova verzija ga ne briše (kao MARK). Pjesma je pod
+ * ključem s `?v=<trajanje>` (lib/player.ts `sourceOf`): nova pjesma pod istim
+ * imenom dobije novi ključ, a stara se obriše.
  */
 const AUDIO = 'stihdana-audio-v1'
-const IMG = 'stihdana-img-v1'
-const KEEP = [CACHE, MARK, AUDIO, IMG]
-/** najviše pjesama i omota u kešu — najstariji izlaze */
+const KEEP = [CACHE, MARK, AUDIO]
+/** najviše pjesama u kešu — najstarije izlaze */
 const SONGS = 30
-const COVERS = 80
 
 /**
  * NEMA `skipWaiting()` ovdje — nova verzija čeka.
@@ -44,47 +41,16 @@ const COVERS = 80
  * prstima. Umjesto toga se javi korisniku, a preuzima na njegovu potvrdu.
  */
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    Promise.all([
-      caches.open(CACHE).then((c) =>
-        Promise.all([
-          c.addAll(OFFLINE),
-          // početna samo sa svojim dijelovima (keepHome) — stari keš s njima nova verzija briše
-          fetch('/').then((res) => (res.ok ? keepHome(c, res).catch(() => {}) : Promise.reject(new Error('/')))),
-        ]),
-      ),
-      warmCovers(),
-    ]),
-  )
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(OFFLINE)))
 })
 
 /** Potvrda iz aplikacije: preuzmi sad. */
 self.addEventListener('message', (e) => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting()
-  // pjesme koje se slušaju (i sljedeća u redu) — lib/sw-cache.ts
+  // pjesma koja se upravo pušta (lib/sw-cache.ts) — njen prvi zahtjev je
+  // i upiše u keš, uz plejer; worker je sam ne preuzima
   if (e.data && e.data.type === 'stihdana:warm-audio' && Array.isArray(e.data.urls)) {
-    const keys = e.data.urls.slice(0, 3).map(songKey).filter(Boolean)
-    keys.forEach((k) => wanted.add(k))
-    // pjesmu koju plejer upravo traži od početka worker preuzme uz njega
-    // (fetch, ispod) — inače je preuzme sam, malo kasnije
-    e.waitUntil(
-      wait(3000).then(() =>
-        Promise.all(
-          keys.map((k) =>
-            caches
-              .open(AUDIO)
-              .then((c) => c.match(k))
-              .then((hit) => {
-                if (hit || loading.has(k)) return
-                const { got, done } = download(k)
-                // plejeru ne treba — drugi primjerak se odbaci, upis ide dalje
-                return got.then((r) => r && r.body.cancel()).catch(() => {}).then(() => done)
-              })
-              .catch(() => {}),
-          ),
-        ),
-      ),
-    )
+    e.data.urls.slice(0, 3).map(songKey).filter(Boolean).forEach((k) => wanted.add(k))
   }
 })
 
@@ -104,14 +70,11 @@ self.addEventListener('activate', (e) => {
  */
 const STATIC = /^\/(_next\/static|brand)\//
 const SONG = /^\/audio\/[^/]+\.(m4a|mp3)$/
-const COVER = /^\/albumi\/.+\.(webp|jpe?g|png|avif)$/i
 
 /**
- * Navigacija — mreža prvo. Početna iz keša samo kad mreža ne odgovori za
- * 2,5 s (ili je nema); keširana poslije novog deploya zna tražiti fajlove
- * kojih više nema — zato je u kešu samo sa svojim dijelovima (`keepHome`),
- * lijeni se preuzmu unaprijed (components/DailyVerse.tsx), a stranica se
- * jednom sama osvježi (app/layout.tsx `CHUNK_SCRIPT`).
+ * Navigacija — mreža prvo, keš samo kad mreže nema. Početna iz keša (bez
+ * mreže) poslije novog deploya traži fajlove kojih na serveru više nema:
+ * panel sačuvanih se ne učita, plejer ne svira, ikone nestanu.
  */
 self.addEventListener('fetch', (e) => {
   const req = e.request
@@ -119,7 +82,6 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || url.origin !== self.location.origin) return
 
   if (SONG.test(url.pathname) && url.searchParams.has('v')) return song(e, url.href)
-  if (COVER.test(url.pathname)) return cover(e, url.href)
 
   if (STATIC.test(url.pathname)) {
     e.respondWith(
@@ -140,54 +102,19 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     // pod ključem "/" smije biti samo početna (ne prezentacija ni admin)
     const home = url.pathname === '/'
-    let saved
-    // otišla je keširana (mreža kasnila) — ova s mreže se nije prikazala
-    let late = false
-    const net = fetch(req).then((res) => {
-      if (home && res.ok && res.type === 'basic' && !res.redirected) {
-        const copy = res.clone()
-        // prikazana: svoje dijelove traži sama (STATIC ih kešira)
-        saved = caches.open(CACHE).then((c) => (late ? keepHome(c, copy) : c.put('/', copy)))
-      }
-      return res
-    })
-    // mreža osvježi keš i kad je početna već otišla iz keša
-    e.waitUntil(net.then(() => saved, () => {}).catch(() => {}))
-    const offline = () => caches.match('/').then((r) => r || Response.error())
-    if (!home) return e.respondWith(net.catch(offline))
     e.respondWith(
-      caches.match('/').then((hit) =>
-        hit
-          ? Promise.race([
-              net.catch(() => hit),
-              wait(2500).then(() => {
-                late = true
-                return hit
-              }),
-            ])
-          : net.catch(offline),
-      ),
+      fetch(req)
+        .then((res) => {
+          if (home && res.ok && res.type === 'basic' && !res.redirected) {
+            const copy = res.clone()
+            e.waitUntil(caches.open(CACHE).then((c) => c.put('/', copy)))
+          }
+          return res
+        })
+        .catch(() => caches.match('/').then((r) => r || Response.error())),
     )
   }
 })
-
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
-
-/**
- * Početna u keš tek kad su u njemu i njeni dijelovi (`/_next/static/` iz
- * HTML-a) — poslije sljedećeg deploya ih na serveru nema. Ne stigne li neki,
- * ostaje stara (njeni su dijelovi tu).
- */
-function keepHome(c, res) {
-  const type = res.headers.get('content-type') || 'text/html; charset=utf-8'
-  return res.text().then((html) => {
-    const urls = [...new Set(html.match(/\/_next\/static\/[^"'\\\s)]+/g) || [])]
-    return Promise.all(
-      // već preuzet (i u kešu stare verzije) se ne skida ponovo
-      urls.map((u) => c.match(u).then((own) => own || caches.match(u).then((hit) => (hit ? c.put(u, hit) : c.add(u))))),
-    ).then(() => c.put('/', new Response(html, { headers: { 'Content-Type': type } })))
-  })
-}
 
 /* ── pjesme ── */
 
@@ -196,9 +123,10 @@ function keepHome(c, res) {
  * povratak iz pozadine skidao pjesmu iznova. Ovdje je pjesma jednom, cijela;
  * plejer dobije tačno dio koji traži.
  *
- * U keš ide samo ono što aplikacija javi da se sluša (`wanted`, poruka
- * `stihdana:warm-audio`) — priprema pjesme ispod stiha (preload) ne skida
- * cijelu pjesmu svakome ko otvori aplikaciju (Vercel: ograničen prenos).
+ * U keš ide samo pjesma koju aplikacija javi da se upravo pušta (`wanted`,
+ * poruka `stihdana:warm-audio`), i to istim preuzimanjem kojim je plejer
+ * sluša — priprema pjesme ispod stiha (preload) ne skida cijelu pjesmu
+ * svakome ko otvori aplikaciju, a u pozadini se ništa ne preuzima.
  */
 const wanted = new Set()
 /** preuzimanja u toku: ključ → upis u keš */
@@ -373,65 +301,6 @@ function song(e, key) {
         )
       }),
   )
-}
-
-/* ── omoti ── */
-
-/** omoti već osvježeni s mreže dok ovaj worker živi — ne pita se za svaki prikaz */
-const fresh = new Set()
-
-/** Omot odmah iz keša, a u pozadini se osvježi (omot se zna zamijeniti istim imenom). */
-function cover(e, key) {
-  const net = () =>
-    fetch(e.request).then((res) => {
-      if (res.status === 200 && res.type === 'basic') {
-        const copy = res.clone()
-        e.waitUntil(
-          caches
-            .open(IMG)
-            .then((c) => c.put(key, copy).then(() => trim(c, COVERS)))
-            .catch(() => {}),
-        )
-      }
-      return res
-    })
-  e.respondWith(
-    caches
-      .open(IMG)
-      .then((c) => c.match(key))
-      .catch(() => null)
-      .then((hit) => {
-        if (!hit) return net()
-        if (!fresh.has(key)) {
-          fresh.add(key)
-          e.waitUntil(net().catch(() => {}))
-        }
-        return hit
-      }),
-  )
-}
-
-/** Mali omoti (spisak pravi build, public/albumi/precache.json) — pri instalaciji; nikad ne obori instalaciju. */
-function warmCovers() {
-  return fetch('/albumi/precache.json', { cache: 'no-cache' })
-    .then((r) => (r.ok ? r.json() : []))
-    .then((list) =>
-      caches.open(IMG).then((c) =>
-        Promise.all(
-          (Array.isArray(list) ? list : [])
-            .filter((u) => typeof u === 'string' && u.startsWith('/albumi/'))
-            .slice(0, COVERS)
-            .map((u) => {
-              const key = new URL(u, self.location.origin).href
-              return c
-                .match(key)
-                .then((hit) => hit || fetch(key).then((res) => (res.status === 200 && res.type === 'basic' ? c.put(key, res) : undefined)))
-                .catch(() => {})
-            }),
-        ),
-      ),
-    )
-    .catch(() => {})
 }
 
 self.addEventListener('push', (e) => {

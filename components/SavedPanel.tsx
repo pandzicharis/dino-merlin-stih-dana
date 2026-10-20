@@ -88,12 +88,12 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   const peek = !open && mini && hasId
   // strelica, povlačenje dolje, dodir pored, Escape — panel se spusti; ima li
   // pjesmu, ona svira dalje i na dnu početne viri mini plejer. Prvo kretnja,
-  // pa stanje plejera kadar poslije — mini plejer i mjesto za njega ionako
-  // kreću tek kad panel prođe (0.36 s), a prvi kadar spuštanja ostaje lak
+  // pa stanje plejera odmah poslije (ne čeka kadar) — mini plejer i mjesto za
+  // njega ionako kreću tek kad panel prođe (0.36 s), a prvi kadar ostaje lak
   const dismiss = useCallback(() => {
     dismissing.current = true
     onClose()
-    requestAnimationFrame(() => {
+    window.setTimeout(() => {
       if (!dismissing.current) return
       dismissing.current = false
       dismissSaved()

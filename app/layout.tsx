@@ -87,16 +87,6 @@ const verseFonts = [
 const OS_SCRIPT = `try{if(!/^\\/(prezentacija|admin)/.test(location.pathname)){var u=navigator.userAgent,o=sessionStorage.getItem('stihdana:os')||(/iPhone|iPad|iPod/.test(u)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'ios':/Android/.test(u)?'android':'ios');document.documentElement.dataset.os=o}}catch(e){}try{if(self!==top&&top.location.pathname.indexOf('/prezentacija')===0)document.documentElement.dataset.deck=''}catch(e){}`
 
 /**
- * Dio aplikacije koji fali (početna iz keša poslije novog deploya traži
- * fajlove kojih na serveru više nema) — stranica se jednom osvježi i dođe
- * nova. Samo kad dio stvarno fali (404; HEAD ide mimo service workera), ne
- * kad mreža na trenutak pukne — tad ga Turbopack sam traži ponovo. Ne dok
- * svira muzika, samo na početnoj (admin bi izgubio neupisano), najviše
- * jednom u 30 s i ne bez mreže (tad bi ionako opet pukao).
- */
-const CHUNK_SCRIPT = `try{if(location.pathname==='/'){var f=function(u){if(navigator.onLine===false)return;fetch(u,{method:'HEAD',cache:'no-store'}).then(function(r){var ms=navigator.mediaSession;if(r.status!==404||(ms&&ms.playbackState==='playing'))return;try{var t=+sessionStorage.getItem('stihdana:chunk')||0;if(Date.now()-t<30000)return;sessionStorage.setItem('stihdana:chunk',String(Date.now()))}catch(e){return}location.reload()}).catch(function(){})};addEventListener('error',function(e){var t=e.target,u=t&&(t.src||t.href);if((t.tagName==='SCRIPT'||t.tagName==='LINK')&&typeof u==='string'&&u.indexOf('/_next/static/')>=0)f(u)},true);addEventListener('unhandledrejection',function(e){var r=e.reason,m=String(r&&(r.name+' '+r.message));if(!/ChunkLoadError|Loading (CSS )?chunk|Failed to load chunk|Failed to fetch dynamically imported module|Importing a module script failed/.test(m))return;var u=/\\/_next\\/static\\/[^\\s"')]+/.exec(m);if(u)f(u[0])})}}catch(e){}`
-
-/**
  * Omot zadnjeg stiha (components/MoodBackground.tsx ga zapamti) se traži s
  * HTML-om, ne tek kad se stih izvuče na uređaju — pozadina ne kasni. Samo
  * dok traje njegov dan stiha (poslije podneva je drugi omot).
@@ -149,8 +139,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* obavijest možda čeka — zastor prije prvog kadra, da se ne vidi stih pa tombola (lib/cekaj.ts) */}
         <script dangerouslySetInnerHTML={{ __html: CEKAJ_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: COVER_SCRIPT }} />
-        {/* u razvoju bi osvježavanje sakrilo grešku (i HMR to radi sam) */}
-        {process.env.NODE_ENV === 'production' && <script dangerouslySetInnerHTML={{ __html: CHUNK_SCRIPT }} />}
         {/* potpis na pločici tombole je CSS maska — maska se traži posebnim (CORS)
             zahtjevom tek kad se tombola pojavi; ovako stigne s HTML-om i stoji od prvog kadra */}
         <link rel="preload" as="image" href="/brand/signature.webp?v=2" crossOrigin="anonymous" fetchPriority="high" />

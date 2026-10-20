@@ -8,7 +8,7 @@ import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
 import { SHARED, SHARED_GONE, SOLO, createPlayer, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
-import { listener, warmAudio } from '@/lib/sw-cache'
+import { warmAudio } from '@/lib/sw-cache'
 import { FitLines } from './deck/FitLines'
 
 /**
@@ -234,14 +234,9 @@ function useSong({
       const a = shared.get(src)
       if (a) attach(a)
     }
-    // plejer ispod stiha: početak pjesme se preuzme kad se ekran smiri — a
-    // cijela (u keš service workera) samo onome ko pjesme sluša
+    // plejer ispod stiha: početak pjesme se preuzme kad se ekran smiri
     const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
-    const ready = () => {
-      if (listener()) warmAudio([src])
-      prime()
-    }
-    const t = preload && !conn?.saveData ? window.setTimeout(ready, 1500) : 0
+    const t = preload && !conn?.saveData ? window.setTimeout(prime, 1500) : 0
     return () => {
       leaving.current = true
       clearTimeout(t)
