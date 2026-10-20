@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, animate, motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { SavedVerses, type SavedView } from './SavedVerses'
@@ -82,12 +82,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
     onClose()
   }, [onClose])
   const sheetDrag = useSheetDrag(dismiss, open)
-  // povučen prstom pa spušten: panel ne nestaje, pa pomak prsta mora nazad na
-  // nulu — inače mini plejer stoji niže nego treba (napola ispod ekrana)
-  const dragY = sheetDrag.style.y
-  useEffect(() => {
-    if (peek) void animate(dragY, 0, { duration: 0.5, ease: [0.32, 0.72, 0, 1] })
-  }, [peek, dragY])
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
@@ -108,10 +102,9 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
     // uvijek montiran (SavedLink ga složi u tišini): otvoren, spušten do mini
     // plejera, ili sklonjen ispod ekrana — otvaranje je samo kretnja
     <SheetLayer className={`fixed inset-0 z-[100] flex items-end justify-center ${open ? 'sm:items-center' : 'pointer-events-none'}`}>
-          <AnimatePresence>{open && <SheetBackdrop key="backdrop" onClose={dismiss} />}</AnimatePresence>
-
-          {/* spušten: panel ode dolje, a mini plejer pluta iznad dna početne */}
+          {/* mini plejer je ispod zatamnjenja i panela — pri podizanju ga prirodno prekriju */}
           <AnimatePresence custom={open ? 'open' : 'stop'}>{peek && <MiniPlayer key="mini" onOpen={onOpen} />}</AnimatePresence>
+          <AnimatePresence>{open && <SheetBackdrop key="backdrop" onClose={dismiss} />}</AnimatePresence>
 
           <SheetSlide away={!open}>
           <motion.div

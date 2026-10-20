@@ -550,17 +550,18 @@ const SongItem = memo(function SongItem({ v, on, playing }: { v: Verse; on: bool
         </span>
         <span className="min-w-0 flex-1">
           {/* naziv pjesme velikim slovima — kao ispod stiha i na albumu */}
-          <span className="flex items-baseline gap-2">
-            <span className="min-w-0 flex-1 truncate text-[12px] font-semibold uppercase leading-tight tracking-[0.18em]" style={{ color: on ? m.accent : 'rgba(255,255,255,0.92)' }}>
-              {v.song}
-            </span>
-            <span className="tabular shrink-0 text-[11px] text-white/35">{song ? mmss(knownDuration(v)) : '—'}</span>
+          <span className="block truncate text-[12px] font-semibold uppercase leading-tight tracking-[0.18em]" style={{ color: on ? m.accent : 'rgba(255,255,255,0.92)' }}>
+            {v.song}
           </span>
           {/* cijeli stih — obična slova, u jednom komadu */}
           <span className="mt-1 block text-[12.5px] leading-snug text-white/50">{oneLine(v.text)}</span>
         </span>
       </button>
-      <LoveButton song={v.song} accent={m.accent} />
+      {/* trajanje iznad zvjezdice */}
+      <span className="flex shrink-0 flex-col items-center gap-0.5 self-stretch justify-center">
+        <span className="tabular text-[11px] leading-none text-white/35">{song ? mmss(knownDuration(v)) : '—'}</span>
+        <LoveButton song={v.song} accent={m.accent} size={30} />
+      </span>
     </div>
   )
 })
@@ -597,9 +598,8 @@ export function SavedList({ verses, front, active = true }: { verses: Verse[]; f
   const ul = useRef<HTMLUListElement>(null)
   useFocusPlaying(ul, active)
   return (
-    // -mx-2: omot i zvjezdica stoje u liniji sa zaglavljem (ikonica, ×), a
-    // podloga reda viri malo van
-    <ul ref={ul} className="-mx-2 flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
+    // redovi (i podloga reda koji svira) u liniji sa zaglavljem — od ikonice do ×
+    <ul ref={ul} className="flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
       {verses.map((v, k) => (
         <motion.li key={v.id} data-now={keyOf(v) === nowKey} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
           <SongItem v={v} on={keyOf(v) === curKey} playing={p.playing && keyOf(v) === nowKey} />
@@ -652,7 +652,7 @@ const AlbumCard = memo(
         aria-label={name}
         aria-hidden={!ahead}
         className="relative flex shrink-0 flex-col overflow-hidden rounded-[24px] border border-white/[0.07]"
-        style={{ width: width || '78%', height: 'min(46dvh, 400px)', contain: 'layout paint' }}
+        style={{ width: width || 'calc(100% - 40px)', height: 'min(46dvh, 400px)', contain: 'layout paint' }}
         onClickCapture={(e) => {
           if (ahead) return
           e.stopPropagation()
@@ -669,8 +669,9 @@ const AlbumCard = memo(
         )}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.6) 100%)' }} aria-hidden />
 
-        {/* album: omot, naziv, godina, broj pjesama */}
-        <div className="relative flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
+        {/* album: omot, naziv, godina, broj pjesama — u liniji s pjesmama ispod
+            (omot albuma počinje gdje i kartica pjesme) */}
+        <div className="relative flex shrink-0 items-center gap-3 px-2 pb-3 pt-2">
           <span
             className="block h-[72px] w-[72px] shrink-0 rounded-[14px] bg-cover bg-center"
             style={{ backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: '0 10px 26px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.1)' }}
@@ -758,9 +759,8 @@ export function SavedLoved({
     )
 
   return (
-    // -mx-2: omot i zvjezdica stoje u liniji sa zaglavljem (ikonica, ×), a
-    // podloga reda viri malo van
-    <ul ref={ul} className="-mx-2 flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
+    // redovi (i podloga reda koji svira) u liniji sa zaglavljem — od ikonice do ×
+    <ul ref={ul} className="flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
       {list.map((v, k) => (
         <motion.li key={v.id} data-now={keyOf(v) === nowKey} layout="position" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
           <SongItem v={v} on={keyOf(v) === curKey} playing={p.playing && keyOf(v) === nowKey} />
@@ -812,8 +812,9 @@ export function SavedAlbums({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  // kartica je 78% širine, na sredini; susjedne vire sa strane
-  const card = Math.round(w * 0.78)
+  // kartica u liniji sa zaglavljem (20 px od ivice, kao ikonica i ×);
+  // sljedeća je odmah iza ivice — prevuci
+  const card = Math.round(w - 40)
   const step = card + ALBUM_GAP
   const pad = (w - card) / 2
   const go = (k: number) => {
@@ -938,15 +939,17 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
       tabIndex={0}
       aria-label="Otvori plejer pjesama"
       data-mini
-      className="pointer-events-auto fixed inset-x-3 z-[101] mx-auto max-w-[420px] cursor-pointer touch-none"
+      // bez z-indexa: u sloju panela je prvi, pa ga zatamnjenje i panel pri
+      // podizanju prekriju prirodno — nema dva sloja koja se miješaju
+      className="pointer-events-auto fixed inset-x-3 mx-auto max-w-[420px] cursor-pointer touch-none"
       // iznad trake za početni ekran (iPhone), inače malo zraka od dna; na
       // localhostu i iznad razvojne trake
       style={{ bottom: 'calc(max(14px, calc(env(safe-area-inset-bottom, 0px) + 4px)) + var(--dev-bar, 0px))' }}
       variants={{
         hidden: (why?: string) =>
           why === 'open'
-            ? // podiže se zajedno s panelom — ista kriva i trajanje kao drawer (Sheet OPEN)
-              { opacity: 0, y: -48, transition: { duration: 0.5, ease: [0.32, 0.72, 0, 1], opacity: { duration: 0.42, ease: 'easeOut' } } }
+            ? // panel se podiže preko njega — samo se tiho ugasi ispod
+              { opacity: 0, transition: { duration: 0.3, ease: 'easeOut' } }
             : { opacity: 0, y: 96, transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } },
         // tek kad panel ode s ekrana (0.42 s) — jedno pa drugo, ništa ne preskače
         shown: { opacity: 1, y: 0, transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1], delay: 0.36 } },

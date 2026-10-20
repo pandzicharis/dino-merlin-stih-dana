@@ -46,6 +46,13 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
   const [el, setEl] = useState<HTMLElement | null>(null)
   useEffect(() => {
     if (!el) return
+    // pušten dovoljno nisko (ili brzo): panel NASTAVI dolje odatle gdje ga je
+    // prst ostavio, brzinom prsta (bez vraćanja gore), dok se zatvaranje odvija;
+    // pri sljedećem otvaranju pomak se vrati na nulu (gore, useLayoutEffect)
+    const fling = () => {
+      void animate(y, y.get() + window.innerHeight * 0.6, { duration: 0.42, ease: [0.22, 0.75, 0.2, 1] })
+      closeRef.current()
+    }
     let g: { x0: number; y0: number; scroller: HTMLElement | null; pull: boolean; off: boolean; last: [number, number][] } | null = null
     const scrollerOf = (t: Element | null) => {
       for (let n = t as HTMLElement | null; n && n !== el; n = n.parentElement) {
@@ -89,7 +96,7 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
       const [a1, b1] = s.last[s.last.length - 1]
       const v = b1 > b0 ? ((a1 - a0) / (b1 - b0)) * 1000 : 0
       // dovoljno nisko ili brzo — zatvori odatle gdje ga je prst ostavio
-      if (y.get() > 90 || v > 600) return closeRef.current()
+      if (y.get() > 90 || v > 600) return fling()
       void animate(y, 0, { duration: 0.3, ease: [0.32, 0.72, 0, 1] })
     }
     // hvatanje (capture): i kad dijete zaustavi događaj (prekidači, dugmad)
@@ -132,7 +139,7 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
       const [a0, b0] = s.last[0]
       const [a1, b1] = s.last[s.last.length - 1]
       const v = b1 > b0 ? ((a1 - a0) / (b1 - b0)) * 1000 : 0
-      if (y.get() > 90 || v > 600) return closeRef.current()
+      if (y.get() > 90 || v > 600) return fling()
       void animate(y, 0, { duration: 0.3, ease: [0.32, 0.72, 0, 1] })
     }
     // povlačenje mišem nije klik (na kartu, pjesmu)
