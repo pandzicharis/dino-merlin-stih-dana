@@ -265,7 +265,8 @@ export function VerseMock({
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          padding: `${top}em 24em ${savedCount > 0 ? 116 : 62}em`,
+          // dno kao na početnoj (VerseScreen pb 2.5rem) — gramofon nisko
+          padding: `${top}em 24em 30em`,
         }}
       >
         {/* zaglavlje */}
@@ -350,9 +351,8 @@ export function VerseMock({
         {/* podnožje */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <PlayerMock verse={verse} w={w} />
-          {/* "Player pjesama" ispod gramofona (kad ima sačuvanih) — mreže su u postavkama */}
-          {/* crtica ispod gramofona; "Player pjesama" je traka na dnu (kao u aplikaciji) */}
-          {savedCount === 0 && (
+          {/* crtica ispod gramofona — plejer pjesama je ikonica gore (kao u aplikaciji) */}
+          {(
             <span
               style={{
                 margin: '22em 0',
@@ -364,62 +364,6 @@ export function VerseMock({
           )}
         </div>
       </div>
-      {/* "Player pjesama" — na dnu, bez okvira, odmaknut od gramofona (PlayerDock) */}
-      {savedCount > 0 && (
-        <span
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            justifyContent: 'center',
-            padding: '12em 0 24em',
-          }}
-        >
-          {/* pilula na sredini footera: omoti · natpis · trake */}
-          <span
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12em',
-              padding: '7em 16em 7em 7em',
-              borderRadius: '99em',
-              background: 'rgba(255,255,255,0.05)',
-            }}
-          >
-            <span style={{ display: 'flex' }} aria-hidden>
-              {ALBUMS.slice(0, 3).map((al, i) => (
-                <span
-                  key={al.cover}
-                  style={{
-                    width: '24em',
-                    height: '24em',
-                    marginLeft: i ? '-9em' : 0,
-                    borderRadius: '50%',
-                    border: '1.5em solid #0c0b0a',
-                    backgroundImage: `url(${al.cover})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    boxShadow: '0 2em 6em rgba(0,0,0,0.5)',
-                    position: 'relative',
-                    zIndex: 3 - i,
-                  }}
-                />
-              ))}
-            </span>
-            <span style={{ fontSize: '9.5em', fontWeight: 500, letterSpacing: '0.26em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>
-              Player pjesama <span style={{ color: 'rgba(255,255,255,0.35)' }}>{savedCount}</span>
-            </span>
-            {/* trake kao na dugmetu u aplikaciji */}
-            <span style={{ display: 'flex', alignItems: 'flex-end', gap: '2em', height: '12em' }} aria-hidden>
-              {[0.55, 1, 0.4, 0.8].map((h, i) => (
-                <span key={i} style={{ width: '2em', height: `${h * 100}%`, borderRadius: '2em', background: m.accent }} />
-              ))}
-            </span>
-          </span>
-        </span>
-      )}
     </div>
   )
 }
@@ -616,7 +560,7 @@ function Gear() {
   )
 }
 
-/** Ikonica sačuvanih s brojačem — ista kao `SavedLink` u aplikaciji. */
+/** Ikonica plejera pjesama s brojačem sačuvanih — ista kao `SavedLink` u aplikaciji. */
 function SavedIcon({ count }: { count: number }) {
   return (
     <span style={{ position: 'relative', display: 'flex' }}>
@@ -629,13 +573,9 @@ function SavedIcon({ count }: { count: number }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M8 3.5h9.5A2.5 2.5 0 0 1 20 6v11" />
-        <rect x="4" y="6.5" width="13" height="14" rx="2.5" />
-        <path
-          d="M10.5 16.8s-3-1.8-3-4a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 2.2-3 4-3 4z"
-          fill="currentColor"
-          stroke="none"
-        />
+        <path d="M3.5 6h11M3.5 10.5h11M3.5 15h6.5" />
+        <path d="M18 16.5V5.2l3 1.1" />
+        <circle cx="15.7" cy="16.8" r="2.3" fill="currentColor" stroke="none" />
       </svg>
       <span
         className="tabular"

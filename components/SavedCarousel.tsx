@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { motion, useDragControls, useMotionValue, useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { ExpandIcon } from './ExpandIcon'
@@ -16,6 +16,7 @@ import { haptic } from '@/lib/haptic'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { FontedLines, MagazaMark, MoodStill, Notes } from './deck/Screens'
 import { FitLines } from './deck/FitLines'
+import { LoveButton } from './SavedPlayer'
 import { SongRow } from './SongCredit'
 import { SAVED_TRACK, playSaved, setSavedPlaylist, useSavedPlayer } from '@/lib/player'
 
@@ -42,8 +43,14 @@ const GAP = [0, 28, 14, 14]
 const SIDE = 54
 /** zraka unutar karte, lijevo i desno (em od W) */
 const SIDE_PAD = 32
-/** ploča na karti u špilu (px) — raširena karta je uvećana, pa je i ona veća */
-const SMALL_VINYL = 46
+/**
+ * Dno karte (em od H) se pretapa u plejer ispod špila — karta kao da izlazi
+ * iz plejera. Stih stoji iznad toga, na sredini vidljivog dijela.
+ */
+const FADE = 190
+// prozirnost tek ispod plejera (on prekriva dno karte) — gdje se karta vidi,
+// pretapa se u NEPROZIRNU boju panela (sloj ispod), pa se karte iza ne naziru
+const CARD_MASK = 'linear-gradient(to bottom, black 86%, transparent 100%)'
 /** atmosfera se pri dnu pretopi u boju karte — na raširenoj, višoj karti nema ruba */
 const STILL_MASK = 'linear-gradient(to bottom, black 80%, transparent 100%)'
 
@@ -71,11 +78,17 @@ export function SavedCarousel({
   verses,
   size,
   onOpen,
+  onFront,
+  dots = true,
 }: {
   verses: Verse[]
   size: string
   /** dodir na prednju kartu — stih preko cijelog ekrana (components/SavedFull.tsx) */
   onOpen?: (verse: Verse) => void
+  /** prednja karta se promijenila — plejer ispod pokazuje njenu pjesmu */
+  onFront?: (verse: Verse) => void
+  /** tačkice ispod špila (u panelu ih zamijeni plejer: "2 / 4") */
+  dots?: boolean
 }) {
   const n = verses.length
   const player = useSavedPlayer()
@@ -97,6 +110,10 @@ export function SavedCarousel({
   )
   // plejer sačuvanih svira ovim redom; kad pređe na drugu pjesmu, špil klizi za njom
   useEffect(() => setSavedPlaylist(verses), [verses])
+  useEffect(() => {
+    const v = verses[at]
+    if (v) onFront?.(v)
+  }, [at, verses, onFront])
   // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma
   useEffect(() => {
     const v = verses[at]
@@ -172,7 +189,8 @@ export function SavedCarousel({
         ))}
       </div>
 
-      {verses.length > 1 &&
+      {dots &&
+        verses.length > 1 &&
         (verses.length <= 8 ? (
           <div className="mt-3 flex items-center gap-1.5">
             {verses.map((v, i) => (
@@ -249,18 +267,27 @@ function Card({
         aspectRatio: `${W} / ${H}`,
         zIndex: 50 - Math.abs(o),
         x,
+        // svoj sloj (GPU) za vidljive karte — prevlačenje ne crta karte iznova
+        willChange: Math.abs(o) <= 2 ? 'transform' : undefined,
         visibility: Math.abs(o) > 3 ? 'hidden' : undefined,
         pointerEvents: front ? undefined : 'none',
         touchAction: 'pan-y',
       }}
-      initial={false}
-      animate={{ x: to.x, scale: to.scale, opacity: to.opacity }}
+      // karte izlete iz plejera ispod: odozdo, iz magle, prednja prva
+      initial={reduced ? false : { x: to.x, y: 60, scale: to.scale * 0.95, opacity: 0 }}
+      animate={{ x: to.x, y: 0, scale: to.scale, opacity: to.opacity }}
       transition={
         reduced
           ? { duration: 0 }
           : glide
             ? { duration: 0.8, ease: [0.45, 0, 0.15, 1] }
-            : { type: 'spring', stiffness: 320, damping: 32 }
+            : {
+                type: 'spring',
+                stiffness: 320,
+                damping: 32,
+                y: { duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.05 * Math.abs(o) },
+                opacity: { duration: 0.35, ease: 'easeOut', delay: 0.05 * Math.abs(o) },
+              }
       }
       drag={front ? 'x' : false}
       dragControls={drag}
@@ -319,6 +346,10 @@ export function CardFace({
   useEffect(() => preloadFonts(verse.font), [verse.font])
   // karte postoje samo na klijentu (poslije hidratacije) — smije se čitati odmah
   const [saved] = useState(() => savedDay(verse.id))
+  // isti elementi iz rendera u render: FitLines mjeri samo kad se stih stvarno
+  // promijeni, a ne pri svakom prevlačenju špila (inače mjere sve karte — trzaj)
+  const dateLine = useMemo(() => <span>{formatFullDateBs(saved)}</span>, [saved])
+  const lines = useMemo(() => <FontedLines text={text} font={verse.font} />, [text, verse.font])
 
   // raširena karta je viša (do dna ekrana), a raspored joj je isti kao na
   // maloj (gornjih H em) — prvi i zadnji kadar su tačno mala karta. Stih
@@ -326,9 +357,8 @@ export function CardFace({
   // `data-drop`: koliko em niže kad je raširena)
   const root = useRef<HTMLDivElement>(null)
   const mid = useRef<HTMLDivElement>(null)
-  // gramofon je JEDAN: na raširenoj karti ista ploča (s nazivom pjesme)
-  // samo klizne na dno (`data-grow`) — ništa se ne pretapa ni ne uvećava, pa
-  // slova ostaju oštra i ne trepnu
+  // gramofon samo na raširenoj karti: ploča se pojavi (data-big) i klizne na
+  // dno (`data-grow`) dok karta raste — u špilu je pjesma u plejeru ispod
   const row = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const r = root.current
@@ -358,7 +388,7 @@ export function CardFace({
       ref={root}
       data-stih={front && onOpen ? verse.id : undefined}
       // raširena karta ide do dna ekrana — zaobljena samo gore
-      className={`relative h-full w-full select-none overflow-hidden ${onCollapse ? 'rounded-t-[26px]' : 'rounded-[26px]'} ${front && onOpen ? 'cursor-pointer' : ''} shadow-[0_24px_60px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.1)]`}
+      className={`relative h-full w-full select-none overflow-hidden ${onCollapse ? 'rounded-t-[26px]' : 'rounded-[26px]'} ${front && onOpen ? 'cursor-pointer' : ''} ${onCollapse ? 'shadow-[0_24px_60px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.1)]' : 'shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'}`}
       style={{
         fontSize: `calc(var(--cw) / ${W})`,
         color: '#f5f5f5',
@@ -366,11 +396,14 @@ export function CardFace({
         // font ekrana stiha — i u panelu (koji ima sistemski font) i na
         // raširenoj karti isti, pa se pri pretapanju slova poklope slovo u slovo
         fontFamily: 'var(--font-sans), sans-serif',
+        // karta u špilu se pri dnu stvarno izgubi (i rubovi) — izlazi iz plejera
+        ...(onCollapse ? {} : { maskImage: CARD_MASK, WebkitMaskImage: CARD_MASK }),
       }}
     >
       {/* atmosfera je uvijek visoka kao karta u špilu (H em) — raširena,
           viša karta je ima istu na vrhu, pa prvi kadar uvećanja = mala karta */}
-      <div className="absolute inset-x-0 top-0" style={{ height: `${H}em`, maskImage: STILL_MASK, WebkitMaskImage: STILL_MASK }}>
+      {/* isolate: slojevi atmosfere (z-index unutra) ostaju ispod sadržaja karte */}
+      <div className="absolute inset-x-0 top-0 isolate" style={{ height: `${H}em`, maskImage: STILL_MASK, WebkitMaskImage: STILL_MASK }}>
         <MoodStill mood={verse.mood} w={W} h={H} cover={album?.cover} lift={album?.lift} />
         <Notes
           accent={m.accent}
@@ -384,9 +417,9 @@ export function CardFace({
       </div>
 
       <div
-        className={`absolute inset-x-0 top-0 flex flex-col justify-between ${actionsZoom ? '' : 'bottom-0'}`}
+        className={`absolute inset-x-0 top-0 z-[1] flex flex-col justify-between ${actionsZoom ? '' : 'bottom-0'}`}
         // zraka od lijeve i desne ivice karte (isto za zaglavlje, stih i gramofon)
-        style={{ padding: `26em ${SIDE_PAD}em 18em`, height: actionsZoom ? `${H}em` : undefined }}
+        style={{ padding: `26em ${SIDE_PAD}em ${FADE * 0.75}em`, height: actionsZoom ? `${H}em` : undefined }}
       >
         {/* zaglavlje — potpis | Magaza, kao na ekranu stiha; desno raširi i srce */}
         <div className="flex items-center justify-between">
@@ -453,9 +486,7 @@ export function CardFace({
             }}
           >
             {/* dug dan (ČETVRTAK, SEPTEMBAR) se smanji — ne izlazi iz razmaka */}
-            <FitLines>
-              <span>{formatFullDateBs(saved)}</span>
-            </FitLines>
+            <FitLines>{dateLine}</FitLines>
           </p>
           <p
             className="verse"
@@ -467,9 +498,7 @@ export function CardFace({
               alignSelf: 'stretch',
             }}
           >
-            <FitLines>
-              <FontedLines text={text} font={verse.font} />
-            </FitLines>
+            <FitLines>{lines}</FitLines>
           </p>
           {/* radnje stiha — mjesto je i na maloj karti, pa se pri uvećanju ništa ne pomjeri */}
           <div className="flex items-center justify-center" style={{ height: '44em', marginTop: '20em' }}>
@@ -482,13 +511,39 @@ export function CardFace({
           </div>
         </div>
 
-        {/* pjesma — pravi plejer, kao ispod stiha; u špilu manja ploča (raširena ima punu) */}
-        {/* isti razmak od lijeve i desne ivice kao zaglavlje i stih */}
-        <div ref={row} data-nodrag className="flex items-center gap-2.5" style={{ padding: '0 0 10em', transformOrigin: 'center bottom' }}>
-          <SongRow verse={verse} accent={m.accent} fit vinyl={SMALL_VINYL} />
-        </div>
+        {/* gramofon — samo na raširenoj karti; ne mijenja raspored stiha (apsolutno, pri dnu) */}
+        {onCollapse && (
+          <div
+            ref={row}
+            data-nodrag
+            data-big
+            className="absolute flex items-center gap-2.5"
+            style={{ left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, bottom: '18em', opacity: 0, transformOrigin: 'center bottom' }}
+          >
+            <SongRow verse={verse} accent={m.accent} fit vinyl={46} />
+          </div>
+        )}
       </div>
 
+
+      {/* pjesma i album na dnu male karte — tik iznad mjesta gdje se karta
+          pretapa u plejer; na raširenoj ih nosi gramofon (data-small → nestanu) */}
+      <div
+        data-small
+        className="pointer-events-none absolute z-[1] flex flex-col items-center text-center"
+        style={{ left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${H - FADE - 46}em`, gap: '7em' }}
+      >
+        {/* zvjezdica — pjesma u "Omiljene" (isto kao u plejeru), na sredini iznad naziva */}
+        <span data-nodrag className="pointer-events-auto" style={{ marginBottom: '2em' }}>
+          <LoveButton id={verse.id} accent={m.accent} size={30} icon={16} />
+        </span>
+        <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '12.5em', letterSpacing: '0.2em', color: m.accent }}>
+          {verse.song}
+        </p>
+        <p className="max-w-full truncate uppercase" style={{ fontSize: '9.5em', letterSpacing: '0.24em', color: 'rgba(255,255,255,0.55)' }}>
+          {verse.album} · {verse.year}
+        </p>
+      </div>
 
       {/* rub male karte (i na raširenoj u prvom kadru) — pretopi se u rub velike */}
       <span
@@ -501,6 +556,15 @@ export function CardFace({
         data-big
         className="pointer-events-none absolute inset-0 rounded-[inherit] border border-b-0 border-white/15"
         style={{ opacity: 0 }}
+        aria-hidden
+      />
+
+      {/* dno se pretopi u boju panela, pa u plejer ispod — na raširenoj karti
+          (data-small) nestane dok raste */}
+      <span
+        data-small
+        className="pointer-events-none absolute inset-x-[-1px]"
+        style={{ top: `${H - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }}
         aria-hidden
       />
 

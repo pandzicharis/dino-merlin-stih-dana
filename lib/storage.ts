@@ -84,6 +84,38 @@ export function setSharePrefs(prefs: { format: string }) {
   write(SHARE, prefs)
 }
 
+/* ── omiljene pjesme (zvjezdica u plejeru) i koliko je koja slušana ─── */
+
+const LOVED = 'stihdana:omiljene'
+const PLAYS = 'stihdana:slusano'
+
+export function getLoved(): string[] {
+  const v = read<unknown>(LOVED, [])
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+}
+
+/** Zvjezdica na pjesmi — dodaj/makni iz omiljenih. Vraća novo stanje. */
+export function toggleLoved(id: string): boolean {
+  const list = getLoved()
+  const on = !list.includes(id)
+  write(LOVED, on ? [id, ...list] : list.filter((x) => x !== id))
+  window.dispatchEvent(new Event('lovedchange'))
+  return on
+}
+
+/** Koliko je puta koja pjesma puštena (id stiha → broj). */
+export function getPlays(): Record<string, number> {
+  return read<Record<string, number>>(PLAYS, {})
+}
+
+/** Pjesma krenula — jedan više (malo, lokalno; za "Omiljene" redom slušanja). */
+export function countPlay(id: string) {
+  const all = getPlays()
+  all[id] = (all[id] ?? 0) + 1
+  write(PLAYS, all)
+  window.dispatchEvent(new Event('lovedchange'))
+}
+
 /* ── favoriti: lista id-eva, bez logina ──────────────────────── */
 
 const FAVORITES = 'stihdana:favorites'

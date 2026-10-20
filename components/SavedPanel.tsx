@@ -1,26 +1,35 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion, useDragControls } from 'motion/react'
+import { AnimatePresence, animate, motion, useDragControls } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { SavedVerses } from './SavedVerses'
-import { closeSaved, dismissSaved, minimizeSaved, useSavedPlayer } from '@/lib/player'
+import { SavedVerses, type SavedView } from './SavedVerses'
+import { closeSaved, dismissSaved, expandSaved, stopSaved, useSavedPlayer } from '@/lib/player'
+import { MiniPlayer, PlayerIconPaths } from './SavedPlayer'
 import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
 import { AfterOpen, SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
-/** Sačuvani stihovi kao donji panel — isti kao panel za dijeljenje. */
-export default function SavedPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** zapamćen pogled: špil karata ili lista */
+const VIEW = 'stihdana:savedView'
+
+/**
+ * Plejer pjesama — sačuvani stihovi kao donji panel: stihovi (špil karata),
+ * pjesme ili albumi, a ispod plejer. Strelica (i povlačenje dolje) ga
+ * spušta: muzika ide dalje, a iznad dna početne pluta mini plejer
+ * (MiniPlayer). Dodir ga podigne; povlačenje dolje gasi muziku.
+ */
+export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
   const [verses, setVerses] = useState<Verse[] | null>(null)
   // Povlači se CIJELI panel, ali se hvata samo za zaglavlje — inače bi
   // skrolanje liste vuklo panel umjesto da skrola.
   const drag = useDragControls()
 
   useEffect(() => {
-    if (!open) return
+    if (verses) return
     let alive = true
     loadVerses().then((v) => {
       if (!alive) return
@@ -31,22 +40,57 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
     return () => {
       alive = false
     }
-  }, [open])
+  }, [verses])
 
   useSheetOpen(open)
-  // pjesme sačuvanih sviraju dok je panel otvoren (i kad se karta skupi ili
-  // prevuče) — zatvaranjem stanu; spušten panel ih pušta dalje, na početnoj
+  // otvoren — mini plejer na dnu se sklopi u njega; zatvoren bez pjesme — sve
+  // stane (samo pri zatvaranju — panel se montira unaprijed, zatvoren)
+  const wasOpen = useRef(false)
   useEffect(() => {
-    if (!open) closeSaved()
+    if (open) expandSaved()
+    else if (wasOpen.current) closeSaved()
+    wasOpen.current = open
   }, [open])
-  const { id } = useSavedPlayer()
-  // povlačenje dolje, dodir pored, Escape — dok svira, panel se spusti i
-  // pjesma svira dalje na početnoj; "Zatvori" (×) gasi sve
+  const [view, setView] = useState<SavedView>(() => {
+    try {
+      const v = localStorage.getItem(VIEW)
+      return v === 'list' || v === 'albums' || v === 'loved' ? v : 'cards'
+    } catch {
+      return 'cards'
+    }
+  })
+  const pick = (v: SavedView) => {
+    setView(v)
+    try {
+      localStorage.setItem(VIEW, v)
+    } catch {
+      /* privatni prozor */
+    }
+  }
+  // spušten: panel stoji dolje, viri samo mini plejer
+  const player = useSavedPlayer()
+  // otvoren, a ništa ne svira — počinje od "Stihovi" (zapamćen pogled važi
+  // dok se sluša)
+  const idle = !player.id
+  const [shown, setShown] = useState(open)
+  if (shown !== open) {
+    setShown(open)
+    if (open && idle) setView('cards')
+  }
+  const peek = !open && Boolean(player.mini && player.id)
+  // strelica, povlačenje dolje, dodir pored, Escape — panel se spusti; ima li
+  // pjesmu, ona svira dalje i na dnu početne viri mini plejer
   const dismiss = useCallback(() => {
     dismissSaved()
     onClose()
   }, [onClose])
   const sheetDrag = useSheetDrag(dismiss, open)
+  // povučen prstom pa spušten: panel ne nestaje, pa pomak prsta mora nazad na
+  // nulu — inače mini plejer stoji niže nego treba (napola ispod ekrana)
+  const dragY = sheetDrag.style.y
+  useEffect(() => {
+    if (peek) void animate(dragY, 0, { duration: 0.5, ease: [0.32, 0.72, 0, 1] })
+  }, [peek, dragY])
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
@@ -64,17 +108,21 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <AnimatePresence>
-      {open && (
-        <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
-          <SheetBackdrop onClose={dismiss} />
+    // uvijek montiran (SavedLink ga složi u tišini): otvoren, spušten do mini
+    // plejera, ili sklonjen ispod ekrana — otvaranje je samo kretnja
+    <SheetLayer className={`fixed inset-0 z-[100] flex items-end justify-center ${open ? 'sm:items-center' : 'pointer-events-none'}`}>
+          <AnimatePresence>{open && <SheetBackdrop key="backdrop" onClose={dismiss} />}</AnimatePresence>
 
-          <SheetSlide>
+          {/* spušten: panel ode dolje, a mini plejer pluta iznad dna početne */}
+          <AnimatePresence custom={open ? 'open' : 'stop'}>{peek && <MiniPlayer key="mini" onOpen={onOpen} />}</AnimatePresence>
+
+          <SheetSlide away={!open}>
           <motion.div
             role="dialog"
-            aria-modal="true"
-            aria-label="Sačuvani stihovi"
-            className="os-sheet relative flex max-h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]"
+            aria-modal={open}
+            aria-label="Player pjesama"
+            aria-hidden={!open}
+            className={`os-sheet ${open ? 'pointer-events-auto' : ''} relative flex max-h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]`}
             {...sheetDrag}
             style={{
               ...sheetDrag.style,
@@ -95,64 +143,60 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
               onPointerDown={(e) => drag.start(e)}
             >
               <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {/* ista ikona kao dugme za sačuvano: dvije kartice, srce na prednjoj */}
+                  {/* ista ikona kao dugme u zaglavlju: plejer pjesama */}
                   <DrawerIcon>
-                    <path d="M8 3.5h9.5A2.5 2.5 0 0 1 20 6v11" />
-                    <rect x="4" y="6.5" width="13" height="14" rx="2.5" />
-                    <path d="M10.5 16.8s-3-1.8-3-4a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 2.2-3 4-3 4z" fill="currentColor" stroke="none" />
+                    <PlayerIconPaths />
                   </DrawerIcon>
                   <div>
                     <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
-                      Stih dana
+                      Sačuvani stihovi
                     </p>
                     <p className="text-[1.1rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                      Sačuvani stihovi
+                      Player pjesama
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5">
-                  {/* spusti — muzika ide dalje, početna pokazuje stih pjesme koja svira */}
-                  <AnimatePresence initial={false}>
-                    {id && (
-                      <motion.button
-                        key="mini"
-                        onClick={() => {
-                          minimizeSaved()
-                          onClose()
-                        }}
-                        aria-label="Spusti"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:text-white"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="m6 9 6 6 6-6" />
-                        </svg>
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
+                <div className="flex items-center gap-2">
+                  {/* spusti — muzika ide dalje, na dnu početne viri mini plejer */}
                   <button
-                    onClick={onClose}
-                    aria-label="Zatvori"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:text-white"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={dismiss}
+                    aria-label="Spusti"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:text-white"
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                      <path d="M6 6l12 12M18 6 6 18" />
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 9 6 6 6-6" />
                     </svg>
                   </button>
+                  {/* zatvori — muzika stane, plejer ode do kraja (bez mini plejera) */}
+                  <motion.button
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => {
+                      stopSaved()
+                      onClose()
+                    }}
+                    aria-label="Zatvori plejer"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:text-white"
+                    whileHover={{ scale: 1.15 }}
+                    whileTap={{ scale: 0.88 }}
+                    transition={{ type: 'spring', stiffness: 460, damping: 24 }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
+                  </motion.button>
                 </div>
               </div>
             </div>
 
-            <div className="min-h-[200px] overflow-y-auto overscroll-contain px-5 pb-4">
+            {/* špil (ili lista) i plejer ispod — SavedVerses sam rasporedi i skrola */}
+            <div className="flex min-h-[200px] flex-1 flex-col">
               {verses ? (
-                // karte i plejeri se slože dok panel već klizi
+                // karte i plejer se slože dok panel već klizi
                 <AfterOpen fallback={<Skeleton />}>
-                  <SavedVerses verses={verses} onClose={onClose} />
+                  <SavedVerses verses={verses} onClose={onClose} view={view} onView={pick} />
                 </AfterOpen>
               ) : (
                 <Skeleton />
@@ -160,9 +204,7 @@ export default function SavedPanel({ open, onClose }: { open: boolean; onClose: 
             </div>
           </motion.div>
           </SheetSlide>
-        </SheetLayer>
-      )}
-    </AnimatePresence>,
+    </SheetLayer>,
     document.body,
   )
 }

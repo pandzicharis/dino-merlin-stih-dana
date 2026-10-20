@@ -128,6 +128,33 @@ function favoritesSnapshot(): string {
   }
 }
 
+const subscribeLoved = subscribeTo(['lovedchange', 'storage'])
+const lovedSnapshot = () => {
+  try {
+    return `${localStorage.getItem('stihdana:omiljene') ?? '[]'}|${localStorage.getItem('stihdana:slusano') ?? '{}'}`
+  } catch {
+    return '[]|{}'
+  }
+}
+
+/** Omiljene pjesme (id-evi stihova) i koliko je koja slušana. Na serveru prazno. */
+export function useLoved(): { ids: string[]; plays: Record<string, number> } {
+  const snap = useSyncExternalStore(subscribeLoved, lovedSnapshot, () => '[]|{}')
+  return useMemo(() => {
+    const [a, b] = snap.split('|')
+    try {
+      const ids: unknown = JSON.parse(a)
+      const plays: unknown = JSON.parse(b)
+      return {
+        ids: Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [],
+        plays: plays && typeof plays === 'object' ? (plays as Record<string, number>) : {},
+      }
+    } catch {
+      return { ids: [], plays: {} }
+    }
+  }, [snap])
+}
+
 /** Sačuvani stihovi, najnoviji prvi. Na serveru prazno. */
 export function useFavorites(): string[] {
   const snap = useSyncExternalStore(subscribeFavorites, favoritesSnapshot, () => '[]')

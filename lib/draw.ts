@@ -192,6 +192,11 @@ export function markSeen(date: string) {
   save(s)
 }
 
+/** Stih za `date` je probni (uvod poslije instalacije) — ne broji se kao današnji. */
+export function isProbe(date: string): boolean {
+  return Boolean(parse(snapshot()).days[date]?.pre)
+}
+
 /**
  * Stigla obavijest na dan instalacije: probni stih iz uvoda se ne broji —
  * dan se izvuče ispočetka (s tombolom). `false` ako stih za `date` nije probni.

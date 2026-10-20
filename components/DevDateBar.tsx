@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { MOOD_KEYS } from '@/data/moods'
 import { TIPS_ON, startTips } from './Tips'
 import { playIntro, playTombola } from './IntroSplash'
@@ -92,12 +92,27 @@ export function DevDateBar({
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  // visina trake → `--dev-bar` na stranici: mini plejer pjesama pluta iznad
+  // nje, ne preko nje (u prezentaciji je traka skrivena — 0)
+  const bar = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = bar.current
+    if (!el) return
+    const root = document.documentElement
+    const ro = new ResizeObserver(() => root.style.setProperty('--dev-bar', `${el.offsetHeight}px`))
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      root.style.removeProperty('--dev-bar')
+    }
+  }, [])
+
   if (!OVERRIDE_ON) return null
 
   const day = daysSinceEpoch(date)
 
   return (
-    <div className="dev-bar fixed inset-x-0 bottom-0 z-50 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 bg-black/85 px-3 py-2 font-mono text-[11px] text-white/80 backdrop-blur">
+    <div ref={bar} className="dev-bar fixed inset-x-0 bottom-0 z-50 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 bg-black/85 px-3 py-2 font-mono text-[11px] text-white/80 backdrop-blur">
       <button onClick={() => move(-1)} className="px-1 hover:text-white" title="[">
         ◀
       </button>

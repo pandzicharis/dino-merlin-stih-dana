@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
-import { getSharePrefs } from '@/lib/storage'
 import { haptic } from '@/lib/haptic'
 
 /**
@@ -39,16 +38,13 @@ export function ShareButton({
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
   // panel se preuzme u tišini kad se ekran smiri, a slika se nacrta unaprijed
-  // u formatu koji korisnik zadnji birao — prvi dodir je otvara odmah
+  // za Story (panel se uvijek otvara na njemu) — prvi dodir je otvara odmah
   useEffect(() => {
     let idle = 0
     const t = setTimeout(() => {
       load()
       const warm = () =>
-        import('@/lib/share-image').then(({ warmShareImage, SHARE_FORMATS }) => {
-          const f = getSharePrefs().format
-          warmShareImage({ verse, date, format: f && f in SHARE_FORMATS ? (f as keyof typeof SHARE_FORMATS) : 'story' })
-        })
+        import('@/lib/share-image').then(({ warmShareImage }) => warmShareImage({ verse, date, format: 'story' }))
       idle = window.requestIdleCallback?.(warm, { timeout: 2000 }) ?? window.setTimeout(warm, 0)
     }, 3000)
     return () => {

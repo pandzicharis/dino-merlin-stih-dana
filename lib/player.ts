@@ -18,6 +18,7 @@ import { audioFile } from './audio-name'
 import { BRAND } from './brand'
 import { youtubeId } from './text'
 import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from './vinyl'
+import { countPlay } from './storage'
 
 /** Svira jedna pjesma u isto vrijeme: kad krene nova, ostale stanu. */
 export const SOLO = 'stihdana:solo'
@@ -164,8 +165,8 @@ export const SHARED_GONE = 'stihdana:shared-gone'
 
 /**
  * `shuffle`: nasumičnim redom; `repeat`: ista pjesma ispočetka; `mini`:
- * sačuvani sviraju NA POČETNOJ — ekran pokazuje stih pjesme koja svira, a
- * gramofon ispod njega je plejer (DailyVerse, components/Listening.tsx).
+ * plejer pjesama je spušten — na dnu početne viri "Trenutno slušaš" s
+ * mini plejerom (components/SavedPlayer.tsx `SavedPeek`).
  */
 type SavedState = { id: string | null; playing: boolean; shuffle: boolean; repeat: boolean; mini: boolean }
 const EMPTY: SavedState = { id: null, playing: false, shuffle: false, repeat: false, mini: false }
@@ -187,31 +188,45 @@ export function toggleRepeat() {
   setState({ repeat: !state.repeat })
 }
 
-/** Spusti panel, muzika ide dalje — na početnoj, sa stihom pjesme koja svira. */
+/** Spusti plejer, muzika ide dalje — na dnu početne viri mini plejer. */
 export function minimizeSaved() {
   if (state.id) setState({ mini: true })
 }
-/** Panel povučen dolje (ili dodir pored) dok pjesma svira — spušta se, ne gasi. */
+/**
+ * Pjesma koju veliki plejer pokazuje (ona koja svira, ili prednja karta) —
+ * SavedPlayer je javlja. Ako se spusti, a ništa nije pušteno, ona ostane u
+ * mini plejeru (spremna, ne svira).
+ */
+let shown: Verse | null = null
+export function setShownSaved(v: Verse | null) {
+  shown = v
+}
+
+/** Pjesma u plejeru, a ne svira — mini plejer je pokazuje, "pusti" je pokrene. */
+function cueSaved(verse: Verse): boolean {
+  const a = load(verse)
+  if (!a) return false
+  a.dataset.want = ''
+  setState({ id: verse.id, playing: false })
+  return true
+}
+
+/**
+ * Plejer spušten (strelica, povlačenje, dodir pored): uvijek ostaje mini
+ * plejer — i kad ništa nije pušteno (tad s pjesmom koju je plejer
+ * pokazivao). Do kraja ga zatvara samo × (stopSaved).
+ */
 export function dismissSaved() {
-  if (state.playing) minimizeSaved()
+  if (!state.id && shown) cueSaved(shown)
+  minimizeSaved()
+}
+/** Spušteni plejer opet otvoren preko cijelog panela. */
+export function expandSaved() {
+  setState({ mini: false })
 }
 /** Panel zatvoren: sačuvani na početnoj sviraju dalje; inače sve stane. */
 export function closeSaved() {
   if (!state.mini) stopSaved()
-}
-
-/**
- * "Player pjesama" s početne: sačuvani redom (najnoviji prvi), prva pjesma
- * odmah — iz istog dodira, bez čekanja (telefon inače ne pusti zvuk).
- */
-export function listenSaved(list: Verse[], show = true): Verse | null {
-  if (!list.length) return null
-  setSavedPlaylist(list)
-  const first = list.find((v) => sourceFor(v))
-  if (!first || !playSaved(first)) return null
-  // `show: false` — zvuk kreće odmah (iz dodira), ekran se prebaci kasnije (prelaz)
-  if (show) setState({ mini: true })
-  return first
 }
 
 /** Koja je po redu pjesma koja svira, od koliko sačuvanih. */
@@ -248,8 +263,11 @@ function sourceFor(verse: Verse) {
 
 /** Sačuvani stih koji je u plejeru (ako ga ima). */
 export function savedVerse(): Verse | null {
-  return playlist.find((x) => x.id === state.id) ?? null
+  // i kad pjesma nije u trenutnom redu (npr. otvorene Omiljene, a svira druga)
+  return playlist.find((x) => x.id === state.id) ?? (playing?.id === state.id ? playing : null)
 }
+/** pjesma koja je zadnja puštena — bez obzira na red (Omiljene, album) */
+let playing: Verse | null = null
 
 /** Zvuk sačuvanog stiha koji je u plejeru (ako ga ima). */
 export function currentSaved(): Player | null {
@@ -360,6 +378,7 @@ function load(verse: Verse): Player | null {
   cancelSoft(a)
   stopCrackle(a)
   loaded = { src: s.src, fallback: s.fallback, id: verse.id }
+  playing = verse
   a.src = s.src
   shared.set(s.src, a)
   window.dispatchEvent(new CustomEvent(SHARED, { detail: s.src }))
@@ -379,6 +398,8 @@ export function playSaved(verse: Verse): boolean {
   if (!a) return false
   cancelSoft(a)
   // druga pjesma kreće ispočetka
+  // nova pjesma — jedno slušanje više (Omiljene se slažu po tome)
+  if (switching) countPlay(verse.id)
   if (switching) {
     try {
       a.currentTime = 0
@@ -459,7 +480,8 @@ export function stopSaved() {
   if (a) {
     a.dataset.want = ''
     stopCrackle(a)
-    void softPause(a, 700).then(() => {
+    // kratko stišavanje — zatvaranje se čuje odmah, ne tek za sekundu
+    void softPause(a, 320).then(() => {
       // u međuvremenu je možda pokrenuta nova — ne diraj je
       if (!a.dataset.want) a.currentTime = 0
     })
@@ -467,6 +489,7 @@ export function stopSaved() {
   if (loaded) window.dispatchEvent(new CustomEvent(SHARED_GONE, { detail: loaded.src }))
   shared.clear()
   loaded = null
+  playing = null
   // i pucketanje koje je ostalo
   if (state.id) stopCrackle()
   history = []

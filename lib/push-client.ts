@@ -213,6 +213,39 @@ export async function hasPushMark(): Promise<boolean> {
   }
 }
 
+/** dan za koji je server već obaviješten da je stih viđen */
+const SEEN = 'stihdana:pushSeen'
+
+/**
+ * Današnji stih izvučen BEZ obavijesti (npr. ujutro, prije podneva) — javi
+ * serveru, pa obavijest danas ne stigne (app/api/push/seen). Jednom dnevno po
+ * uređaju, u pozadini, samo kad su obavijesti uključene; ništa ne čeka na to.
+ */
+export async function reportSeen(date: string) {
+  try {
+    if (localStorage.getItem(SEEN) === date) return
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    if (localStorage.getItem('stihdana:notify') === 'false') return
+    const sub = await (await navigator.serviceWorker?.getRegistration())?.pushManager.getSubscription()
+    if (!sub) return
+    localStorage.setItem(SEEN, date)
+    const r = await fetch('/api/push/seen', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ endpoint: sub.endpoint, date }),
+      keepalive: true,
+    })
+    // nije prošlo — pokuša se pri sljedećem izvlačenju (i obavijest dođe, kao i prije)
+    if (!r.ok) localStorage.removeItem(SEEN)
+  } catch {
+    try {
+      localStorage.removeItem(SEEN)
+    } catch {
+      /* privatni prozor */
+    }
+  }
+}
+
 /** Stih izvučen — obavijest je pročitana: oznaka, tačka na ikonici, centar obavijesti. */
 export function clearPushMark() {
   if (typeof caches !== 'undefined') caches.open(MARK).then((c) => c.delete(MARK_KEY)).catch(() => {})

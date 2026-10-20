@@ -4,12 +4,10 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
-import { markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
-import { bumpStreak, favoriteDate, peekStreak, setLastSeen } from '@/lib/storage'
-import { savedVerse, useSavedPlayer } from '@/lib/player'
-import { fadeSwap } from '@/lib/fade-swap'
+import { isProbe, markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
+import { bumpStreak, peekStreak, setLastSeen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
-import { clearBadge, clearPushMark, hasPushMark } from '@/lib/push-client'
+import { clearBadge, clearPushMark, hasPushMark, reportSeen } from '@/lib/push-client'
 import { cover, markHandled, mayWait, uncover } from '@/lib/cekaj'
 import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
@@ -67,16 +65,19 @@ export function DailyVerse({
 
   // splash: kad papirić sleti, ekran sa stihom se ispiše ispočetka
   const [replay, setReplay] = useState(0)
-  // vraćen s plejera sačuvanih — stih odmah, bez ispisivanja (vidi ispod)
-  const [back, setBack] = useState(false)
   // papirić otvoren = stih izvučen (tek tad, ne kad se tombola pokaže) i
   // obavijest pročitana
   const land = useCallback(() => {
-    // novi papirić — stih se opet ispisuje kad sleti (ne "odmah" kao poslije plejera)
-    setBack(false)
     setReplay((r) => r + 1)
     if (!verseId) markSeen(date)
-    clearPushMark()
+    // izvučen prije obavijesti (nema oznake) — obavijest danas ne treba.
+    // Probni stih s dana instalacije se ne broji: obavijest ga zamijeni pravim
+    if (!verseId && !isProbe(date))
+      void hasPushMark().then((fromPush) => {
+        clearPushMark()
+        if (!fromPush) void reportSeen(date)
+      })
+    else clearPushMark()
     // poslije podneva — obavijest je izvučena, danas više nema zastora
     markHandled()
     uncover()
@@ -168,38 +169,6 @@ export function DailyVerse({
     setLastSeen(date)
   }, [date])
 
-  // sačuvani sviraju na početnoj — ekran pokazuje stih pjesme koja svira
-  // (components/Listening.tsx); × na pilulici vraća današnji
-  const player = useSavedPlayer()
-  const playing = player.mini && player.id ? savedVerse() : null
-  // nova pjesma dok sačuvani sviraju: stari stih se mekano utiša, pa dođe
-  // novi (ispiše se, pozadina se pretopi) — bez naglog skoka
-  const [shown, setShown] = useState<Verse | null>(null)
-  const listening = playing && shown && shown.id !== playing.id ? shown : playing
-  // povratak s plejera na današnji stih: stih je odmah tu (ne ispisuje se
-  // ponovo riječ po riječ) — prelaz ne kasni
-  const [was, setWas] = useState(false)
-  if (was !== Boolean(listening)) {
-    setWas(Boolean(listening))
-    if (!listening) setBack(true)
-  }
-  useEffect(() => {
-    let alive = true
-    const swap = () => alive && setShown(playing)
-    if (!playing || !shown || shown.id === playing.id || reduced) {
-      // ulazak/izlazak već ide kroz prelaz (components/Listening.tsx)
-      if (shown?.id !== playing?.id) void Promise.resolve().then(swap)
-      return () => {
-        alive = false
-      }
-    }
-    // utiša se, promijeni, vrati — i u pozadini (zaključan ekran) promjena dođe
-    void Promise.resolve().then(() => fadeSwap(document.querySelector<HTMLElement>('main'), swap, 300, 600))
-    return () => {
-      alive = false
-    }
-  }, [playing, shown, reduced])
-
   const tone = mood ?? verse?.mood ?? 'nostalgija'
   // ostali aktivni stihovi — papirići u gomili na prvom otvaranju
   const others = useMemo(
@@ -213,15 +182,7 @@ export function DailyVerse({
       <Onboarding mood={tone} seed={verse?.id ?? 'stih-dana'} />
       {/* dok uređaj ne izvuče stih (prvi frejm), ekran je prazan — pozadina
           i stih uđu zajedno, kao i inače */}
-      {listening ? (
-        <VerseScreen
-          verse={listening}
-          date={favoriteDate(listening.id) ?? date}
-          listening
-        />
-      ) : (
-        verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} streak={verseId ? 0 : streak} instant={back} />
-      )}
+      {verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} streak={verseId ? 0 : streak} />}
       {/* key: novi stih — zastor od prvog frejma, prije tombole */}
       {verse && <IntroHost key={verse.id} text={verse.text} others={others} mood={tone} date={date} onLand={land} fresh={fresh} font={verse.font} />}
       <Tips />

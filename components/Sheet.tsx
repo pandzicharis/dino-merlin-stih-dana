@@ -72,20 +72,28 @@ export function SheetBackdrop({ onClose }: { onClose: () => void }) {
   )
 }
 
-/** Panel: na telefonu odozdo cijelom visinom, na širokom ekranu 48px uz fade. */
-export function SheetSlide({ children }: { children: ReactNode }) {
+/**
+ * Panel: na telefonu odozdo cijelom visinom, na širokom ekranu 48px uz fade.
+ * `away`: panel ostaje montiran, sklonjen ispod ekrana (plejer pjesama) —
+ * otvaranje je samo kretnja, bez ponovnog slaganja sadržaja.
+ */
+export function SheetSlide({ children, away = false }: { children: ReactNode; away?: boolean }) {
   const [wide] = useState(() => window.matchMedia('(min-width: 640px)').matches)
-  const from = wide
-    ? { transform: 'translateY(48px)', opacity: 0 }
-    : { transform: 'translateY(100%)' }
-  const to = wide ? { transform: 'translateY(0px)', opacity: 1 } : { transform: 'translateY(0%)' }
+  const hidden = wide ? { transform: 'translateY(48px)', opacity: 0 } : { transform: 'translateY(100%)' }
+  const shown = wide ? { transform: 'translateY(0px)', opacity: 1 } : { transform: 'translateY(0%)' }
   return (
     <motion.div
       className="relative flex w-full max-w-[440px] justify-center"
       style={{ willChange: 'transform' }}
-      initial={from}
-      animate={{ ...to, transition: OPEN }}
-      exit={{ ...from, transition: CLOSE }}
+      // `away`: panel stalno montiran, sklonjen ispod ekrana — kad sjedne
+      // dolje, ne crta se (visibility), a otvara se bez ikakvog slaganja
+      variants={{
+        hidden: { ...hidden, transition: CLOSE, ...(away ? { transitionEnd: { visibility: 'hidden' } } : {}) },
+        shown: { ...shown, visibility: 'visible', transition: OPEN },
+      }}
+      initial={away ? { ...hidden, visibility: 'hidden' } : 'hidden'}
+      animate={away ? 'hidden' : 'shown'}
+      exit="hidden"
     >
       {children}
       {/* ispod panela je crno — i kad ga opruga ili prst malo podignu, ne vidi se
@@ -118,7 +126,11 @@ export function useSheetOpen(open: boolean) {
     const d = document.documentElement
     d.dataset.sheet = ''
     return () => {
-      delete d.dataset.sheet
+      // tek kad se panel spusti do kraja (CLOSE) — inače bi se pozadina
+      // pokrenula dok je zamućenje još preko nje i blur bi se računao svaki kadar
+      window.setTimeout(() => {
+        if (!d.querySelector('[role="dialog"][aria-modal="true"]')) delete d.dataset.sheet
+      }, CLOSE.duration * 1000 + 50)
     }
   }, [open])
 }

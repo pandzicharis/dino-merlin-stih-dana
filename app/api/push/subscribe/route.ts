@@ -1,37 +1,12 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { SEND_HOUR, TZ } from '@/lib/date'
+import { isPushEndpoint } from '@/lib/push-endpoint'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-/**
- * Adrese na koje se uopšte može slati push. Sve ostalo je ili greška ili
- * pokušaj da nam se u tabelu ubaci tuđi URL — ruta ima servisni ključ, pa
- * bi bez ove provjere bila mali generator zahtjeva na adresu po izboru.
- */
-const PUSH_HOSTS = [
-  'googleapis.com', // fcm / android — Chrome, Edge, Android
-  'push.apple.com', // Safari, iOS PWA
-  'mozilla.com', // Firefox (push.services.mozilla.com)
-  'notify.windows.com', // WNS
-  'pushservice.mozilla.com',
-]
-
-const MAX_ENDPOINT = 800
 const MAX_KEY = 200
-
-function isPushEndpoint(raw: string): boolean {
-  if (raw.length > MAX_ENDPOINT) return false
-  let u: URL
-  try {
-    u = new URL(raw)
-  } catch {
-    return false
-  }
-  if (u.protocol !== 'https:') return false
-  return PUSH_HOSTS.some((h) => u.hostname === h || u.hostname.endsWith(`.${h}`))
-}
 
 const isKey = (s: string) => s.length > 0 && s.length <= MAX_KEY && /^[A-Za-z0-9_\-=]+$/.test(s)
 

@@ -15,7 +15,7 @@ export const revalidate = 3600
 export default async function SacuvanoPage() {
   const verses = await allVerses()
   return (
-    <PageShell eyebrow="Stih dana" title="Sačuvani stihovi">
+    <PageShell eyebrow="Sačuvani stihovi" title="Player pjesama">
       <SavedVerses verses={verses} />
     </PageShell>
   )

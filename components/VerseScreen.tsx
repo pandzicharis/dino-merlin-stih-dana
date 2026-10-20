@@ -18,8 +18,7 @@ import { FavoriteButton } from './FavoriteButton'
 import { SavedLink } from './SavedLink'
 import { MagazaLogo } from './MagazaLogo'
 import { StreakLine } from './Streak'
-import { AnimatePresence } from 'motion/react'
-import { PlayerDock, useSavedCount } from './Listening'
+import { useSavedPlayer } from '@/lib/player'
 
 /**
  * Čista prezentacija — datum i stih dolaze izvana.
@@ -36,7 +35,6 @@ export function VerseScreen({
   instant = false,
   preview = false,
   streak = 0,
-  listening = false,
 }: {
   verse: Verse
   date: string
@@ -51,17 +49,13 @@ export function VerseScreen({
   preview?: boolean
   /** dana zaredom (lib/storage.ts) — tiho iznad datuma, tek od drugog dana */
   streak?: number
-  /**
-   * sačuvani sviraju na početnoj (components/Listening.tsx): stih je pjesme
-   * koja svira, gramofon je plejer sačuvanih, ispod njega kontrole
-   */
-  listening?: boolean
 }) {
   const m = MOODS[mood ?? verse.mood]
-  // sačuvanih ima — "Player pjesama" je traka zakucana na dno, sadržaj se podigne
-  const saved = useSavedCount()
-  // footer s plejerom: pozivnica (ima sačuvanih) ili plejer (sačuvani sviraju)
-  const docked = !compact && (listening || saved > 0)
+  // mini plejer pjesama pluta na dnu — sadržaj se podigne iznad njega. Mjesto
+  // stoji dok god je pjesma u plejeru (i dok je panel otvoren), pa se početna
+  // ne preslaže usred otvaranja i zatvaranja panela
+  const player = useSavedPlayer()
+  const peek = !compact && Boolean(player.id)
 
   // Sve na ekranu ide po JEDNOM rasporedu izvedenom iz dužine stiha.
   // Ranije se čekalo da zadnja riječ javi da je gotova, pa se osjećao zastoj
@@ -70,10 +64,9 @@ export function VerseScreen({
   // papira stignu na mjesto (pretope se), pa izgleda kao da su prenesena
   // dok sačuvani sviraju, novi stih ulazi cio, zajedno s mekanim pretapanjem
   // ekrana (DailyVerse) — bez ispisivanja koje bi kasnilo iza prelaza
-  const arrive = instant || listening ? 0 : replay > 0 ? SPLASH_ARRIVE : undefined
-  // prelaz plejer ⇄ današnji stih: ekran se pretopi (fadeSwap) — dugmad i
-  // gramofon su odmah na mjestu, ne ulaze još jednom poslije stiha
-  const settled = instant || listening
+  const arrive = instant ? 0 : replay > 0 ? SPLASH_ARRIVE : undefined
+  // pregled (admin): dugmad i gramofon su odmah na mjestu, ne ulaze poslije stiha
+  const settled = instant
   const tail = compact ? 0 : arrive != null ? arrive + 0.3 : verseTail(verse.text)
 
   // Statusna traka (Android, Chrome) preuzme gornju boju pozadine stiha,
@@ -101,7 +94,7 @@ export function VerseScreen({
           compact
             ? 'flex min-h-[260px] flex-col justify-between p-5'
             : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(3rem,calc(var(--sat)+1.75rem))] ${
-                OVERRIDE_ON ? 'dev-pad pb-16' : 'pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+2rem))]'
+                OVERRIDE_ON ? 'dev-pad pb-12' : 'pb-[max(2.5rem,calc(env(safe-area-inset-bottom)+0.5rem))]'
               }`
         }
       >
@@ -154,7 +147,7 @@ export function VerseScreen({
             // niz dana iznad datuma, tiho — tek od drugog dana; više zraka do
             // stiha (i ispod njega), da stih dođe do izražaja
             <div className="flex flex-col items-center gap-3">
-              {!listening && streak > 1 && <StreakLine n={streak} accent={m.accent} />}
+              {streak > 1 && <StreakLine n={streak} accent={m.accent} />}
               <motion.p
                 data-tip="mine"
                 className="tabular whitespace-nowrap text-[12px] font-bold uppercase tracking-[0.2em]"
@@ -175,8 +168,7 @@ export function VerseScreen({
           {!compact && (
             <motion.div
               className="mt-5"
-              // dok sačuvani sviraju, dugmad ostaju — mijenja se samo stih
-              key={listening ? 's-listen' : `s-${verse.id}-${replay}`}
+              key={`s-${verse.id}-${replay}`}
               initial={settled ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: Math.max(0.15, tail - 0.5), ease: [0.22, 1, 0.36, 1] }}
@@ -192,13 +184,12 @@ export function VerseScreen({
 
         {/* podnožje — uvijek prisutno, samo se stiša */}
         <motion.footer
-          // dok sačuvani sviraju, podnožje (gramofon, kontrole) ostaje — mijenja se samo pjesma
-          key={listening ? 'f-listen' : `f-${verse.id}-${replay}`}
+          key={`f-${verse.id}-${replay}`}
           className="flex flex-col items-center gap-6 text-center"
           initial={settled ? false : { opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           // podnožje (gramofon, plejer) ne čeka da stih sjedne — ulazi dok se još ispisuje
-          transition={{ duration: 0.75, delay: compact ? 0 : listening ? 0.1 : Math.max(0.3, tail - 0.3), ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.75, delay: compact ? 0 : Math.max(0.3, tail - 0.3), ease: [0.22, 1, 0.36, 1] }}
         >
           {compact ? (
             <div>
@@ -214,25 +205,21 @@ export function VerseScreen({
             </div>
           ) : (
             <>
-              <SongCredit verse={verse} preview={preview} share={listening} />
-              {/* crtica ispod gramofona; plejer i "Player pjesama" su u footeru (PlayerDock) */}
-              {!docked && (
-                <span
-                  className="h-px w-16 shrink-0"
-                  style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }}
-                  aria-hidden
-                />
-              )}
+              <SongCredit verse={verse} preview={preview} />
+              {/* crtica ispod gramofona — uvijek na mjestu (ne mijenja raspored),
+                  samo se pretopi: dok pluta mini plejer, nje nema */}
+              <span
+                className="h-px w-16 shrink-0 transition-opacity duration-500"
+                style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`, opacity: peek ? 0 : 1 }}
+                aria-hidden
+              />
             </>
           )}
         </motion.footer>
-        {/* mjesto za traku na dnu — gramofon ostane odvojen od nje */}
-        {!compact && <div aria-hidden className={`shrink-0 transition-[height] duration-500 ${docked ? 'dock-space' : 'h-0'}`} />}
-        {/* plejer je viši od pozivnice — bez prelaza: promjenu krije pretapanje ekrana */}
-        {!compact && <div aria-hidden className={`shrink-0 ${listening ? 'dock-extra' : 'h-0'}`} />}
+        {/* mjesto za spušten plejer na dnu — gramofon ostane odvojen od njega */}
+        {/* mini plejer ode — gramofon se mekano spusti (visina se pretapa), ne skoči */}
+        {!compact && <div aria-hidden className={`peek-slot shrink-0 ${peek ? 'peek-space' : 'h-0'}`} />}
       </main>
-      {/* "Player pjesama" — traka zakucana na dno (dok sačuvani ne sviraju) */}
-      {!compact && <AnimatePresence>{docked && <PlayerDock accent={m.accent} listening={listening} />}</AnimatePresence>}
     </div>
   )
 }

@@ -708,6 +708,13 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
       return false
     }
     const close = () => {
+      // plejer pjesama: muzika stane (i mini plejer ode), pa panel dolje
+      try {
+        const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
+        w?.dispatchEvent(new w.Event('stihdana:stop-audio'))
+      } catch {
+        /* tuđa adresa */
+      }
       if (q('[role="dialog"][aria-modal="true"]')) q('button[aria-label="Zatvori"]')?.click()
     }
     close()
@@ -1310,10 +1317,10 @@ function Sacuvano() {
       {/* scena po sistemu: kad iPhone završi, ista ide na Androidu (prekidač ide s njom) */}
       <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
       <Text>
-        „Sačuvaj“ ispod stiha, a gore se pojavi ikonica s brojem sačuvanih — dodir ih otvara kao špil karata: svaka
-        je stih s danom kad je sačuvan i svojim gramofonom; susjedne vire sa strane, prevuci za sljedeći. Raširi
-        kartu i stih je tu preko cijelog ekrana, kao na početnoj — povuci je nadolje i vrati se u špil. Bez naloga
-        i prijave: sve ostaje na telefonu.
+        „Sačuvaj“ ispod stiha, a gore se pojavi ikonica plejera s brojem — dodir otvara Player pjesama: sačuvani
+        stihovi kao špil karata koje izlaze iz plejera, svaka s danom kad je sačuvana, pjesmom i albumom. Prevuci za
+        sljedeći, raširi kartu i stih je preko cijelog ekrana — povuci je nadolje i vrati se u špil. Bez naloga i
+        prijave: sve ostaje na telefonu.
       </Text>
     </>
   )
@@ -1348,8 +1355,8 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
 }
 
 /**
- * Player pjesama: sačuvani sviraju na početnoj — svaka pjesma donese svoj
- * stih (pozadina se pretopi), kontrole kao u Apple Musicu, "Današnji stih" vraća današnji.
+ * Player pjesama: sačuvani stihovi su plejer — karte, pjesme, albumi, omiljene;
+ * spušten pluta na početnoj kao mini plejer.
  */
 function Plejer() {
   const { os, setOs, manual, phone } = useDeck()
@@ -1370,9 +1377,10 @@ function Plejer() {
     <>
       <PlejerScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
       <Text>
-        Sačuvani postaju plejer: „Player pjesama“ na dnu ekrana — svaka pjesma donese svoj stih, pozadina se pretopi.
-        Kontrole kao u Apple Musicu: natrag, pauza, naprijed, nasumično i ponovi. „Današnji stih“ vraća današnji. Radi i iz špila:
-        pusti pjesmu na karti, spusti panel — muzika ide dalje na početnoj.
+        Sačuvani su plejer: ikonica gore otvara Player pjesama — stihovi kao karte, pjesme sa cijelim stihom,
+        albumi i omiljene (zvjezdica, redom koliko se slušaju). Plejer je u boji stiha, kontrole kao u Apple Musicu,
+        a naprijed i natrag idu kroz album ili omiljene u kojima si. Spusti ga — na početnoj pluta mini plejer,
+        muzika ide dalje.
       </Text>
     </>
   )
@@ -1398,17 +1406,30 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     if (!(await home())) return
     await seedSaved(phone()?.contentWindow)
     await wait(900)
-    // "Player pjesama" — ekran pređe na stih prve sačuvane pjesme
-    if (alive()) await press('[aria-label="Player pjesama"]')
-    await wait(4200)
-    // sljedeća — novi stih, nova atmosfera
-    if (alive()) await press('footer button[aria-label="Sljedeća"]')
-    await wait(4200)
-    if (alive()) await press('footer button[aria-label="Sljedeća"]')
-    await wait(3800)
-    // nazad na današnji — pa isto na drugom sistemu
-    if (alive()) await press('[aria-label="Nazad na današnji stih"]')
+    // ikonica plejera gore — otvara se Player pjesama (karte stihova)
+    if (alive()) await press('[data-tip="saved"]')
+    await wait(1800)
+    // pusti pa sljedeća — špil klizi za pjesmom
+    if (alive()) await press('[data-player] [aria-label="Pusti"]')
+    await wait(2600)
+    if (alive()) await press('[data-player] [aria-label="Sljedeća"]')
+    await wait(2400)
+    // pjesme (cijeli stih), zvjezdica — u omiljene, albumi
+    if (alive()) await press('[data-view="list"]')
+    await wait(1600)
+    if (alive()) await press('[role="dialog"] [aria-label="Dodaj u omiljene"]')
+    await wait(1200)
+    if (alive()) await press('[data-view="albums"]')
     await wait(2200)
+    if (alive()) await press('[data-view="loved"]')
+    await wait(1800)
+    if (alive()) await press('[data-view="cards"]')
+    await wait(1200)
+    // spusti — na početnoj pluta mini plejer, muzika ide dalje
+    if (alive()) await press('[aria-label="Spusti"]')
+    await wait(2600)
+    if (alive()) await press('[aria-label="Otvori plejer pjesama"] [aria-label="Sljedeća"]')
+    await wait(2400)
     if (alive()) onDone()
   })
   return null

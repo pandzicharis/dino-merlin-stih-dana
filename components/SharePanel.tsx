@@ -12,7 +12,6 @@ import {
   drawShareImage,
   type ShareFormat,
 } from '@/lib/share-image'
-import { getSharePrefs, setSharePrefs } from '@/lib/storage'
 import { recordStory, videoSupported } from '@/lib/share-video'
 import { haptic } from '@/lib/haptic'
 import { DrawerIcon } from './DrawerIcon'
@@ -34,12 +33,8 @@ export default function SharePanel({
   date: string
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  // Zadnji izbor se pamti — ko dijeli za Story, dijeli uvijek za Story.
-  // Na serveru je storage prazan, ali panel se ionako crta tek kad se otvori.
-  const [format, setFormat] = useState<ShareFormat>(() => {
-    const f = getSharePrefs().format
-    return f && f in SHARE_FORMATS ? (f as ShareFormat) : 'story'
-  })
+  // uvijek se otvara na Story — najčešće dijeljenje (Instagram, WhatsApp status)
+  const [format, setFormat] = useState<ShareFormat>('story')
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState<Target | null>(null)
   // video za Story (lib/share-video.ts) — važi za stih i format za koji je snimljen
@@ -79,7 +74,6 @@ export default function SharePanel({
   const choose = (f: ShareFormat) => {
     haptic(5)
     setFormat(f)
-    setSharePrefs({ format: f })
   }
 
   const fileName = `stih-dana-${verse.id}-${format}.jpg`

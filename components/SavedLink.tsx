@@ -12,9 +12,10 @@ const load = () => import('./SavedPanel')
 const SavedPanel = dynamic(load, { ssr: false })
 
 /**
- * Sačuvani stihovi — tiha ikonica u zaglavlju s malim brojačem u tonu
- * ikonice (ne crvena "obavijest"). Otvara donji panel s listom.
- * Pojavi se tek kad postoji bar jedan sačuvan stih.
+ * Plejer pjesama (sačuvani stihovi) — tiha ikonica u zaglavlju s malim
+ * brojačem u tonu ikonice (ne crvena "obavijest"). Otvara donji panel;
+ * spušten panel viri na dnu početne kao mini plejer. Pojavi se tek kad
+ * postoji bar jedan sačuvan stih.
  */
 export function SavedLink() {
   const ids = useFavorites()
@@ -25,10 +26,20 @@ export function SavedLink() {
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
-  // panel se preuzme u tišini kad se ekran smiri — prvi dodir ga otvara odmah
+  // panel se preuzme i SLOŽI u tišini kad se ekran smiri (sklonjen ispod
+  // ekrana) — prvi dodir ga samo podigne, bez čekanja i treptaja
   useEffect(() => {
-    const t = setTimeout(load, 3000)
-    return () => clearTimeout(t)
+    let idle = 0
+    const t = setTimeout(() => {
+      void load().then(() => {
+        const mount = () => setUsed(true)
+        idle = window.requestIdleCallback?.(mount, { timeout: 2500 }) ?? window.setTimeout(mount, 0)
+      })
+    }, 3000)
+    return () => {
+      clearTimeout(t)
+      if (idle) (window.cancelIdleCallback ?? clearTimeout)(idle)
+    }
   }, [])
   // pilula sačuvanih na početnoj vraća panel
   useEffect(() => {
@@ -60,16 +71,16 @@ export function SavedLink() {
                 setUsed(true)
                 setOpen(true)
               }}
-              aria-label={`Sačuvani stihovi (${count})`}
-              title="Sačuvani stihovi"
+              aria-label={`Player pjesama (${count})`}
+              title="Player pjesama"
               data-tip="saved"
               className="relative -m-[10.5px] p-[10.5px] text-white/60 transition-all hover:text-white/85 active:scale-90"
             >
-              {/* dvije kartice jedna iza druge, srce na prednjoj */}
+              {/* plejer pjesama: redovi liste i nota */}
               <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M8 3.5h9.5A2.5 2.5 0 0 1 20 6v11" />
-                <rect x="4" y="6.5" width="13" height="14" rx="2.5" />
-                <path d="M10.5 16.8s-3-1.8-3-4a1.6 1.6 0 0 1 3-.8 1.6 1.6 0 0 1 3 .8c0 2.2-3 4-3 4z" fill="currentColor" stroke="none" />
+                <path d="M3.5 6h11M3.5 10.5h11M3.5 15h6.5" />
+                <path d="M18 16.5V5.2l3 1.1" />
+                <circle cx="15.7" cy="16.8" r="2.3" fill="currentColor" stroke="none" />
               </svg>
               {/* mali brojač, puna zlatna — u boji brenda, ne kao crvena obavijest */}
               <span
@@ -87,7 +98,8 @@ export function SavedLink() {
           </motion.span>
         )}
       </AnimatePresence>
-      {used && <SavedPanel open={open} onClose={() => setOpen(false)} />}
+      {/* jednom otvoren ostaje montiran — spušten viri kao mini plejer */}
+      {used && <SavedPanel open={open} onOpen={() => setOpen(true)} onClose={() => setOpen(false)} />}
     </>
   )
 }

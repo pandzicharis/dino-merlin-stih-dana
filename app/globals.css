@@ -165,7 +165,7 @@ html[data-deck] .dev-bar {
   display: none;
 }
 html[data-deck] .dev-pad {
-  padding-bottom: max(4.5rem, calc(env(safe-area-inset-bottom) + 2rem));
+  padding-bottom: max(2.5rem, calc(env(safe-area-inset-bottom) + 0.5rem));
 }
 
 ::selection {
@@ -321,25 +321,27 @@ html[data-sheet] .note-float:not([data-full] *) {
  * "Player pjesama" — footer na dnu početne (components/Listening.tsx, ~48px
  * + donja zona iPhonea): podnožje se izdigne da je gramofon odvojen od njega.
  */
-.dock-space {
-  height: calc(22px + env(safe-area-inset-bottom, 0px) * 0.6);
+.peek-space {
+  height: calc(90px + max(12px, env(safe-area-inset-bottom, 0px)));
 }
-/* plejer u footeru je viši od pozivnice (kontrole i "Današnji stih") */
-.dock-extra {
-  height: 52px;
+/* mjesto za mini plejer: dolazi i odlazi mekano — gramofon klizne, ne skoči */
+.peek-slot {
+  transition: height 0.7s cubic-bezier(0.32, 0.72, 0, 1);
 }
-/* localhost: traka stoji iznad razvojne trake (99px), a donji razmak je pb-16 */
-.dev-dock {
-  bottom: 99px !important;
+/* localhost: mini plejer pluta iznad razvojne trake (--dev-bar); donji razmak je pb-16 */
+.dev-pad .peek-space {
+  height: 102px;
 }
-.dev-pad .dock-space {
-  height: 129px;
+/* localhost: razvojna traka ne prekriva gramofon — dno ekrana počinje iznad nje */
+html .dev-pad {
+  padding-bottom: calc(2rem + var(--dev-bar, 0px));
 }
-html[data-deck] .dev-dock {
-  bottom: 0 !important;
+html[data-deck] .dev-pad .peek-space {
+  height: calc(90px + max(12px, env(safe-area-inset-bottom, 0px)));
 }
-html[data-deck] .dev-pad .dock-space {
-  height: calc(22px + env(safe-area-inset-bottom, 0px) * 0.6);
+/* mjesto za mini plejer: dolazi i odlazi mekano — gramofon klizne, ne skoči */
+.peek-slot {
+  transition: height 0.7s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* "Player pjesama" (components/Listening.tsx) — trake titraju kao muzika */
@@ -354,4 +356,12 @@ html[data-deck] .dev-pad .dock-space {
 }
 @media (prefers-reduced-motion: reduce) {
   .eq-bar { animation: none; transform: scaleY(0.7); }
+}
+
+/* raširena sačuvana karta u pokretu (SavedFull): ukrasne animacije stanu dok
+   karta raste ili se skuplja — ništa se ne iscrtava iznova, kretnja je glatka */
+[data-moving] *,
+[data-moving] *::before,
+[data-moving] *::after {
+  animation-play-state: paused !important;
 }
