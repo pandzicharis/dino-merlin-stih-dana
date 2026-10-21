@@ -16,6 +16,8 @@ export type DeckData = {
   verses: Verse[]
   /** po jedan stih za svako raspoloženje — za birač na slajdu */
   moods: { mood: Mood; verse: Verse }[]
+  /** po jedan stih za svaki album (album bez stiha: primjer s njegovim nazivom) */
+  albums: { album: string; verse: Verse }[]
   poster: PosterData
 }
 

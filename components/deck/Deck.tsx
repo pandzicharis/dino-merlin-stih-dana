@@ -735,8 +735,10 @@ function Bar({
   const bare = index === 0 || index === SLIDES.length - 1
   return (
     <div
-      className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-4 px-[var(--pad-x)]"
-      style={{ height: 'var(--bar)' }}
+      className="absolute inset-x-0 bottom-0 z-30 flex items-center gap-4 px-[var(--pad-x)]"
+      // podnožje s logom: puna pozadina (gore mekan prelaz) — dug sadržaj slajda
+      // ide ispod njega, ne preko loga
+      style={{ height: 'var(--bar)', background: 'linear-gradient(to bottom, rgba(11,11,12,0) 0, #0b0b0c 18px)' }}
     >
       {/* Potpis pa Magaza — na svakom slajdu. Potpis je rukopis pa mu
           treba više visine da bi imao istu težinu kao slova Magaze. */}

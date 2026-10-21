@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
 import { motion, useIsPresent } from 'motion/react'
 import { MOODS } from '@/data/moods'
-import { albumOf, ALBUMS } from '@/data/albums'
+import { albumOf, ALBUMS, thumbOf } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
 import { playable } from '@/lib/player'
 import { DECK_VERSE } from '@/lib/deck'
@@ -69,9 +69,15 @@ const STIH: FeatureDef[] = [
     body: (d) => <Obavijest d={d} />,
   },
   {
+    id: 'albumi',
+    title: 'Podržano svih 12 albuma',
+    // /pregled mijenja stih porukom, bez ponovnog učitavanja — pozadina se pretapa
+    enter: '/pregled',
+    body: (d) => <Albumi d={d} />,
+  },
+  {
     id: 'atmosfera',
     title: 'Atmosfera po raspoloženju',
-    // /pregled mijenja stih porukom, bez ponovnog učitavanja — pozadina se pretapa
     enter: '/pregled',
     body: (d) => <Atmosfera d={d} />,
   },
@@ -599,6 +605,64 @@ function Atmosfera({ d }: { d: DeckData }) {
             }}
           />
         ))}
+      </div>
+    </>
+  )
+}
+
+/** Svih 12 albuma: telefon ih smjenjuje (isti stih, njegov album u pozadini), ispod nazivi 6 + 6. */
+function Albumi({ d }: { d: DeckData }) {
+  const { phone, manual } = useDeck()
+  const [k, setK] = useState(0)
+  const [round, setRound] = useState(0)
+
+  useEffect(() => {
+    const send = () =>
+      phone()?.contentWindow?.postMessage({ type: 'stihdana:preview', verse: d.albums[k].verse, date: d.today }, window.location.origin)
+    send()
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === window.location.origin && e.data?.type === 'stihdana:preview-ready') send()
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [k, d, phone])
+
+  useEffect(() => {
+    if (manual) return
+    const t = setInterval(() => setK((i) => (i + 1) % d.albums.length), 3000)
+    return () => clearInterval(t)
+  }, [manual, d.albums.length, round])
+
+  return (
+    <>
+      <Text>Svaki stih nosi album svoje pjesme — omot je u pozadini ekrana, od Kokuznih vremena do albuma Mi.</Text>
+      <div className="mt-[1.8vh] grid max-w-[40em] grid-cols-6 gap-2">
+        {d.albums.map(({ album }, i) => {
+          const a = albumOf(album)
+          const on = i === k
+          return (
+            <motion.button
+              key={album}
+              type="button"
+              onClick={() => {
+                setK(i)
+                setRound((r) => r + 1)
+              }}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex flex-col items-center gap-1.5 rounded-[12px] border p-1.5 text-center transition-colors"
+              style={{ borderColor: on ? 'rgba(241,226,191,0.6)' : 'rgba(255,255,255,0.1)', background: on ? 'rgba(255,255,255,0.06)' : 'transparent' }}
+              aria-pressed={on}
+            >
+              <span
+                className="block aspect-square w-full rounded-[8px] bg-cover bg-center"
+                style={{ backgroundImage: a ? `url(${thumbOf(a.cover) ?? a.cover})` : undefined, opacity: on ? 1 : 0.7 }}
+                aria-hidden
+              />
+              <span className="line-clamp-2 text-[0.62em] leading-tight text-white/80">{album}</span>
+            </motion.button>
+          )
+        })}
       </div>
     </>
   )

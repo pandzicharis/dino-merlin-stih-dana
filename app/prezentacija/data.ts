@@ -1,4 +1,5 @@
 import { MOOD_KEYS, type Mood } from '@/data/moods'
+import { ALBUMS, albumOf } from '@/data/albums'
 import type { Verse } from '@/data/verses'
 import { getCatalog } from '@/lib/catalog'
 import { DECK_VERSE } from '@/lib/deck'
@@ -44,6 +45,10 @@ export async function deckData(): Promise<DeckData> {
     count: active.length,
     verses: pool,
     moods: MOOD_KEYS.map((mood) => ({ mood, verse: pool.find((v) => v.mood === mood) ?? pool[0] })),
+    albums: ALBUMS.map((a) => ({
+      album: a.title,
+      verse: pool.find((v) => albumOf(v.album)?.id === a.id) ?? { ...pool[0], id: `primjer-${a.id}`, album: a.title, year: a.year },
+    })),
     poster: {
       qr: qrMatrix(PUBLIC_URL),
       host,
