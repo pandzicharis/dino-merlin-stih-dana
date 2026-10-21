@@ -428,7 +428,10 @@ export function SavedPlayer({
             <span className="tabular text-[10px] tracking-[0.18em] text-white/45">
               {i + 1} / {n}
             </span>
-            <LoveButton song={cur.song} accent={m.accent} size={30} />
+            {/* zvjezdica (17 u dugmetu od 30) poravnata s krajem trajanja ispod */}
+            <span className="-mr-[6.5px]">
+              <LoveButton song={cur.song} accent={m.accent} size={30} />
+            </span>
           </div>
         </div>
 
@@ -967,7 +970,8 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
               { opacity: 0, transform: 'translateY(-22px) scale(0.97)', transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } }
             : { opacity: 0, transform: 'translateY(96px) scale(1)', transition: { duration: 0.3, ease: [0.4, 0, 1, 1] } },
         // tek kad panel ode s ekrana (0.42 s) — jedno pa drugo, ništa ne preskače
-        shown: { opacity: 1, transform: 'translateY(0px) scale(1)', transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1], delay: 0.36 } },
+        // 0.24 s + LAG (SavedPanel, 0.12 s) — kad panel prođe
+        shown: { opacity: 1, transform: 'translateY(0px) scale(1)', transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1], delay: 0.24 } },
       }}
       initial={{ opacity: 0, transform: 'translateY(26px) scale(1)' }}
       animate="shown"

@@ -95,12 +95,18 @@ function configureVapid(): boolean {
   return true
 }
 
-/** Adresa preko koje ruta zove samu sebe kad dijeli posao. */
+/**
+ * Adresa preko koje ruta zove samu sebe kad dijeli posao. Prvo ona preko
+ * koje je okidač stigao — javna, bez Vercelove zaštite. Adresa jednog
+ * deploya (VERCEL_URL) zna biti iza prijave (401), pa workeri ne bi krenuli.
+ */
 function selfOrigin(req: Request): string {
+  const own = new URL(req.url).origin
+  if (!process.env.VERCEL || !/\/\/(localhost|127\.0\.0\.1)(:|$)/.test(own)) return own
   const explicit = process.env.NEXT_PUBLIC_SITE_URL
   if (explicit) return explicit.replace(/\/$/, '')
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
-  return new URL(req.url).origin
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : own
 }
 
 /**
@@ -372,6 +378,16 @@ export async function POST(req: Request) {
     } else {
       errors.push(String((r.reason as Error)?.message ?? r.reason))
     }
+  }
+
+  // Nijedan worker nije ništa poslao (adresa iza zaštite, mreža, rok) —
+  // dispatcher šalje sam, koliko stigne do svog roka. Ostatak (ako ga ima)
+  // pokupi sljedeći poziv okidača: ruta se smije zvati više puta.
+  if (!total.sent && errors.length) {
+    const out = await runWorker(run, today, force, payload, started + DISPATCH_BUDGET_MS)
+    total = add(total, { ...emptyTally(), ...out })
+    if ('error' in out && out.error) errors.push(out.error)
+    if ('truncated' in out && out.truncated) truncated = true
   }
 
   return NextResponse.json({

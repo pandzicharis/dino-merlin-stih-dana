@@ -13,6 +13,13 @@ export const SITE_URL =
   (process.env.VERCEL_PROJECT_PRODUCTION_URL && `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`) ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3111')
 
+/**
+ * Odakle se puštaju pjesme: Cloudflare (workers.dev, besplatno — npm run
+ * audio:deploy, cloudflare/audio). `NEXT_PUBLIC_AUDIO_BASE=/` vrati ih na
+ * ovaj server (/audio). Bez kose crte na kraju.
+ */
+export const AUDIO_BASE = (process.env.NEXT_PUBLIC_AUDIO_BASE || 'https://stihdana-audio.pandzicharis.workers.dev').replace(/\/$/, '')
+
 /** Adresa koju nosi odštampani QR kod — mora raditi i kad se gleda s localhosta. */
 export const PUBLIC_URL = SITE_URL.startsWith('http://localhost')
   ? 'https://dino-merlin-stih-dana.vercel.app'

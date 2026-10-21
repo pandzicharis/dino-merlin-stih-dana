@@ -276,8 +276,13 @@ bio kriv devet puta od deset.
 ## Pjesme
 
 Svaki stih ima pjesmu koja se pušta odmah: `public/audio/<pjesma>.m4a`
-(HE-AAC 64 kbps) i trajanje u `data/audio.json` — oboje ide u build, pa se
-pjesma servira sa CDN-a. Stih bez toga ima samo YouTube znak.
+(HE-AAC 64 kbps) i trajanje u `data/audio.json`. Aplikacija pjesme pušta s
+**Cloudflarea** (`https://stihdana-audio.pandzicharis.workers.dev`, besplatno,
+bez naplate prenosa — `cloudflare/audio`, `lib/site.ts` `AUDIO_BASE`); ista
+pjesma je i u buildu na Vercelu, kao rezerva. Stih bez pjesme ima samo YouTube znak.
+
+Ručno slanje na Cloudflare (poslije `npm run audio`): `npm run audio:deploy`
+(prvi put `npx wrangler login`).
 
 Kad se stih sačuva u adminu, pjesma se sprema sama:
 
@@ -293,6 +298,18 @@ Za produkciju jednom treba token:
 2. *Repository access*: samo `dino-merlin-stih-dana`
 3. *Permissions*: **Contents: Read and write** i **Actions: Read-only**
 4. Vercel → Environment Variables → `GITHUB_AUDIO_TOKEN` = token → Redeploy
+
+Da workflow pjesme šalje i na Cloudflare, jednom dvije tajne (GitHub →
+**Settings → Secrets and variables → Actions → New repository secret**):
+
+1. Cloudflare → **My Profile → API Tokens → Create Token** → predložak
+   **Edit Cloudflare Workers** → *Account Resources*: tvoj nalog → *Create*
+2. `CLOUDFLARE_API_TOKEN` = taj token
+3. `CLOUDFLARE_ACCOUNT_ID` = ID naloga (`npx wrangler whoami`, ili desno na
+   Cloudflare početnoj stranici)
+
+Bez njih workflow i dalje radi, samo javi upozorenje, a nova pjesma se pušta
+s Vercela dok je ne pošalješ ručno (`npm run audio:deploy`).
 
 YouTube GitHubove servere bez prijave odbija („Sign in to confirm you're
 not a bot"). Zato workflow koristi kolačiće YouTube naloga, iz tajne

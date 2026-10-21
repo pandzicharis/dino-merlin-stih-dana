@@ -3,8 +3,10 @@ name: Stih dana — pjesme
 # Admin na produkciji sačuva stih s pjesmom koje još nema → ruta
 # /api/admin/audio pošalje `repository_dispatch` → ovdje se pjesma preuzme
 # (yt-dlp), kodira u HE-AAC 64 kbps (afconvert — zato macOS), upiše joj se
-# trajanje i sve se commita na trunk. Vercel objavi novi build i pjesma se
-# pušta odmah, sa CDN-a. Isto što lokalno radi `npm run audio`.
+# trajanje, sve pjesme odu na Cloudflare (odatle ih aplikacija pušta —
+# lib/site.ts AUDIO_BASE) i sve se commita na trunk. Vercel objavi novi
+# build i pjesma se pušta odmah. Isto što lokalno rade `npm run audio` i
+# `npm run audio:deploy`.
 #
 # Ruta zna i stanje ovog workflowa (admin pokaže "preuzima se" / "nije uspjelo").
 #
@@ -74,6 +76,22 @@ jobs:
           AUDIO_SONG: ${{ github.event.client_payload.song }}
           AUDIO_YOUTUBE: ${{ github.event.client_payload.youtube }}
         run: npx -y tsx@4.23.13 scripts/audio-sync.ts
+
+      # Prije commita: kad Vercel objavi novi build, Cloudflare pjesmu već ima.
+      # Ne uspije li, aplikacija je pušta s Vercela (rezerva u lib/player.ts),
+      # a commit ide svejedno. Tajne: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+      - name: Pjesme na Cloudflare
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::Nema tajne CLOUDFLARE_API_TOKEN — pjesme nisu poslane na Cloudflare (DEPLOY.md → Pjesme)"
+            exit 0
+          fi
+          bash scripts/deploy-audio.sh
 
       - name: Commit i push
         # i kad neka pjesma ne prođe — one koje jesu idu gore

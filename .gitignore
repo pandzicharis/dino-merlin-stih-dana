@@ -42,3 +42,7 @@ next-env.d.ts
 
 # admin u razvoju, dok Supabase shema nije pokrenuta
 /.data
+
+# cloudflare (pjesme) — složeno iz public/audio
+/cloudflare/audio/dist
+.wrangler

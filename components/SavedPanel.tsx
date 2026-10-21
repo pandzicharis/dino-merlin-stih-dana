@@ -13,6 +13,14 @@ import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
 import { AfterOpen, SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
+/**
+ * Zatvaranje: prvo samo kretnja, a sve ostalo (stanje plejera, gašenje
+ * muzike, mini plejer, stranica ispod) ovoliko kasnije — kad panel već klizi
+ * na grafičkom procesoru. Inače bi prvi kadar zatvaranja bio težak i panel bi
+ * "preskočio" početak.
+ */
+const LAG = 120
+
 /** zapamćen pogled: špil karata ili lista */
 const VIEW = 'stihdana:savedView'
 
@@ -46,11 +54,18 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   // otvoren — mini plejer na dnu se sklopi u njega; zatvoren bez pjesme — sve
   // stane (samo pri zatvaranju — panel se montira unaprijed, zatvoren)
   const wasOpen = useRef(false)
+  // otvoren baš sad — posao odgođen pri zatvaranju se ne radi ako je panel u međuvremenu opet otvoren
+  const openNow = useRef(open)
   useEffect(() => {
+    openNow.current = open
     if (open) {
       dismissing.current = false
       expandSaved()
-    } else if (wasOpen.current && !dismissing.current) closeSaved()
+    } else if (wasOpen.current && !dismissing.current) {
+      const t = window.setTimeout(() => !openNow.current && closeSaved(), LAG)
+      wasOpen.current = open
+      return () => clearTimeout(t)
+    }
     wasOpen.current = open
   }, [open])
   // spušten: panel stoji dolje, viri samo mini plejer. Sluša se samo ovo — promjena
@@ -118,8 +133,9 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
     const el = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Player pjesama"]')
     if (!el) return
     if (!open) {
-      delete el.dataset.warm
-      return
+      // tek kad panel ode s ekrana — ne mijenja slojeve usred zatvaranja
+      const t = window.setTimeout(() => delete el.dataset.warm, 460)
+      return () => clearTimeout(t)
     }
     if (skel) return
     const t = window.setTimeout(() => (el.dataset.warm = ''), 300)
@@ -134,17 +150,17 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   }, [open, idle, view])
   // strelica, povlačenje dolje, dodir pored, Escape — panel se spusti; ima li
   // pjesmu, ona svira dalje i na dnu početne viri mini plejer. Prvo kretnja,
-  // pa stanje plejera odmah poslije (ne čeka kadar) — mini plejer i mjesto za
-  // njega ionako kreću tek kad panel prođe (0.36 s), a prvi kadar ostaje lak
+  // pa stanje plejera (LAG) — mini plejer i mjesto za njega ionako kreću tek
+  // kad panel prođe, a prvi kadar zatvaranja ostaje lak
   const dismiss = useCallback(() => {
     dismissing.current = true
     onClose()
     window.setTimeout(() => {
-      if (!dismissing.current) return
+      if (!dismissing.current || openNow.current) return
       dismissing.current = false
       dismissSaved()
       closeSaved()
-    })
+    }, LAG)
   }, [onClose])
   const sheetDrag = useSheetDrag(dismiss, open)
 
@@ -156,7 +172,8 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = prev
+      // stranica se vrati kad panel ode — ne u prvom kadru zatvaranja (cijela stranica bi se iznova rasporedila)
+      window.setTimeout(() => !openNow.current && (document.body.style.overflow = prev), 460)
       window.removeEventListener('keydown', onKey)
     }
   }, [open, dismiss])
@@ -227,8 +244,9 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                   <motion.button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => {
-                      stopSaved()
                       onClose()
+                      // muzika stane čim panel krene (LAG) — prvi kadar zatvaranja ostaje lak
+                      window.setTimeout(() => !openNow.current && stopSaved(), LAG)
                     }}
                     aria-label="Zatvori plejer"
                     className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:text-white"

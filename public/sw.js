@@ -31,7 +31,7 @@ const markDraw = () =>
 const AUDIO = 'stihdana-audio-v1'
 const KEEP = [CACHE, MARK, AUDIO]
 /** najviše pjesama u kešu — najstarije izlaze */
-const SONGS = 30
+const SONGS = 120
 
 /**
  * NEMA `skipWaiting()` ovdje — nova verzija čeka.
@@ -79,9 +79,10 @@ const SONG = /^\/audio\/[^/]+\.(m4a|mp3)$/
 self.addEventListener('fetch', (e) => {
   const req = e.request
   const url = new URL(req.url)
-  if (req.method !== 'GET' || url.origin !== self.location.origin) return
-
+  if (req.method !== 'GET') return
+  // pjesma — i s druge adrese (Cloudflare, lib/site.ts AUDIO_BASE)
   if (SONG.test(url.pathname) && url.searchParams.has('v')) return song(e, url.href)
+  if (url.origin !== self.location.origin) return
 
   if (STATIC.test(url.pathname)) {
     e.respondWith(
@@ -136,11 +137,11 @@ const SMALL = 65535
 /** "od početka": i odmah iza zaglavlja pjesme (iPhone poslije pripreme) */
 const NEAR = 131072
 
-/** Puni URL pjesme s `?v=`, istog sajta — inače ništa. */
+/** Puni URL pjesme s `?v=` (ovaj sajt ili Cloudflare) — inače ništa. */
 function songKey(u) {
   try {
     const url = new URL(u, self.location.origin)
-    return url.origin === self.location.origin && SONG.test(url.pathname) && url.searchParams.has('v') ? url.href : null
+    return SONG.test(url.pathname) && url.searchParams.has('v') ? url.href : null
   } catch {
     return null
   }
@@ -193,7 +194,8 @@ function part(hit, range, key) {
 function whole(r) {
   const enc = r.headers.get('content-encoding')
   const len = Number(r.headers.get('content-length'))
-  return r.status === 200 && r.type === 'basic' && r.body && (!enc || enc === 'identity') && len > 0 ? len : 0
+  // `cors`: pjesma s Cloudflarea (CORS zaglavlja, scripts/deploy-audio.sh)
+  return r.status === 200 && (r.type === 'basic' || r.type === 'cors') && r.body && (!enc || enc === 'identity') && len > 0 ? len : 0
 }
 
 /**

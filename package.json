@@ -15,6 +15,7 @@
     "promo:video": "node scripts/export-video.mjs",
     "catalog:push": "tsx --env-file-if-exists=.env.local scripts/push-catalog.ts",
     "audio": "STIH_AUDIO_FETCH=1 tsx scripts/audio-sync.ts",
+    "audio:deploy": "bash scripts/deploy-audio.sh",
     "cookies": "sh scripts/yt-cookies.sh"
   },
   "dependencies": {

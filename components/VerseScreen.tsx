@@ -250,7 +250,8 @@ export function VerseScreen({
 }
 
 /** mjesto se otvara kad panel ode (s mini plejerom), ne dok se spušta */
-const SLOT_IN: KeyframeAnimationOptions = { duration: 450, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', delay: 360, fill: 'backwards' }
+// 240 ms + LAG (SavedPanel, 120 ms) — kad panel prođe
+const SLOT_IN: KeyframeAnimationOptions = { duration: 450, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', delay: 240, fill: 'backwards' }
 const SLOT_OUT: KeyframeAnimationOptions = { duration: 700, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' }
 
 /**

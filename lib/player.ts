@@ -20,6 +20,7 @@ import { youtubeId } from './text'
 import { dropNeedle, startCrackle, stopCrackle, unlockVinyl } from './vinyl'
 import { countPlay } from './storage'
 import { warmAudio } from './sw-cache'
+import { AUDIO_BASE } from './site'
 
 /** Svira jedna pjesma u isto vrijeme: kad krene nova, ostale stanu. */
 export const SOLO = 'stihdana:solo'
@@ -39,7 +40,7 @@ export const sourceOf = (verse: Verse, id: string) => {
   return {
     // `?v=<trajanje>`: ključ u kešu service workera — nova pjesma pod istim
     // imenom (admin) je novi ključ, ne stara iz keša
-    src: `/audio/${file}.m4a${dur ? `?v=${dur}` : ''}`,
+    src: `${AUDIO_BASE}/audio/${file}.m4a${dur ? `?v=${dur}` : ''}`,
     fallback: `/api/audio/${id}?s=${file}`,
     dur,
   }
@@ -61,7 +62,10 @@ export type Player = HTMLAudioElement & { fails?: Set<() => void> }
 
 /** Zvuk pjesme: statični fajl, pa server ako fajla nema. `data-want`: treba svirati. */
 export function createPlayer(src: string, fallback: string): Player {
-  const a: Player = new Audio(src)
+  const a: Player = new Audio()
+  // pjesma je s druge adrese (Cloudflare) — CORS, da Web Audio (utišavanje) ne bude tih
+  a.crossOrigin = 'anonymous'
+  a.src = src
   a.preload = 'none'
   a.fails = new Set()
   let retried = false
@@ -316,6 +320,8 @@ let retried = false
 function carrierEl(): Player {
   if (carrier) return carrier
   const a: Player = new Audio()
+  // pjesma je s druge adrese (Cloudflare) — CORS, da Web Audio (utišavanje) ne bude tih
+  a.crossOrigin = 'anonymous'
   a.preload = 'auto'
   a.fails = new Set()
   a.addEventListener('playing', () => {
