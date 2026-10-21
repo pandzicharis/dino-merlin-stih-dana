@@ -153,13 +153,13 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
           <AnimatePresence custom={open ? 'open' : 'stop'}>{peek && <MiniPlayer key="mini" onOpen={onOpen} />}</AnimatePresence>
           <AnimatePresence>{open && <SheetBackdrop key="backdrop" onClose={dismiss} />}</AnimatePresence>
 
-          <SheetSlide away={!open} rise={rise} cover>
+          <SheetSlide away={!open} rise={rise}>
           <motion.div
             role="dialog"
             aria-modal={open}
             aria-label="Player pjesama"
             aria-hidden={!open}
-            className={`os-sheet ${open ? 'pointer-events-auto' : ''} relative flex max-h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b sm:rounded-[30px]`}
+            className={`os-sheet ${open ? 'pointer-events-auto' : ''} relative flex max-h-[96dvh] w-full max-w-[440px] flex-col rounded-t-[30px] border border-b-0 border-white/10 sm:border-b sm:rounded-[30px]`}
             {...sheetDrag}
             style={{
               ...sheetDrag.style,

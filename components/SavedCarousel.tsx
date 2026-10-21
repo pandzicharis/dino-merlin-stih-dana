@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import type { Verse } from '@/data/verses'
 import { ExpandIcon } from './ExpandIcon'
 import { FavoriteButton } from './FavoriteButton'
@@ -43,6 +43,25 @@ const SIDE_PAD = 32
  */
 const FADE = 190
 
+/**
+ * Karta na sredini dok se lista (čim pređe pola puta) — plejer je sluša
+ * direktno, pa se pjesma u njemu promijeni odmah, a ništa drugo se ne crta.
+ */
+let liveId: string | null = null
+const liveSubs = new Set<() => void>()
+function setLiveFront(id: string | null) {
+  if (liveId === id) return
+  liveId = id
+  liveSubs.forEach((f) => f())
+}
+const subscribeLive = (f: () => void) => {
+  liveSubs.add(f)
+  return () => void liveSubs.delete(f)
+}
+export function useLiveFront(): string | null {
+  return useSyncExternalStore(subscribeLive, () => liveId, () => null)
+}
+
 /** Isto pravilo kao `verseFontSize` (i VerseMock) — za ekran širok W. */
 function verseSize(text: string) {
   const longest = Math.max(...text.split('\n').map((l) => l.trim().length), 1)
@@ -78,6 +97,11 @@ export function SavedCarousel({
   const [near, setNear] = useState(cur)
 
   const strip = useRef<HTMLDivElement>(null)
+  const versesRef = useRef(verses)
+  const nearRef = useRef(near)
+  useEffect(() => {
+    versesRef.current = verses
+  }, [verses])
   /** karta `i` na sredini trake — `smooth`: mekano (tačkice, plejer prešao na drugu pjesmu) */
   const scrollToCard = useCallback((i: number, smooth: boolean) => {
     const el = strip.current
@@ -116,7 +140,14 @@ export function SavedCarousel({
     const live = () => {
       raf = 0
       const i = nearest()
-      if (i >= 0) setAt(i)
+      if (i < 0) return
+      setAt(i)
+      setLiveFront(versesRef.current[i]?.id ?? null)
+      // dug zalet — lica karata idu za njim (prekidivo)
+      if (Math.abs(i - nearRef.current) > 2) {
+        nearRef.current = i
+        startTransition(() => setNear(i))
+      }
     }
     const settle = () => {
       clearTimeout(t)
@@ -125,6 +156,8 @@ export function SavedCarousel({
       if (i < 0) return
       setAt(i)
       setRest(i)
+      setLiveFront(versesRef.current[i]?.id ?? null)
+      nearRef.current = i
       startTransition(() => setNear(i))
     }
     const onScroll = () => {
@@ -339,6 +372,19 @@ const Card = memo(function Card({
   onOpen?: (verse: Verse) => void
   onPick: (i: number) => void
 }) {
+  // daleko od sredine: samo mjesto za zaustavljanje, u boji karte — bez sloja i sadržaja
+  if (!full) {
+    const g = MOODS[verse.mood].gradient[0]
+    return (
+      <div
+        data-card
+        aria-hidden
+        className="relative h-full shrink-0 cursor-pointer snap-center snap-always rounded-[26px]"
+        style={{ width: 'var(--cw)', opacity: 0.8, background: `linear-gradient(180deg, ${g} 0%, ${g} 75%, rgba(12,11,11,0) 100%)` }}
+        onClick={() => onPick(index)}
+      />
+    )
+  }
   // dodir na prednju kartu je otvara (dugmad rade svoje)
   const tap = (e: React.MouseEvent) => {
     if ((e.target as Element).closest('button, a, input, [data-nodrag]')) return
@@ -366,11 +412,7 @@ const Card = memo(function Card({
           style={front ? undefined : { pointerEvents: 'none' }}
           onClick={front ? tap : undefined}
         >
-          {full ? (
-            <CardFace verse={verse} o={0} onOpen={onOpen} />
-          ) : (
-            <CardSkeleton verse={verse} />
-          )}
+          <CardFace verse={verse} o={0} onOpen={onOpen} />
         </div>
       </div>
     </div>
@@ -631,34 +673,6 @@ function CardFaceView({
     </div>
   )
 }
-
-/**
- * Obris karte: boja raspoloženja i tihe linije umjesto datuma, stiha i
- * pjesme — crta se za tren. Pri brzom listanju (karte van pripremljenog prozora).
- */
-const CardSkeleton = memo(function CardSkeleton({ verse }: { verse: Verse }) {
-  const m = MOODS[verse.mood]
-  const line = (w: string, h: number, bg: string) => <span className="block rounded-full" style={{ width: w, height: `${h}em`, background: bg }} />
-  return (
-    <div
-      aria-hidden
-      className={`relative h-full w-full overflow-hidden rounded-[26px] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]`}
-      style={{ fontSize: `calc(var(--cw) / ${W})`, background: `linear-gradient(180deg, ${m.gradient[0]} 0%, ${m.gradient[0]} 80%, rgba(12,11,11,0) 100%)` }}
-    >
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: '210em', gap: '22em' }}>
-        {line('34%', 9, `${m.accent}55`)}
-        <div className="flex w-full flex-col items-center" style={{ gap: '14em' }}>
-          {line('70%', 20, 'rgba(255,255,255,0.09)')}
-          {line('58%', 20, 'rgba(255,255,255,0.09)')}
-        </div>
-      </div>
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: `${H - FADE - 7}em`, gap: '10em' }}>
-        {line('30%', 11, `${m.accent}55`)}
-        {line('42%', 8, 'rgba(255,255,255,0.12)')}
-      </div>
-    </div>
-  )
-})
 
 /**
  * Lice karte, memoizovano: pri prevlačenju svaka karta promijeni mjesto u

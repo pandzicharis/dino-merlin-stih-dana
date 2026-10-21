@@ -185,7 +185,8 @@ export function MoodBackground({
                 style={{ backgroundImage: `url(${sharp})`, opacity: 0.42, transform: coverLift ? `translateY(-${coverLift * 100}%)` : undefined }}
               />
               {/* nijansa raspoloženja preko albuma — ekran ostaje "njegov" */}
-              <div className="absolute inset-0" style={{ backgroundColor: m.gradient[1], mixBlendMode: 'color', opacity: 0.4 }} />
+              {/* obična providna boja — miješanje boja (mix-blend-mode) telefon slaže u svakom kadru */}
+              <div className="absolute inset-0" style={{ backgroundColor: m.gradient[1], opacity: 0.18 }} />
               <div
                 className="absolute inset-0"
                 style={{
@@ -250,17 +251,6 @@ export function MoodBackground({
 
       {/* 5b — note */}
       <FloatingNotes count={m.notes} accent={m.accent} speed={m.speed} seed={seed} />
-
-      {/* 6 — zrnatost */}
-      <div
-        className={`absolute -inset-4 ${m.grain > 0.5 && !reduced ? 'bg-grain' : ''}`}
-        style={{
-          opacity: m.grain * 0.4,
-          mixBlendMode: 'overlay',
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-        }}
-        // filmsko podrhtavanje samo tamo gdje je zrno ionako izraženo
-      />
 
       {/* 7 — vinjeta */}
       <div

@@ -144,6 +144,27 @@ const lovedIdsSnapshot = () => {
     return '[]'
   }
 }
+/** omiljene kao skup — jedan za sve zvjezdice (parsira se jednom po promjeni) */
+let lovedSetFor = ''
+let lovedSet = new Set<string>()
+function lovedHas(id: string): boolean {
+  const snap = lovedIdsSnapshot()
+  if (snap !== lovedSetFor) {
+    lovedSetFor = snap
+    try {
+      const v: unknown = JSON.parse(snap)
+      lovedSet = new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
+    } catch {
+      lovedSet = new Set()
+    }
+  }
+  return lovedSet.has(id)
+}
+/** Je li pjesma `id` u omiljenim — iznova se crta samo zvjezdica koja se promijenila. */
+export function useIsLoved(id: string): boolean {
+  return useSyncExternalStore(subscribeLoved, () => lovedHas(id), () => false)
+}
+
 /** Samo omiljene (bez brojanja slušanja) — za zvjezdice: ne crtaju se iznova kad pjesma krene. */
 export function useLovedIds(): string[] {
   const snap = useSyncExternalStore(subscribeLoved, lovedIdsSnapshot, () => '[]')

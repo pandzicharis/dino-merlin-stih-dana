@@ -11,7 +11,8 @@ import { EqBars } from './EqBars'
 import { toggleLoved } from '@/lib/storage'
 import { audioFile } from '@/lib/audio-name'
 import { dragScroll } from '@/lib/drag-scroll'
-import { useLoved, useLovedIds } from '@/lib/client-store'
+import { useIsLoved, useLoved } from '@/lib/client-store'
+import { useLiveFront } from './SavedCarousel'
 import {
   SAVED_TRACK,
   currentSaved,
@@ -232,9 +233,9 @@ function Btn({
 export function LoveButton({ song, accent, size = 34, icon = 17, ring = false }: { song: string; accent: string; size?: number; icon?: number; ring?: boolean }) {
   // omiljena je PJESMA (svi njeni stihovi), ne jedan stih
   const id = audioFile(song)
-  const on = useLovedIds().includes(id)
+  const on = useIsLoved(id)
   return (
-    <motion.button
+    <button
       type="button"
       onClick={(e) => {
         e.stopPropagation()
@@ -243,7 +244,7 @@ export function LoveButton({ song, accent, size = 34, icon = 17, ring = false }:
       }}
       aria-label={on ? 'Makni iz omiljenih' : 'Dodaj u omiljene'}
       aria-pressed={on}
-      className="flex shrink-0 items-center justify-center rounded-full"
+      className="flex shrink-0 items-center justify-center rounded-full transition-transform active:scale-90"
       style={{
         width: size,
         height: size,
@@ -251,13 +252,11 @@ export function LoveButton({ song, accent, size = 34, icon = 17, ring = false }:
         // `ring`: u krugu, kao srce i "Raširi" na karti
         ...(ring ? { border: `1px solid ${accent}55`, background: on ? `${accent}33` : `${accent}1a` } : {}),
       }}
-      whileTap={{ scale: 0.8 }}
-      transition={{ type: 'spring', stiffness: 460, damping: 20 }}
     >
-      <motion.svg width={icon} height={icon} viewBox="0 0 24 24" fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden key={String(on)} initial={on ? { scale: 0.6 } : false} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 520, damping: 14 }}>
+      <svg width={icon} height={icon} viewBox="0 0 24 24" fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
         <path d={STAR} />
-      </motion.svg>
-    </motion.button>
+      </svg>
+    </button>
   )
 }
 
@@ -342,7 +341,10 @@ export function SavedPlayer({
   }
   const nowKey = nowKeyOf(p.id)
   const loaded = verses.find((v) => v.id === p.id) ?? (nowKey ? verses.find((v) => keyOf(v) === nowKey) : undefined) ?? null
-  const inQueue = front && verses.some((v) => v.id === front.id) ? front : front && verses.find((v) => keyOf(v) === keyOf(front))
+  // u špilu: karta na sredini dok se lista — pjesma se promijeni čim karta pređe pola puta
+  const liveId = useLiveFront()
+  const shownFront = (view === 'cards' && liveId && liveId !== front?.id ? verses.find((v) => v.id === liveId) : undefined) ?? front
+  const inQueue = shownFront && verses.some((v) => v.id === shownFront.id) ? shownFront : shownFront && verses.find((v) => keyOf(v) === keyOf(shownFront))
   // u "Stihovi" plejer je uvijek pjesma prednje karte — "Pusti" pusti nju;
   // inače pjesma koja je u plejeru (pa prednja / prva)
   const cur = (view === 'cards' ? (inQueue ?? loaded) : (loaded ?? inQueue)) ?? verses[0] ?? null
@@ -585,7 +587,7 @@ export const SavedList = memo(function SavedList({ verses, front, active = true 
     // redovi (i podloga reda koji svira) u liniji sa zaglavljem — od ikonice do ×
     <ul ref={ul} className="flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
       {verses.map((v) => (
-        <li key={v.id} data-now={keyOf(v) === nowKey}>
+        <li key={v.id} data-now={keyOf(v) === nowKey} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 68px' }}>
           <SongItem v={v} on={keyOf(v) === curKey} playing={p.playing && keyOf(v) === nowKey} />
         </li>
       ))}
@@ -685,7 +687,7 @@ const AlbumCard = memo(
                 </div>
               ))
             : list.map((v) => (
-                <div key={v.id}>
+                <div key={v.id} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 68px' }}>
                   <SongItem v={v} on={curId === keyOf(v)} playing={playingId === keyOf(v)} />
                 </div>
               ))}
@@ -757,10 +759,10 @@ export function SavedLoved({
   return (
     // redovi (i podloga reda koji svira) u liniji sa zaglavljem — od ikonice do ×
     <ul ref={ul} className="flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
-      {list.map((v, k) => (
-        <motion.li key={v.id} data-now={keyOf(v) === nowKey} layout="position" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
+      {list.map((v) => (
+        <li key={v.id} data-now={keyOf(v) === nowKey} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 68px' }}>
           <SongItem v={v} on={keyOf(v) === curKey} playing={p.playing && keyOf(v) === nowKey} />
-        </motion.li>
+        </li>
       ))}
     </ul>
   )
@@ -898,6 +900,8 @@ export function SavedAlbums({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [names])
 
+  const curKey = cur ? keyOf(cur) : null
+  const playKey = p.playing ? nowKeyOf(p.id) : null
   // red za plejer: album pjesme koja svira, inače album ispred — i spušten
   // (mini plejer) ide samo kroz njega
   const playingAlbum = albums.findIndex((a) => a.list.some((v) => keyOf(v) === nowKey))
@@ -926,8 +930,9 @@ export function SavedAlbums({
               list={list}
               width={0}
               ahead={k === i}
-              curId={cur ? keyOf(cur) : null}
-              playingId={p.playing ? nowKeyOf(p.id) : null}
+              // samo kartica albuma koji ga ima — ostale se ne crtaju iznova
+              curId={curKey && list.some((v) => keyOf(v) === curKey) ? curKey : null}
+              playingId={playKey && list.some((v) => keyOf(v) === playKey) ? playKey : null}
               onBring={() => go(k)}
             />
           ))}
@@ -940,7 +945,7 @@ export function SavedAlbums({
         <div className="mt-3 flex items-center justify-center gap-1.5">
           {albums.map(({ name, list }, k) => (
             <button key={name} type="button" onClick={() => go(k)} aria-label={name} aria-current={k === dot} className="flex h-6 items-center px-0.5">
-              <span className="block h-1.5 rounded-full transition-all duration-300" style={{ width: k === dot ? 18 : 6, background: k === dot ? MOODS[list[0].mood].accent : 'rgba(255,255,255,0.22)' }} />
+              <span className="block h-1.5 w-1.5 rounded-full" style={{ background: k === dot ? MOODS[list[0].mood].accent : 'rgba(255,255,255,0.22)' }} />
             </button>
           ))}
         </div>

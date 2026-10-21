@@ -199,7 +199,7 @@ export function useSheetDrag(onClose: () => void, open: boolean, handle?: RefObj
 export function SheetLayer({ children, className }: { children: ReactNode; className: string }) {
   const present = useIsPresent()
   return (
-    <div data-sheet-layer className={className} style={{ pointerEvents: present ? undefined : 'none' }}>
+    <div className={className} style={{ pointerEvents: present ? undefined : 'none' }}>
       {children}
     </div>
   )
@@ -265,13 +265,10 @@ export function SheetSlide({
   away = false,
   rise = false,
   onShown,
-  cover = false,
 }: {
   children: ReactNode
   away?: boolean
   rise?: boolean
-  /** kad sjedne, stranica ispod se sakrije (panel preko skoro cijelog ekrana) */
-  cover?: boolean
   /** panel je sjeo (otvaranje gotovo) */
   onShown?: () => void
 }) {
@@ -308,15 +305,6 @@ export function SheetSlide({
         transition: { ...(rise ? RISE : OPEN), opacity: { duration: 0 } },
       }
   const resume = { ...shown, opacity: 1, visibility: 'visible' as const, transition: rise ? RISE : OPEN }
-  // panel sjeo — stranica ispod se sakrije (globals.css `data-covered`): telefon
-  // ne slaže maske i slojeve pozadine u svakom kadru dok se u panelu lista;
-  // vrati se čim panel krene dolje
-  const present = useIsPresent()
-  const leaving = away || !present
-  useLayoutEffect(() => {
-    if (leaving) uncover()
-  }, [leaving])
-  useEffect(() => uncover, [])
   return (
     <motion.div
       className="relative flex w-full max-w-[440px] justify-center"
@@ -333,10 +321,7 @@ export function SheetSlide({
       animate={away ? 'hidden' : from === 'mid' ? 'resume' : go ? 'shown' : 'ready'}
       onAnimationComplete={(d) => {
         if (d === 'hidden') setDown(true)
-        else if (d === 'shown' || d === 'resume') {
-          if (cover && !wide && !leaving) document.documentElement.dataset.covered = ''
-          onShown?.()
-        }
+        else if (d === 'shown' || d === 'resume') onShown?.()
       }}
       exit="hidden"
     >
@@ -346,10 +331,6 @@ export function SheetSlide({
       {!wide && <span aria-hidden className="pointer-events-none absolute inset-x-0 top-full h-[40vh] bg-[#0a0909]" />}
     </motion.div>
   )
-}
-
-function uncover() {
-  delete document.documentElement.dataset.covered
 }
 
 /** Sadržaj tek dva kadra poslije otvaranja — klizanje krene odmah. */

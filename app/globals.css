@@ -201,15 +201,6 @@ html[data-deck] .dev-pad {
 /* ── pozadina i note: CSS animacije umjesto JavaScripta ─────────────
    transform i opacity vrti grafički procesor, pa glavna nit ostaje
    slobodna za dodir i ispis stiha. */
-@keyframes bg-blob {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(var(--drift), calc(var(--drift) * -0.75)) scale(1.12); }
-  66% { transform: translate(calc(var(--drift) * -0.6), calc(var(--drift) * 0.6)) scale(0.94); }
-}
-.bg-blob {
-  animation: bg-blob 20s ease-in-out infinite;
-  will-change: transform;
-}
 
 @keyframes bg-breathe {
   0%, 100% { transform: scale(1); }
@@ -219,13 +210,6 @@ html[data-deck] .dev-pad {
   animation: bg-breathe 34s ease-in-out infinite;
 }
 
-@keyframes bg-bloom {
-  0%, 100% { opacity: var(--lo); }
-  50% { opacity: var(--hi); }
-}
-.bg-bloom {
-  animation: bg-bloom 11s ease-in-out infinite;
-}
 
 /* zrno: par skokova u sekundi, kao film — ne klizi u svakom frejmu */
 @keyframes bg-grain {
@@ -369,12 +353,6 @@ html[data-deck] .dev-pad .peek-space {
 }
 @media (prefers-reduced-motion: reduce) {
   .eq-bar { animation: none; transform: scaleY(0.7); }
-}
-
-/* donji panel sjeo (components/Sheet.tsx `cover`) — stranica ispod se ne
-   crta: telefon ne slaže njene maske i slojeve u svakom kadru listanja */
-html[data-covered] body > :not([data-sheet-layer], [data-full]) {
-  visibility: hidden;
 }
 
 /* raširena sačuvana karta u pokretu (SavedFull): ukrasne animacije stanu dok
