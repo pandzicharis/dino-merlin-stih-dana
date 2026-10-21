@@ -376,6 +376,25 @@ html[data-deck] .dev-pad .peek-space {
 .os-sheet:not([data-warm]) [data-far] {
   visibility: hidden;
 }
+/* Skelet plejera: dok panel klizi, lica karata se ne crtaju — samo obrisi
+   (SavedPanel `data-skel`). Kad sjedne, lica se pokažu, a obrisi se pretope */
+.os-sheet[data-skel] [data-pane] [data-face] {
+  visibility: hidden;
+}
+[data-skel-card] {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.28s ease 0.04s, visibility 0s linear 0.32s;
+}
+.os-sheet[data-skel] [data-skel-card] {
+  visibility: visible;
+  opacity: 1;
+  transition: none;
+}
+/* daleke karte ostaju neiscrtane i kao obrisi */
+.os-sheet:not([data-warm]) [data-far] [data-skel-card] {
+  visibility: hidden;
+}
 /* ...i dok se otvara (ili je zatvoren), promjena prikaza (npr. nazad na "Stihovi")
    ne animira visinu — ivica panela ne poskoči dok on klizi gore */
 .os-sheet:not([data-warm]) [data-pane-box] {

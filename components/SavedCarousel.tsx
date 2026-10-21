@@ -16,7 +16,6 @@ import { haptic } from '@/lib/haptic'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { FontedLines, MagazaMark, MoodStill, Notes } from './deck/Screens'
 import { FitLines } from './deck/FitLines'
-import { LoveButton } from './SavedPlayer'
 import { SongRow } from './SongCredit'
 import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayerSelect } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
@@ -72,7 +71,9 @@ function place(o: number, cw: number, side: number) {
   const scale = 1 - d * 0.04
   // umanjena oko središta — pomjeri se taman da joj ivica stane GAP[d] od ivice ekrana
   const x = Math.sign(o) * ((cw * (1 - scale)) / 2 + Math.max(0, side - GAP[d]))
-  return { x, scale, opacity: Math.abs(o) > 2 ? 0 : 1 }
+  // dalje od druge: nevidljiva, ali ne 0 — preglednik je nacrta unaprijed (dok
+  // špil miruje), pa prevlačenje ne čeka da se karta tek iscrta
+  return { x, scale, opacity: Math.abs(o) > 2 ? 0.001 : 1 }
 }
 
 export function SavedCarousel({
@@ -145,7 +146,12 @@ export function SavedCarousel({
   // na karti gdje se stane — ne za svaku usput
   const [pick, setPick] = useState(at)
   useEffect(() => {
-    const t = window.setTimeout(() => setPick(at), PICK)
+    let t = 0
+    // ne dok je prst na karti — tad ništa ne smije uzeti kadar povlačenju
+    const wait = () => {
+      t = window.setTimeout(() => (hold.current ? wait() : setPick(at)), PICK)
+    }
+    wait()
     return () => clearTimeout(t)
   }, [at])
   // plejer ispod (pjesma, atmosfera) pokazuje prednju kartu
@@ -201,7 +207,7 @@ export function SavedCarousel({
   // mirno — otvaranje panela i prevlačenje ih samo nacrtaju, ne dekodiraju
   useEffect(() => {
     const urls = new Set<string>(['/brand/signature.webp?v=2'])
-    for (let k = -2; k <= 2; k++) {
+    for (let k = -4; k <= 4; k++) {
       const v = verses[wrap(rest + k)]
       const cover = v && albumOf(v.album)?.cover
       const art = cardArtOf(cover)
@@ -282,6 +288,8 @@ export function SavedCarousel({
               verse={v}
               o={rel(i)}
               front={rel(i, rest) === 0}
+              // van pripremljenog prozora (brzo listanje) — samo obris, lice kad špil stane
+              lite={Math.abs(rel(i, rest)) > 4}
               alone={n === 1}
               cw={cw}
               side={side}
@@ -415,6 +423,7 @@ const Card = memo(function Card({
   verse,
   o,
   front: still,
+  lite = false,
   alone = false,
   cw,
   side,
@@ -431,6 +440,8 @@ const Card = memo(function Card({
   front: boolean
   /** jedini sačuvani stih — karta stoji, ne vuče se */
   alone?: boolean
+  /** samo obris (brzo listanje) — lice se složi kad špil stane */
+  lite?: boolean
   cw: number
   /** slobodan prostor od prednje karte do ivice ekrana */
   side: number
@@ -502,11 +513,10 @@ const Card = memo(function Card({
         aspectRatio: `${W} / ${H}`,
         zIndex: 50 - Math.abs(o),
         pointerEvents: front ? undefined : 'none',
-        // skrivene iza druge susjede: složene (spremne), ali se ne crtaju
-        visibility: Math.abs(o) > 3 ? 'hidden' : undefined,
       }}
-      // treća (ispod druge, prozirna): crta se tek kad panel sjedne (globals.css)
-      data-far={Math.abs(o) === 3 ? '' : undefined}
+      // iza druge susjede (nevidljive, spremne za prevlačenje): crtaju se tek
+      // kad panel sjedne (globals.css) — otvaranje crta samo ono što se vidi
+      data-far={Math.abs(o) >= 3 ? '' : undefined}
       initial={reduced || !enter ? false : { y: 60, scale: 0.95, opacity: 0 }}
       animate={{ y: 0, scale: 1, opacity: 1 }}
       transition={
@@ -563,7 +573,15 @@ const Card = memo(function Card({
             x.set(0)
           }}
         >
-          <CardFace verse={verse} o={still ? 0 : 1} onOpen={onOpen} />
+          {lite ? (
+            <CardSkeleton verse={verse} />
+          ) : (
+            <>
+              <CardFace verse={verse} o={still ? 0 : 1} onOpen={onOpen} />
+              {/* obris dok se plejer otvara (SavedPanel `data-skel`) */}
+              <CardSkeleton verse={verse} overlay />
+            </>
+          )}
         </motion.div>
         {/* karte ispod su tamnije — prednja se ističe. Sloj jedne boje (bez
             slike), svoj na grafičkom procesoru: tamnjenje ne crta kartu iznova */}
@@ -653,6 +671,7 @@ function CardFaceView({
   return (
     <div
       ref={root}
+      data-face
       // raširena karta ide do dna ekrana — zaobljena samo gore
       className={`relative h-full w-full select-none overflow-hidden ${onCollapse ? 'rounded-t-[26px]' : 'rounded-[26px]'} ${onCollapse ? 'shadow-[0_24px_60px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.1)]' : 'shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'}`}
       style={{
@@ -797,12 +816,9 @@ function CardFaceView({
       <div
         data-small
         className="pointer-events-none absolute z-[1] flex flex-col items-center text-center"
-        style={{ left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${H - FADE - 46}em`, gap: '7em' }}
+        // naziv ostaje gdje je bio (bez zvjezdice iznad njega)
+        style={{ left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${H - FADE - 7}em`, gap: '7em' }}
       >
-        {/* zvjezdica — pjesma u "Omiljene" (isto kao u plejeru), na sredini iznad naziva */}
-        <span data-nodrag className="pointer-events-auto" style={{ marginBottom: '2em' }}>
-          <LoveButton song={verse.song} accent={m.accent} size={30} icon={16} />
-        </span>
         <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '12.5em', letterSpacing: '0.2em', color: m.accent }}>
           {verse.song}
         </p>
@@ -837,6 +853,36 @@ function CardFaceView({
     </div>
   )
 }
+
+/**
+ * Obris karte: boja raspoloženja i tihe linije umjesto datuma, stiha i
+ * pjesme — crta se za tren. Dok se plejer otvara (`overlay`, preko lica) i
+ * pri brzom listanju (karte van pripremljenog prozora).
+ */
+const CardSkeleton = memo(function CardSkeleton({ verse, overlay = false }: { verse: Verse; overlay?: boolean }) {
+  const m = MOODS[verse.mood]
+  const line = (w: string, h: number, bg: string) => <span className="block rounded-full" style={{ width: w, height: `${h}em`, background: bg }} />
+  return (
+    <div
+      data-skel-card={overlay ? '' : undefined}
+      aria-hidden
+      className={`${overlay ? 'pointer-events-none absolute inset-0' : 'relative h-full w-full'} overflow-hidden rounded-[26px] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]`}
+      style={{ fontSize: `calc(var(--cw) / ${W})`, background: `linear-gradient(180deg, ${m.gradient[0]} 0%, ${m.gradient[0]} 80%, rgba(12,11,11,0) 100%)` }}
+    >
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: '210em', gap: '22em' }}>
+        {line('34%', 9, `${m.accent}55`)}
+        <div className="flex w-full flex-col items-center" style={{ gap: '14em' }}>
+          {line('70%', 20, 'rgba(255,255,255,0.09)')}
+          {line('58%', 20, 'rgba(255,255,255,0.09)')}
+        </div>
+      </div>
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: `${H - FADE - 7}em`, gap: '10em' }}>
+        {line('30%', 11, `${m.accent}55`)}
+        {line('42%', 8, 'rgba(255,255,255,0.12)')}
+      </div>
+    </div>
+  )
+})
 
 /**
  * Lice karte, memoizovano: pri prevlačenju svaka karta promijeni mjesto u

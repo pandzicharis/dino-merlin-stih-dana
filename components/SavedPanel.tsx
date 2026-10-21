@@ -82,14 +82,38 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   const [shown, setShown] = useState(open)
   // otvoren iz mini plejera — panel se podiže sporije, kao da izraste iz njega
   const [rise, setRise] = useState(false)
+  // Skelet: dok panel klizi, karte su samo obrisi (boja i linije) — lica
+  // (slike, stih) se ne crtaju, pa je svaki kadar kretnje lak. Kad panel
+  // sjedne i slike su dekodirane (najviše 250 ms poslije), lica se pokažu, a
+  // obrisi se pretope (globals.css `data-skel`)
+  // montiran već otvoren (prvi dodir prije slaganja unaprijed) — i tad skelet
+  const [skel, setSkel] = useState(open)
+  const slid = useRef<() => void>(() => {})
+  const onShown = useCallback(() => slid.current(), [])
+  useEffect(() => {
+    if (!open || !skel) return
+    let alive = true
+    const decoded = decodeIn(document.querySelector('[role="dialog"][aria-label="Player pjesama"]'))
+    const after = (ms: number) => new Promise((r) => window.setTimeout(r, ms))
+    const sat = new Promise<void>((r) => (slid.current = r))
+    const show = () => alive && setSkel(false)
+    void sat.then(() => Promise.race([decoded, after(250)])).then(show)
+    // nikad ne ostane skelet
+    void after(1500).then(show)
+    return () => {
+      alive = false
+      slid.current = () => {}
+    }
+  }, [open, skel])
   if (shown !== open) {
     setShown(open)
     if (open && idle) setView('cards')
     setRise(open && mini && hasId)
+    setSkel(open)
   }
   const peek = !open && mini && hasId
-  // Otvaranje crta samo karte koje se vide; daleke (iza druge susjede, spremne
-  // za prevlačenje) tek kad panel sjedne — `data-warm`, globals.css. Bez Reacta
+  // Daleke karte (iza druge susjede, spremne za prevlačenje) se crtaju tek
+  // kad se lica pokažu — `data-warm`, globals.css. Bez Reacta
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Player pjesama"]')
     if (!el) return
@@ -97,10 +121,10 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
       delete el.dataset.warm
       return
     }
-    // tek kad panel sjedne (iz mini plejera se diže duže)
-    const t = window.setTimeout(() => (el.dataset.warm = ''), rise ? 850 : 700)
+    if (skel) return
+    const t = window.setTimeout(() => (el.dataset.warm = ''), 300)
     return () => clearTimeout(t)
-  }, [open, rise])
+  }, [open, skel])
   // spušten i muzika stala — "Stihovi" se vrate dok je panel dolje (poslije
   // spuštanja), ne pri otvaranju: otvaranje je onda samo kretnja, bez slaganja špila
   useEffect(() => {
@@ -147,12 +171,13 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
           <AnimatePresence custom={open ? 'open' : 'stop'}>{peek && <MiniPlayer key="mini" onOpen={onOpen} />}</AnimatePresence>
           <AnimatePresence>{open && <SheetBackdrop key="backdrop" onClose={dismiss} />}</AnimatePresence>
 
-          <SheetSlide away={!open} rise={rise}>
+          <SheetSlide away={!open} rise={rise} onShown={onShown}>
           <motion.div
             role="dialog"
             aria-modal={open}
             aria-label="Player pjesama"
             aria-hidden={!open}
+            data-skel={skel ? '' : undefined}
             className={`os-sheet ${open ? 'pointer-events-auto' : ''} relative flex max-h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]`}
             {...sheetDrag}
             style={{
@@ -234,6 +259,26 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
           </SheetSlide>
     </SheetLayer>,
     document.body,
+  )
+}
+
+/** Slike koje se vide u panelu (izabran prikaz i plejer), dekodirane — bez dalekih karata. Ne čeka dekodiranje u kadru. */
+function decodeIn(root: Element | null): Promise<unknown> {
+  if (!root) return Promise.resolve()
+  const urls = new Set<string>()
+  const scope = '[data-pane]:not([aria-hidden="true"]), [data-player]'
+  for (const el of root.querySelectorAll<HTMLElement>(`:is(${scope}) img, :is(${scope}) [style*="url("]`)) {
+    if (el.closest('[data-far]')) continue
+    const src = el instanceof HTMLImageElement ? el.currentSrc || el.src : /url\(["']?([^"')]+)/.exec(el.style.backgroundImage)?.[1]
+    if (src) urls.add(src)
+    if (urls.size >= 24) break
+  }
+  return Promise.all(
+    [...urls].map((u) => {
+      const i = new Image()
+      i.src = u
+      return i.decode().catch(() => {})
+    }),
   )
 }
 
