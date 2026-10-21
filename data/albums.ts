@@ -95,6 +95,23 @@ export function cardArtOf(cover?: string): string | undefined {
 }
 
 /**
+ * Omot iza stiha na početnoj: isti pikseli kao hq (≤ 1290 px), manji fajl —
+ * stigne i nacrta se brže. Sloj je na 42% i utopljen maskom.
+ */
+export function bgArtOf(cover?: string): string | undefined {
+  const id = coverId(cover)
+  const url = id && `/albumi/lg/${id}.webp`
+  return url && MADE.has(url) ? url : undefined
+}
+
+/** Podloga omota (odraz + omot) unaprijed zamućena — `.album-glow` na telefonu bez CSS blura. */
+export function glowOf(cover?: string): string | undefined {
+  const id = coverId(cover)
+  const url = id && `/albumi/glow/${id}.webp`
+  return url && MADE.has(url) ? url : undefined
+}
+
+/**
  * Zamućene varijante (blur pa saturate(1.2), zapečeno). `sigma` = CSS blur
  * podijeljen s prikazanom stranicom omota (račun u scripts/make-covers.ts).
  */

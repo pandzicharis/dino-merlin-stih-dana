@@ -155,8 +155,10 @@ function useProgress(
       if (now?.current && n !== lastNow) now.current.textContent = lastNow = n
       const l = d ? `-${mmss(Math.max(0, d - t))}` : ''
       if (left?.current && l !== lastLeft) left.current.textContent = lastLeft = l
-      // dok ne svira, nema šta da se pomjera — provjera rjeđe
-      raf = a && !a.paused ? requestAnimationFrame(tick) : window.setTimeout(tick, 400)
+      // dok ne svira (ili se plejer ne vidi — zatvoren panel; vidi ga mini
+      // plejer), nema šta da se pomjera svaki kadar — provjera rjeđe
+      const hidden = fill.current?.closest('[role="dialog"]')?.getAttribute('aria-hidden') === 'true'
+      raf = a && !a.paused && !hidden ? requestAnimationFrame(tick) : window.setTimeout(tick, 400)
     }
     tick()
     return () => {
@@ -698,7 +700,7 @@ const AlbumCard = memo(
         </div>
 
         {/* njegove pjesme — isti redovi kao u "Pjesme", lista se skrola u kartici */}
-        <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-2 pb-2 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
+        <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-2 pb-5 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
           {list.map((v) => (
             <div key={v.id}>
               <SongItem v={v} on={curId === keyOf(v)} playing={playingId === keyOf(v)} />

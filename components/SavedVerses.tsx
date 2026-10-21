@@ -8,6 +8,7 @@ import { BRAND } from '@/lib/brand'
 import { useSavedFull } from './SavedFull'
 import { SavedCarousel } from './SavedCarousel'
 import { SAVED_TRACK, closeSaved, setSavedPlaylist } from '@/lib/player'
+import { whenCalm } from '@/lib/calm'
 import { SavedAlbums, SavedList, SavedLoved, SavedPlayer, keyOf, type View } from './SavedPlayer'
 
 /** Kako se sačuvani prikazuju iznad plejera: špil karata, lista ili albumi. */
@@ -115,17 +116,19 @@ export const SavedVerses = memo(function SavedVerses({
   // ostaju montirani: prebacivanje je samo pretapanje, bez ponovnog slaganja
   const [made, setMade] = useState<SavedView[]>(() => [view])
   if (!made.includes(view)) setMade([...made, view])
+  // Ostali prikazi se slože jedan po jedan, i to tek kad je panel otvoren i prst
+  // miruje — ne pri svakom otvaranju aplikacije (panel se slaže unaprijed) i ne
+  // usred prevlačenja karata. Izabran prikaz se ionako složi odmah (gore)
+  const inPage = !onClose
   useEffect(() => {
-    let idle = 0
-    const t = window.setTimeout(() => {
-      const all = () => setMade(VIEWS)
-      idle = window.requestIdleCallback?.(all, { timeout: 2500 }) ?? window.setTimeout(all, 0)
-    }, 900)
-    return () => {
-      clearTimeout(t)
-      if (idle) (window.cancelIdleCallback ?? clearTimeout)(idle)
-    }
-  }, [])
+    const next = VIEWS.find((v) => !made.includes(v))
+    if (!next) return
+    return whenCalm(
+      () => setMade((m) => (m.includes(next) ? m : [...m, next])),
+      1200,
+      () => inPage || Boolean(document.querySelector('[role="dialog"][aria-modal="true"]')),
+    )
+  }, [made, inPage])
   // odlaskom sa stranice /sacuvano njihove pjesme stanu (panel to radi sam — SavedPanel)
   const page = !onClose
   useEffect(() => {

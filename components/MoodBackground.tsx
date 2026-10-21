@@ -3,7 +3,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { motion, AnimatePresence, useMotionValue, useReducedMotion, useSpring } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
-import { ALBUMS, blurOf } from '@/data/albums'
+import { ALBUMS, bgArtOf, blurOf, glowOf } from '@/data/albums'
 import { msUntilNextDay } from '@/lib/date'
 import { FloatingNotes } from './FloatingNotes'
 
@@ -45,6 +45,10 @@ export function MoodBackground({
   // atmosfera na telefonu: omot unaprijed zamućen (blur(56px) na omotu visokom
   // 1.3 × 844 px) — bez filtera i bez dekodiranja velikog omota za nju
   const soft = blurOf(cover, 56 / (844 * 1.3))
+  // oštri omot: isti pikseli kao hq, manji fajl — stigne i nacrta se brže
+  const sharp = bgArtOf(cover) ?? cover
+  // podloga omota (odraz + omot) unaprijed zamućena — na telefonu bez CSS blura
+  const glow = glowOf(cover)
   const reduced = useReducedMotion()
   const dur = (base: number) => base / m.speed
 
@@ -71,9 +75,9 @@ export function MoodBackground({
   useEffect(() => {
     if (!cover || location.pathname !== '/' || 'deck' in document.documentElement.dataset) return
     try {
-      localStorage.setItem('stihdana:cover', JSON.stringify({ c: cover, until: Date.now() + msUntilNextDay() }))
+      localStorage.setItem('stihdana:cover', JSON.stringify({ c: sharp, x: [soft, glow].filter(Boolean), until: Date.now() + msUntilNextDay() }))
     } catch {}
-  }, [cover])
+  }, [cover, sharp, soft, glow])
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
@@ -150,21 +154,28 @@ export function MoodBackground({
                   se boje s gornjeg ruba nastave do vrha ekrana; ispod oštrog omota
                   popuni njegov meki rub. Kutija: 0.35 širine iznad omota + omot. */}
               <div
-                className="album-glow absolute inset-x-0 top-[calc(6dvh-min(100vw,74dvh,760px)*0.33)] mx-auto aspect-[1/1.35] w-[min(100vw,74dvh,760px)] md:top-[calc(2dvh-min(118dvh,1100px)*0.33)] md:w-[min(118dvh,1100px)]"
+                className={`album-glow absolute inset-x-0 top-[calc(6dvh-min(100vw,74dvh,760px)*0.33)] mx-auto aspect-[1/1.35] w-[min(100vw,74dvh,760px)] md:top-[calc(2dvh-min(118dvh,1100px)*0.33)] md:w-[min(118dvh,1100px)] ${glow ? 'max-md:hidden' : ''}`}
                 style={{ opacity: 0.3, transform: coverLift ? `translateY(-${((coverLift * 100) / 1.35).toFixed(2)}%)` : undefined }}
               >
                 <div
                   className="absolute inset-x-0 top-0 h-[25.93%]"
-                  style={{ backgroundImage: `url(${cover})`, backgroundSize: '100% auto', backgroundPosition: 'top', transform: 'scaleY(-1)' }}
+                  style={{ backgroundImage: `url(${sharp})`, backgroundSize: '100% auto', backgroundPosition: 'top', transform: 'scaleY(-1)' }}
                 />
-                <div className="absolute inset-x-0 bottom-0 h-[74.07%] bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
+                <div className="absolute inset-x-0 bottom-0 h-[74.07%] bg-cover bg-center" style={{ backgroundImage: `url(${sharp})` }} />
               </div>
+              {glow && (
+                // telefon: isti kompozit (odraz + omot), zamućenje i saturate već u slici
+                <div
+                  className="album-glow-soft absolute inset-x-0 top-[calc(6dvh-min(100vw,74dvh,760px)*0.33)] mx-auto aspect-[1/1.35] w-[min(100vw,74dvh,760px)] bg-[length:100%_100%] md:hidden"
+                  style={{ backgroundImage: `url(${glow})`, opacity: 0.3, transform: coverLift ? `translateY(-${((coverLift * 100) / 1.35).toFixed(2)}%)` : undefined }}
+                />
+              )}
               {/* omot gore — na telefonu preko cijele širine, nestaje u strane i prema
                   stihu; na računaru veći i rastopljen ovalno na sve strane (globals.css).
                   Spušten za malo (0.02 — i u visini boje iznad). */}
               <div
                 className="album-art absolute inset-x-0 top-[calc(6dvh+min(100vw,74dvh,760px)*0.02)] mx-auto aspect-square w-[min(100vw,74dvh,760px)] bg-cover bg-center md:top-[calc(2dvh+min(118dvh,1100px)*0.02)] md:w-[min(118dvh,1100px)]"
-                style={{ backgroundImage: `url(${cover})`, opacity: 0.42, transform: coverLift ? `translateY(-${coverLift * 100}%)` : undefined }}
+                style={{ backgroundImage: `url(${sharp})`, opacity: 0.42, transform: coverLift ? `translateY(-${coverLift * 100}%)` : undefined }}
               />
               {/* nijansa raspoloženja preko albuma — ekran ostaje "njegov" */}
               <div className="absolute inset-0" style={{ backgroundColor: m.gradient[1], mixBlendMode: 'color', opacity: 0.4 }} />

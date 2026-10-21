@@ -7,6 +7,7 @@ import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { EqBars } from './EqBars'
 import { OPEN_SAVED, useSavedPlayerSelect } from '@/lib/player'
+import { whenCalm } from '@/lib/calm'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
 const load = () => import('./SavedPanel')
@@ -33,20 +34,10 @@ export function SavedLink() {
   const onOpen = useCallback(() => setOpen(true), [])
   const onClose = useCallback(() => setOpen(false), [])
   // panel se preuzme i SLOŽI u tišini kad se ekran smiri (sklonjen ispod
-  // ekrana) — prvi dodir ga samo podigne, bez čekanja i treptaja
-  useEffect(() => {
-    let idle = 0
-    const t = setTimeout(() => {
-      void load().then(() => {
-        const mount = () => setUsed(true)
-        idle = window.requestIdleCallback?.(mount, { timeout: 2500 }) ?? window.setTimeout(mount, 0)
-      })
-    }, 3000)
-    return () => {
-      clearTimeout(t)
-      if (idle) (window.cancelIdleCallback ?? clearTimeout)(idle)
-    }
-  }, [])
+  // ekrana) — prvi dodir ga samo podigne, bez čekanja i treptaja. "Smiri":
+  // bar 3 s, bez tombole i uvoda i bez prsta na ekranu (lib/calm.ts) — slaganje
+  // je dug posao za glavnu nit i ne smije uzeti kadar animaciji
+  useEffect(() => whenCalm(() => void load().then(() => setUsed(true)), 3000), [])
   // pilula sačuvanih na početnoj vraća panel
   useEffect(() => {
     const show = () => {

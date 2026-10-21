@@ -40,6 +40,18 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   }, [verses])
 
   useSheetOpen(open)
+  // Otvaranje crta samo karte koje se vide; daleke (iza druge susjede, spremne
+  // za prevlačenje) tek kad panel sjedne — `data-warm`, globals.css. Bez Reacta
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Player pjesama"]')
+    if (!el) return
+    if (!open) {
+      delete el.dataset.warm
+      return
+    }
+    const t = window.setTimeout(() => (el.dataset.warm = ''), 700)
+    return () => clearTimeout(t)
+  }, [open])
   // spušten (strelica, povlačenje, dodir pored) — stanje plejera se sredi kadar
   // poslije (dismiss), pa ga ovdje ne treba gasiti; ponovo otvoren prije toga — ništa
   const dismissing = useRef(false)

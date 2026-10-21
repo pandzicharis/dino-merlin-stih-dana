@@ -87,11 +87,11 @@ const verseFonts = [
 const OS_SCRIPT = `try{if(!/^\\/(prezentacija|admin)/.test(location.pathname)){var u=navigator.userAgent,o=sessionStorage.getItem('stihdana:os')||(/iPhone|iPad|iPod/.test(u)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'ios':/Android/.test(u)?'android':'ios');document.documentElement.dataset.os=o}}catch(e){}try{if(self!==top&&top.location.pathname.indexOf('/prezentacija')===0)document.documentElement.dataset.deck=''}catch(e){}`
 
 /**
- * Omot zadnjeg stiha (components/MoodBackground.tsx ga zapamti) se traži s
- * HTML-om, ne tek kad se stih izvuče na uređaju — pozadina ne kasni. Samo
- * dok traje njegov dan stiha (poslije podneva je drugi omot).
+ * Omot zadnjeg stiha i njegove male zamućene slike (components/MoodBackground.tsx
+ * ih zapamti) se traže s HTML-om, ne tek kad se stih izvuče na uređaju —
+ * pozadina ne kasni. Samo dok traje njegov dan stiha (poslije podneva je drugi omot).
  */
-const COVER_SCRIPT = `try{var d=document.documentElement;if(location.pathname==='/'&&!('deck' in d.dataset)){var s=JSON.parse(localStorage.getItem('stihdana:cover')||'null'),c=s&&s.c;if(typeof c==='string'&&c.indexOf('/albumi/')===0&&Date.now()<s.until){var l=document.createElement('link');l.rel='preload';l.as='image';l.href=c;l.setAttribute('fetchpriority','high');document.head.appendChild(l)}}}catch(e){}`
+const COVER_SCRIPT = `try{var d=document.documentElement;if(location.pathname==='/'&&!('deck' in d.dataset)){var s=JSON.parse(localStorage.getItem('stihdana:cover')||'null'),c=s&&s.c;if(typeof c==='string'&&c.indexOf('/albumi/')===0&&Date.now()<s.until){var add=function(u,hi){var l=document.createElement('link');l.rel='preload';l.as='image';l.href=u;if(hi)l.setAttribute('fetchpriority','high');document.head.appendChild(l)};add(c,1);(s.x||[]).forEach(function(u){if(typeof u==='string'&&u.indexOf('/albumi/')===0)add(u)})}}}catch(e){}`
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

@@ -7,7 +7,7 @@ import { ExpandIcon } from './ExpandIcon'
 import { FavoriteButton } from './FavoriteButton'
 import { ShareButton } from './ShareSheet'
 import { MOODS } from '@/data/moods'
-import { albumOf, cardArtOf } from '@/data/albums'
+import { albumOf, blurOf, cardArtOf } from '@/data/albums'
 import { lookCss, lookScale, parseFont, preloadFonts } from '@/lib/fonts'
 import { asWritten } from '@/lib/text'
 import { savedDay, toggleFavorite } from '@/lib/storage'
@@ -19,6 +19,7 @@ import { FitLines } from './deck/FitLines'
 import { LoveButton } from './SavedPlayer'
 import { SongRow } from './SongCredit'
 import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayerSelect } from '@/lib/player'
+import { whenCalm } from '@/lib/calm'
 
 /**
  * Sačuvani kao špil karata: svaka karta je ekran aplikacije u malom (isti
@@ -188,6 +189,21 @@ export function SavedCarousel({
   // kad špil stoji, po dvije skrivene iza njih — spremne za sljedeća
   // prevlačenja (lazy). Špil od 5 i od 500 sačuvanih je isto lak
   const shown = (i: number) => Math.abs(rel(i)) <= 2 || Math.abs(rel(i, rest)) <= 4
+  // Slike karata oko mjesta gdje špil stoji se dekodiraju unaprijed, kad je
+  // mirno — otvaranje panela i prevlačenje ih samo nacrtaju, ne dekodiraju
+  useEffect(() => {
+    const urls = new Set<string>(['/brand/signature.webp?v=2'])
+    for (let k = -2; k <= 2; k++) {
+      const v = verses[wrap(rest + k)]
+      const cover = v && albumOf(v.album)?.cover
+      const art = cardArtOf(cover)
+      const soft = blurOf(cover, Math.round(W * 0.14) / (1.3 * Math.max(W, H)))
+      if (art) urls.add(art)
+      if (soft) urls.add(soft)
+    }
+    return whenCalm(() => urls.forEach(decodeOnce), 800)
+  }, [rest, verses, wrap])
+
   // ulaz (karte izlete iz plejera) samo pri prvom slaganju — kasnije karte stoje na mjestu
   const [settled, setSettled] = useState(false)
   useEffect(() => {
@@ -294,6 +310,16 @@ export function SavedCarousel({
 
     </div>
   )
+}
+
+/** slike već dekodirane (iste kao pozadine karata — dekodiranje se dijeli) */
+const decoded = new Set<string>()
+function decodeOnce(src: string) {
+  if (decoded.has(src)) return
+  decoded.add(src)
+  const img = new Image()
+  img.src = src
+  img.decode().catch(() => decoded.delete(src))
 }
 
 /** tamnjenje karte ispod prednje (0, 0.07, 0.14, 0.2) — od mjesta u špilu */
@@ -462,6 +488,8 @@ const Card = memo(function Card({
         // skrivene iza druge susjede: složene (spremne), ali se ne crtaju
         visibility: Math.abs(o) > 3 ? 'hidden' : undefined,
       }}
+      // treća (ispod druge, prozirna): crta se tek kad panel sjedne (globals.css)
+      data-far={Math.abs(o) === 3 ? '' : undefined}
       initial={reduced || !enter ? false : { y: 60, scale: 0.95, opacity: 0 }}
       animate={{ y: 0, scale: 1, opacity: 1 }}
       transition={
