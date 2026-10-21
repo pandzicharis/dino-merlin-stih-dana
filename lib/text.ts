@@ -48,6 +48,15 @@ export function oneLine(text: string): string {
  * Stih na papiriću: sve malim slovima, samo prvo slovo veliko — i kad je
  * dio stiha napisan velikim (papirići na pultu tako izgledaju).
  */
+/**
+ * Tekst na papiriću (tombola, gomila u uvodu): kako je upisan u adminu (velika
+ * i mala slova, interpunkcija), u jednom redu — redovi stiha spojeni razmakom;
+ * papirić ga sam prelomi po širini.
+ */
+export function paperText(text: string): string {
+  return asWritten(text).replace(/\s*\n\s*/g, ' ').trim()
+}
+
 export function paperCase(text: string): string {
   const low = text.toLocaleLowerCase('bs')
   const i = low.search(/\p{L}/u)

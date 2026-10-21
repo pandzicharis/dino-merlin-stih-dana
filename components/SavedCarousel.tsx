@@ -6,17 +6,19 @@ import { ExpandIcon } from './ExpandIcon'
 import { FavoriteButton } from './FavoriteButton'
 import { ShareButton } from './ShareSheet'
 import { MOODS } from '@/data/moods'
-import { albumOf, blurOf, cardArtOf, thumbOf } from '@/data/albums'
+import { albumOf, cardArtOf, cardStillOf, thumbOf } from '@/data/albums'
 import { lookCss, lookScale, parseFont, preloadFonts } from '@/lib/fonts'
 import { asWritten } from '@/lib/text'
 import { savedDay, toggleFavorite } from '@/lib/storage'
 import { formatFullDateBs } from '@/lib/date'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
-import { FontedLines, MagazaMark, MoodStill, Notes } from './deck/Screens'
+import { FontedLines, MagazaMark } from './deck/Screens'
+import { CardAtmosphere } from './CardAtmosphere'
 import { FitLines } from './deck/FitLines'
 import { SongRow } from './SongCredit'
 import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayerSelect } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
+import { dragScroll } from '@/lib/drag-scroll'
 
 /**
  * Sačuvani kao traka karata: svaka karta je ekran aplikacije u malom (isti
@@ -40,11 +42,6 @@ const SIDE_PAD = 32
  * iz plejera. Stih stoji iznad toga, na sredini vidljivog dijela.
  */
 const FADE = 190
-// prozirnost tek ispod plejera (on prekriva dno karte) — gdje se karta vidi,
-// pretapa se u NEPROZIRNU boju panela (sloj ispod), pa se karte iza ne naziru
-const CARD_MASK = 'linear-gradient(to bottom, black 86%, transparent 100%)'
-/** atmosfera se pri dnu pretopi u boju karte — na raširenoj, višoj karti nema ruba */
-const STILL_MASK = 'linear-gradient(to bottom, black 80%, transparent 100%)'
 
 /** Isto pravilo kao `verseFontSize` (i VerseMock) — za ekran širok W. */
 function verseSize(text: string) {
@@ -112,6 +109,8 @@ export function SavedCarousel({
         if (cards.length < 2) return -1
         step = cards[1].offsetLeft - cards[0].offsetLeft
       }
+      // sakriven prikaz (0) — ništa se ne zaključuje
+      if (!(step > 0)) return (step = 0), -1
       return Math.max(0, Math.min(n - 1, Math.round(el.scrollLeft / step)))
     }
     const live = () => {
@@ -135,7 +134,13 @@ export function SavedCarousel({
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     el.addEventListener('scrollend', settle)
+    // mišem (računar) — prst i trackpad ionako skrolaju sami
+    const undrag = dragScroll(el, () => {
+      const cards = el.querySelectorAll<HTMLElement>('[data-card]')
+      return cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : 0
+    })
     return () => {
+      undrag()
       clearTimeout(t)
       cancelAnimationFrame(raf)
       el.removeEventListener('scroll', onScroll)
@@ -191,23 +196,31 @@ export function SavedCarousel({
     return () => window.removeEventListener(SAVED_TRACK, onTrack)
   }, [verses, go])
 
-  // Slike SVIH karata (po albumu — najviše dvije po albumu) se preuzmu i
-  // dekodiraju unaprijed, kad je mirno — otvaranje panela i listanje ih
-  // samo nacrtaju, ne čekaju mrežu ni dekoder
+  // Unaprijed preuzeto i dekodirano, kad je mirno — otvaranje panela i
+  // listanje samo nacrtaju, ne čekaju mrežu ni dekoder: sličice omota (plejer
+  // ispod), potpis, i ispečene atmosfere karata oko mjesta gdje se lista
+  // (držane samo za bliže karte — malo memorije i kad je sačuvanih stotinu)
   useEffect(() => {
     const urls = new Set<string>(['/brand/signature.webp?v=2'])
     for (const v of verses) {
-      const cover = albumOf(v.album)?.cover
-      const art = cardArtOf(cover)
-      const soft = blurOf(cover, Math.round(W * 0.14) / (1.3 * Math.max(W, H)))
-      // i sličica omota — plejer ispod je pokaže čim se karta promijeni
-      const thumb = thumbOf(cover)
-      if (art) urls.add(art)
-      if (soft) urls.add(soft)
+      const thumb = thumbOf(albumOf(v.album)?.cover)
       if (thumb) urls.add(thumb)
     }
     return whenCalm(() => urls.forEach(decodeOnce), 800)
   }, [verses])
+  useEffect(() => {
+    const want = new Set<string>()
+    for (let k = -6; k <= 6; k++) {
+      const v = verses[near + k]
+      if (!v) continue
+      const still = cardStillOf(v.album, v.mood)
+      const art = still ? undefined : cardArtOf(albumOf(v.album)?.cover)
+      if (still) want.add(still)
+      if (art) want.add(art)
+    }
+    for (const u of [...stills.keys()]) if (!want.has(u)) stills.delete(u)
+    return whenCalm(() => want.forEach(keepDecoded), 400)
+  }, [near, verses])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -293,6 +306,15 @@ function decodeOnce(src: string) {
   img.src = src
   img.decode().catch(() => decoded.delete(src))
 }
+/** atmosfere karata oko mjesta gdje se lista — dekodirane i držane dok su blizu */
+const stills = new Map<string, HTMLImageElement>()
+function keepDecoded(src: string) {
+  if (stills.has(src)) return
+  const img = new Image()
+  stills.set(src, img)
+  img.src = src
+  img.decode().catch(() => stills.delete(src))
+}
 
 /** razmak između karata u traci (px) */
 const STRIP_GAP = 14
@@ -337,8 +359,9 @@ const Card = memo(function Card({
       // ne mogu slučajno pritisnuti (pointer-events ispod)
       onClick={front ? undefined : () => onPick(index)}
     >
-      {/* svoj sloj samo blizu sredine — daleke karte (obrisi) ne drže memoriju grafičkog procesora */}
-      <div className="absolute inset-0" style={full ? { willChange: 'transform' } : undefined}>
+      {/* svaka karta svoj stalni sloj: nacrta se jednom, a skrol je samo pomjera
+          (slojevi koji se prave i ruše pri svakom zaustavljanju — crtanje usred listanja) */}
+      <div className="absolute inset-0" style={{ willChange: 'transform' }}>
         {/* `data-stih` — po njemu je nađe raširena karta */}
         <div
           data-stih={front && onOpen ? verse.id : undefined}
@@ -360,7 +383,7 @@ const Card = memo(function Card({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 rounded-[26px] bg-black"
-          style={{ opacity: front ? 0 : 0.2, transition: 'opacity 0.2s ease', ...(full ? { willChange: 'opacity' } : {}) }}
+          style={{ opacity: front ? 0 : 0.2, transition: 'opacity 0.2s ease', willChange: 'opacity' }}
         />
       </div>
     </div>
@@ -393,6 +416,8 @@ function CardFaceView({
 }) {
   const m = MOODS[verse.mood]
   const album = albumOf(verse.album)
+  // karta u traci: atmosfera kao jedna ispečena slika (raširena je crta slojevima)
+  const still = onCollapse ? undefined : cardStillOf(verse.album, verse.mood)
   const text = asWritten(verse.text)
   const look = parseFont(verse.font).look
   const front = o === 0
@@ -450,25 +475,20 @@ function CardFaceView({
         // font ekrana stiha — i u panelu (koji ima sistemski font) i na
         // raširenoj karti isti, pa se pri pretapanju slova poklope slovo u slovo
         fontFamily: 'var(--font-sans), sans-serif',
-        // karta u špilu se pri dnu stvarno izgubi (i rubovi) — izlazi iz plejera
-        ...(onCollapse ? {} : { maskImage: CARD_MASK, WebkitMaskImage: CARD_MASK }),
+        // dno karte (ispod plejera) se pretapa u boju panela slojem ispod (bez
+        // maske preko cijele karte — ona je karti udvostručavala crtanje)
       }}
     >
       {/* atmosfera je uvijek visoka kao karta u špilu (H em) — raširena,
           viša karta je ima istu na vrhu, pa prvi kadar uvećanja = mala karta */}
       {/* isolate: slojevi atmosfere (z-index unutra) ostaju ispod sadržaja karte */}
-      <div className="absolute inset-x-0 top-0 isolate" style={{ height: `${H}em`, maskImage: STILL_MASK, WebkitMaskImage: STILL_MASK }}>
-        <MoodStill mood={verse.mood} w={W} h={H} cover={album?.cover} art={onCollapse ? undefined : cardArtOf(album?.cover)} lift={album?.lift} />
-        <Notes
-          accent={m.accent}
-          // note sa strane, ne preko stiha ni dugmadi (ni na raširenoj karti)
-          spots={[
-            [8, 36, 26, '♫'],
-            [88, 50, 18, '♪'],
-            [84, 22, 16, '♩'],
-          ]}
-        />
-      </div>
+      {/* u traci: atmosfera kao JEDNA unaprijed ispečena slika (scripts/bake-cards.ts) —
+          brzo se crta i pri listanju; raširena karta je crta slojevima, oštro */}
+      {still ? (
+        <div aria-hidden className="absolute inset-x-0 top-0" style={{ height: `${H}em`, backgroundImage: `url(${still})`, backgroundSize: '100% 100%' }} />
+      ) : (
+        <CardAtmosphere mood={verse.mood} cover={album?.cover} art={onCollapse ? undefined : cardArtOf(album?.cover)} lift={album?.lift} />
+      )}
 
       <div
         className={`absolute inset-x-0 top-0 z-[1] flex flex-col justify-between ${actionsZoom ? '' : 'bottom-0'}`}
@@ -585,7 +605,6 @@ function CardFaceView({
       <div
         data-small
         className="pointer-events-none absolute z-[1] flex flex-col items-center text-center"
-        // naziv ostaje gdje je bio (bez zvjezdice iznad njega)
         style={{ left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${H - FADE - 7}em`, gap: '7em' }}
       >
         <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '12.5em', letterSpacing: '0.2em', color: m.accent }}>

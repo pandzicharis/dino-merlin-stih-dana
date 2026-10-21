@@ -5,6 +5,7 @@
  * Admin bira album s ove liste, pa naziv uvijek tačno odgovara.
  */
 import made from '../public/albumi/precache.json'
+import baked from '../public/karte/index.json'
 
 export type Album = {
   id: string
@@ -82,6 +83,18 @@ export function thumbOf(cover?: string): string | undefined {
   const id = coverId(cover)
   const url = id && `/albumi/sm/${id}.webp`
   return url && MADE.has(url) ? url : undefined
+}
+
+const BAKED = new Set<string>(baked)
+
+/**
+ * Atmosfera karte u traci, unaprijed ispečena u jednu sliku (album ×
+ * raspoloženje — scripts/bake-cards.ts). Nema je → undefined (karta crta
+ * atmosferu sama, slojevima).
+ */
+export function cardStillOf(album: string | null | undefined, mood: string): string | undefined {
+  const key = `${albumOf(album)?.id ?? 'bez'}-${mood}`
+  return BAKED.has(key) ? `/karte/${key}.webp` : undefined
 }
 
 /**

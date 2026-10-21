@@ -9,7 +9,7 @@ import { deckParam, inDeck } from '@/lib/deck'
 import { formatFullDateBs } from '@/lib/date'
 import { haptic } from '@/lib/haptic'
 import { SPLASH_ARRIVE } from './VerseText'
-import { paperCase, asWritten } from '@/lib/text'
+import { paperText, asWritten } from '@/lib/text'
 import { VERSES } from '@/data/verses'
 import { MOODS, type Mood } from '@/data/moods'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
@@ -907,7 +907,7 @@ function Tombola({
             animate={phase === 'fly' && to ? { opacity: 0 } : { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)', scale: 1 }}
             transition={phase === 'fly' ? { duration: 0 } : { delay: RISE + 0.3, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
           >
-            <PaperVerse text={paperCase(text)} />
+            <PaperVerse text={paperText(text)} />
           </motion.div>
         </motion.div>
       )}
@@ -1392,7 +1392,7 @@ function IntroSplash({
           // kopija koja leti je od prvog kadra tačno preko — zamjena odmah
           transition={{ duration: 0 }}
         >
-          <PaperVerse text={paperCase(lines[0] ?? '')} />
+          <PaperVerse text={paperText(lines[0] ?? '')} />
         </motion.div>
       </motion.div>
 
@@ -1439,11 +1439,7 @@ function Face({ p, paper }: { p: Strip; paper: React.CSSProperties }) {
         fontSize: Math.min(12.5, p.w * 0.07),
       }}
     >
-      {p.text && paperCase(p.text).split('\n').map((l, j) => (
-        <span key={j} className="block">
-          {l}
-        </span>
-      ))}
+      {p.text && <span className="block">{paperText(p.text)}</span>}
     </div>
   )
 }
@@ -1489,7 +1485,7 @@ function FlyText({ to, text, font }: { to: Transfer; text: string; font?: string
         // stiha) uđe — boja i font se pretope u letu, slova ne izblijede
         transition={{ duration: 0.3, delay: 0.4, ease: 'easeOut' }}
       >
-        <VerseLines text={paperCase(text)} />
+        <VerseLines text={text} />
       </motion.span>
       <motion.span
         className="absolute inset-0 block"

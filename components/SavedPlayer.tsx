@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
@@ -10,6 +10,7 @@ import { asWritten } from '@/lib/text'
 import { EqBars } from './EqBars'
 import { toggleLoved } from '@/lib/storage'
 import { audioFile } from '@/lib/audio-name'
+import { dragScroll } from '@/lib/drag-scroll'
 import { useLoved, useLovedIds } from '@/lib/client-store'
 import {
   SAVED_TRACK,
@@ -228,7 +229,7 @@ function Btn({
 }
 
 /** Zvjezdica — pjesma u "Omiljene" (ili van). */
-export function LoveButton({ song, accent, size = 34, icon = 17 }: { song: string; accent: string; size?: number; icon?: number }) {
+export function LoveButton({ song, accent, size = 34, icon = 17, ring = false }: { song: string; accent: string; size?: number; icon?: number; ring?: boolean }) {
   // omiljena je PJESMA (svi njeni stihovi), ne jedan stih
   const id = audioFile(song)
   const on = useLovedIds().includes(id)
@@ -243,7 +244,13 @@ export function LoveButton({ song, accent, size = 34, icon = 17 }: { song: strin
       aria-label={on ? 'Makni iz omiljenih' : 'Dodaj u omiljene'}
       aria-pressed={on}
       className="flex shrink-0 items-center justify-center rounded-full"
-      style={{ width: size, height: size, color: on ? accent : 'rgba(255,255,255,0.4)' }}
+      style={{
+        width: size,
+        height: size,
+        color: ring ? accent : on ? accent : 'rgba(255,255,255,0.4)',
+        // `ring`: u krugu, kao srce i "Raširi" na karti
+        ...(ring ? { border: `1px solid ${accent}55`, background: on ? `${accent}33` : `${accent}1a` } : {}),
+      }}
       whileTap={{ scale: 0.8 }}
       transition={{ type: 'spring', stiffness: 460, damping: 20 }}
     >
@@ -427,10 +434,6 @@ export function SavedPlayer({
           <div className="flex shrink-0 flex-col items-end gap-1 self-stretch">
             <span className="tabular text-[10px] tracking-[0.18em] text-white/45">
               {i + 1} / {n}
-            </span>
-            {/* zvjezdica (17 u dugmetu od 30) poravnata s krajem trajanja ispod */}
-            <span className="-mr-[6.5px]">
-              <LoveButton song={cur.song} accent={m.accent} size={30} />
             </span>
           </div>
         </div>
@@ -670,7 +673,8 @@ const AlbumCard = memo(
         aria-hidden={!ahead}
         data-album
         className="relative flex shrink-0 snap-center snap-always flex-col overflow-hidden rounded-[24px] border border-white/[0.07]"
-        style={{ width: width || 'calc(100% - 40px)', height: 'min(46dvh, 400px)', contain: 'layout paint' }}
+        // svoj stalni sloj: kartica (i zamućeni omot u njoj) nacrta se jednom, a skrol je samo pomjera
+        style={{ width: width || 'calc(100% - 40px)', height: 'min(46dvh, 400px)', contain: 'layout paint', willChange: 'transform' }}
         onClickCapture={(e) => {
           if (ahead) return
           e.stopPropagation()
@@ -681,8 +685,8 @@ const AlbumCard = memo(
         {cover && (
           <div
             className="absolute left-0 top-0 h-[30%] w-[30%] origin-top-left bg-cover bg-center opacity-35"
-            // svoj sloj: zamućenje računa grafički procesor, ne crta se pri listanju
-            style={{ backgroundImage: `url(${thumbOf(cover) ?? cover})`, filter: 'blur(5px)', transform: 'scale(3.5)', willChange: 'transform' }}
+            // zamućenje se nacrta jednom u sloj kartice (ne kao filter grafičkog procesora — taj se računa svaki kadar)
+            style={{ backgroundImage: `url(${thumbOf(cover) ?? cover})`, filter: 'blur(5px)', transform: 'scale(3.5)' }}
             aria-hidden
           />
         )}
@@ -708,7 +712,9 @@ const AlbumCard = memo(
         </div>
 
         {/* njegove pjesme — isti redovi kao u "Pjesme", lista se skrola u kartici */}
-        <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-2 pb-2 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
+        {/* samo okomito (`overflow-x-hidden`, `overscroll-y-contain`): vodoravan potez
+            preko pjesama ide traci albuma — `touch-pan-y` / `overscroll-contain` su ga blokirali */}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain px-2 pb-2 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
           {lite
             ? list.slice(0, 6).map((v) => (
                 <div key={v.id} className="flex items-center gap-3 px-2 py-3" aria-hidden>
@@ -807,8 +813,8 @@ const ALBUM_GAP = 12
 /**
  * Albumi kao kartice — prevuci lijevo/desno za sljedeći album: pravi
  * vodoravni skrol sistema sa zaustavljanjem na kartici (kao karte stihova),
- * pa listanje ne zavisi od JavaScripta. Daleki albumi su obrisi dok se ne
- * približe. Tačkice ispod pokazuju koji je. Kartica nosi omot (zamućen
+ * pa listanje ne zavisi od JavaScripta; svaka kartica je svoj sloj (nacrta se
+ * jednom). Tačkice ispod pokazuju koji je. Kartica nosi omot (zamućen
  * iza), naziv velikim slovima i godinu, a ispod svoje pjesme — isti redovi
  * kao u "Pjesme", u listi koja se skrola gore-dolje unutar kartice.
  *
@@ -834,21 +840,12 @@ export function SavedAlbums({
   // na početku je ispred album pjesme koja svira — inače prvi album
   const [at, setAt] = useState(() => Math.max(0, albums.findIndex((a) => a.list.some((v) => keyOf(v) === nowKey))))
   const i = Math.min(at, n - 1)
-  // pjesme albuma oko onog ispred — slože se poslije (prekidivo), ne u kadru promjene
-  const [near, setNear] = useState(i)
-  const box = useRef<HTMLDivElement>(null)
+  // tačkica ispod — prati listanje odmah (album ispred i red plejera tek kad stane)
+  const [dot, setDot] = useState(i)
   const strip = useRef<HTMLDivElement>(null)
-  const [w, setW] = useState(0)
-  useEffect(() => {
-    const el = box.current
-    if (!el) return
-    const ro = new ResizeObserver(() => el.clientWidth && setW(el.clientWidth))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-  // kartica u liniji sa zaglavljem (20 px od ivice, kao ikonica i ×);
-  // sljedeća je odmah iza ivice — prevuci
-  const card = Math.round(w - 40)
+  // kartica u liniji sa zaglavljem (20 px od ivice, kao ikonica i ×) — širinu
+  // daje CSS (100% − 40px), pa je raspored tačan od prvog kadra, i kad se
+  // prikaz tek pokaže (ne čeka mjerenje); sljedeća je odmah iza ivice — prevuci
   /** album `k` na sredini trake (`smooth`: mekano — tačkice, plejer prešao na drugi) */
   const scrollTo = useCallback((k: number, smooth: boolean) => {
     const el = strip.current
@@ -866,22 +863,42 @@ export function SavedAlbums({
     const el = strip.current
     if (!el || n < 2) return
     let t = 0
+    let raf = 0
+    const nearest = () => {
+      const cs = el.querySelectorAll<HTMLElement>('[data-album]')
+      const step = cs.length > 1 ? cs[1].offsetLeft - cs[0].offsetLeft : 0
+      // sakriven prikaz (0) — ništa se ne zaključuje
+      if (!(step > 0)) return -1
+      return Math.max(0, Math.min(n - 1, Math.round(el.scrollLeft / step)))
+    }
     const settle = () => {
       clearTimeout(t)
-      const cs = el.querySelectorAll<HTMLElement>('[data-album]')
-      if (cs.length < 2) return
-      const k = Math.max(0, Math.min(n - 1, Math.round(el.scrollLeft / (cs[1].offsetLeft - cs[0].offsetLeft))))
+      const k = nearest()
+      if (k < 0) return
+      setDot(k)
       setAt(k)
-      startTransition(() => setNear(k))
     }
     const onScroll = () => {
+      if (!raf)
+        raf = requestAnimationFrame(() => {
+          raf = 0
+          const k = nearest()
+          if (k >= 0) setDot(k)
+        })
       clearTimeout(t)
       t = window.setTimeout(settle, 90)
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     el.addEventListener('scrollend', settle)
+    // mišem (računar) — prst i trackpad ionako skrolaju sami
+    const undrag = dragScroll(el, () => {
+      const cs = el.querySelectorAll<HTMLElement>('[data-album]')
+      return cs.length > 1 ? cs[1].offsetLeft - cs[0].offsetLeft : 0
+    })
     return () => {
+      undrag()
       clearTimeout(t)
+      cancelAnimationFrame(raf)
       el.removeEventListener('scroll', onScroll)
       el.removeEventListener('scrollend', settle)
     }
@@ -893,7 +910,7 @@ export function SavedAlbums({
   }, [i])
   useLayoutEffect(() => {
     scrollTo(iRef.current, false)
-  }, [n, card, scrollTo])
+  }, [n, scrollTo])
 
   // prikaz opet vidljiv (Activity) — ispred je album pjesme koja sad svira
   useEffect(() => {
@@ -902,7 +919,7 @@ export function SavedAlbums({
     const r = requestAnimationFrame(() => {
       scrollTo(k, false)
       setAt(k)
-      setNear(k)
+      setDot(k)
     })
     return () => cancelAnimationFrame(r)
     // samo pri pokazivanju prikaza
@@ -934,7 +951,7 @@ export function SavedAlbums({
 
   return (
     <div className="pt-2">
-      <div ref={box} className="-mx-5">
+      <div className="-mx-5">
         <div
           ref={strip}
           data-hscroll
@@ -948,9 +965,8 @@ export function SavedAlbums({
               key={name}
               name={name}
               list={list}
-              width={card}
+              width={0}
               ahead={k === i}
-              lite={Math.abs(k - near) > 1}
               curId={cur ? keyOf(cur) : null}
               playingId={p.playing ? nowKeyOf(p.id) : null}
               onBring={() => go(k)}
@@ -964,8 +980,8 @@ export function SavedAlbums({
       {n > 1 && (
         <div className="mt-3 flex items-center justify-center gap-1.5">
           {albums.map(({ name, list }, k) => (
-            <button key={name} type="button" onClick={() => go(k)} aria-label={name} aria-current={k === i} className="flex h-6 items-center px-0.5">
-              <span className="block h-1.5 rounded-full transition-all duration-300" style={{ width: k === i ? 18 : 6, background: k === i ? MOODS[list[0].mood].accent : 'rgba(255,255,255,0.22)' }} />
+            <button key={name} type="button" onClick={() => go(k)} aria-label={name} aria-current={k === dot} className="flex h-6 items-center px-0.5">
+              <span className="block h-1.5 rounded-full transition-all duration-300" style={{ width: k === dot ? 18 : 6, background: k === dot ? MOODS[list[0].mood].accent : 'rgba(255,255,255,0.22)' }} />
             </button>
           ))}
         </div>
