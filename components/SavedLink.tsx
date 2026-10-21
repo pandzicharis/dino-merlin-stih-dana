@@ -37,7 +37,8 @@ export function SavedLink() {
   // ekrana) — prvi dodir ga samo podigne, bez čekanja i treptaja. "Smiri":
   // bar 3 s, bez tombole i uvoda i bez prsta na ekranu (lib/calm.ts) — slaganje
   // je dug posao za glavnu nit i ne smije uzeti kadar animaciji
-  useEffect(() => whenCalm(() => void load().then(() => setUsed(true)), 3000), [])
+  // (najkasnije 5 s — i kad se ekran stalno dodiruje, da prvi dodir na plejer ne čeka slaganje)
+  useEffect(() => whenCalm(() => void load().then(() => setUsed(true)), 3000, undefined, 5000), [])
   // pilula sačuvanih na početnoj vraća panel
   useEffect(() => {
     const show = () => {

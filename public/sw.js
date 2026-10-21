@@ -9,7 +9,7 @@
  * iznova. Ništa se ne preuzima unaprijed, u pozadini.
  */
 
-const CACHE = 'stihdana-v29'
+const CACHE = 'stihdana-v30'
 const OFFLINE = ['/', '/manifest.webmanifest', '/icons/icon-192.png?v=2']
 
 /**

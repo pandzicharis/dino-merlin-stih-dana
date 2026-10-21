@@ -97,7 +97,6 @@ export function Poster({ data, width, style }: { data: PosterData; width: string
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '2em' }}>
             <div>
               <Platforms size="1.25em" />
-              <p style={{ marginTop: '0.6em', fontSize: '1.45em', color: 'rgba(255,255,255,0.5)' }}>{data.host}</p>
             </div>
             <MagazaMark height={2.8} color="rgba(255,255,255,0.9)" />
           </div>
@@ -134,7 +133,6 @@ export function PosterLandscape({ data, width, style }: { data: PosterData; widt
         {/* adresa u jednom redu — s PWA oznakom je red tijesan, pa se ona ne lomi */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5em' }}>
           <Platforms size="0.9em" />
-          <p style={{ fontSize: '1em', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', flexShrink: 0 }}>{data.host}</p>
         </div>
       </div>
 
@@ -171,7 +169,6 @@ export function SocialPost({ data, width, style }: { data: PosterData; width: st
         }}
       >
         <Platforms size="1.5em" />
-        <LinkPill host={data.host} size="2.25em" style={{ marginTop: '1.4em' }} />
       </div>
       {/* znak sam pri dnu, odvojen od poziva */}
       <MagazaMark
@@ -209,7 +206,8 @@ export function SocialStory({ data, width, style }: { data: PosterData; width: s
         }}
       >
         <Platforms size="1.9em" />
-        <LinkPill host={data.host} size="2.7em" style={{ marginTop: '1.5em' }} />
+        {/* prazno mjesto za Instagramovu naljepnicu s linkom (adresa nije na slici) */}
+        <span aria-hidden style={{ fontSize: '2.7em', height: '2.5em', marginTop: '1.5em' }} />
       </div>
       {/* znak sam pri dnu, odvojen od poziva */}
       <MagazaMark
@@ -490,33 +488,6 @@ function AndroidGlyph() {
     <svg viewBox="0 0 24 24" style={{ width: '1.2em', height: '1.2em' }} fill="currentColor" aria-hidden>
       <path d="M17.6 9.5l1.7-3a.4.4 0 0 0-.7-.4l-1.8 3A10.6 10.6 0 0 0 12 8.1c-1.7 0-3.3.4-4.8 1l-1.8-3a.4.4 0 0 0-.7.4l1.7 3C3.6 11 1.8 13.8 1.5 17h21c-.3-3.2-2.1-6-4.9-7.5zM7 14.4a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm10 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
     </svg>
-  )
-}
-
-/** Adresa kao dugme — za objave, gdje se kod ne skenira. */
-export function LinkPill({ host, size, style }: { host: string; size: string; style?: CSSProperties }) {
-  return (
-    <span
-      style={{
-        fontSize: size,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.6em',
-        height: '2.5em',
-        padding: '0 1.2em',
-        borderRadius: '99em',
-        background: 'linear-gradient(180deg, #E2CFA6, #BFA87F)',
-        color: '#14100A',
-        fontWeight: 600,
-        boxShadow: '0 0.6em 1.6em rgba(0,0,0,0.45)',
-        ...style,
-      }}
-    >
-      {host}
-      <svg viewBox="0 0 24 24" style={{ width: '0.9em', height: '0.9em' }} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M5 12h14M13 6l6 6-6 6" />
-      </svg>
-    </span>
   )
 }
 

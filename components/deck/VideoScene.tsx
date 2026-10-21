@@ -7,7 +7,7 @@ import { BRAND } from '@/lib/brand'
 import { audioFile } from '@/lib/audio-name'
 import { LivePhone } from './Stages'
 import { MagazaMark } from './Screens'
-import { Backdrop, LinkPill, Sheet } from './Poster'
+import { Backdrop, Sheet } from './Poster'
 import type { Simulation } from './types'
 
 export type VideoFormat = 'story' | 'objava'
@@ -301,9 +301,6 @@ export function VideoScene({
             ...(story ? { left: 0, right: 0, bottom: '17em' } : { left: '7em', bottom: '7em' }),
           }}
         >
-          <motion.div initial={false} animate={{ opacity: step === 'end' ? 1 : 0, y: step === 'end' ? 0 : '1em' }} transition={{ duration: 0.6 }}>
-            <LinkPill host={host} size={story ? '2.7em' : '2.3em'} />
-          </motion.div>
           <MagazaMark height={story ? 3.25 : 2.8} color="rgba(255,255,255,0.85)" />
         </div>
       </Sheet>
