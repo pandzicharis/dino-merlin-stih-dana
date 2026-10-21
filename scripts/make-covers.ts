@@ -4,9 +4,10 @@
  *   npm run brand:covers   (poslije svakog novog albuma u data/albums.ts)
  *
  *   sm/<id>.webp          240 px — sličice u plejeru (46–72 px, oštre i na 3× ekranu)
+ *   md/<id>.webp          960 px — oštri omot u kartama špila (karta ≤ 320 px, 3× ekran)
  *   blur/<id>.webp        128 px, zamućen + saturate(1.2) — atmosfera iza stiha
  *   blur-card/<id>.webp   128 px, jače zamućen — atmosfera karte u panelu
- *   precache.json         svi ovi URL-ovi — service worker ih preuzme unaprijed
+ *   precache.json         svi ovi URL-ovi — data/albums.ts po njemu zna koje varijante postoje
  *
  * CSS `filter: blur()` preko omota od 1200 px iPhone plaća dvaput: dekodira
  * cijeli omot (~5,7 MB) i zamućuje ga pri svakom crtanju sloja. Mutna slika od
@@ -46,6 +47,7 @@ import { ALBUMS, COVER_BLURS } from '../data/albums'
 
 const PUB = join(process.cwd(), 'public')
 const SM = 240
+const MD = 960
 const BLUR = 128
 
 // CSS saturate(s) — matrica iz Filter Effects specifikacije
@@ -60,7 +62,7 @@ const urls: string[] = []
 const kb = (f: string) => (statSync(f).size / 1024).toFixed(1)
 
 async function main() {
-  for (const dir of ['sm', ...COVER_BLURS.map((b) => b.dir)]) mkdirSync(join(PUB, 'albumi', dir), { recursive: true })
+  for (const dir of ['sm', 'md', ...COVER_BLURS.map((b) => b.dir)]) mkdirSync(join(PUB, 'albumi', dir), { recursive: true })
 
   for (const a of ALBUMS) {
     const id = a.cover.match(/^\/albumi\/hq\/([a-z0-9-]+)\.webp$/)?.[1]
@@ -71,6 +73,11 @@ async function main() {
     await sharp(src).resize(SM, SM, { fit: 'cover' }).webp({ quality: 80, effort: 6 }).toFile(join(PUB, sm))
     urls.push(sm)
     const line = [`sm ${kb(join(PUB, sm))} KB`]
+
+    const md = `/albumi/md/${id}.webp`
+    await sharp(src).resize(MD, MD, { fit: 'cover' }).webp({ quality: 82, effort: 6 }).toFile(join(PUB, md))
+    urls.push(md)
+    line.push(`md ${kb(join(PUB, md))} KB`)
 
     for (const b of COVER_BLURS) {
       // 1) blur u 512 px (sharp radi jedan resize po prolazu, pa smanjenje ide u 2. koraku)

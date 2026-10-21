@@ -85,6 +85,16 @@ export function thumbOf(cover?: string): string | undefined {
 }
 
 /**
+ * Oštri omot za karte u špilu (karta do ~320 px, 3× ekran): 960 px umjesto
+ * 1200+ — brže se dekodira i drži manje memorije dok se karte prevlače.
+ */
+export function cardArtOf(cover?: string): string | undefined {
+  const id = coverId(cover)
+  const url = id && `/albumi/md/${id}.webp`
+  return url && MADE.has(url) ? url : undefined
+}
+
+/**
  * Zamućene varijante (blur pa saturate(1.2), zapečeno). `sigma` = CSS blur
  * podijeljen s prikazanom stranicom omota (račun u scripts/make-covers.ts).
  */

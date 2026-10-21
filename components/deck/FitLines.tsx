@@ -8,13 +8,23 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react'
  * Za statične ekrane u prezentaciji i na grafikama, gdje nema prave
  * aplikacije: veličina iz broja slova ne zna da su VELIKA slova šira.
  */
-export function FitLines({ children }: { children: ReactNode }) {
+/** izmjerene veličine (`cacheKey` + širina) — karta koja se ponovo složi ne mjeri iznova */
+const sizes = new Map<string, number>()
+
+export function FitLines({ children, cacheKey }: { children: ReactNode; cacheKey?: string }) {
   const box = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const el = box.current
     const parent = el?.parentElement
     if (!el || !parent) return
-    const fit = () => {
+    const fit = (again = false) => {
+      // širina rasporeda (bez transformacija) — ista karta u bilo kojem dijelu špila
+      const key = cacheKey && parent.clientWidth ? `${cacheKey}|${parent.clientWidth}` : null
+      const known = key && !again ? sizes.get(key) : undefined
+      if (known) {
+        el.style.fontSize = `${known.toFixed(4)}em`
+        return
+      }
       // širine s ekrana (getBoundingClientRect) — i roditelj i redovi, pa
       // vrijedi i kad je cijeli uređaj umanjen transformom
       const avail = parent.getBoundingClientRect().width * 0.98
@@ -37,17 +47,20 @@ export function FitLines({ children }: { children: ReactNode }) {
         size *= avail / w
         el.style.fontSize = `${size.toFixed(4)}em`
       }
+      if (key && avail) sizes.set(key, size)
     }
     fit()
-    const ro = new ResizeObserver(fit)
+    const ro = new ResizeObserver(() => fit())
     ro.observe(parent)
-    document.fonts?.addEventListener('loadingdone', fit)
-    void document.fonts?.ready.then(fit)
+    // font stigao — mjeri se ponovo (i zapamćeno)
+    const loaded = () => fit(true)
+    document.fonts?.addEventListener('loadingdone', loaded)
+    if (document.fonts && document.fonts.status !== 'loaded') void document.fonts.ready.then(loaded)
     return () => {
       ro.disconnect()
-      document.fonts?.removeEventListener('loadingdone', fit)
+      document.fonts?.removeEventListener('loadingdone', loaded)
     }
-  }, [children])
+  }, [children, cacheKey])
   return (
     <span ref={box} style={{ display: 'block', whiteSpace: 'nowrap' }}>
       {children}

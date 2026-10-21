@@ -42,6 +42,7 @@ export function MoodStill({
   h,
   dim = 0,
   cover,
+  art: artSrc,
   lift = 0,
 }: {
   mood: Mood
@@ -50,6 +51,8 @@ export function MoodStill({
   dim?: number
   /** omot albuma stiha — umjesto portreta, kao u aplikaciji */
   cover?: string
+  /** oštri omot iz manje varijante (karte u špilu, data/albums.ts `cardArtOf`) — inače `cover` */
+  art?: string
   /** koliko je omot podignut (dio njegove visine) */
   lift?: number
 }) {
@@ -119,7 +122,7 @@ export function MoodStill({
               left: `${((w - art) / 2).toFixed(1)}em`,
               width: `${art.toFixed(1)}em`,
               height: `${art.toFixed(1)}em`,
-              backgroundImage: `url(${cover})`,
+              backgroundImage: `url(${artSrc ?? cover})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               opacity: 0.42,
