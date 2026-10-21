@@ -65,7 +65,7 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
       )
       closeRef.current()
     }
-    let g: { x0: number; y0: number; scroller: HTMLElement | null; pull: boolean; off: boolean; last: [number, number][] } | null = null
+    let g: { x0: number; y0: number; scroller: HTMLElement | null; h: boolean; pull: boolean; off: boolean; last: [number, number][] } | null = null
     const scrollerOf = (t: Element | null) => {
       for (let n = t as HTMLElement | null; n && n !== el; n = n.parentElement) {
         const o = getComputedStyle(n).overflowY
@@ -77,7 +77,8 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
       const t = e.target as Element
       if (e.touches.length > 1 || t.closest('input, textarea, select, [role="slider"], [data-nodrag]')) return (g = null)
       const p = e.touches[0]
-      g = { x0: p.clientX, y0: p.clientY, scroller: scrollerOf(t), pull: false, off: false, last: [[p.clientY, e.timeStamp]] }
+      // `h`: unutar vodoravnog skrola (traka karata) — njega sistem ne smije izgubiti
+      g = { x0: p.clientX, y0: p.clientY, scroller: scrollerOf(t), h: Boolean(t.closest('[data-hscroll]')), pull: false, off: false, last: [[p.clientY, e.timeStamp]] }
     }
     const move = (e: TouchEvent) => {
       if (!g || g.off) return
@@ -90,6 +91,9 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
         const top = !g.scroller || g.scroller.scrollTop <= 0
         // gore, ili sadržaj nije na vrhu — normalno skrolanje
         if (dy < 0 || !top) return void (dy < -4 || !top ? (g.off = true) : null)
+        // na traci karata: dok nije jasno da je nadolje, ne blokira se — inače
+        // sistem ne pokrene vodoravno listanje
+        if (g.h && Math.abs(dx) >= dy) return
         // nadolje s vrha: skrolanje se zaustavi odmah, panel krene poslije praga
         if (e.cancelable) e.preventDefault()
         if (dy < 8) return
