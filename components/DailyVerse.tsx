@@ -8,7 +8,7 @@ import { isProbe, markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
 import { bumpStreak, peekStreak, setLastSeen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
 import { clearBadge, clearPushMark, hasPushMark, reportSeen } from '@/lib/push-client'
-import { cover, markHandled, mayWait, uncover } from '@/lib/cekaj'
+import { cover, handledToday, markHandled, markUsed, mayWait, uncover } from '@/lib/cekaj'
 import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
 import { DevDateBar } from './DevDateBar'
@@ -74,6 +74,8 @@ export function DailyVerse({
     // Probni stih s dana instalacije se ne broji: obavijest ga zamijeni pravim
     if (!verseId && !isProbe(date))
       void hasPushMark().then((fromPush) => {
+        // izvučeno s obavijesti — kasna ili ponovljena oznaka danas ne pokreće tombolu
+        if (fromPush) markUsed(date)
         clearPushMark()
         if (!fromPush) void reportSeen(date)
       })
@@ -114,6 +116,12 @@ export function DailyVerse({
         if (!(await hasPushMark())) {
           uncover()
           return clearBadge()
+        }
+        // današnja obavijest je već izvučena — oznaka je zaostala ili kasna
+        // (ponovljena obavijest, dodir obrađen poslije izvlačenja): bez nove tombole
+        if (handledToday(date) && !isProbe(date)) {
+          uncover()
+          return clearPushMark()
         }
         // probni stih: dan se izvuče ispočetka — novi stih sam pokrene tombolu
         if (unseat(date, verses)) return

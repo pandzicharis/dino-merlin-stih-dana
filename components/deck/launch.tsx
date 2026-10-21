@@ -6,7 +6,7 @@ import { BRAND, MAGAZA_RATIO } from '@/lib/brand'
 import { SEND_TIME } from '@/lib/date'
 import { useDeck } from './context'
 import { deviceOuter, IPhone, IPHONE, IosStatus } from './Devices'
-import { Poster, PosterLandscape, SocialPost, SocialStory } from './Poster'
+import { Poster, PosterLandscape, PosterQr, SocialPost, SocialStory } from './Poster'
 import { Ico, R } from './ui'
 import type { DeckData, FeatureDef } from './types'
 import { TIPS_ON } from '../Tips'
@@ -1261,6 +1261,15 @@ export function Grafike({ d }: { d: DeckData }) {
       pdf: '/promo/stih-dana-plakat-A4-polozeno.pdf',
     },
     {
+      title: 'QR A5',
+      sub: 'pola A4, za pult',
+      ratio: Math.SQRT2,
+      draw: (w) => <PosterQr data={d.poster} width={w} />,
+      // 1748 px = A5 na 300 DPI
+      exportW: 874,
+      file: 'stih-dana-qr-A5',
+    },
+    {
       title: 'Objava 4:5',
       sub: 'Instagram i Facebook',
       ratio: 1.25,
@@ -1301,8 +1310,8 @@ export function Grafike({ d }: { d: DeckData }) {
     setAuto(false)
     setOpen(k)
   }
-  // svi pregledi iste visine; zbir širina je ~3.5 visine (+ razmaci)
-  const h = 'min(32vh, calc((100vw - 220px) / 3.8), 360px)'
+  // svi pregledi iste visine; zbir širina je ~4.2 visine (+ razmaci)
+  const h = 'min(32vh, calc((100vw - 240px) / 4.6), 360px)'
   return (
     <div>
       <R i={0}>
@@ -1315,7 +1324,7 @@ export function Grafike({ d }: { d: DeckData }) {
       </R>
       <R i={2}>
         <p className="dk-lead mt-[1.8vh] max-w-[40em]">
-          Plakat A3 za radnju, A4 za izlog, objava i story za mreže — isti stih, isti telefoni, isti jezik. Svaka se
+          Plakat A3 za radnju, A4 za izlog, QR A5 za pult, objava i story za mreže — isti stih, isti telefoni, isti jezik. Svaka se
           preuzima u punoj rezoluciji, a plakati i kao PDF za štampu.
         </p>
       </R>

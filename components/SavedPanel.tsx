@@ -40,18 +40,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   }, [verses])
 
   useSheetOpen(open)
-  // Otvaranje crta samo karte koje se vide; daleke (iza druge susjede, spremne
-  // za prevlačenje) tek kad panel sjedne — `data-warm`, globals.css. Bez Reacta
-  useEffect(() => {
-    const el = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Player pjesama"]')
-    if (!el) return
-    if (!open) {
-      delete el.dataset.warm
-      return
-    }
-    const t = window.setTimeout(() => (el.dataset.warm = ''), 700)
-    return () => clearTimeout(t)
-  }, [open])
   // spušten (strelica, povlačenje, dodir pored) — stanje plejera se sredi kadar
   // poslije (dismiss), pa ga ovdje ne treba gasiti; ponovo otvoren prije toga — ništa
   const dismissing = useRef(false)
@@ -65,7 +53,13 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
     } else if (wasOpen.current && !dismissing.current) closeSaved()
     wasOpen.current = open
   }, [open])
+  // spušten: panel stoji dolje, viri samo mini plejer. Sluša se samo ovo — promjena
+  // pjesme ili pauza ne crta panel iznova
+  const hasId = useSavedPlayerSelect((s) => Boolean(s.id))
+  const mini = useSavedPlayerSelect((s) => s.mini)
   const [view, setView] = useState<SavedView>(() => {
+    // ništa ne svira — otvara se na "Stihovi", pa se špil složi već sad (unaprijed)
+    if (!hasId) return 'cards'
     try {
       const v = localStorage.getItem(VIEW)
       return v === 'list' || v === 'albums' || v === 'loved' ? v : 'cards'
@@ -82,10 +76,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
       /* privatni prozor */
     }
   }, [])
-  // spušten: panel stoji dolje, viri samo mini plejer. Sluša se samo ovo — promjena
-  // pjesme ili pauza ne crta panel iznova
-  const hasId = useSavedPlayerSelect((s) => Boolean(s.id))
-  const mini = useSavedPlayerSelect((s) => s.mini)
   // otvoren, a ništa ne svira — počinje od "Stihovi" (zapamćen pogled važi
   // dok se sluša)
   const idle = !hasId
@@ -98,6 +88,26 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
     setRise(open && mini && hasId)
   }
   const peek = !open && mini && hasId
+  // Otvaranje crta samo karte koje se vide; daleke (iza druge susjede, spremne
+  // za prevlačenje) tek kad panel sjedne — `data-warm`, globals.css. Bez Reacta
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Player pjesama"]')
+    if (!el) return
+    if (!open) {
+      delete el.dataset.warm
+      return
+    }
+    // tek kad panel sjedne (iz mini plejera se diže duže)
+    const t = window.setTimeout(() => (el.dataset.warm = ''), rise ? 850 : 700)
+    return () => clearTimeout(t)
+  }, [open, rise])
+  // spušten i muzika stala — "Stihovi" se vrate dok je panel dolje (poslije
+  // spuštanja), ne pri otvaranju: otvaranje je onda samo kretnja, bez slaganja špila
+  useEffect(() => {
+    if (open || !idle || view === 'cards') return
+    const t = window.setTimeout(() => setView('cards'), 600)
+    return () => clearTimeout(t)
+  }, [open, idle, view])
   // strelica, povlačenje dolje, dodir pored, Escape — panel se spusti; ima li
   // pjesmu, ona svira dalje i na dnu početne viri mini plejer. Prvo kretnja,
   // pa stanje plejera odmah poslije (ne čeka kadar) — mini plejer i mjesto za

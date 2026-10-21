@@ -16,8 +16,8 @@ import { QrCode } from './deck/QrCode'
 import APP_QR from '@/data/app-qr.json'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
-/** Broj verzije iz `public/sw.js` (`stihdana-vNN`) — raste sa svakim deployem. */
-const versionOf = (name: string) => /^stihdana-v(\d+)$/.exec(name)?.[1]
+/** Verzija iz `public/sw.js` (`stihdana-v1.0`) — 1.0, 1.1… raste s izdanjima. */
+const versionOf = (name: string) => /^stihdana-v(\d+\.\d+)$/.exec(name)?.[1]
 
 const NOTIFY_SUB: Record<NotifyState, string> = {
   on: `Stiže svaki dan u ${SEND_TIME}`,
@@ -62,7 +62,7 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
       if (!v) {
         try {
           const text = await fetch('/sw.js', { cache: 'no-store' }).then((r) => r.text())
-          v = /stihdana-v(\d+)/.exec(text)?.[1]
+          v = /stihdana-v(\d+\.\d+)/.exec(text)?.[1]
         } catch {}
       }
       if (alive && v) setVersion(v)

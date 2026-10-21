@@ -4,6 +4,7 @@ import { PrintButton } from './PrintButton'
 const FORMATS = [
   { href: '/prezentacija/plakat', label: 'Plakat A3' },
   { href: '/prezentacija/plakat/a4', label: 'A4 položeno' },
+  { href: '/prezentacija/plakat/a5', label: 'QR A5' },
   { href: '/prezentacija/objava', label: 'Društvene mreže' },
 ] as const
 

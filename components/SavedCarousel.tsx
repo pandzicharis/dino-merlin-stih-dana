@@ -228,13 +228,16 @@ export function SavedCarousel({
     const el = box.current
     const all = deck.current
     if (!el || !all) return
-    const ro = new ResizeObserver(() => {
+    const measure = () => {
       // sakriven prikaz (0) se ne mjeri — karte ostanu gdje su
       const a = el.getBoundingClientRect().width
       const b = all.getBoundingClientRect().width
       if (a) setCw(a)
       if (b) setFw(b)
-    })
+    }
+    // odmah, prije prvog crtanja — karte ne krenu od 260 px pa poskoče
+    measure()
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
     ro.observe(all)
     return () => ro.disconnect()

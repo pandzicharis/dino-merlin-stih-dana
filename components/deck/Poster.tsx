@@ -107,6 +107,53 @@ export function Poster({ data, width, style }: { data: PosterData; width: string
   )
 }
 
+/* ═══ A5 uspravno — samo naslov i QR ═══════════════════════════ */
+
+export function PosterQr({ data, width, style }: { data: PosterData; width: string; style?: CSSProperties }) {
+  return (
+    <Sheet width={width} ratio={Math.SQRT2} style={style}>
+      <Backdrop portrait={{ right: '-22em', top: '-6em', width: '92em', height: '122em' }} />
+      <div
+        style={{
+          position: 'absolute',
+          inset: '10em 8em 8.5em',
+          zIndex: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/signature.webp?v=2" alt="Dino Merlin" style={{ height: '7em', width: 'auto' }} />
+        <h1
+          style={{
+            marginTop: '0.3em',
+            fontFamily: serif,
+            fontVariationSettings: "'opsz' 144, 'SOFT' 30, 'WONK' 0",
+            fontWeight: 360,
+            fontSize: '15em',
+            lineHeight: 1,
+            letterSpacing: '-0.03em',
+            color: '#FBF6EC',
+          }}
+        >
+          Stih <span style={{ fontStyle: 'italic', color: '#E9D9B6' }}>dana</span>
+        </h1>
+        <div style={{ marginTop: '7em' }}>
+          <QrCard qr={data.qr} width="60em" label="2.6em" />
+        </div>
+        <p style={{ marginTop: '4.5em', fontSize: '2.6em', lineHeight: 1.4, color: 'rgba(255,255,255,0.66)' }}>
+          Svaki dan u {SEND_TIME}
+        </p>
+        <div style={{ marginTop: 'auto' }}>
+          <MagazaMark height={3} color="rgba(255,255,255,0.85)" />
+        </div>
+      </div>
+    </Sheet>
+  )
+}
+
 /* ═══ A4 položeno ═══════════════════════════════════════════════ */
 
 export function PosterLandscape({ data, width, style }: { data: PosterData; width: string; style?: CSSProperties }) {

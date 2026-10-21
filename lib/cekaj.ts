@@ -27,7 +27,7 @@ export function mayWait(): boolean {
   try {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false
     if (localStorage.getItem('stihdana:notify') === 'false') return false
-    return hourInTz() >= SEND_HOUR && localStorage.getItem(DONE) !== verseDayInTz()
+    return hourInTz() >= SEND_HOUR && !handledToday()
   } catch {
     return false
   }
@@ -45,6 +45,30 @@ export function cover() {
 
 export function uncover() {
   delete document.documentElement.dataset.cekaj
+}
+
+/** dan kad je obavijest izvučena (oznaka obrisana poslije tombole) — u bilo koje doba */
+const USED = 'stihdana:obavijestIzvucena'
+
+/** Tombola s obavijesti je završena — oznaka za danas je potrošena. */
+export function markUsed(day: string) {
+  try {
+    localStorage.setItem(USED, day)
+  } catch {
+    /* privatni prozor */
+  }
+}
+
+/**
+ * Današnja obavijest je već izvučena — tombola poslije podneva ili tombola s
+ * obavijesti. Jedna tombola s obavijesti na dan, nikad dvije.
+ */
+export function handledToday(day = verseDayInTz()): boolean {
+  try {
+    return localStorage.getItem(DONE) === verseDayInTz() || localStorage.getItem(USED) === day
+  } catch {
+    return false
+  }
 }
 
 /** Tombola poslije podneva je izvučena — danas više nema zastora. */
@@ -71,4 +95,4 @@ export function setCoverColor(bg: string) {
  * Dodir na obavijest otvara `/?izvuci` — tad uvijek. Ne u prezentaciji
  * (telefon u njoj je iframe; OS_SCRIPT prije ovoga postavi `data-deck`).
  */
-export const CEKAJ_SCRIPT = `try{var d=document.documentElement;if(location.pathname==='/'&&!('deck' in d.dataset)){var ok=/[?&]izvuci/.test(location.search);if(!ok&&typeof Notification!=='undefined'&&Notification.permission==='granted'&&localStorage.getItem('stihdana:notify')!=='false'){var n=new Date(),h=+new Intl.DateTimeFormat('en-GB',{timeZone:'${TZ}',hour:'2-digit',hourCycle:'h23'}).format(n),t=new Intl.DateTimeFormat('en-CA',{timeZone:'${TZ}'}).format(n);ok=h>=${SEND_HOUR}&&localStorage.getItem('${DONE}')!==t}if(ok){var b=localStorage.getItem('${BG}');if(b)d.style.setProperty('--cekaj',b);d.dataset.cekaj='';setTimeout(function(){if(!document.querySelector('[data-izvlacenje]'))delete d.dataset.cekaj},4000)}}}catch(e){}`
+export const CEKAJ_SCRIPT = `try{var d=document.documentElement;if(location.pathname==='/'&&!('deck' in d.dataset)){var ok=/[?&]izvuci/.test(location.search);if(!ok&&typeof Notification!=='undefined'&&Notification.permission==='granted'&&localStorage.getItem('stihdana:notify')!=='false'){var n=new Date(),h=+new Intl.DateTimeFormat('en-GB',{timeZone:'${TZ}',hour:'2-digit',hourCycle:'h23'}).format(n),t=new Intl.DateTimeFormat('en-CA',{timeZone:'${TZ}'}).format(n);ok=h>=${SEND_HOUR}&&localStorage.getItem('${DONE}')!==t&&localStorage.getItem('${USED}')!==t}if(ok){var b=localStorage.getItem('${BG}');if(b)d.style.setProperty('--cekaj',b);d.dataset.cekaj='';setTimeout(function(){if(!document.querySelector('[data-izvlacenje]'))delete d.dataset.cekaj},4000)}}}catch(e){}`

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Activity, memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { Activity, memo, startTransition, useCallback, useEffect, useMemo, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { useFavorites, useLovedIds, useMounted } from '@/lib/client-store'
 import { BRAND } from '@/lib/brand'
@@ -124,7 +124,8 @@ export const SavedVerses = memo(function SavedVerses({
     const next = VIEWS.find((v) => !made.includes(v))
     if (!next) return
     return whenCalm(
-      () => setMade((m) => (m.includes(next) ? m : [...m, next])),
+      // prekidivo — dodir na karte ne čeka slaganje skrivenog prikaza
+      () => startTransition(() => setMade((m) => (m.includes(next) ? m : [...m, next]))),
       1200,
       () => inPage || Boolean(document.querySelector('[role="dialog"][aria-modal="true"]')),
     )

@@ -198,15 +198,42 @@ export function SheetLayer({ children, className }: { children: ReactNode; class
   )
 }
 
+/**
+ * `on`, ali tek dva kadra kasnije. Kadar u kojem se panel otvara je težak
+ * (slaganje, crtanje); kretnja koja krene u njemu na iPhoneu preskoči svoj
+ * početak — poskok. Ovako krene u laganom kadru, od prvog piksela.
+ */
+function useFrames(on: boolean) {
+  const [go, setGo] = useState(false)
+  if (!on && go) setGo(false)
+  useEffect(() => {
+    if (!on) return
+    let b = 0
+    const a = requestAnimationFrame(() => {
+      b = requestAnimationFrame(() => setGo(true))
+    })
+    // bez kadrova (prigušen preglednik) panel ipak krene — nikad ne ostane nevidljiv
+    const t = window.setTimeout(() => setGo(true), 150)
+    return () => {
+      cancelAnimationFrame(a)
+      cancelAnimationFrame(b)
+      clearTimeout(t)
+    }
+  }, [on])
+  return on && go
+}
+
 /** Zatamnjenje iza panela — blago, ekran ispod se vidi zamućen; pojavljuje se postepeno. */
 export function SheetBackdrop({ onClose }: { onClose: () => void }) {
+  // kreće zajedno s panelom (SheetSlide)
+  const go = useFrames(true)
   return (
     <motion.button
       aria-label="Zatvori"
       className="absolute inset-0 bg-black/25 backdrop-blur-md backdrop-saturate-150"
       onClick={onClose}
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1, transition: { duration: 0.4 } }}
+      animate={go ? { opacity: 1, transition: { duration: 0.4 } } : { opacity: 0 }}
       exit={{ opacity: 0, transition: CLOSE }}
     />
   )
@@ -218,12 +245,28 @@ export function SheetBackdrop({ onClose }: { onClose: () => void }) {
  * otvaranje je samo kretnja, bez ponovnog slaganja sadržaja.
  */
 /** podizanje iz mini plejera — sporije i mekše, panel "izraste" iz njega */
-const RISE = { duration: 0.72, ease: [0.22, 1, 0.36, 1] as const }
+const RISE = { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const }
 
 export function SheetSlide({ children, away = false, rise = false }: { children: ReactNode; away?: boolean; rise?: boolean }) {
   const [wide] = useState(() => window.matchMedia('(min-width: 640px)').matches)
   const hidden = wide ? { transform: 'translateY(48px)', opacity: 0 } : { transform: 'translateY(100%)' }
   const shown = wide ? { transform: 'translateY(0px)', opacity: 1 } : { transform: 'translateY(0%)' }
+  // Otvaranje u dva koraka: panel prvo stane na svoje mjesto nevidljiv
+  // (opacity ~0) — preglednik ga tad nacrta dok se ništa ne miče — pa dva
+  // kadra kasnije klizne odozdo, već nacrtan: bez zastoja, poskoka i
+  // sadržaja koji se pojavljuje tek usput
+  const go = useFrames(!away)
+  const ready = wide
+    ? { ...hidden, visibility: 'visible' as const, transition: { duration: 0 } }
+    : { transform: 'translateY(0%)', opacity: 0.001, visibility: 'visible' as const, transition: { duration: 0 } }
+  const open = wide
+    ? { ...shown, visibility: 'visible' as const, transition: rise ? RISE : OPEN }
+    : {
+        transform: ['translateY(100%)', 'translateY(0%)'],
+        opacity: 1,
+        visibility: 'visible' as const,
+        transition: { ...(rise ? RISE : OPEN), opacity: { duration: 0 } },
+      }
   return (
     <motion.div
       className="relative flex w-full max-w-[440px] justify-center"
@@ -232,10 +275,11 @@ export function SheetSlide({ children, away = false, rise = false }: { children:
       // dolje, ne crta se (visibility), a otvara se bez ikakvog slaganja
       variants={{
         hidden: { ...hidden, transition: CLOSE, ...(away ? { transitionEnd: { visibility: 'hidden' } } : {}) },
-        shown: { ...shown, visibility: 'visible', transition: rise ? RISE : OPEN },
+        ready,
+        shown: open,
       }}
       initial={away ? { ...hidden, visibility: 'hidden' } : 'hidden'}
-      animate={away ? 'hidden' : 'shown'}
+      animate={away ? 'hidden' : go ? 'shown' : 'ready'}
       exit="hidden"
     >
       {children}
