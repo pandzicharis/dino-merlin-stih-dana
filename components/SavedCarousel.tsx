@@ -203,20 +203,20 @@ export function SavedCarousel({
   // kad špil stoji, po dvije skrivene iza njih — spremne za sljedeća
   // prevlačenja (lazy). Špil od 5 i od 500 sačuvanih je isto lak
   const shown = (i: number) => Math.abs(rel(i)) <= 2 || Math.abs(rel(i, rest)) <= 4
-  // Slike karata oko mjesta gdje špil stoji se dekodiraju unaprijed, kad je
-  // mirno — otvaranje panela i prevlačenje ih samo nacrtaju, ne dekodiraju
+  // Slike SVIH karata (po albumu — najviše dvije po albumu) se preuzmu i
+  // dekodiraju unaprijed, kad je mirno — otvaranje panela i prevlačenje ih
+  // samo nacrtaju, ne čekaju mrežu ni dekoder
   useEffect(() => {
     const urls = new Set<string>(['/brand/signature.webp?v=2'])
-    for (let k = -4; k <= 4; k++) {
-      const v = verses[wrap(rest + k)]
-      const cover = v && albumOf(v.album)?.cover
+    for (const v of verses) {
+      const cover = albumOf(v.album)?.cover
       const art = cardArtOf(cover)
       const soft = blurOf(cover, Math.round(W * 0.14) / (1.3 * Math.max(W, H)))
       if (art) urls.add(art)
       if (soft) urls.add(soft)
     }
     return whenCalm(() => urls.forEach(decodeOnce), 800)
-  }, [rest, verses, wrap])
+  }, [verses])
 
   // ulaz (karte izlete iz plejera) samo pri prvom slaganju — kasnije karte stoje na mjestu
   const [settled, setSettled] = useState(false)
@@ -333,11 +333,12 @@ export function SavedCarousel({
 }
 
 /** slike već dekodirane (iste kao pozadine karata — dekodiranje se dijeli) */
-const decoded = new Set<string>()
+// slike se drže (ne bace se poslije dekodiranja) — preglednik ih ne mora opet dekodirati
+const decoded = new Map<string, HTMLImageElement>()
 function decodeOnce(src: string) {
   if (decoded.has(src)) return
-  decoded.add(src)
   const img = new Image()
+  decoded.set(src, img)
   img.src = src
   img.decode().catch(() => decoded.delete(src))
 }
@@ -349,39 +350,22 @@ const dimOf = (o: number) => Math.min(Math.abs(o) * 0.07, 0.2)
 const PICK = 150
 /** koliko špil mora mirovati (bez prsta) prije težeg posla — opruga je tad skoro sjela */
 const REST = 420
-/** opruga špila: brzo krene, mekano sjedne — kao listanje na telefonu */
-const STIFF = 380
-const DAMP = 36
 /** povratak na pjesmu koja svira, tačkice: mekano preko više karata */
 const GLIDE: KeyframeAnimationOptions = { duration: 800, easing: 'cubic-bezier(0.45, 0, 0.15, 1)' }
-const LINEAR = typeof CSS !== 'undefined' && CSS.supports?.('transition-timing-function', 'linear(0, 1)')
-const springs = new Map<number, KeyframeAnimationOptions>()
+/** pomjeranje špila: brzo krene, mekano sjedne — kao listanje na telefonu */
+const SLIDE_MS = 400
 
 /**
- * Opruga kao WAAPI kriva (`linear()`), s početnom brzinom `v` (dio puta u
- * sekundi) — kretnju vrti grafički procesor, a brz potez prsta se nastavi
- * brzinom prsta. Stariji preglednik bez `linear()`: bezier blizu opruge.
+ * Kriva pomjeranja: cubic-bezier, NE `linear()` opruga — Safari (iPhone)
+ * animaciju s `linear()` krivom ne da grafičkom procesoru nego je vrti
+ * glavna nit, kadar po kadar: listanje je tad sporo i zapinje. Bezier ide
+ * na grafički procesor. `v` (dio puta u sekundi): brz potez prsta — kriva
+ * krene brzinom prsta (nikad sporije od obične).
  */
-function springTiming(v = 0): KeyframeAnimationOptions {
-  if (!LINEAR) return { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
-  const key = Math.round(Math.max(0, Math.min(15, v)) * 4) / 4
-  let t = springs.get(key)
-  if (t) return t
-  const dt = 1 / 60
-  let x = 0
-  let vel = key
-  let time = 0
-  const pts = ['0']
-  do {
-    vel += (-STIFF * (x - 1) - DAMP * vel) * dt
-    x += vel * dt
-    time += dt
-    pts.push(x.toFixed(4))
-  } while (time < 1.5 && (Math.abs(1 - x) > 0.002 || Math.abs(vel) > 0.03))
-  pts[pts.length - 1] = '1'
-  t = { duration: Math.round(time * 1000), easing: `linear(${pts.join(', ')})` }
-  springs.set(key, t)
-  return t
+function slideTiming(v = 0): KeyframeAnimationOptions {
+  const slope = Math.min(12, Math.max(3, v * (SLIDE_MS / 1000)))
+  const x1 = Math.min(0.25, 1 / slope)
+  return { duration: SLIDE_MS, easing: `cubic-bezier(${x1.toFixed(3)}, ${(x1 * slope).toFixed(3)}, 0.3, 1)` }
 }
 
 type Slot = { x: number; scale: number; opacity: number }
@@ -406,8 +390,8 @@ function slide(el: HTMLElement, to: Slot, running: Animation[], how: { d?: numbe
   const dist = to.x - fx
   const out: Animation[] = []
   if (Math.abs(dist) > 0.5 || Math.abs(m.a - to.scale) > 0.001)
-    out.push(el.animate([{ transform: `translateX(${fx}px) scale(${m.a})` }, { transform: target }], how.glide ? GLIDE : springTiming(Math.abs(dist) > 1 ? (how.v ?? 0) / dist : 0)))
-  if (Math.abs(op - to.opacity) > 0.01) out.push(el.animate([{ opacity: op }, { opacity: to.opacity }], how.glide ? GLIDE : springTiming()))
+    out.push(el.animate([{ transform: `translateX(${fx}px) scale(${m.a})` }, { transform: target }], how.glide ? GLIDE : slideTiming(Math.abs(dist) > 1 ? (how.v ?? 0) / dist : 0)))
+  if (Math.abs(op - to.opacity) > 0.01) out.push(el.animate([{ opacity: op }, { opacity: to.opacity }], how.glide ? GLIDE : slideTiming()))
   return out
 }
 
