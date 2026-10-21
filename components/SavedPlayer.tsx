@@ -700,7 +700,7 @@ const AlbumCard = memo(
         </div>
 
         {/* njegove pjesme — isti redovi kao u "Pjesme", lista se skrola u kartici */}
-        <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-4 pb-4 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
+        <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-2 pb-2 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
           {list.map((v) => (
             <div key={v.id}>
               <SongItem v={v} on={curId === keyOf(v)} playing={playingId === keyOf(v)} />

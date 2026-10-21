@@ -5,10 +5,6 @@
  *
  *   sm/<id>.webp          240 px — sličice u plejeru (46–72 px, oštre i na 3× ekranu)
  *   md/<id>.webp          960 px — oštri omot u kartama špila (karta ≤ 320 px, 3× ekran)
- *   lg/<id>.webp          ≤ 1290 px — oštri omot iza stiha (430 px × 3); isti pikseli
- *                         kao hq, manji fajl — sloj je na 42% i utopljen maskom
- *   glow/<id>.webp        128 × 173 px — podloga omota (odraz + omot) unaprijed
- *                         zamućena: blur(28px) saturate(1.15) iz .album-glow
  *   blur/<id>.webp        128 px, zamućen + saturate(1.2) — atmosfera iza stiha
  *   blur-card/<id>.webp   128 px, jače zamućen — atmosfera karte u panelu
  *   precache.json         svi ovi URL-ovi — data/albums.ts po njemu zna koje varijante postoje
@@ -52,7 +48,6 @@ import { ALBUMS, COVER_BLURS } from '../data/albums'
 const PUB = join(process.cwd(), 'public')
 const SM = 240
 const MD = 960
-const LG = 1290
 const BLUR = 128
 
 // CSS saturate(s) — matrica iz Filter Effects specifikacije
@@ -67,7 +62,7 @@ const urls: string[] = []
 const kb = (f: string) => (statSync(f).size / 1024).toFixed(1)
 
 async function main() {
-  for (const dir of ['sm', 'md', 'lg', 'glow', ...COVER_BLURS.map((b) => b.dir)]) mkdirSync(join(PUB, 'albumi', dir), { recursive: true })
+  for (const dir of ['sm', 'md', ...COVER_BLURS.map((b) => b.dir)]) mkdirSync(join(PUB, 'albumi', dir), { recursive: true })
 
   for (const a of ALBUMS) {
     const id = a.cover.match(/^\/albumi\/hq\/([a-z0-9-]+)\.webp$/)?.[1]
@@ -83,36 +78,6 @@ async function main() {
     await sharp(src).resize(MD, MD, { fit: 'cover' }).webp({ quality: 82, effort: 6 }).toFile(join(PUB, md))
     urls.push(md)
     line.push(`md ${kb(join(PUB, md))} KB`)
-
-    // omot iza stiha: najviše 1290 px (telefon 430 px na 3×), bez uvećanja
-    const lg = `/albumi/lg/${id}.webp`
-    await sharp(src).resize(LG, LG, { fit: 'cover', withoutEnlargement: true }).webp({ quality: 80, effort: 6 }).toFile(join(PUB, lg))
-    urls.push(lg)
-    line.push(`lg ${kb(join(PUB, lg))} KB`)
-
-    // Podloga omota (.album-glow): kutija 1 × 1.35 širine — gore odraz gornjih
-    // 35% omota (preokrenut), ispod cijeli omot; pa blur(28px) saturate(1.15).
-    // Telefon 390 px: σ = 28 / 390 = 7,18% širine kutije. Maska kutije je na sva
-    // četiri ruba nula, pa rub zamućenja ne pravi razliku.
-    const G = 512
-    const strip = Math.round(G * 0.35)
-    const base = await sharp(src).removeAlpha().resize(G, G, { fit: 'cover' }).raw().toBuffer()
-    const top = await sharp(base, { raw: { width: G, height: G, channels: 3 } }).extract({ left: 0, top: 0, width: G, height: strip }).flip().raw().toBuffer()
-    const { data: gd, info: gi } = await sharp({ create: { width: G, height: G + strip, channels: 3, background: '#000' } })
-      .composite([
-        { input: top, raw: { width: G, height: strip, channels: 3 }, top: 0, left: 0 },
-        { input: base, raw: { width: G, height: G, channels: 3 }, top: strip, left: 0 },
-      ])
-      .raw()
-      .toBuffer({ resolveWithObject: true })
-    const glow = `/albumi/glow/${id}.webp`
-    await sharp(await sharp(gd, { raw: gi }).blur({ sigma: (28 / 390) * G, minAmplitude: 0.001, precision: 'float' }).raw().toBuffer(), { raw: gi })
-      .resize(BLUR, Math.round(BLUR * 1.35))
-      .recomb(sat(1.15))
-      .webp({ quality: 95, smartSubsample: true, effort: 6 })
-      .toFile(join(PUB, glow))
-    urls.push(glow)
-    line.push(`glow ${kb(join(PUB, glow))} KB`)
 
     for (const b of COVER_BLURS) {
       // 1) blur u 512 px (sharp radi jedan resize po prolazu, pa smanjenje ide u 2. koraku)
