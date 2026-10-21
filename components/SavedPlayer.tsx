@@ -682,7 +682,7 @@ const AlbumCard = memo(
 
         {/* album: omot, naziv, godina, broj pjesama — u liniji s pjesmama ispod
             (omot albuma počinje gdje i kartica pjesme) */}
-        <div className="relative flex shrink-0 items-center gap-3 px-2 pb-3 pt-2">
+        <div className="relative flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
           <span
             className="block h-[72px] w-[72px] shrink-0 rounded-[14px] bg-cover bg-center"
             style={{ backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: '0 10px 26px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.1)' }}
@@ -700,7 +700,7 @@ const AlbumCard = memo(
         </div>
 
         {/* njegove pjesme — isti redovi kao u "Pjesme", lista se skrola u kartici */}
-        <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-2 pb-5 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
+        <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-4 pb-4 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
           {list.map((v) => (
             <div key={v.id}>
               <SongItem v={v} on={curId === keyOf(v)} playing={playingId === keyOf(v)} />
