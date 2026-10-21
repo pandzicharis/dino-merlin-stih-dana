@@ -282,6 +282,7 @@ export function SavedCarousel({
               verse={v}
               o={rel(i)}
               front={rel(i, rest) === 0}
+              alone={n === 1}
               cw={cw}
               side={side}
               glide={glide}
@@ -414,6 +415,7 @@ const Card = memo(function Card({
   verse,
   o,
   front: still,
+  alone = false,
   cw,
   side,
   glide = false,
@@ -427,6 +429,8 @@ const Card = memo(function Card({
   o: number
   /** prednja kad špil stoji — lice (rub) se mijenja tek tad */
   front: boolean
+  /** jedini sačuvani stih — karta stoji, ne vuče se */
+  alone?: boolean
   cw: number
   /** slobodan prostor od prednje karte do ivice ekrana */
   side: number
@@ -525,14 +529,14 @@ const Card = memo(function Card({
           data-stih={front && onOpen ? verse.id : undefined}
           className={`absolute inset-0 ${front && onOpen ? 'cursor-pointer' : ''}`}
           style={{ x, touchAction: 'pan-y', willChange: 'transform' }}
-          drag={front ? 'x' : false}
+          drag={front && !alone ? 'x' : false}
           dragControls={drag}
           dragListener={false}
           dragMomentum={false}
           onPointerDown={(e) => {
             down.current = { x: e.clientX, y: e.clientY }
             // plejer se ne vuče — premotavanje i ploča rade svoje
-            if (!front || (e.target as Element).closest('[data-nodrag]')) return
+            if (!front || alone || (e.target as Element).closest('[data-nodrag]')) return
             onHold(true)
             const up = () => {
               onHold(false)
