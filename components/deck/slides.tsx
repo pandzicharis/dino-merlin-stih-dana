@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
 import { motion, useIsPresent } from 'motion/react'
 import { MOODS } from '@/data/moods'
-import { albumOf, ALBUMS, thumbOf } from '@/data/albums'
+import { albumOf, ALBUMS, blurOf, glowOf, thumbOf } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
 import { playable } from '@/lib/player'
 import { DECK_VERSE } from '@/lib/deck'
@@ -553,6 +553,7 @@ function Dozvola() {
  */
 function Atmosfera({ d }: { d: DeckData }) {
   const { phone, manual } = useDeck()
+  useWarmCovers(useMemo(() => d.moods.map((m) => m.verse), [d.moods]))
   const [k, setK] = useState(0)
   const [round, setRound] = useState(0)
 
@@ -610,9 +611,31 @@ function Atmosfera({ d }: { d: DeckData }) {
   )
 }
 
+/**
+ * Omoti koje telefon na slajdu smjenjuje — preuzmu se i dekodiraju unaprijed,
+ * pa smjena ne čeka mrežu ni dekodiranje (isto porijeklo: telefon ih uzme iz keša).
+ */
+function useWarmCovers(verses: Verse[]) {
+  useEffect(() => {
+    const urls = new Set<string>()
+    for (const v of verses) {
+      const cover = albumOf(v.album)?.cover
+      if (!cover) continue
+      urls.add(cover)
+      for (const u of [blurOf(cover, 56 / (844 * 1.3)), glowOf(cover)]) if (u) urls.add(u)
+    }
+    urls.forEach((src) => {
+      const img = new Image()
+      img.src = src
+      img.decode().catch(() => {})
+    })
+  }, [verses])
+}
+
 /** Svih 12 albuma: telefon ih smjenjuje (isti stih, njegov album u pozadini), ispod nazivi 6 + 6. */
 function Albumi({ d }: { d: DeckData }) {
   const { phone, manual } = useDeck()
+  useWarmCovers(useMemo(() => d.albums.map((a) => a.verse), [d.albums]))
   const [k, setK] = useState(0)
   const [round, setRound] = useState(0)
 

@@ -140,26 +140,34 @@ export function SavedCarousel({
 
   // plejer sačuvanih svira ovim redom; kad pređe na drugu pjesmu, špil klizi za njom
   useEffect(() => setSavedPlaylist(verses), [verses])
-  // plejer ispod (pjesma, atmosfera) pokazuje kartu na kojoj je špil stao
+  // Prednja karta za plejer ispod i pjesmu: brzo poslije prevlačenja (karte
+  // klize na grafičkom procesoru, pa im to ne smeta), a pri brzom listanju tek
+  // na karti gdje se stane — ne za svaku usput
+  const [pick, setPick] = useState(at)
   useEffect(() => {
-    const v = verses[rest]
+    const t = window.setTimeout(() => setPick(at), PICK)
+    return () => clearTimeout(t)
+  }, [at])
+  // plejer ispod (pjesma, atmosfera) pokazuje prednju kartu
+  useEffect(() => {
+    const v = verses[pick]
     if (v) startTransition(() => onFront?.(v))
-  }, [rest, verses, onFront])
+  }, [pick, verses, onFront])
   // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma. Samo
   // kad se ŠPIL pomjeri (prst, tačkice); kad plejer pređe na drugu pjesmu,
   // špil je stiže kadar kasnije — tad se ništa ne pušta (inače bi vratio staru).
   // Kad špil stane — ne usred kretnje, i ne za svaku kartu pri brzom prevlačenju
-  const lastRest = useRef(rest)
+  const lastPick = useRef(pick)
   const live = useRef({ playing: player.playing, verses })
   useEffect(() => {
     live.current = { playing: player.playing, verses }
   }, [player.playing, verses])
   useEffect(() => {
-    if (lastRest.current === rest) return
-    lastRest.current = rest
-    const v = live.current.verses[rest]
+    if (lastPick.current === pick) return
+    lastPick.current = pick
+    const v = live.current.verses[pick]
     if (live.current.playing && v && v.id !== savedVerse()?.id) playSaved(v)
-  }, [rest])
+  }, [pick])
   // prikaz opet vidljiv (Activity) — prednja je pjesma koja sad svira
   useEffect(() => {
     const i = verses.findIndex((v) => v.id === savedVerse()?.id)
@@ -325,6 +333,8 @@ function decodeOnce(src: string) {
 /** tamnjenje karte ispod prednje (0, 0.07, 0.14, 0.2) — od mjesta u špilu */
 const dimOf = (o: number) => Math.min(Math.abs(o) * 0.07, 0.2)
 
+/** prednja karta → plejer ispod i pjesma: kratko poslije prevlačenja (brzo listanje preskoči usputne) */
+const PICK = 150
 /** koliko špil mora mirovati (bez prsta) prije težeg posla — opruga je tad skoro sjela */
 const REST = 420
 /** opruga špila: brzo krene, mekano sjedne — kao listanje na telefonu */

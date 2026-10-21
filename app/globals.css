@@ -142,6 +142,15 @@ html[data-os='android'] .os-grabber {
   mask-composite: intersect;
   -webkit-mask-composite: source-in;
 }
+/* isto, iz unaprijed zamućene slike (telefon) — samo maska, bez filtera */
+.album-glow-soft {
+  mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 52%, rgba(0, 0, 0, 0.3) 72%, transparent 90%),
+    linear-gradient(to right, transparent 0%, black 18%, black 82%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 52%, rgba(0, 0, 0, 0.3) 72%, transparent 90%),
+    linear-gradient(to right, transparent 0%, black 18%, black 82%, transparent 100%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
 /* boja iznad omota: puna do gornjeg ruba omota, pa se utopi u njega; strane kao omot */
 .album-fill {
   mask-image: linear-gradient(to bottom, black 62%, transparent 100%),
