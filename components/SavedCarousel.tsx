@@ -160,15 +160,15 @@ export function SavedCarousel({
 
   // plejer sačuvanih svira ovim redom; kad pređe na drugu pjesmu, špil klizi za njom
   useEffect(() => setSavedPlaylist(verses), [verses])
-  // plejer ispod (pjesma, atmosfera) pokazuje prednju kartu — odmah, čim
-  // karta pređe pola puta (listanje je sistemsko, ovo ga ne usporava)
+  // plejer ispod (pjesma, atmosfera) pokazuje prednju kartu — tek kad listanje
+  // stane: usred listanja se ne crta ništa osim karata
+  const restN = Math.min(rest, Math.max(0, n - 1))
   useEffect(() => {
-    const v = verses[cur]
+    const v = verses[restN]
     if (v) onFront?.(v)
-  }, [cur, verses, onFront])
+  }, [restN, verses, onFront])
   // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma, kad
   // listanje stane. Kad plejer pređe na drugu pjesmu, špil je stiže — tad se ništa ne pušta
-  const restN = Math.min(rest, Math.max(0, n - 1))
   const lastRest = useRef(restN)
   const live = useRef({ playing: player.playing, verses })
   useEffect(() => {
@@ -259,7 +259,6 @@ export function SavedCarousel({
             verse={v}
             index={i}
             front={i === cur}
-            far={Math.abs(i - cur) >= 2}
             full={Math.abs(i - near) <= 3}
             onOpen={onOpen}
             onPick={go}
@@ -329,7 +328,6 @@ const Card = memo(function Card({
   verse,
   index,
   front,
-  far,
   full,
   onOpen,
   onPick,
@@ -337,8 +335,6 @@ const Card = memo(function Card({
   verse: Verse
   index: number
   front: boolean
-  /** dalje od prve susjede — crta se tek kad panel sjedne (globals.css) */
-  far: boolean
   full: boolean
   onOpen?: (verse: Verse) => void
   onPick: (i: number) => void
@@ -351,7 +347,6 @@ const Card = memo(function Card({
   return (
     <div
       data-card
-      data-far={far ? '' : undefined}
       aria-hidden={!front}
       className={`relative h-full shrink-0 snap-center snap-always ${front ? '' : 'cursor-pointer'}`}
       style={{ width: 'var(--cw)' }}
@@ -372,11 +367,7 @@ const Card = memo(function Card({
           onClick={front ? tap : undefined}
         >
           {full ? (
-            <>
-              <CardFace verse={verse} o={0} onOpen={onOpen} />
-              {/* obris dok se plejer otvara (SavedPanel `data-skel`) */}
-              <CardSkeleton verse={verse} overlay />
-            </>
+            <CardFace verse={verse} o={0} onOpen={onOpen} />
           ) : (
             <CardSkeleton verse={verse} />
           )}
@@ -412,8 +403,11 @@ function CardFaceView({
 }) {
   const m = MOODS[verse.mood]
   const album = albumOf(verse.album)
-  // karta u traci: atmosfera kao jedna ispečena slika (raširena je crta slojevima)
-  const still = onCollapse ? undefined : cardStillOf(verse.album, verse.mood)
+  // atmosfera kao jedna ispečena slika — i na raširenoj karti (bez maski i zrna)
+  const still = cardStillOf(verse.album, verse.mood)
+  // raširena karta: sve što se tokom rasta pretapa ili pomjera je svoj sloj od
+  // prvog kadra — animacija ne mora usred kretnje iznova crtati cijelu kartu
+  const layer: CSSProperties | undefined = onCollapse ? { willChange: 'transform, opacity' } : undefined
   const text = asWritten(verse.text)
   const look = parseFont(verse.font).look
   const front = o === 0
@@ -499,7 +493,7 @@ function CardFaceView({
             <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
             <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
           </div>
-          <div data-shrink className="flex items-center gap-2" style={{ transformOrigin: 'right center' }}>
+          <div data-shrink className="flex items-center gap-2" style={{ ...layer, transformOrigin: 'right center' }}>
             {/* raširi kartu preko cijelog ekrana / skupi je nazad */}
             {(onOpen || onCollapse) && (
               <button
@@ -512,11 +506,11 @@ function CardFaceView({
                 {/* na raširenoj karti obje ikone, jedna preko druge — pretapaju se dok
                     karta raste (components/SavedFull.tsx `data-small` / `data-big`) */}
                 <span className="relative block h-[15px] w-[15px]">
-                  <span data-small className="absolute inset-0">
+                  <span data-small className="absolute inset-0" style={layer}>
                     <ExpandIcon />
                   </span>
                   {onCollapse && (
-                    <span data-big className="absolute inset-0" style={{ opacity: 0 }}>
+                    <span data-big className="absolute inset-0" style={{ ...layer, opacity: 0 }}>
                       <ExpandIcon collapse />
                     </span>
                   )}
@@ -541,7 +535,7 @@ function CardFaceView({
 
         {/* dan kad je sačuvan → stih — datum isti kao na ekranu stiha */}
         {/* razmaci isti kao na ekranu stiha: datum → stih → dugmad (32 / 52) */}
-        <div ref={mid} className="flex flex-1 flex-col items-center justify-center" style={{ gap: '32em' }}>
+        <div ref={mid} className="flex flex-1 flex-col items-center justify-center" style={{ ...layer, gap: '32em' }}>
           <p
             className="tabular"
             style={{
@@ -573,7 +567,7 @@ function CardFaceView({
           {/* radnje stiha — mjesto je i na maloj karti, pa se pri uvećanju ništa ne pomjeri */}
           <div className="flex items-center justify-center" style={{ height: '44em', marginTop: '20em' }}>
             {actionsZoom && (
-              <div data-nodrag data-big className="flex items-center gap-2.5" style={{ zoom: actionsZoom, opacity: 0 }}>
+              <div data-nodrag data-big className="flex items-center gap-2.5" style={{ ...layer, zoom: actionsZoom, opacity: 0 }}>
                 <FavoriteButton id={verse.id} accent={m.accent} />
                 <ShareButton verse={verse} accent={m.accent} date={saved} pill />
               </div>
@@ -588,7 +582,7 @@ function CardFaceView({
             data-nodrag
             data-big
             className="absolute flex items-center gap-2.5"
-            style={{ left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, bottom: '18em', opacity: 0, transformOrigin: 'center bottom' }}
+            style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, bottom: '18em', opacity: 0, transformOrigin: 'center bottom' }}
           >
             <SongRow verse={verse} accent={m.accent} fit vinyl={46} />
           </div>
@@ -601,7 +595,7 @@ function CardFaceView({
       <div
         data-small
         className="pointer-events-none absolute z-[1] flex flex-col items-center text-center"
-        style={{ left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${H - FADE - 7}em`, gap: '7em' }}
+        style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${H - FADE - 7}em`, gap: '7em' }}
       >
         <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '12.5em', letterSpacing: '0.2em', color: m.accent }}>
           {verse.song}
@@ -615,13 +609,13 @@ function CardFaceView({
       <span
         data-small
         className={`pointer-events-none absolute inset-x-0 top-0 rounded-[26px] border ${front ? 'border-white/15' : 'border-white/30'}`}
-        style={{ height: `${H}em` }}
+        style={{ ...layer, height: `${H}em` }}
         aria-hidden
       />
       <span
         data-big
         className="pointer-events-none absolute inset-0 rounded-[inherit] border border-b-0 border-white/15"
-        style={{ opacity: 0 }}
+        style={{ ...layer, opacity: 0 }}
         aria-hidden
       />
 
@@ -630,7 +624,7 @@ function CardFaceView({
       <span
         data-small
         className="pointer-events-none absolute inset-x-[-1px]"
-        style={{ top: `${H - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }}
+        style={{ ...layer, top: `${H - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }}
         aria-hidden
       />
 
@@ -640,17 +634,15 @@ function CardFaceView({
 
 /**
  * Obris karte: boja raspoloženja i tihe linije umjesto datuma, stiha i
- * pjesme — crta se za tren. Dok se plejer otvara (`overlay`, preko lica) i
- * pri brzom listanju (karte van pripremljenog prozora).
+ * pjesme — crta se za tren. Pri brzom listanju (karte van pripremljenog prozora).
  */
-const CardSkeleton = memo(function CardSkeleton({ verse, overlay = false }: { verse: Verse; overlay?: boolean }) {
+const CardSkeleton = memo(function CardSkeleton({ verse }: { verse: Verse }) {
   const m = MOODS[verse.mood]
   const line = (w: string, h: number, bg: string) => <span className="block rounded-full" style={{ width: w, height: `${h}em`, background: bg }} />
   return (
     <div
-      data-skel-card={overlay ? '' : undefined}
       aria-hidden
-      className={`${overlay ? 'pointer-events-none absolute inset-0' : 'relative h-full w-full'} overflow-hidden rounded-[26px] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]`}
+      className={`relative h-full w-full overflow-hidden rounded-[26px] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]`}
       style={{ fontSize: `calc(var(--cw) / ${W})`, background: `linear-gradient(180deg, ${m.gradient[0]} 0%, ${m.gradient[0]} 80%, rgba(12,11,11,0) 100%)` }}
     >
       <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: '210em', gap: '22em' }}>
@@ -664,8 +656,6 @@ const CardSkeleton = memo(function CardSkeleton({ verse, overlay = false }: { ve
         {line('30%', 11, `${m.accent}55`)}
         {line('42%', 8, 'rgba(255,255,255,0.12)')}
       </div>
-      {/* odsjaj dok se plejer otvara (globals.css `.skel-shine`) */}
-      {overlay && <span aria-hidden className="skel-shine" />}
     </div>
   )
 })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
@@ -137,10 +137,12 @@ function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 
   })
 }
 
+type Opened = { verse: Verse; from: Rect }
+/** otvaranje ide pravo u sloj raširene karte — špil i plejer se ne crtaju iznova */
+let show: ((o: Opened | null) => void) | null = null
+
 /** `saved`: svi sačuvani redom — dvije sljedeće vire iza raširene. */
 export function useSavedFull(saved: Verse[] = []): { open: (verse: Verse) => void; view: ReactNode } {
-  const [full, setFull] = useState<{ verse: Verse; from: Rect } | null>(null)
-
   const open = useCallback((verse: Verse) => {
     const card = cardOf(verse.id)
     if (!card) return
@@ -149,7 +151,19 @@ export function useSavedFull(saved: Verse[] = []): { open: (verse: Verse) => voi
     // plejer ispod špila prekriva dno karte — kopija počinje (i sleti) iznad njega
     const player = document.querySelector('[data-player]')?.getBoundingClientRect()
     const visible = player && player.top > r.top ? Math.min(r.height, player.top - r.top) : r.height
-    setFull({ verse, from: { left: r.left, top: r.top, width: r.width, height: r.height, visible } })
+    show?.({ verse, from: { left: r.left, top: r.top, width: r.width, height: r.height, visible } })
+  }, [])
+  const view = useMemo(() => <SavedFullLayer saved={saved} />, [saved])
+  return { open, view }
+}
+
+function SavedFullLayer({ saved }: { saved: Verse[] }) {
+  const [full, setFull] = useState<Opened | null>(null)
+  useEffect(() => {
+    show = setFull
+    return () => {
+      if (show === setFull) show = null
+    }
   }, [])
   const done = useCallback(() => setFull(null), [])
 
@@ -160,10 +174,7 @@ export function useSavedFull(saved: Verse[] = []): { open: (verse: Verse) => voi
     behind = behind.filter((v, d) => behind.findIndex((x) => x.id === v.id) === d)
   }
 
-  return {
-    open,
-    view: full && <SavedFull key={full.verse.id} verse={full.verse} from={full.from} behind={behind} onClosed={done} />,
-  }
+  return full && <SavedFull key={full.verse.id} verse={full.verse} from={full.from} behind={behind} onClosed={done} />
 }
 
 function SavedFull({

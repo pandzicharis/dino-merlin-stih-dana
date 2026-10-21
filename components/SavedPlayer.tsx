@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
 import { albumOf, thumbOf } from '@/data/albums'
@@ -291,60 +291,27 @@ function moodBg(v: Verse) {
   return `radial-gradient(130% 120% at 15% 0%, ${m.gradient[2]}66 0%, transparent 55%), radial-gradient(120% 120% at 100% 100%, ${m.gradient[1]}aa 0%, transparent 60%), linear-gradient(180deg, ${m.gradient[1]} 0%, ${m.gradient[0]} 100%)`
 }
 
-/** Atmosfera stiha iza plejera; omot jedva, zamućen — pretopi se s pjesmom. */
+/** Atmosfera stiha iza plejera — samo boje (bez zamućenog omota i pretapanja). */
 function Atmosphere({ verse }: { verse: Verse }) {
-  const cover = albumOf(verse.album)?.cover
   return (
-    <AnimatePresence initial={false}>
-      <motion.div
-        key={verse.id}
-        className="absolute inset-0"
-        // svoj sloj: pretapanje dvije atmosfere ne računa zamućenje iznova svaki kadar
-        style={{ willChange: 'opacity' }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3 }}
-        aria-hidden
-      >
-        <div className="absolute inset-0" style={{ background: moodBg(verse) }} />
-        {cover && (
-          // mali sloj uvećan — izgleda kao jako zamućen, a crta se jeftino (i sličica je dovoljna)
-          <div
-            className="absolute left-0 top-0 h-[30%] w-[30%] origin-top-left bg-cover bg-center opacity-25"
-            style={{ backgroundImage: `url(${thumbOf(cover) ?? cover})`, filter: 'blur(6px)', transform: 'scale(3.5)' }}
-          />
-        )}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.4) 100%)' }} />
-      </motion.div>
-    </AnimatePresence>
+    <div className="absolute inset-0" aria-hidden>
+      <div className="absolute inset-0" style={{ background: moodBg(verse) }} />
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.4) 100%)' }} />
+    </div>
   )
 }
 
 /** Pjesma kao ispod stiha na početnoj: naziv krupno u boji stiha, album · godina sitno. */
 function Credit({ verse, size = 12.5, track = 0.18 }: { verse: Verse; size?: number; track?: number }) {
   const m = MOODS[verse.mood]
-  // stara i nova pjesma u istoj ćeliji — pretope se bez mjerenja rasporeda
   return (
-    <div className="grid min-w-0">
-      <AnimatePresence initial={false}>
-        <motion.div
-          key={verse.id}
-          className="col-start-1 row-start-1 min-w-0"
-          style={{ willChange: 'opacity, transform' }}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <p className="truncate font-semibold uppercase leading-tight" style={{ fontSize: size, letterSpacing: `${track}em`, color: m.accent }}>
-            {verse.song}
-          </p>
-          <p className="mt-1.5 truncate text-[10px] uppercase tracking-[0.22em] text-white/55">
-            {verse.album} · {verse.year}
-          </p>
-        </motion.div>
-      </AnimatePresence>
+    <div className="min-w-0">
+      <p className="truncate font-semibold uppercase leading-tight" style={{ fontSize: size, letterSpacing: `${track}em`, color: m.accent }}>
+        {verse.song}
+      </p>
+      <p className="mt-1.5 truncate text-[10px] uppercase tracking-[0.22em] text-white/55">
+        {verse.album} · {verse.year}
+      </p>
     </div>
   )
 }
@@ -607,7 +574,7 @@ function useFocusPlaying(list: React.RefObject<HTMLElement | null>, active = tru
 }
 
 /** Pjesme: lista sačuvanih (najnovija prva). */
-export function SavedList({ verses, front, active = true }: { verses: Verse[]; front: Verse | null; active?: boolean }) {
+export const SavedList = memo(function SavedList({ verses, front, active = true }: { verses: Verse[]; front: Verse | null; active?: boolean }) {
   const p = { id: useSavedPlayerSelect((s) => s.id), playing: useSavedPlayerSelect((s) => s.playing) }
   // po pjesmi: red pjesme je "trenutni" i kad svira drugi njen stih
   const nowKey = nowKeyOf(p.id)
@@ -617,14 +584,14 @@ export function SavedList({ verses, front, active = true }: { verses: Verse[]; f
   return (
     // redovi (i podloga reda koji svira) u liniji sa zaglavljem — od ikonice do ×
     <ul ref={ul} className="flex flex-col pt-1 [&>li+li]:border-t [&>li+li]:border-white/[0.06]">
-      {verses.map((v, k) => (
-        <motion.li key={v.id} data-now={keyOf(v) === nowKey} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: Math.min(k, 8) * 0.04, ease: [0.22, 1, 0.36, 1] }}>
+      {verses.map((v) => (
+        <li key={v.id} data-now={keyOf(v) === nowKey}>
           <SongItem v={v} on={keyOf(v) === curKey} playing={p.playing && keyOf(v) === nowKey} />
-        </motion.li>
+        </li>
       ))}
     </ul>
   )
-}
+})
 
 /** sačuvani po albumima, redom kako su sačuvani (najnoviji prvi) */
 function byAlbum(verses: Verse[]) {
@@ -682,14 +649,6 @@ const AlbumCard = memo(
         }}
       >
         <div className="absolute inset-0" style={{ background: moodBg(first) }} aria-hidden />
-        {cover && (
-          <div
-            className="absolute left-0 top-0 h-[30%] w-[30%] origin-top-left bg-cover bg-center opacity-35"
-            // zamućenje se nacrta jednom u sloj kartice (ne kao filter grafičkog procesora — taj se računa svaki kadar)
-            style={{ backgroundImage: `url(${thumbOf(cover) ?? cover})`, filter: 'blur(5px)', transform: 'scale(3.5)' }}
-            aria-hidden
-          />
-        )}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.6) 100%)' }} aria-hidden />
 
         {/* album: omot, naziv, godina, broj pjesama — u liniji s pjesmama ispod
@@ -697,7 +656,7 @@ const AlbumCard = memo(
         <div className="relative flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
           <span
             className="block h-[72px] w-[72px] shrink-0 rounded-[14px] bg-cover bg-center"
-            style={{ backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: '0 10px 26px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.1)' }}
+            style={{ backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }}
             aria-hidden
           />
           <div className="min-w-0">

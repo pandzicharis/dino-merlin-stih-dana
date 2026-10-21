@@ -25,8 +25,6 @@ export type SavedView = View
  * uzme koliko ima (SavedCarousel).
  */
 const FIT = 'calc(96dvh - 250px - env(safe-area-inset-bottom, 0px))'
-/** blago pretapanje liste pjesama: gore malo, dole prema plejeru više */
-const LIST_FADE = 'linear-gradient(to bottom, transparent 0, black 12px, black calc(100% - 150px), rgba(0,0,0,0.15) calc(100% - 80px))'
 /** visina reda pjesme (omot 46 + razmak) — liste su visoke koliko pjesama ima */
 const ROW = 70
 /** najviše ovoliko redova se vidi odjednom — ostalo se skrola (pola reda viri) */
@@ -172,9 +170,7 @@ export const SavedVerses = memo(function SavedVerses({
             izabrani (pretopi se). isolate: karte ostaju ispod plejera */}
         <div
           className="relative isolate min-h-0 shrink"
-          // visina se mekano mijenja samo dok je plejer otvoren (globals.css `data-pane-box`)
-          data-pane-box
-          style={{ height: paneHeight(view, songs.length, loved, !onClose), transition: 'height 0.45s cubic-bezier(0.32, 0.72, 0, 1)' }}
+          style={{ height: paneHeight(view, songs.length, loved, !onClose) }}
         >
           {VIEWS.filter((v) => made.includes(v)).map((v) => {
             const on = v === view
@@ -186,12 +182,7 @@ export const SavedVerses = memo(function SavedVerses({
                 className={`absolute inset-0 overflow-y-auto overscroll-contain px-5 ${v === 'cards' ? 'pt-3' : 'pb-20'} ${
                   on ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'
                 }`}
-                style={{
-                  transition: on ? 'opacity 0.26s ease' : 'opacity 0.16s ease, visibility 0s linear 0.16s',
-                  // pjesme se blago gube prema plejeru (i ispod zaglavlja) dok se
-                  // skrola — samo kad ih ima više od dvije (jedna-dvije stoje čiste)
-                  ...((v === 'list' && songs.length > 2) || (v === 'loved' && loved > 2) ? { maskImage: LIST_FADE, WebkitMaskImage: LIST_FADE } : {}),
-                }}
+                style={{ transition: on ? 'opacity 0.26s ease' : 'opacity 0.16s ease, visibility 0s linear 0.16s' }}
               >
                 {/* sakriven prikaz se ne crta iznova (Activity) — promjena pjesme
                     osvježi samo ono što se vidi; stanje (mjesto u špilu, skrol) ostaje */}

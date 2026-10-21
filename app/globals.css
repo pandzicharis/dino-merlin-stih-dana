@@ -371,54 +371,10 @@ html[data-deck] .dev-pad .peek-space {
   .eq-bar { animation: none; transform: scaleY(0.7); }
 }
 
-/* plejer pjesama: daleke karte špila (SavedCarousel `data-far`) se ne crtaju
-   dok panel ne sjedne — otvaranje crta samo ono što se vidi (SavedPanel) */
-.os-sheet:not([data-warm]) [data-far] {
+/* donji panel sjeo (components/Sheet.tsx `cover`) — stranica ispod se ne
+   crta: telefon ne slaže njene maske i slojeve u svakom kadru listanja */
+html[data-covered] body > :not([data-sheet-layer], [data-full]) {
   visibility: hidden;
-}
-/* Skelet plejera: dok panel klizi, lica karata se ne crtaju — samo obrisi
-   (SavedPanel `data-skel`). Kad sjedne, lica se pokažu, a obrisi se pretope */
-.os-sheet[data-skel] [data-pane] [data-face] {
-  visibility: hidden;
-}
-[data-skel-card] {
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity 0.34s ease, visibility 0s linear 0.34s;
-}
-/* `data-skel-hold`: lica se upravo crtaju ispod — obrisi još stoje */
-.os-sheet:is([data-skel], [data-skel-hold]) [data-skel-card] {
-  visibility: visible;
-  opacity: 1;
-  transition: none;
-}
-/* odsjaj preko obrisa dok se plejer otvara — samo transform (grafički procesor) */
-.skel-shine {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 55%;
-  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.075) 50%, transparent 100%);
-  transform: translateX(-120%);
-  pointer-events: none;
-}
-.os-sheet[data-skel] .skel-shine {
-  animation: skel-shine 1.25s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-@keyframes skel-shine {
-  from { transform: translateX(-120%); }
-  to { transform: translateX(280%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .os-sheet[data-skel] .skel-shine { animation: none; }
-}
-/* daleke karte ostaju neiscrtane i kao obrisi */
-.os-sheet:not([data-warm]) [data-far] [data-skel-card] {
-  visibility: hidden;
-}
-/* ...i dok se otvara (ili je zatvoren), promjena prikaza (npr. nazad na "Stihovi")
-   ne animira visinu — ivica panela ne poskoči dok on klizi gore */
-.os-sheet:not([data-warm]) [data-pane-box] {
-  transition: none !important;
 }
 
 /* raširena sačuvana karta u pokretu (SavedFull): ukrasne animacije stanu dok
@@ -440,8 +396,6 @@ html[data-deck] .dev-pad .peek-space {
   color: rgba(255, 255, 255, 0.82);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
   transition: color 0.25s, border-color 0.25s, transform 0.15s;
 }
 .hdr-btn:hover {

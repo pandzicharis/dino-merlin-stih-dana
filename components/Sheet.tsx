@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { animate, motion, useIsPresent, useMotionValue } from 'motion/react'
 
 /*
@@ -27,7 +27,7 @@ const CLOSE = { duration: 0.42, ease: [0.4, 0, 0.75, 0.35] as const }
  * Pri sljedećem otvaranju povlačenje kreće od nule — inače bi se panel
  * otvorio tamo gdje ga je prst zadnji put pustio (do pola).
  */
-export function useSheetDrag(onClose: () => void, open: boolean) {
+export function useSheetDrag(onClose: () => void, open: boolean, handle?: RefObject<HTMLElement | null>) {
   const y = useMotionValue(0)
   // spuštanje poslije povlačenja (WAAPI, ostaje dolje) — otkaže se pri otvaranju
   const fly = useRef<Animation | null>(null)
@@ -51,6 +51,9 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
   const [el, setEl] = useState<HTMLElement | null>(null)
   useEffect(() => {
     if (!el) return
+    // `handle`: samo zaglavlje prima povlačenje — sadržaj (karte, albumi, liste)
+    // nema blokirajući touchmove, pa sistem skrola bez čekanja na JavaScript
+    const root = handle?.current ?? el
     // pušten dovoljno nisko (ili brzo): panel NASTAVI dolje odatle gdje ga je
     // prst ostavio, brzinom prsta (bez vraćanja gore), dok se zatvaranje odvija;
     // pri sljedećem otvaranju pomak se vrati na nulu (gore, useLayoutEffect).
@@ -67,7 +70,7 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
     }
     let g: { x0: number; y0: number; scroller: HTMLElement | null; h: boolean; pull: boolean; off: boolean; last: [number, number][] } | null = null
     const scrollerOf = (t: Element | null) => {
-      for (let n = t as HTMLElement | null; n && n !== el; n = n.parentElement) {
+      for (let n = t as HTMLElement | null; n && n !== root; n = n.parentElement) {
         const o = getComputedStyle(n).overflowY
         if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n
       }
@@ -116,10 +119,10 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
       void animate(y, 0, { duration: 0.3, ease: [0.32, 0.72, 0, 1] })
     }
     // hvatanje (capture): i kad dijete zaustavi događaj (prekidači, dugmad)
-    el.addEventListener('touchstart', start, { passive: true, capture: true })
-    el.addEventListener('touchmove', move, { passive: false })
-    el.addEventListener('touchend', end)
-    el.addEventListener('touchcancel', end)
+    root.addEventListener('touchstart', start, { passive: true, capture: true })
+    root.addEventListener('touchmove', move, { passive: false })
+    root.addEventListener('touchend', end)
+    root.addEventListener('touchcancel', end)
 
     // i mišem (računar): pritisni bilo gdje i povuci nadolje — isto pravilo
     let m: { y0: number; x0: number; scroller: HTMLElement | null; pull: boolean; last: [number, number][] } | null = null
@@ -164,25 +167,25 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
       e.stopPropagation()
       e.preventDefault()
     }
-    el.addEventListener('pointerdown', mDown, true)
+    root.addEventListener('pointerdown', mDown, true)
     // link ili slika se ne "vuku" (prevlačenje preglednika bi progutalo povlačenje panela)
     const noNativeDrag = (e: DragEvent) => e.preventDefault()
-    el.addEventListener('dragstart', noNativeDrag, true)
+    root.addEventListener('dragstart', noNativeDrag, true)
     window.addEventListener('pointermove', mMove)
     window.addEventListener('pointerup', mUp)
-    el.addEventListener('click', noClick, true)
+    root.addEventListener('click', noClick, true)
     return () => {
-      el.removeEventListener('touchstart', start, true)
-      el.removeEventListener('touchmove', move)
-      el.removeEventListener('touchend', end)
-      el.removeEventListener('touchcancel', end)
-      el.removeEventListener('pointerdown', mDown, true)
-      el.removeEventListener('dragstart', noNativeDrag, true)
+      root.removeEventListener('touchstart', start, true)
+      root.removeEventListener('touchmove', move)
+      root.removeEventListener('touchend', end)
+      root.removeEventListener('touchcancel', end)
+      root.removeEventListener('pointerdown', mDown, true)
+      root.removeEventListener('dragstart', noNativeDrag, true)
       window.removeEventListener('pointermove', mMove)
       window.removeEventListener('pointerup', mUp)
-      el.removeEventListener('click', noClick, true)
+      root.removeEventListener('click', noClick, true)
     }
-  }, [el, y])
+  }, [el, y, handle])
 
   // jedan način povlačenja za sve panele (prst i miš, bilo gdje) — bez
   // Motion "drag", da se dva povlačenja ne bore oko iste pozicije
@@ -196,7 +199,7 @@ export function useSheetDrag(onClose: () => void, open: boolean) {
 export function SheetLayer({ children, className }: { children: ReactNode; className: string }) {
   const present = useIsPresent()
   return (
-    <div className={className} style={{ pointerEvents: present ? undefined : 'none' }}>
+    <div data-sheet-layer className={className} style={{ pointerEvents: present ? undefined : 'none' }}>
       {children}
     </div>
   )
@@ -262,10 +265,13 @@ export function SheetSlide({
   away = false,
   rise = false,
   onShown,
+  cover = false,
 }: {
   children: ReactNode
   away?: boolean
   rise?: boolean
+  /** kad sjedne, stranica ispod se sakrije (panel preko skoro cijelog ekrana) */
+  cover?: boolean
   /** panel je sjeo (otvaranje gotovo) */
   onShown?: () => void
 }) {
@@ -302,6 +308,15 @@ export function SheetSlide({
         transition: { ...(rise ? RISE : OPEN), opacity: { duration: 0 } },
       }
   const resume = { ...shown, opacity: 1, visibility: 'visible' as const, transition: rise ? RISE : OPEN }
+  // panel sjeo — stranica ispod se sakrije (globals.css `data-covered`): telefon
+  // ne slaže maske i slojeve pozadine u svakom kadru dok se u panelu lista;
+  // vrati se čim panel krene dolje
+  const present = useIsPresent()
+  const leaving = away || !present
+  useLayoutEffect(() => {
+    if (leaving) uncover()
+  }, [leaving])
+  useEffect(() => uncover, [])
   return (
     <motion.div
       className="relative flex w-full max-w-[440px] justify-center"
@@ -318,7 +333,10 @@ export function SheetSlide({
       animate={away ? 'hidden' : from === 'mid' ? 'resume' : go ? 'shown' : 'ready'}
       onAnimationComplete={(d) => {
         if (d === 'hidden') setDown(true)
-        else if (d === 'shown' || d === 'resume') onShown?.()
+        else if (d === 'shown' || d === 'resume') {
+          if (cover && !wide && !leaving) document.documentElement.dataset.covered = ''
+          onShown?.()
+        }
       }}
       exit="hidden"
     >
@@ -328,6 +346,10 @@ export function SheetSlide({
       {!wide && <span aria-hidden className="pointer-events-none absolute inset-x-0 top-full h-[40vh] bg-[#0a0909]" />}
     </motion.div>
   )
+}
+
+function uncover() {
+  delete document.documentElement.dataset.covered
 }
 
 /** Sadržaj tek dva kadra poslije otvaranja — klizanje krene odmah. */
