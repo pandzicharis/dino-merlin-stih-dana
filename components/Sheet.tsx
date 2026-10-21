@@ -227,14 +227,20 @@ function useFrames(on: boolean) {
   return on && go
 }
 
-/** Zatamnjenje iza panela — blago, ekran ispod se vidi zamućen; pojavljuje se postepeno. */
+/**
+ * Zatamnjenje iza panela — tamna zavjesa, pojavljuje se postepeno. Bez
+ * `backdrop-filter` zamućenja: ono se na iPhoneu računa iznova u SVAKOM
+ * kadru u kojem se išta pomjeri (panel, karte, albumi, raširena karta) —
+ * preko cijelog ekrana, najskuplja stvar u plejeru.
+ */
 export function SheetBackdrop({ onClose }: { onClose: () => void }) {
   // kreće zajedno s panelom (SheetSlide)
   const go = useFrames(true)
   return (
     <motion.button
       aria-label="Zatvori"
-      className="absolute inset-0 bg-black/25 backdrop-blur-md backdrop-saturate-150"
+      className="absolute inset-0 bg-black/55"
+      style={{ willChange: 'opacity' }}
       onClick={onClose}
       initial={{ opacity: 0 }}
       animate={go ? { opacity: 1, transition: { duration: 0.4 } } : { opacity: 0 }}

@@ -82,6 +82,8 @@ function deckGate(): string {
   return deckParam('uvod') ?? 'none'
 }
 const still = () => () => {}
+const localHost = () =>
+  process.env.NODE_ENV !== 'production' || /^(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)$/.test(location.hostname)
 
 /**
  * Kapija ispred aplikacije — stoji dok stih nije na početnom ekranu.
@@ -96,8 +98,9 @@ const still = () => () => {}
  * prelaz se osjeti, ali se ne vidi.
  */
 export function Onboarding({ mood, seed }: { mood: Mood; seed: string }) {
-  // Bez ovoga se kapija na desktopu ne može ni pogledati ni proći. Nikad u produkciji.
-  const isLocal = process.env.NODE_ENV !== 'production'
+  // Bez ovoga se kapija na desktopu ne može ni pogledati ni proći. U produkciji
+  // samo na računaru (localhost, lokalna mreža) — za probu prave brzine; javna adresa nikad
+  const isLocal = useSyncExternalStore(still, localHost, () => process.env.NODE_ENV !== 'production')
   const reduced = useReducedMotion()
   const mounted = useMounted()
   const installed = useSyncExternalStore(subscribeInstalled, isStandalone, () => false)

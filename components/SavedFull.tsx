@@ -370,7 +370,7 @@ function SavedFull({
             {/* svoj sloj (will-change): karta se iscrta jednom, u punoj veličini —
                 smanjivanje i odsijecanje dna tokom kretnje je onda samo posao
                 GPU-a, bez ponovnog crtanja pozadine, slova i sjenki */}
-            <div style={{ width: from.width, height: H / k, zoom: k, willChange: 'transform', '--cw': `${from.width}px` } as CSSProperties}>
+            <div style={{ width: from.width, height: H / k, zoom: k, '--cw': `${from.width}px` } as CSSProperties}>
               <CardFace verse={verse} onCollapse={collapse} actionsZoom={1 / k} />
             </div>
           </div>

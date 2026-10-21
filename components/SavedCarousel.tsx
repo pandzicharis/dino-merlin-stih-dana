@@ -361,7 +361,9 @@ const Card = memo(function Card({
     >
       {/* svaka karta svoj stalni sloj: nacrta se jednom, a skrol je samo pomjera
           (slojevi koji se prave i ruše pri svakom zaustavljanju — crtanje usred listanja) */}
-      <div className="absolute inset-0" style={{ willChange: 'transform' }}>
+      {/* susjedne su tamnije — providnost sloja preko tamnog panela (isto kao
+          crni sloj od 20 %, a jedan sloj manje po karti), prelaz na grafičkom procesoru */}
+      <div className="absolute inset-0" style={{ willChange: 'transform', opacity: front ? 1 : 0.8, transition: 'opacity 0.2s ease' }}>
         {/* `data-stih` — po njemu je nađe raširena karta */}
         <div
           data-stih={front && onOpen ? verse.id : undefined}
@@ -379,12 +381,6 @@ const Card = memo(function Card({
             <CardSkeleton verse={verse} />
           )}
         </div>
-        {/* susjedne su tamnije — prednja se ističe */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[26px] bg-black"
-          style={{ opacity: front ? 0 : 0.2, transition: 'opacity 0.2s ease', willChange: 'opacity' }}
-        />
       </div>
     </div>
   )
