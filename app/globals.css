@@ -376,6 +376,11 @@ html[data-deck] .dev-pad .peek-space {
 .os-sheet:not([data-warm]) [data-far] {
   visibility: hidden;
 }
+/* ...i dok se otvara (ili je zatvoren), promjena prikaza (npr. nazad na "Stihovi")
+   ne animira visinu — ivica panela ne poskoči dok on klizi gore */
+.os-sheet:not([data-warm]) [data-pane-box] {
+  transition: none !important;
+}
 
 /* raširena sačuvana karta u pokretu (SavedFull): ukrasne animacije stanu dok
    karta raste ili se skuplja — ništa se ne iscrtava iznova, kretnja je glatka */

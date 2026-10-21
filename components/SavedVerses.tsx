@@ -145,6 +145,8 @@ export const SavedVerses = memo(function SavedVerses({
             izabrani (pretopi se). isolate: karte ostaju ispod plejera */}
         <div
           className="relative isolate min-h-0 shrink"
+          // visina se mekano mijenja samo dok je plejer otvoren (globals.css `data-pane-box`)
+          data-pane-box
           style={{ height: paneHeight(view, songs.length, loved, !onClose), transition: 'height 0.45s cubic-bezier(0.32, 0.72, 0, 1)' }}
         >
           {VIEWS.filter((v) => made.includes(v)).map((v) => {
