@@ -384,12 +384,32 @@ html[data-deck] .dev-pad .peek-space {
 [data-skel-card] {
   visibility: hidden;
   opacity: 0;
-  transition: opacity 0.28s ease 0.04s, visibility 0s linear 0.32s;
+  transition: opacity 0.34s ease, visibility 0s linear 0.34s;
 }
-.os-sheet[data-skel] [data-skel-card] {
+/* `data-skel-hold`: lica se upravo crtaju ispod — obrisi još stoje */
+.os-sheet:is([data-skel], [data-skel-hold]) [data-skel-card] {
   visibility: visible;
   opacity: 1;
   transition: none;
+}
+/* odsjaj preko obrisa dok se plejer otvara — samo transform (grafički procesor) */
+.skel-shine {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 55%;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.075) 50%, transparent 100%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+.os-sheet[data-skel] .skel-shine {
+  animation: skel-shine 1.25s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes skel-shine {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(280%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .os-sheet[data-skel] .skel-shine { animation: none; }
 }
 /* daleke karte ostaju neiscrtane i kao obrisi */
 .os-sheet:not([data-warm]) [data-far] [data-skel-card] {

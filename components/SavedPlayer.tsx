@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
@@ -647,12 +647,15 @@ const AlbumCard = memo(
     curId,
     playingId,
     onBring,
+    lite = false,
   }: {
     name: string
     list: Verse[]
     width: number
     /** ova je ispred */
     ahead: boolean
+    /** daleko od sredine — pjesme kao tihi obrisi (slože se kad se album približi) */
+    lite?: boolean
     curId: string | null
     playingId: string | null
     /** dodir na susjednu karticu je dovede naprijed */
@@ -665,7 +668,8 @@ const AlbumCard = memo(
       <section
         aria-label={name}
         aria-hidden={!ahead}
-        className="relative flex shrink-0 flex-col overflow-hidden rounded-[24px] border border-white/[0.07]"
+        data-album
+        className="relative flex shrink-0 snap-center snap-always flex-col overflow-hidden rounded-[24px] border border-white/[0.07]"
         style={{ width: width || 'calc(100% - 40px)', height: 'min(46dvh, 400px)', contain: 'layout paint' }}
         onClickCapture={(e) => {
           if (ahead) return
@@ -677,7 +681,8 @@ const AlbumCard = memo(
         {cover && (
           <div
             className="absolute left-0 top-0 h-[30%] w-[30%] origin-top-left bg-cover bg-center opacity-35"
-            style={{ backgroundImage: `url(${thumbOf(cover) ?? cover})`, filter: 'blur(5px)', transform: 'scale(3.5)' }}
+            // svoj sloj: zamućenje računa grafički procesor, ne crta se pri listanju
+            style={{ backgroundImage: `url(${thumbOf(cover) ?? cover})`, filter: 'blur(5px)', transform: 'scale(3.5)', willChange: 'transform' }}
             aria-hidden
           />
         )}
@@ -704,11 +709,21 @@ const AlbumCard = memo(
 
         {/* njegove pjesme — isti redovi kao u "Pjesme", lista se skrola u kartici */}
         <div className="relative flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain px-2 pb-2 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
-          {list.map((v) => (
-            <div key={v.id}>
-              <SongItem v={v} on={curId === keyOf(v)} playing={playingId === keyOf(v)} />
-            </div>
-          ))}
+          {lite
+            ? list.slice(0, 6).map((v) => (
+                <div key={v.id} className="flex items-center gap-3 px-2 py-3" aria-hidden>
+                  <span className="block h-[46px] w-[46px] shrink-0 rounded-[10px] bg-white/[0.06]" />
+                  <span className="flex flex-1 flex-col gap-2">
+                    <span className="block h-2.5 w-1/2 rounded-full bg-white/[0.08]" />
+                    <span className="block h-2 w-1/3 rounded-full bg-white/[0.05]" />
+                  </span>
+                </div>
+              ))
+            : list.map((v) => (
+                <div key={v.id}>
+                  <SongItem v={v} on={curId === keyOf(v)} playing={playingId === keyOf(v)} />
+                </div>
+              ))}
         </div>
       </section>
     )
@@ -719,7 +734,8 @@ const AlbumCard = memo(
     a.width === b.width &&
     a.ahead === b.ahead &&
     a.curId === b.curId &&
-    a.playingId === b.playingId,
+    a.playingId === b.playingId &&
+    a.lite === b.lite,
 )
 
 /**
@@ -789,9 +805,10 @@ export function SavedLoved({
 const ALBUM_GAP = 12
 
 /**
- * Albumi kao kartice — prevuci lijevo/desno (i mišem) za sljedeći album:
- * cijeli niz klizi na grafičkom procesoru (transform + opruga), pa nema
- * treptaja. Tačkice ispod pokazuju koji je. Kartica nosi omot (zamućen
+ * Albumi kao kartice — prevuci lijevo/desno za sljedeći album: pravi
+ * vodoravni skrol sistema sa zaustavljanjem na kartici (kao karte stihova),
+ * pa listanje ne zavisi od JavaScripta. Daleki albumi su obrisi dok se ne
+ * približe. Tačkice ispod pokazuju koji je. Kartica nosi omot (zamućen
  * iza), naziv velikim slovima i godinu, a ispod svoje pjesme — isti redovi
  * kao u "Pjesme", u listi koja se skrola gore-dolje unutar kartice.
  *
@@ -817,8 +834,10 @@ export function SavedAlbums({
   // na početku je ispred album pjesme koja svira — inače prvi album
   const [at, setAt] = useState(() => Math.max(0, albums.findIndex((a) => a.list.some((v) => keyOf(v) === nowKey))))
   const i = Math.min(at, n - 1)
+  // pjesme albuma oko onog ispred — slože se poslije (prekidivo), ne u kadru promjene
+  const [near, setNear] = useState(i)
   const box = useRef<HTMLDivElement>(null)
-  const moved = useRef(false)
+  const strip = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(0)
   useEffect(() => {
     const el = box.current
@@ -830,19 +849,61 @@ export function SavedAlbums({
   // kartica u liniji sa zaglavljem (20 px od ivice, kao ikonica i ×);
   // sljedeća je odmah iza ivice — prevuci
   const card = Math.round(w - 40)
-  const step = card + ALBUM_GAP
-  const pad = (w - card) / 2
+  /** album `k` na sredini trake (`smooth`: mekano — tačkice, plejer prešao na drugi) */
+  const scrollTo = useCallback((k: number, smooth: boolean) => {
+    const el = strip.current
+    const c = el?.querySelectorAll<HTMLElement>('[data-album]')[k]
+    if (!el || !c) return
+    el.scrollTo({ left: c.offsetLeft + c.offsetWidth / 2 - el.clientWidth / 2, behavior: smooth ? 'smooth' : 'instant' })
+  }, [])
   const go = (k: number) => {
     const t = Math.max(0, Math.min(n - 1, k))
     if (t !== i) haptic(5)
-    setAt(t)
+    scrollTo(t, true)
   }
+  // gdje je listanje stalo — tek tad se mijenja album ispred (i red plejera)
+  useEffect(() => {
+    const el = strip.current
+    if (!el || n < 2) return
+    let t = 0
+    const settle = () => {
+      clearTimeout(t)
+      const cs = el.querySelectorAll<HTMLElement>('[data-album]')
+      if (cs.length < 2) return
+      const k = Math.max(0, Math.min(n - 1, Math.round(el.scrollLeft / (cs[1].offsetLeft - cs[0].offsetLeft))))
+      setAt(k)
+      startTransition(() => setNear(k))
+    }
+    const onScroll = () => {
+      clearTimeout(t)
+      t = window.setTimeout(settle, 90)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    el.addEventListener('scrollend', settle)
+    return () => {
+      clearTimeout(t)
+      el.removeEventListener('scroll', onScroll)
+      el.removeEventListener('scrollend', settle)
+    }
+  }, [n])
+  // na svoje mjesto odmah — pri slaganju, kad se prikaz ponovo pokaže (Activity), kad se promijeni širina
+  const iRef = useRef(i)
+  useEffect(() => {
+    iRef.current = i
+  }, [i])
+  useLayoutEffect(() => {
+    scrollTo(iRef.current, false)
+  }, [n, card, scrollTo])
 
   // prikaz opet vidljiv (Activity) — ispred je album pjesme koja sad svira
   useEffect(() => {
     const k = byAlbum(verses).findIndex((a) => a.list.some((v) => keyOf(v) === nowKeyOf(savedVerse()?.id ?? null)))
     if (k < 0) return
-    const r = requestAnimationFrame(() => setAt(k))
+    const r = requestAnimationFrame(() => {
+      scrollTo(k, false)
+      setAt(k)
+      setNear(k)
+    })
     return () => cancelAnimationFrame(r)
     // samo pri pokazivanju prikaza
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -854,7 +915,7 @@ export function SavedAlbums({
     const onTrack = (e: Event) => {
       const key = nowKeyOf(String((e as CustomEvent).detail))
       const k = byAlbum(verses).findIndex((a) => a.list.some((v) => keyOf(v) === key))
-      if (k >= 0) setAt(k)
+      if (k >= 0) scrollTo(k, true)
     }
     window.addEventListener(SAVED_TRACK, onTrack)
     return () => window.removeEventListener(SAVED_TRACK, onTrack)
@@ -873,33 +934,15 @@ export function SavedAlbums({
 
   return (
     <div className="pt-2">
-      <div ref={box} className="-mx-5 overflow-hidden">
-        <motion.div
-          className="flex touch-pan-y"
-          style={{ gap: ALBUM_GAP, paddingLeft: pad, paddingRight: pad, willChange: 'transform' }}
-          initial={false}
-          animate={{ x: -i * step }}
-          transition={{ type: 'spring', stiffness: 300, damping: 34 }}
-          // povlačenje nije dodir na pjesmu
-          onPointerDownCapture={() => (moved.current = false)}
-          onDragStart={() => (moved.current = true)}
-          onClickCapture={(e) => {
-            if (!moved.current) return
-            moved.current = false
-            e.stopPropagation()
-            e.preventDefault()
-          }}
-          drag="x"
-          dragDirectionLock
-          dragConstraints={{ left: -(n - 1) * step, right: 0 }}
-          dragElastic={0.12}
-          dragMomentum={false}
-          onDragEnd={(_, info) => {
-            const swipe = Math.abs(info.offset.x) > card * 0.22 || Math.abs(info.velocity.x) > 400
-            if (swipe) go(i + (info.offset.x < 0 ? 1 : -1))
-            else go(i)
-          }}
+      <div ref={box} className="-mx-5">
+        <div
+          ref={strip}
+          data-hscroll
+          className="relative flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ gap: ALBUM_GAP }}
         >
+          {/* razmak do prvog/zadnjeg — da i oni stanu u liniju sa zaglavljem */}
+          <div aria-hidden className="shrink-0" style={{ width: 20 - ALBUM_GAP }} />
           {albums.map(({ name, list }, k) => (
             <AlbumCard
               key={name}
@@ -907,12 +950,14 @@ export function SavedAlbums({
               list={list}
               width={card}
               ahead={k === i}
+              lite={Math.abs(k - near) > 1}
               curId={cur ? keyOf(cur) : null}
               playingId={p.playing ? nowKeyOf(p.id) : null}
               onBring={() => go(k)}
             />
           ))}
-        </motion.div>
+          <div aria-hidden className="shrink-0" style={{ width: 20 - ALBUM_GAP }} />
+        </div>
       </div>
 
       {/* tačkice — koji je album; dodir skoči na njega */}

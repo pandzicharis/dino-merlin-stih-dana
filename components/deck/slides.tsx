@@ -1404,7 +1404,7 @@ function Pristup() {
   )
 }
 
-/** Stih se sačuva, broj u zaglavlju otvori sačuvane: špil karata, raširena karta. */
+/** Stih se sačuva, broj u zaglavlju otvori sačuvane: karte jedna do druge, raširena karta. */
 function Sacuvano() {
   const { os, setOs, manual } = useDeck()
   return (
@@ -1413,9 +1413,9 @@ function Sacuvano() {
       <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
       <Text>
         „Sačuvaj“ ispod stiha, a gore se pojavi ikonica plejera s brojem — dodir otvara Player pjesama: sačuvani
-        stihovi kao špil karata koje izlaze iz plejera, svaka s danom kad je sačuvana, pjesmom i albumom. Prevuci za
-        sljedeći, raširi kartu i stih je preko cijelog ekrana — povuci je nadolje i vrati se u špil. Bez naloga i
-        prijave: sve ostaje na telefonu.
+        stihovi kao karte jedna do druge, svaka s danom kad je sačuvana, pjesmom i albumom. Prevuci za sljedeći —
+        glatko kao listanje fotografija; raširi kartu i stih je preko cijelog ekrana — povuci je nadolje i vrati se
+        među karte. Bez naloga i prijave: sve ostaje na telefonu.
       </Text>
     </>
   )
@@ -1438,7 +1438,7 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
     await wait(1300)
     if (alive()) await press('[data-tip="saved"]')
     // "Raširi" — stih preko cijelog ekrana, kao na početnoj; "Skupi" ga
-    // vrati u špil — pa isto na drugom sistemu
+    // vrati među karte — pa isto na drugom sistemu
     await wait(2200)
     if (alive()) await press('[aria-label="Raširi"]')
     await wait(3400)
@@ -1476,7 +1476,7 @@ function Plejer() {
         Sačuvani su plejer: ikonica gore otvara Player pjesama — stihovi kao karte, pjesme sa cijelim stihom,
         albumi i omiljene (zvjezdica, redom koliko se slušaju). Plejer je u boji stiha, kontrole kao u Apple Musicu,
         a naprijed i natrag idu kroz album ili omiljene u kojima si. Spusti ga — na početnoj pluta mini plejer,
-        muzika ide dalje.
+        muzika ide dalje, a na zaključanom ekranu je omot albuma koji svira.
       </Text>
     </>
   )
@@ -1505,7 +1505,7 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     // ikonica plejera gore — otvara se Player pjesama (karte stihova)
     if (alive()) await press('[data-tip="saved"]')
     await wait(1800)
-    // pusti pa sljedeća — špil klizi za pjesmom
+    // pusti pa sljedeća — karte klize za pjesmom
     if (alive()) await press('[data-player] [aria-label="Pusti"]')
     await wait(2600)
     if (alive()) await press('[data-player] [aria-label="Sljedeća"]')
@@ -1513,7 +1513,7 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     // pjesme (cijeli stih), zvjezdica — u omiljene, albumi
     if (alive()) await press('[data-view="list"]')
     await wait(1600)
-    // zvjezdica u listi (ne na karti u sakrivenom špilu)
+    // zvjezdica u listi (karte je više nemaju)
     if (alive()) await press('[data-pane="list"] [aria-label="Dodaj u omiljene"]')
     await wait(1200)
     if (alive()) await press('[data-view="albums"]')

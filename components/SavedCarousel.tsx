@@ -321,17 +321,31 @@ const Card = memo(function Card({
   onOpen?: (verse: Verse) => void
   onPick: (i: number) => void
 }) {
-  // dodir na prednju kartu je otvara, na susjednu — dovede je na sredinu
+  // dodir na prednju kartu je otvara (dugmad rade svoje)
   const tap = (e: React.MouseEvent) => {
     if ((e.target as Element).closest('button, a, input, [data-nodrag]')) return
-    if (!front) return onPick(index)
     onOpen?.(verse)
   }
   return (
-    <div data-card data-far={far ? '' : undefined} aria-hidden={!front} className="relative h-full shrink-0 snap-center snap-always" style={{ width: 'var(--cw)' }}>
-      <div className="absolute inset-0" style={{ willChange: 'transform' }}>
+    <div
+      data-card
+      data-far={far ? '' : undefined}
+      aria-hidden={!front}
+      className={`relative h-full shrink-0 snap-center snap-always ${front ? '' : 'cursor-pointer'}`}
+      style={{ width: 'var(--cw)' }}
+      // susjedna: dodir je dovede na sredinu — njena dugmad (srce, raširi) se
+      // ne mogu slučajno pritisnuti (pointer-events ispod)
+      onClick={front ? undefined : () => onPick(index)}
+    >
+      {/* svoj sloj samo blizu sredine — daleke karte (obrisi) ne drže memoriju grafičkog procesora */}
+      <div className="absolute inset-0" style={full ? { willChange: 'transform' } : undefined}>
         {/* `data-stih` — po njemu je nađe raširena karta */}
-        <div data-stih={front && onOpen ? verse.id : undefined} className={`absolute inset-0 ${front && onOpen ? 'cursor-pointer' : ''}`} onClick={tap}>
+        <div
+          data-stih={front && onOpen ? verse.id : undefined}
+          className={`absolute inset-0 ${front && onOpen ? 'cursor-pointer' : ''}`}
+          style={front ? undefined : { pointerEvents: 'none' }}
+          onClick={front ? tap : undefined}
+        >
           {full ? (
             <>
               <CardFace verse={verse} o={0} onOpen={onOpen} />
@@ -346,7 +360,7 @@ const Card = memo(function Card({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 rounded-[26px] bg-black"
-          style={{ opacity: front ? 0 : 0.2, transition: 'opacity 0.2s ease', willChange: 'opacity' }}
+          style={{ opacity: front ? 0 : 0.2, transition: 'opacity 0.2s ease', ...(full ? { willChange: 'opacity' } : {}) }}
         />
       </div>
     </div>
@@ -635,6 +649,8 @@ const CardSkeleton = memo(function CardSkeleton({ verse, overlay = false }: { ve
         {line('30%', 11, `${m.accent}55`)}
         {line('42%', 8, 'rgba(255,255,255,0.12)')}
       </div>
+      {/* odsjaj dok se plejer otvara (globals.css `.skel-shine`) */}
+      {overlay && <span aria-hidden className="skel-shine" />}
     </div>
   )
 })

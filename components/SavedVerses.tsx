@@ -5,6 +5,7 @@ import { Activity, memo, startTransition, useCallback, useEffect, useMemo, useSt
 import type { Verse } from '@/data/verses'
 import { useFavorites, useLovedIds, useMounted } from '@/lib/client-store'
 import { BRAND } from '@/lib/brand'
+import { MOODS } from '@/data/moods'
 import { useSavedFull } from './SavedFull'
 import { SavedCarousel } from './SavedCarousel'
 import { SAVED_TRACK, closeSaved, setSavedPlaylist } from '@/lib/player'
@@ -47,6 +48,31 @@ function paneHeight(view: SavedView, songs: number, loved: number, page: boolean
   const n = view === 'loved' ? loved : songs
   if (!n) return `${200 + UNDER}px`
   return `${Math.round(Math.min(n, MAX_ROWS) * ROW + 12 + UNDER)}px`
+}
+
+/**
+ * Tačkice ispod karata — kao ispod albuma (aktivna duža, u boji stiha). Za
+ * mnogo stihova vidi se prozor oko trenutne (do 9), krajnje su manje — znak
+ * da ih ima još — a prozor klizi za kartom. Samo pokazuje, ne prima dodir.
+ */
+function Pager({ n, at, accent }: { n: number; at: number; accent: string }) {
+  const VIS = 9
+  const first = n <= VIS ? 0 : Math.max(0, Math.min(n - VIS, at - Math.floor(VIS / 2)))
+  return (
+    <div aria-hidden className="pointer-events-none flex h-6 items-center justify-center gap-1.5">
+      {Array.from({ length: Math.min(n, VIS) }, (_, j) => {
+        const k = first + j
+        const edge = n > VIS && ((j === 0 && first > 0) || (j === VIS - 1 && k < n - 1))
+        return (
+          <span
+            key={k}
+            className="block rounded-full transition-all duration-300"
+            style={{ height: edge ? 4 : 6, width: k === at ? 18 : edge ? 4 : 6, background: k === at ? accent : 'rgba(255,255,255,0.22)' }}
+          />
+        )
+      })}
+    </div>
+  )
 }
 
 /** prikazi po redu — svi ostaju montirani, pa je prebacivanje samo pretapanje */
@@ -183,6 +209,12 @@ export const SavedVerses = memo(function SavedVerses({
               </div>
             )
           })}
+          {/* tačkice ispod karata (kao ispod albuma) — tik iznad plejera */}
+          {onClose && view === 'cards' && list.length > 1 && (
+            <div className="pointer-events-none absolute inset-x-0 z-[1]" style={{ bottom: UNDER + 2 }}>
+              <Pager n={list.length} at={Math.max(0, list.findIndex((v) => v.id === front?.id))} accent={front ? MOODS[front.mood].accent : BRAND.gold} />
+            </div>
+          )}
         </div>
         {/* plejer uz dno panela — karta se pretapa u njega (prekrije joj dno);
             uvijek isto mjesto, pa se ništa ne pomjera pri prebacivanju */}

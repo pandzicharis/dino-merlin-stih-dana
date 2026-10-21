@@ -1076,7 +1076,7 @@ export function Ostalo({ d }: { d: DeckData }) {
     ...(TIPS_ON ? ['Savjeti pri prvom otvaranju'] : []),
     'Atmosfera po raspoloženju, album u pozadini',
     'Pjesma uz stih, u pozadini',
-    'Sačuvani kao špil karata, s pjesmom',
+    'Sačuvani kao karte, s pjesmom',
     'Player pjesama: stihovi, pjesme, albumi, omiljene',
     'Mini plejer dok muzika svira',
     'Dijeljenje kao slika',

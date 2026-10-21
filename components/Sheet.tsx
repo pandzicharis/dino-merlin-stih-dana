@@ -271,6 +271,19 @@ export function SheetSlide({
   // kadra kasnije klizne odozdo, već nacrtan: bez zastoja, poskoka i
   // sadržaja koji se pojavljuje tek usput
   const go = useFrames(!away)
+  // Otvoren usred spuštanja (spusti pa odmah dodir): panel nastavi gore
+  // odatle gdje jeste — bez skoka na dno i bez treptaja. Samo iz mirovanja
+  // (spuštanje gotovo) ide u dva koraka iznad.
+  const [down, setDown] = useState(away)
+  const [from, setFrom] = useState<'rest' | 'mid'>('rest')
+  const [wasAway, setWasAway] = useState(away)
+  if (wasAway !== away) {
+    setWasAway(away)
+    if (!away) {
+      setFrom(down ? 'rest' : 'mid')
+      setDown(false)
+    }
+  }
   const ready = wide
     ? { ...hidden, visibility: 'visible' as const, transition: { duration: 0 } }
     : { transform: 'translateY(0%)', opacity: 0.001, visibility: 'visible' as const, transition: { duration: 0 } }
@@ -282,6 +295,7 @@ export function SheetSlide({
         visibility: 'visible' as const,
         transition: { ...(rise ? RISE : OPEN), opacity: { duration: 0 } },
       }
+  const resume = { ...shown, opacity: 1, visibility: 'visible' as const, transition: rise ? RISE : OPEN }
   return (
     <motion.div
       className="relative flex w-full max-w-[440px] justify-center"
@@ -292,10 +306,14 @@ export function SheetSlide({
         hidden: { ...hidden, transition: CLOSE, ...(away ? { transitionEnd: { visibility: 'hidden' } } : {}) },
         ready,
         shown: open,
+        resume,
       }}
       initial={away ? { ...hidden, visibility: 'hidden' } : 'hidden'}
-      animate={away ? 'hidden' : go ? 'shown' : 'ready'}
-      onAnimationComplete={(d) => d === 'shown' && onShown?.()}
+      animate={away ? 'hidden' : from === 'mid' ? 'resume' : go ? 'shown' : 'ready'}
+      onAnimationComplete={(d) => {
+        if (d === 'hidden') setDown(true)
+        else if (d === 'shown' || d === 'resume') onShown?.()
+      }}
       exit="hidden"
     >
       {children}

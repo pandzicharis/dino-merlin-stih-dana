@@ -101,17 +101,18 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   // (slike, stih) se ne crtaju, pa je svaki kadar kretnje lak. Kad panel
   // sjedne i slike su dekodirane (najviše 250 ms poslije), lica se pokažu, a
   // obrisi se pretope (globals.css `data-skel`)
-  // montiran već otvoren (prvi dodir prije slaganja unaprijed) — i tad skelet
-  const [skel, setSkel] = useState(open)
+  // montiran već otvoren (prvi dodir prije slaganja unaprijed) — i tad skelet.
+  // 'hold': lica se upravo crtaju ispod obrisa (dva kadra), pa se obrisi pretope
+  const [skel, setSkel] = useState<'on' | 'hold' | 'off'>(open ? 'on' : 'off')
   const slid = useRef<() => void>(() => {})
   const onShown = useCallback(() => slid.current(), [])
   useEffect(() => {
-    if (!open || !skel) return
+    if (!open || skel !== 'on') return
     let alive = true
     const decoded = decodeIn(document.querySelector('[role="dialog"][aria-label="Player pjesama"]'))
     const after = (ms: number) => new Promise((r) => window.setTimeout(r, ms))
     const sat = new Promise<void>((r) => (slid.current = r))
-    const show = () => alive && setSkel(false)
+    const show = () => alive && setSkel('hold')
     void sat.then(() => Promise.race([decoded, after(250)])).then(show)
     // nikad ne ostane skelet
     void after(1500).then(show)
@@ -124,9 +125,25 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
     setShown(open)
     if (open && idle) setView('cards')
     setRise(open && mini && hasId)
-    setSkel(open)
+    setSkel(open ? 'on' : 'off')
   }
+
   const peek = !open && mini && hasId
+  // lica se nacrtaju ispod obrisa (ovaj kadar i sljedeći), pa tek onda obrisi
+  // krenu da se pretapaju — pretapanje ne čeka crtanje i ne preskoči početak
+  useEffect(() => {
+    if (skel !== 'hold') return
+    let b = 0
+    const a = requestAnimationFrame(() => {
+      b = requestAnimationFrame(() => setSkel('off'))
+    })
+    const t = window.setTimeout(() => setSkel('off'), 200)
+    return () => {
+      cancelAnimationFrame(a)
+      cancelAnimationFrame(b)
+      clearTimeout(t)
+    }
+  }, [skel])
   // Daleke karte (iza druge susjede, spremne za prevlačenje) se crtaju tek
   // kad se lica pokažu — `data-warm`, globals.css. Bez Reacta
   useEffect(() => {
@@ -137,7 +154,7 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
       const t = window.setTimeout(() => delete el.dataset.warm, 460)
       return () => clearTimeout(t)
     }
-    if (skel) return
+    if (skel !== 'off') return
     const t = window.setTimeout(() => (el.dataset.warm = ''), 300)
     return () => clearTimeout(t)
   }, [open, skel])
@@ -194,7 +211,8 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
             aria-modal={open}
             aria-label="Player pjesama"
             aria-hidden={!open}
-            data-skel={skel ? '' : undefined}
+            data-skel={skel === 'on' ? '' : undefined}
+            data-skel-hold={skel === 'hold' ? '' : undefined}
             className={`os-sheet ${open ? 'pointer-events-auto' : ''} relative flex max-h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:rounded-[30px]`}
             {...sheetDrag}
             style={{

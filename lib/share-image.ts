@@ -192,6 +192,33 @@ export type Mark = { kind: 'sig' | 'date' | 'song' | 'album' | 'label'; x: numbe
  */
 type VerseOpts = { bare?: boolean; boxes?: WordBox[]; marks?: Mark[] }
 
+/**
+ * Stih sa sjenom kao na ekranu (VerseText): `0 2px 30px rgba(0,0,0,.5)` i
+ * aura u boji naglaska `0 0 48px accent/18%` — u pikselima ekrana širokog
+ * 390, pa umnoženo na širinu slike. Ranije je sjena bila oko dva puta uža i
+ * tik uz slova, pa su slova izgledala udvostručeno. Aura se crta samo kao
+ * sjena: slova su tad van platna (pomak), pa se ne pojačaju dvaput.
+ */
+function drawVerseShadowed(ctx: CanvasRenderingContext2D, W: number, light: boolean, draw: (opts?: { quiet?: boolean }) => void) {
+  if (light) return draw()
+  const k = W / 390
+  const glow = ctx.fillStyle
+  ctx.save()
+  const off = W * 4
+  ctx.translate(-off, 0)
+  ctx.shadowOffsetX = off
+  ctx.shadowColor = typeof glow === 'string' && glow.startsWith('#') ? rgba(glow, 0.18) : 'rgba(0,0,0,0)'
+  ctx.shadowBlur = 48 * k
+  draw({ quiet: true })
+  ctx.restore()
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'
+  ctx.shadowBlur = 30 * k
+  ctx.shadowOffsetY = 2 * k
+  draw()
+  ctx.restore()
+}
+
 /** Nacrtaj redove centrirano; `y` je sredina prvog reda. Riječi s naglaskom u boji `accent`. */
 function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, y: number, lh: number, size: number, serif: string, accent?: string, opts: VerseOpts = {}) {
   if (opts.bare) return
@@ -650,13 +677,12 @@ async function render(input: ShareInput, opts: VerseOpts = {}): Promise<HTMLCanv
 
     ctx.save()
     ctx.font = `400 ${size}px ${fonts.serif}`
-    ctx.fillStyle = p.text
-    if (!p.light) {
-      ctx.shadowColor = 'rgba(0,0,0,0.5)'
-      ctx.shadowBlur = size * 0.4
-      ctx.shadowOffsetY = size * 0.03
-    }
-    drawVerse(ctx, lines, W / 2, y + lh / 2, lh, size, fonts.serif, p.accent, opts)
+    // aura u boji naglaska (kao na ekranu), pa slova u boji stiha
+    ctx.fillStyle = p.accent
+    drawVerseShadowed(ctx, W, p.light, (o) => {
+      ctx.fillStyle = o?.quiet ? p.accent : p.text
+      drawVerse(ctx, lines, W / 2, y + lh / 2, lh, size, fonts.serif, p.accent, o?.quiet ? { bare: opts.bare } : opts)
+    })
     ctx.restore()
     y += lines.length * lh + g1
 
@@ -867,13 +893,12 @@ async function render(input: ShareInput, opts: VerseOpts = {}): Promise<HTMLCanv
 
   ctx.save()
   ctx.font = `400 ${size}px ${fonts.serif}`
-  ctx.fillStyle = p.text
-  if (!p.light) {
-    ctx.shadowColor = 'rgba(0,0,0,0.5)'
-    ctx.shadowBlur = size * 0.4
-    ctx.shadowOffsetY = size * 0.03
-  }
-  drawVerse(ctx, lines, W / 2, firstY, lh, size, fonts.serif, p.accent, opts)
+  // aura u boji naglaska (kao na ekranu), pa slova u boji stiha
+  ctx.fillStyle = p.accent
+  drawVerseShadowed(ctx, W, p.light, (o) => {
+    ctx.fillStyle = o?.quiet ? p.accent : p.text
+    drawVerse(ctx, lines, W / 2, firstY, lh, size, fonts.serif, p.accent, o?.quiet ? { bare: opts.bare } : opts)
+  })
   ctx.restore()
 
 

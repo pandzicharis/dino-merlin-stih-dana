@@ -85,6 +85,16 @@ export function thumbOf(cover?: string): string | undefined {
 }
 
 /**
+ * Omot za zaključan ekran i kontrolni centar (Media Session): kvadratni JPEG
+ * 512 px — iPhone veliki WebP tu zna ne učitati, pa pokaže ikonu aplikacije.
+ */
+export function lockArtOf(cover?: string): string | undefined {
+  const id = coverId(cover)
+  const url = id && `/albumi/lock/${id}.jpg`
+  return url && MADE.has(url) ? url : undefined
+}
+
+/**
  * Oštri omot za karte u špilu (karta do ~320 px, 3× ekran): 960 px umjesto
  * 1200+ — brže se dekodira i drži manje memorije dok se karte prevlače.
  */

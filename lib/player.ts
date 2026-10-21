@@ -13,7 +13,7 @@
 import { useSyncExternalStore } from 'react'
 import type { Verse } from '@/data/verses'
 import AUDIO from '@/data/audio.json'
-import { albumOf } from '@/data/albums'
+import { albumOf, lockArtOf } from '@/data/albums'
 import { audioFile } from './audio-name'
 import { BRAND } from './brand'
 import { youtubeId } from './text'
@@ -102,13 +102,18 @@ export function session(a: HTMLAudioElement, verse: Verse, tracks?: { prev: () =
   const ms = navigator.mediaSession
   owner = a
   const cover = albumOf(verse.album)?.cover
+  // omot albuma koji svira — prvo kvadratni JPEG (iPhone ga sigurno pokaže),
+  // pune adrese (sistem ih preuzima sam, van stranice)
+  const abs = (u: string) => new URL(u, location.href).href
+  const lock = lockArtOf(cover)
   ms.metadata = new MediaMetadata({
     title: verse.song,
     artist: BRAND.name,
     album: verse.album,
     artwork: [
-      ...(cover ? [{ src: cover, sizes: '1200x1200', type: 'image/webp' }] : []),
-      { src: '/icons/icon-512.png?v=2', sizes: '512x512', type: 'image/png' },
+      ...(lock ? [{ src: abs(lock), sizes: '512x512', type: 'image/jpeg' }] : []),
+      ...(cover ? [{ src: abs(cover), sizes: '1200x1200', type: 'image/webp' }] : []),
+      { src: abs('/icons/icon-512.png?v=2'), sizes: '512x512', type: 'image/png' },
     ],
   })
   const at = (t: number) => {

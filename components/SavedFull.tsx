@@ -66,11 +66,14 @@ function layout(r: Rect) {
   const small = `translate(${r.left - left}px, ${r.top - top}px) scale(${1 / k})`
   // prvi kadar: vidi se samo ono što se vidi od male karte — do plejera koji
   // joj prekriva dno; ostatak raste do dna. Dno ravno (mala se tu pretapa u
-  // plejer, nema ruba ni zaobljenja), pa i pri skupljanju sleti tačno tu
-  const R = RADIUS * k
-  const cut = `inset(0px 0px ${Math.max(0, H - r.visible * k)}px 0px round ${R}px ${R}px 0px 0px)`
-  const whole = `inset(0px 0px 0px 0px round ${R}px ${R}px 0px 0px)`
-  return { k, left, top, W, H, small, cut, whole }
+  // plejer, nema ruba), pa i pri skupljanju sleti tačno tu. Bez `clip-path`
+  // animacije (iPhone je vrti na glavnoj niti): okvir koji reže (overflow)
+  // pomjeren gore za odsječeni dio, sadržaj u njemu isto toliko dolje — oba
+  // `transform`, na grafičkom procesoru; ivica okvira je tad tačno dno
+  const off = Math.max(0, H - r.visible * k)
+  const cut = `translateY(${-off}px)`
+  const back = `translateY(${off}px)`
+  return { k, left, top, W, H, small, cut, back }
 }
 const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -178,12 +181,14 @@ function SavedFull({
   // odsijecanje (karta raste do dna) je na unutrašnjem sloju — pokretni
   // sloj ima samo transform, pa na kraju ne trepne
   const clip = useRef<HTMLDivElement>(null)
+  // sadržaj unutar okvira — pomjeren suprotno od njega (vidi `layout`)
+  const shift = useRef<HTMLDivElement>(null)
   const shade = useRef<HTMLDivElement>(null)
   const extras = useRef<HTMLDivElement>(null)
   const grab = useRef<HTMLDivElement>(null)
   const closing = useRef(false)
   const drag = useRef<{ x0: number; y0: number; dy: number; id: number; on: boolean } | null>(null)
-  const [{ k, left, top, W, H, small, cut, whole }] = useState(() => layout(from))
+  const [{ k, left, top, W, H, small, cut, back }] = useState(() => layout(from))
 
   // otvaranje: velika karta stoji nevidljiva na mjestu male dok se ne iscrta,
   // pa se uveća do pune — mala je ispod, pa nema treptaja; rubovi ostalih i
@@ -192,7 +197,7 @@ function SavedFull({
     const el = box.current
     if (!el) return
     const cl = clip.current
-    if (cl) cl.style.clipPath = whole
+    const sh = shift.current
     if (still()) {
       // bez kretnje: odmah velika karta, bez stvari male
       el.querySelectorAll<HTMLElement>('[data-small]').forEach((n) => (n.style.visibility = 'hidden'))
@@ -208,7 +213,8 @@ function SavedFull({
     // sve što se pojavljuje — nevidljivo od prvog kadra (bez bljeska zatamnjenja)
     const fading = [shade.current, extras.current, grab.current]
     el.style.transform = small
-    if (cl) cl.style.clipPath = cut
+    if (cl) cl.style.transform = cut
+    if (sh) sh.style.transform = back
     el.style.opacity = '0'
     for (const n of fading) if (n) n.style.opacity = '0'
     let b = 0
@@ -216,13 +222,15 @@ function SavedFull({
       b = requestAnimationFrame(() => {
         el.style.opacity = ''
         el.style.transform = ''
-        if (cl) cl.style.clipPath = whole
+        if (cl) cl.style.transform = ''
+        if (sh) sh.style.transform = ''
         // kopija se prvo pretopi preko male karte NA MJESTU (obje se poklapaju),
         // a tek onda krene — nikad se ne vide dvoja slova koja se razilaze
         el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: SETTLE, easing: 'ease-in-out' })
         const lead = SETTLE
         el.animate([{ transform: small }, { transform: 'none' }], { ...OPEN, delay: lead, fill: 'backwards' })
-        cl?.animate([{ clipPath: cut }, { clipPath: whole }], { ...OPEN, delay: lead, fill: 'backwards' })
+        cl?.animate([{ transform: cut }, { transform: 'none' }], { ...OPEN, delay: lead, fill: 'backwards' })
+        sh?.animate([{ transform: back }, { transform: 'none' }], { ...OPEN, delay: lead, fill: 'backwards' })
         swap(el, true, OPEN.duration, k, lead)
         moving(el, lead + OPEN.duration)
         shade.current?.animate([{ opacity: 0 }, { opacity: 1 }], { ...OPEN, delay: lead, fill: 'backwards' })
@@ -235,7 +243,7 @@ function SavedFull({
       cancelAnimationFrame(a)
       cancelAnimationFrame(b)
     }
-  }, [small, k, cut, whole])
+  }, [small, k, cut, back])
 
   /** smanji nazad tačno na malu kartu (i iz povučenog položaja), pa zatvori */
   const close = useCallback(
@@ -250,15 +258,17 @@ function SavedFull({
       for (const n of [extras.current, grab.current])
         n?.animate([{ opacity: Number(n.style.opacity || 1) }, { opacity: 0 }], { duration: curve.duration * 0.4, easing: 'ease-out', fill: 'forwards' })
       // sleti tačno na malu kartu, pa se kratko pretopi u nju — bez treptaja
-      el.animate([{ transform: fromTransform }, { transform: small }], { ...curve, fill: 'forwards' })
-      clip.current?.animate([{ clipPath: whole }, { clipPath: cut }], { ...curve, fill: 'forwards' })
-        .finished.then(() => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SETTLE, easing: 'ease-in-out', fill: 'forwards' }).finished)
+      const moved = el.animate([{ transform: fromTransform }, { transform: small }], { ...curve, fill: 'forwards' })
+      clip.current?.animate([{ transform: 'none' }, { transform: cut }], { ...curve, fill: 'forwards' })
+      shift.current?.animate([{ transform: 'none' }, { transform: back }], { ...curve, fill: 'forwards' })
+      moved.finished
+        .then(() => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SETTLE, easing: 'ease-in-out', fill: 'forwards' }).finished)
         .then(onClosed, onClosed)
       swap(el, false, curve.duration, k, 0, curve.easing)
       moving(el, curve.duration + SETTLE)
       shade.current?.animate([{ opacity: Number(shade.current.style.opacity || 1) }, { opacity: 0 }], { ...curve, fill: 'forwards' })
     },
-    [small, k, cut, whole, onClosed],
+    [small, k, cut, back, onClosed],
   )
   const collapse = useCallback(() => close(), [close])
 
@@ -355,12 +365,14 @@ function SavedFull({
         onPointerCancel={onUp}
       >
         {/* ista karta, složena u punoj veličini — oštra */}
-        <div ref={clip} className="h-full w-full" style={{ contain: 'strict' }}>
-          {/* svoj sloj (will-change): karta se iscrta jednom, u punoj veličini —
-              smanjivanje i odsijecanje dna tokom kretnje je onda samo posao
-              GPU-a, bez ponovnog crtanja pozadine, slova i sjenki */}
-          <div style={{ width: from.width, height: H / k, zoom: k, willChange: 'transform', '--cw': `${from.width}px` } as CSSProperties}>
-            <CardFace verse={verse} onCollapse={collapse} actionsZoom={1 / k} />
+        <div ref={clip} className="h-full w-full overflow-hidden" style={{ contain: 'strict', willChange: 'transform' }}>
+          <div ref={shift} className="h-full w-full" style={{ willChange: 'transform' }}>
+            {/* svoj sloj (will-change): karta se iscrta jednom, u punoj veličini —
+                smanjivanje i odsijecanje dna tokom kretnje je onda samo posao
+                GPU-a, bez ponovnog crtanja pozadine, slova i sjenki */}
+            <div style={{ width: from.width, height: H / k, zoom: k, willChange: 'transform', '--cw': `${from.width}px` } as CSSProperties}>
+              <CardFace verse={verse} onCollapse={collapse} actionsZoom={1 / k} />
+            </div>
           </div>
         </div>
         {/* hvataljka — kao na drawerima (karta se vuče nadolje bilo gdje) */}

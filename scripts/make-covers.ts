@@ -9,6 +9,8 @@
  *                         zamućena: blur(28px) saturate(1.15) iz .album-glow
  *   blur/<id>.webp        128 px, zamućen + saturate(1.2) — atmosfera iza stiha
  *   blur-card/<id>.webp   128 px, jače zamućen — atmosfera karte u panelu
+ *   lock/<id>.jpg         512 px JPEG — omot na zaključanom ekranu (Media Session;
+ *                         iPhone ga iz velikog WebP-a zna ne učitati pa pokaže ikonu)
  *   precache.json         svi ovi URL-ovi — data/albums.ts po njemu zna koje varijante postoje
  *
  * CSS `filter: blur()` preko omota od 1200 px iPhone plaća dvaput: dekodira
@@ -64,7 +66,7 @@ const urls: string[] = []
 const kb = (f: string) => (statSync(f).size / 1024).toFixed(1)
 
 async function main() {
-  for (const dir of ['sm', 'md', 'glow', ...COVER_BLURS.map((b) => b.dir)]) mkdirSync(join(PUB, 'albumi', dir), { recursive: true })
+  for (const dir of ['sm', 'md', 'glow', 'lock', ...COVER_BLURS.map((b) => b.dir)]) mkdirSync(join(PUB, 'albumi', dir), { recursive: true })
 
   for (const a of ALBUMS) {
     const id = a.cover.match(/^\/albumi\/hq\/([a-z0-9-]+)\.webp$/)?.[1]
@@ -80,6 +82,11 @@ async function main() {
     await sharp(src).resize(MD, MD, { fit: 'cover' }).webp({ quality: 82, effort: 6 }).toFile(join(PUB, md))
     urls.push(md)
     line.push(`md ${kb(join(PUB, md))} KB`)
+
+    const lock = `/albumi/lock/${id}.jpg`
+    await sharp(src).removeAlpha().resize(512, 512, { fit: 'cover' }).jpeg({ quality: 86, mozjpeg: true }).toFile(join(PUB, lock))
+    urls.push(lock)
+    line.push(`lock ${kb(join(PUB, lock))} KB`)
 
     // Podloga omota (.album-glow): kutija 1 × 1.35 širine — gore odraz gornjih
     // 35% omota (preokrenut), ispod cijeli omot; pa blur(28px) saturate(1.15).
