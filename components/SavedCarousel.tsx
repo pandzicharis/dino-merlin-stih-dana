@@ -6,7 +6,7 @@ import { ExpandIcon } from './ExpandIcon'
 import { FavoriteButton } from './FavoriteButton'
 import { ShareButton } from './ShareSheet'
 import { MOODS } from '@/data/moods'
-import { albumOf, blurOf, cardArtOf } from '@/data/albums'
+import { albumOf, blurOf, cardArtOf, thumbOf } from '@/data/albums'
 import { lookCss, lookScale, parseFont, preloadFonts } from '@/lib/fonts'
 import { asWritten } from '@/lib/text'
 import { savedDay, toggleFavorite } from '@/lib/storage'
@@ -72,9 +72,11 @@ export function SavedCarousel({
   const n = verses.length
   // samo pjesma i svira li — spuštanje i podizanje panela ne crtaju špil iznova
   const player = { id: useSavedPlayerSelect((s) => s.id), playing: useSavedPlayerSelect((s) => s.playing) }
-  // karta na sredini — mijenja se tek kad listanje stane (ne usred prevlačenja)
+  // karta na sredini — čim pređe pola puta (plejer je pokaže odmah)
   const [at, setAt] = useState(() => Math.max(0, verses.findIndex((v) => v.id === player.id)))
   const cur = Math.min(at, Math.max(0, n - 1))
+  // gdje je listanje stalo — tad se prebaci muzika (ako svira)
+  const [rest, setRest] = useState(cur)
   // lica karata oko sredine — slože se odmah poslije (prekidivo), ne u kadru promjene
   const [near, setNear] = useState(cur)
 
@@ -96,21 +98,38 @@ export function SavedCarousel({
 
   // Listanje vodi sistem (vodoravni skrol uz zaustavljanje na karti): prst,
   // zalet i zaustavljanje idu van JavaScripta, glatko i kad je glavna nit
-  // zauzeta. Ovdje se samo sazna gdje je stalo — kad skrol miruje
+  // zauzeta. Ovdje se samo sazna koja je na sredini (jednom po kadru) i gdje
+  // je stalo
   useEffect(() => {
     const el = strip.current
     if (!el || n < 2) return
     let t = 0
+    let raf = 0
+    let step = 0
+    const nearest = () => {
+      if (!step) {
+        const cards = el.querySelectorAll<HTMLElement>('[data-card]')
+        if (cards.length < 2) return -1
+        step = cards[1].offsetLeft - cards[0].offsetLeft
+      }
+      return Math.max(0, Math.min(n - 1, Math.round(el.scrollLeft / step)))
+    }
+    const live = () => {
+      raf = 0
+      const i = nearest()
+      if (i >= 0) setAt(i)
+    }
     const settle = () => {
       clearTimeout(t)
-      const cards = el.querySelectorAll<HTMLElement>('[data-card]')
-      if (cards.length < 2) return
-      const step = cards[1].offsetLeft - cards[0].offsetLeft
-      const i = Math.max(0, Math.min(n - 1, Math.round(el.scrollLeft / step)))
+      const i = nearest()
+      step = 0
+      if (i < 0) return
       setAt(i)
+      setRest(i)
       startTransition(() => setNear(i))
     }
     const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(live)
       clearTimeout(t)
       t = window.setTimeout(settle, 90)
     }
@@ -118,6 +137,7 @@ export function SavedCarousel({
     el.addEventListener('scrollend', settle)
     return () => {
       clearTimeout(t)
+      cancelAnimationFrame(raf)
       el.removeEventListener('scroll', onScroll)
       el.removeEventListener('scrollend', settle)
     }
@@ -135,24 +155,26 @@ export function SavedCarousel({
 
   // plejer sačuvanih svira ovim redom; kad pređe na drugu pjesmu, špil klizi za njom
   useEffect(() => setSavedPlaylist(verses), [verses])
-  // plejer ispod (pjesma, atmosfera) pokazuje prednju kartu
+  // plejer ispod (pjesma, atmosfera) pokazuje prednju kartu — odmah, čim
+  // karta pređe pola puta (listanje je sistemsko, ovo ga ne usporava)
   useEffect(() => {
     const v = verses[cur]
-    if (v) startTransition(() => onFront?.(v))
+    if (v) onFront?.(v)
   }, [cur, verses, onFront])
-  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma. Kad
-  // plejer pređe na drugu pjesmu, špil je stiže — tad se ništa ne pušta
-  const lastAt = useRef(cur)
+  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma, kad
+  // listanje stane. Kad plejer pređe na drugu pjesmu, špil je stiže — tad se ništa ne pušta
+  const restN = Math.min(rest, Math.max(0, n - 1))
+  const lastRest = useRef(restN)
   const live = useRef({ playing: player.playing, verses })
   useEffect(() => {
     live.current = { playing: player.playing, verses }
   }, [player.playing, verses])
   useEffect(() => {
-    if (lastAt.current === cur) return
-    lastAt.current = cur
-    const v = live.current.verses[cur]
+    if (lastRest.current === restN) return
+    lastRest.current = restN
+    const v = live.current.verses[restN]
     if (live.current.playing && v && v.id !== savedVerse()?.id) playSaved(v)
-  }, [cur])
+  }, [restN])
   // prikaz opet vidljiv (Activity) — prednja je pjesma koja sad svira
   useEffect(() => {
     const i = verses.findIndex((v) => v.id === savedVerse()?.id)
@@ -178,8 +200,11 @@ export function SavedCarousel({
       const cover = albumOf(v.album)?.cover
       const art = cardArtOf(cover)
       const soft = blurOf(cover, Math.round(W * 0.14) / (1.3 * Math.max(W, H)))
+      // i sličica omota — plejer ispod je pokaže čim se karta promijeni
+      const thumb = thumbOf(cover)
       if (art) urls.add(art)
       if (soft) urls.add(soft)
+      if (thumb) urls.add(thumb)
     }
     return whenCalm(() => urls.forEach(decodeOnce), 800)
   }, [verses])
@@ -273,10 +298,10 @@ function decodeOnce(src: string) {
 const STRIP_GAP = 14
 
 /**
- * Jedna karta u traci. Susjedne su malo manje i tamnije — mijenja se tek
- * kad listanje stane (CSS prelaz na grafičkom procesoru). `full`: lice
- * karte; inače samo obris (daleko od sredine). Svoj sloj (will-change):
- * nacrta se jednom, a skrol je samo pomjera.
+ * Jedna karta u traci. Sve su iste veličine i istog lica — promjena prednje
+ * ne crta ništa iznova; susjedne su samo tamnije (sloj boje, prelaz na
+ * grafičkom procesoru). `full`: lice karte; inače samo obris (daleko od
+ * sredine). Svoj sloj (will-change): nacrta se jednom, a skrol je samo pomjera.
  */
 const Card = memo(function Card({
   verse,
@@ -304,15 +329,12 @@ const Card = memo(function Card({
   }
   return (
     <div data-card data-far={far ? '' : undefined} aria-hidden={!front} className="relative h-full shrink-0 snap-center snap-always" style={{ width: 'var(--cw)' }}>
-      <div
-        className="absolute inset-0"
-        style={{ transform: front ? 'none' : 'scale(0.94)', transition: 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)', willChange: 'transform' }}
-      >
+      <div className="absolute inset-0" style={{ willChange: 'transform' }}>
         {/* `data-stih` — po njemu je nađe raširena karta */}
         <div data-stih={front && onOpen ? verse.id : undefined} className={`absolute inset-0 ${front && onOpen ? 'cursor-pointer' : ''}`} onClick={tap}>
           {full ? (
             <>
-              <CardFace verse={verse} o={front ? 0 : 1} onOpen={onOpen} />
+              <CardFace verse={verse} o={0} onOpen={onOpen} />
               {/* obris dok se plejer otvara (SavedPanel `data-skel`) */}
               <CardSkeleton verse={verse} overlay />
             </>
@@ -324,7 +346,7 @@ const Card = memo(function Card({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 rounded-[26px] bg-black"
-          style={{ opacity: front ? 0 : 0.2, transition: 'opacity 0.3s ease', willChange: 'opacity' }}
+          style={{ opacity: front ? 0 : 0.2, transition: 'opacity 0.2s ease', willChange: 'opacity' }}
         />
       </div>
     </div>
