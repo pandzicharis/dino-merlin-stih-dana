@@ -39,6 +39,25 @@ export async function generateStaticParams() {
   return (await getCatalog()).verses.flatMap((v) => Object.keys(FORMATS).map((format) => ({ id: v.id, format })))
 }
 
+/**
+ * Fraunces stiha — statični rez s osama ekrana (`opsz 144, SOFT 30, WONK 0`,
+ * globals.css `.verse`), upečen u fajl (public/fonts). Google Fonts bez njih
+ * vrati drugi rez (WONK 1, SOFT 0), a Satori ose ionako ne zna postaviti.
+ */
+const frauncesCache = new Map<string, ArrayBuffer | null>()
+function frauncesFont(bold: boolean, italic: boolean): ArrayBuffer | null {
+  const file = `fraunces-og-${bold ? 620 : 400}${italic ? '-italic' : ''}.ttf`
+  if (!frauncesCache.has(file)) {
+    try {
+      const b = readFileSync(join(process.cwd(), 'public/fonts', file))
+      frauncesCache.set(file, b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer)
+    } catch {
+      frauncesCache.set(file, null)
+    }
+  }
+  return frauncesCache.get(file) ?? null
+}
+
 /** Logotip kao data URI — Satori ga tako umeće bez mrežnog poziva. */
 let wordmark: string | null = null
 function wordmarkDataUri(): string {
@@ -109,7 +128,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
   // i velika/mala slova — dizajn stiha zna ih promijeniti
   const chars = `${text}${text.toLocaleUpperCase('bs')}${text.toLocaleLowerCase('bs')}${verse.song}${verse.album}${verse.year}Stih dana${BRAND.name}`
   const [serif, sans] = await Promise.all([
-    loadFont('Fraunces:opsz,wght@9..144,400', chars),
+    frauncesFont(false, false) ?? loadFont('Fraunces:opsz,wght@9..144,400', chars),
     loadFont('Rubik:wght@500', chars.toUpperCase() + chars),
   ])
   // fontovi stiha po riječi — svaki stil jednom, sveden na znakove stiha
@@ -125,7 +144,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
   const styles = new Map(styled.flat().map((x) => [styleName(x.st), x.st]))
   const verseFonts = (
     await Promise.all(
-      [...styles].map(async ([name, st]) => ({ name, st, data: await loadFont(googleFamily(st), shown) })),
+      [...styles].map(async ([name, st]) => ({
+        name,
+        st,
+        data: (st.font === 'fraunces' && frauncesFont(Boolean(st.bold), Boolean(st.italic))) || (await loadFont(googleFamily(st), shown)),
+      })),
     )
   ).filter((f) => f.data)
   const loaded = new Set(verseFonts.map((f) => f.name))

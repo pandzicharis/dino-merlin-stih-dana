@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { animate, motion, useIsPresent, useMotionValue } from 'motion/react'
 
 /*
@@ -27,7 +27,13 @@ const CLOSE = { duration: 0.42, ease: [0.4, 0, 0.75, 0.35] as const }
  * Pri sljedećem otvaranju povlačenje kreće od nule — inače bi se panel
  * otvorio tamo gdje ga je prst zadnji put pustio (do pola).
  */
-export function useSheetDrag(onClose: () => void, open: boolean, handle?: RefObject<HTMLElement | null>) {
+/**
+ * `passive`: prst se samo prati (pasivni touchmove) — skrol unutra (karte,
+ * albumi, liste) ne čeka JavaScript. Za to ono ispod prsta ne smije samo
+ * skrolati nadolje: liste su bez odskoka (`overscroll-none`), traka karata
+ * vodoravna (`pan-x`).
+ */
+export function useSheetDrag(onClose: () => void, open: boolean, { passive = false }: { passive?: boolean } = {}) {
   const y = useMotionValue(0)
   // spuštanje poslije povlačenja (WAAPI, ostaje dolje) — otkaže se pri otvaranju
   const fly = useRef<Animation | null>(null)
@@ -51,9 +57,7 @@ export function useSheetDrag(onClose: () => void, open: boolean, handle?: RefObj
   const [el, setEl] = useState<HTMLElement | null>(null)
   useEffect(() => {
     if (!el) return
-    // `handle`: samo zaglavlje prima povlačenje — sadržaj (karte, albumi, liste)
-    // nema blokirajući touchmove, pa sistem skrola bez čekanja na JavaScript
-    const root = handle?.current ?? el
+    const root = el
     // pušten dovoljno nisko (ili brzo): panel NASTAVI dolje odatle gdje ga je
     // prst ostavio, brzinom prsta (bez vraćanja gore), dok se zatvaranje odvija;
     // pri sljedećem otvaranju pomak se vrati na nulu (gore, useLayoutEffect).
@@ -98,12 +102,12 @@ export function useSheetDrag(onClose: () => void, open: boolean, handle?: RefObj
         // sistem ne pokrene vodoravno listanje
         if (g.h && Math.abs(dx) >= dy) return
         // nadolje s vrha: skrolanje se zaustavi odmah, panel krene poslije praga
-        if (e.cancelable) e.preventDefault()
+        if (!passive && e.cancelable) e.preventDefault()
         if (dy < 8) return
         g.pull = true
         g.y0 = p.clientY
       }
-      if (e.cancelable) e.preventDefault()
+      if (!passive && e.cancelable) e.preventDefault()
       y.set(Math.max(0, p.clientY - g.y0))
       g.last = [...g.last.slice(-3), [p.clientY, e.timeStamp]]
     }
@@ -120,7 +124,7 @@ export function useSheetDrag(onClose: () => void, open: boolean, handle?: RefObj
     }
     // hvatanje (capture): i kad dijete zaustavi događaj (prekidači, dugmad)
     root.addEventListener('touchstart', start, { passive: true, capture: true })
-    root.addEventListener('touchmove', move, { passive: false })
+    root.addEventListener('touchmove', move, { passive })
     root.addEventListener('touchend', end)
     root.addEventListener('touchcancel', end)
 
@@ -185,7 +189,7 @@ export function useSheetDrag(onClose: () => void, open: boolean, handle?: RefObj
       window.removeEventListener('pointerup', mUp)
       root.removeEventListener('click', noClick, true)
     }
-  }, [el, y, handle])
+  }, [el, y, passive])
 
   // jedan način povlačenja za sve panele (prst i miš, bilo gdje) — bez
   // Motion "drag", da se dva povlačenja ne bore oko iste pozicije

@@ -32,6 +32,8 @@ export function MoodBackground({
   coverLift = 0,
   /** fotografija umjesto portreta (uvodni ekran) — u bojama raspoloženja, utopljena */
   art,
+  /** uz stranicu (ne fiksirana) — kad prst povuče sadržaj, pozadina ide s njim */
+  scroll = false,
 }: {
   mood: Mood
   seed: string
@@ -39,6 +41,7 @@ export function MoodBackground({
   cover?: string
   coverLift?: number
   art?: string
+  scroll?: boolean
 }) {
   const m = MOODS[mood]
   const coverFill = cover ? ALBUMS.find((a) => a.cover === cover)?.fill : undefined
@@ -80,7 +83,7 @@ export function MoodBackground({
   }, [cover, sharp, soft, glow])
 
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
+    <div className={`pointer-events-none ${scroll ? 'absolute' : 'fixed'} inset-0 -z-10 overflow-hidden`} aria-hidden>
       <AnimatePresence mode="sync">
         <motion.div
           key={mood}

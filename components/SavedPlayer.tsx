@@ -151,7 +151,7 @@ function useProgress(
       if (Math.abs(f - lastF) > 0.0015) {
         lastF = f
         if (fill.current) fill.current.style.transform = `scaleX(${f})`
-        if (dot?.current) dot.current.style.transform = `translateX(${f * (dot.current.parentElement?.clientWidth ?? 0)}px)`
+        if (dot?.current) dot.current.style.transform = `translateX(${(f * 100).toFixed(2)}%)`
       }
       const n = mmss(t)
       if (now?.current && n !== lastNow) now.current.textContent = lastNow = n
@@ -160,13 +160,12 @@ function useProgress(
       // dok ne svira (ili se plejer ne vidi — zatvoren panel; vidi ga mini
       // plejer), nema šta da se pomjera svaki kadar — provjera rjeđe
       const hidden = fill.current?.closest('[role="dialog"]')?.getAttribute('aria-hidden') === 'true'
-      raf = a && !a.paused && !hidden ? requestAnimationFrame(tick) : window.setTimeout(tick, 400)
+      // dok svira: 10 puta u sekundi (traka se ionako pomjeri pola piksela za ~0,3 s) —
+      // ne u svakom kadru, pa glavna nit ne šalje promjene usred listanja
+      raf = window.setTimeout(tick, a && !a.paused && !hidden ? 100 : 400)
     }
     tick()
-    return () => {
-      cancelAnimationFrame(raf)
-      clearTimeout(raf)
-    }
+    return () => clearTimeout(raf)
   }, [id, fill, now, left, known, dot])
 }
 
@@ -277,7 +276,12 @@ function PlayGlyph({ playing, size }: { playing: boolean; size: number }) {
 export { EqBars } from './EqBars'
 
 /** Šta pusti/pauza radi za pjesmu `cur` (ona u plejeru ili prednja karta). */
+let lastToggle = 0
 function toggle(cur: Verse, playing: boolean) {
+  // dvostruki dodir (prst odskoči) se ne broji kao pusti pa pauza
+  const t = performance.now()
+  if (t - lastToggle < 400) return
+  lastToggle = t
   haptic(6)
   // dugme kaže "svira", a zvuk je stao (iOS u pozadini) — dodir pusti
   if (playing && savedSounding()) return pauseSaved()
@@ -395,7 +399,7 @@ export function SavedPlayer({
             <div className="mb-1.5 flex items-center gap-1.5">
               <EqBars accent={m.accent} on={playing} h={9} />
               <span className="text-[8.5px] font-medium uppercase tracking-[0.26em]" style={{ color: m.accent }}>
-                {playing ? 'Trenutno slušaš' : isLoaded ? 'Pauzirano' : 'Pusti pjesmu'}
+                {playing ? 'Trenutno' : isLoaded ? 'Pauzirano' : 'Pusti pjesmu'}
               </span>
             </div>
             <Credit verse={cur} />
@@ -423,11 +427,13 @@ export function SavedPlayer({
             <span className="relative block h-[4px] w-full overflow-hidden rounded-full bg-white/15">
               <span ref={fill} className="block h-full w-full origin-left rounded-full" style={{ background: `linear-gradient(90deg, ${m.accent}, #fff)`, transform: 'scaleX(0)' }} />
             </span>
-            <span
-              ref={dot}
-              className="pointer-events-none absolute -left-1.5 top-[4px] block h-3 w-3 rounded-full bg-white"
-              style={{ boxShadow: `0 0 0 3px ${m.accent}40, 0 2px 6px rgba(0,0,0,0.5)` }}
-            />
+            {/* omot tačke širok kao traka — pomak u % od nje, bez mjerenja u svakom kadru */}
+            <span ref={dot} className="pointer-events-none absolute inset-x-0 top-[4px] block h-3">
+              <span
+                className="absolute -left-1.5 top-0 block h-3 w-3 rounded-full bg-white"
+                style={{ boxShadow: `0 0 0 3px ${m.accent}40, 0 2px 6px rgba(0,0,0,0.5)` }}
+              />
+            </span>
           </div>
           <div className="tabular flex justify-between text-[10px] text-white/50">
             <span ref={now}>0:00</span>
@@ -675,7 +681,7 @@ const AlbumCard = memo(
         {/* njegove pjesme — isti redovi kao u "Pjesme", lista se skrola u kartici */}
         {/* samo okomito (`overflow-x-hidden`, `overscroll-y-contain`): vodoravan potez
             preko pjesama ide traci albuma — `touch-pan-y` / `overscroll-contain` su ga blokirali */}
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain px-2 pb-2 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-none px-2 pb-2 [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
           {lite
             ? list.slice(0, 6).map((v) => (
                 <div key={v.id} className="flex items-center gap-3 px-2 py-3" aria-hidden>
@@ -1036,7 +1042,7 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
             <div className="mb-1.5 flex items-center gap-1.5">
               <EqBars accent={m.accent} on={p.playing} h={9} />
               <span className="whitespace-nowrap text-[8px] font-medium uppercase tracking-[0.14em]" style={{ color: m.accent }}>
-                {p.playing ? 'Trenutno slušaš' : 'Pauzirano'}
+                {p.playing ? 'Trenutno' : 'Pauzirano'}
               </span>
             </div>
             <Credit verse={v} size={12} track={0.1} />

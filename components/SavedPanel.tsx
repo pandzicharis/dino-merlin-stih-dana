@@ -125,9 +125,8 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
       closeSaved()
     }, LAG)
   }, [onClose])
-  // povlačenje samo za zaglavlje — sadržaj skrola bez blokirajućeg touchmove
-  const grab = useRef<HTMLDivElement>(null)
-  const sheetDrag = useSheetDrag(dismiss, open, grab)
+  // povuci nadolje bilo gdje — prst se samo prati, skrol unutra ne čeka JavaScript
+  const sheetDrag = useSheetDrag(dismiss, open, { passive: true })
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
@@ -174,7 +173,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
 
             {/* zaglavlje se povlači za zatvaranje; lista ispod normalno skrola */}
             <div
-              ref={grab}
               className="shrink-0 cursor-grab touch-none px-5 pt-3 active:cursor-grabbing"
             >
               <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />

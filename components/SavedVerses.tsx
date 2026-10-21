@@ -153,7 +153,7 @@ export const SavedVerses = memo(function SavedVerses({
                 key={v}
                 data-pane={v}
                 aria-hidden={!on}
-                className={`absolute inset-0 px-5 ${v === 'cards' ? 'overflow-hidden pt-3' : 'overflow-y-auto overscroll-contain pb-20'} ${
+                className={`absolute inset-0 px-5 ${v === 'cards' ? 'overflow-hidden pt-3' : 'overflow-y-auto overscroll-none pb-20'} ${
                   on ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'
                 }`}
                 style={{ transition: on ? 'opacity 0.26s ease' : 'opacity 0.16s ease, visibility 0s linear 0.16s' }}

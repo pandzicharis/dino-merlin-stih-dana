@@ -15,6 +15,7 @@ import { DevDateBar } from './DevDateBar'
 import { Onboarding } from './Onboarding'
 import { Tips } from './Tips'
 import { UpdatePrompt } from './UpdatePrompt'
+import { PullRefresh } from './PullRefresh'
 import { IntroHost, playDraw } from './IntroSplash'
 
 /**
@@ -191,6 +192,8 @@ export function DailyVerse({
       {/* dok uređaj ne izvuče stih (prvi frejm), ekran je prazan — pozadina
           i stih uđu zajedno, kao i inače */}
       {verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} streak={verseId ? 0 : streak} />}
+      {/* povuci nadolje — osvježi (instalirana aplikacija) */}
+      <PullRefresh />
       {/* key: novi stih — zastor od prvog frejma, prije tombole */}
       {verse && <IntroHost key={verse.id} text={verse.text} others={others} mood={tone} date={date} onLand={land} fresh={fresh} font={verse.font} />}
       <Tips />

@@ -49,12 +49,23 @@ export function oneLine(text: string): string {
  * dio stiha napisan velikim (papirići na pultu tako izgledaju).
  */
 /**
- * Tekst na papiriću (tombola, gomila u uvodu): kako je upisan u adminu (velika
- * i mala slova, interpunkcija), u jednom redu — redovi stiha spojeni razmakom;
- * papirić ga sam prelomi po širini.
+ * Tekst na papiriću (tombola, gomila u uvodu, štampa): kako je upisan u adminu
+ * (interpunkcija, imena), u jednom redu — redovi stiha spojeni razmakom;
+ * papirić ga sam prelomi po širini. Počinje velikim slovom, a dalje mala:
+ * riječ s JEDNIM velikim slovom na početku ostaje (ime — "Volim te", "Bosna"),
+ * a riječ s više velikih slova (verzal) ide malim.
  */
 export function paperText(text: string): string {
-  return asWritten(text).replace(/\s*\n\s*/g, ' ').trim()
+  const one = asWritten(text)
+    .replace(/\s*\n\s*/g, ' ')
+    .trim()
+    .replace(/\p{L}+/gu, (w) => {
+      const caps = [...w].filter((c) => c !== c.toLocaleLowerCase('bs')).length
+      const name = caps === 1 && w[0] !== w[0].toLocaleLowerCase('bs')
+      return caps === 0 || name ? w : w.toLocaleLowerCase('bs')
+    })
+  const i = one.search(/\p{L}/u)
+  return i < 0 ? one : one.slice(0, i) + one.charAt(i).toLocaleUpperCase('bs') + one.slice(i + 1)
 }
 
 export function paperCase(text: string): string {

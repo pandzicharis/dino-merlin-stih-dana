@@ -187,7 +187,7 @@ export const SHARED_GONE = 'stihdana:shared-gone'
 
 /**
  * `shuffle`: nasumičnim redom; `repeat`: ista pjesma ispočetka; `mini`:
- * plejer pjesama je spušten — na dnu početne viri "Trenutno slušaš" s
+ * plejer pjesama je spušten — na dnu početne viri "Trenutno" s
  * mini plejerom (components/SavedPlayer.tsx `SavedPeek`).
  */
 type SavedState = { id: string | null; playing: boolean; shuffle: boolean; repeat: boolean; mini: boolean }
@@ -481,8 +481,14 @@ export function playSaved(verse: Verse): boolean {
   if (history[history.length - 1] !== verse.id) history = [...history.slice(-30), verse.id]
   setState({ id: verse.id })
   window.dispatchEvent(new CustomEvent(SAVED_TRACK, { detail: verse.id }))
-  if (a.paused) a.play().catch(() => setState({ playing: false }))
-  else setState({ playing: true })
+  if (a.paused)
+    a.play().catch((e: unknown) => {
+      // učitavanje prekinuto (nova adresa usred puštanja) — još jednom, ako se i dalje želi
+      if ((e as DOMException)?.name === 'AbortError' && a.dataset.want) return a.play().catch(() => setState({ playing: false }))
+      setState({ playing: false })
+    })
+  // dugme i ploča odmah — zvuk krene čim se učita (ne čeka mrežu, pa nema drugog dodira)
+  setState({ playing: true })
   return true
 }
 

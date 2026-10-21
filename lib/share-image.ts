@@ -99,11 +99,30 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   return p
 }
 
-/** Imena porodica iz next/font — ista koja crta ekran. */
+/**
+ * Fraunces stiha za platno — isti rez kao na ekranu. Ekran ga crta s osama
+ * `opsz 144, SOFT 30, WONK 0` (globals.css `.verse`), a platno ose ne zna
+ * postaviti (bez njih je Fraunces "krivi" rez: WONK 1, SOFT 0, opsz po
+ * veličini). Zato su te ose unaprijed upečene u ovaj font (public/fonts).
+ */
+const SHARE_SERIF = '"Fraunces Share"'
+let shareFaces: Promise<unknown> | null = null
+function loadShareSerif(): Promise<unknown> {
+  if (shareFaces || typeof FontFace === 'undefined') return shareFaces ?? Promise.resolve()
+  const faces = [
+    new FontFace('Fraunces Share', 'url(/fonts/fraunces-share.woff2) format("woff2")', { weight: '100 900', style: 'normal' }),
+    new FontFace('Fraunces Share', 'url(/fonts/fraunces-share-italic.woff2) format("woff2")', { weight: '100 900', style: 'italic' }),
+  ]
+  faces.forEach((f) => document.fonts.add(f))
+  shareFaces = Promise.all(faces.map((f) => f.load().catch(() => null)))
+  return shareFaces
+}
+
+/** Imena porodica — ista koja crta ekran (Fraunces stiha s osama ekrana). */
 function fontFamilies() {
   const cs = getComputedStyle(document.documentElement)
   return {
-    serif: cs.getPropertyValue('--font-serif').trim() || 'Georgia, serif',
+    serif: `${SHARE_SERIF}, ${cs.getPropertyValue('--font-serif').trim() || 'Georgia, serif'}`,
     sans: cs.getPropertyValue('--font-sans').trim() || 'system-ui, sans-serif',
   }
 }
@@ -118,12 +137,11 @@ function runCss(map: FontMap, i: number, size: number, serif: string): string {
   const st = styleOf(map, i)
   const f = VERSE_FONTS[st.font]
   const cs = getComputedStyle(document.documentElement)
-  const family =
-    st.font === 'fraunces'
-      ? (st.italic && cs.getPropertyValue('--font-serif-italic').trim()) || serif
-      : cs.getPropertyValue(f.family.slice(4, -1)).trim() || serif
+  // Fraunces (i kurziv) iz istog upečenog fonta kao ekran — `serif` ga već nosi
+  const family = st.font === 'fraunces' ? serif : cs.getPropertyValue(f.family.slice(4, -1)).trim() || serif
   const px = size * (st.font === 'fraunces' ? 1 : f.scale) * ((st.size ?? 100) / 100)
-  return `${st.italic ? 'italic ' : ''}${st.bold ? 700 : 400} ${px}px ${family}`
+  // podebljan Fraunces je na ekranu wght 620 (lib/fonts.ts), ne 700
+  return `${st.italic ? 'italic ' : ''}${st.bold ? (st.font === 'fraunces' ? 620 : 700) : 400} ${px}px ${family}`
 }
 
 /** Razmak slova na platnu (dizajn stiha) — gdje ga preglednik zna; pisani bez razmaka. */
@@ -383,6 +401,7 @@ async function render(input: ShareInput, opts: VerseOpts = {}): Promise<HTMLCanv
   // prored stiha kao na ekranu (dizajn: lib/fonts.ts)
   const lhOf = (map.look.lh ?? 118) / 100
   const words = text.split(/\s+/).filter(Boolean).length
+  await loadShareSerif()
   const runFonts = [...new Set(Array.from({ length: words }, (_, i) => runCss(map, i, 100, fonts.serif)))]
   await Promise.all(runFonts.map((c) => document.fonts?.load(c, text).catch(() => null)))
   const [figure, signature, label, , , cover] = await Promise.all([

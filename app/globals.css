@@ -19,7 +19,17 @@ body {
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  overscroll-behavior-y: none;
+}
+
+/* donji panel otvoren — stranica iza ne odskače pod prstom (panel prati prst
+   pasivno, bez zaustavljanja skrola: components/Sheet.tsx `passive`) */
+html[data-sheet],
+html[data-sheet] body {
+  overscroll-behavior: none;
+}
+/* plejer u panelu ne skrola ništa — povlačenje po njemu je samo za panel */
+.os-sheet [data-player] {
+  touch-action: none;
 }
 
 /* Stih — tipografija JE proizvod.

@@ -104,7 +104,8 @@ export function VerseScreen({
   }, [top, compact])
 
   return (
-    <div className={compact ? 'relative isolate overflow-hidden rounded-2xl' : ''}>
+    // `relative`: pozadina je uz ekran stiha (ne fiksirana) — povlačenje je pomjera zajedno sa sadržajem
+    <div className={compact ? 'relative isolate overflow-hidden rounded-2xl' : 'relative min-h-[100dvh]'}>
       <div className={compact ? 'absolute inset-0 -z-10' : ''}>
         <MoodBackgroundSlot mood={mood ?? verse.mood} compact={compact} seed={verse.id} cover={albumOf(verse.album)?.cover} coverLift={albumOf(verse.album)?.lift} />
       </div>
@@ -304,7 +305,7 @@ const MoodBackgroundSlot = memo(function MoodBackgroundSlot({
   coverLift?: number
 }) {
   const m = MOODS[mood]
-  if (!compact) return <MoodBackground mood={mood} seed={seed} cover={cover} coverLift={coverLift} />
+  if (!compact) return <MoodBackground mood={mood} seed={seed} cover={cover} coverLift={coverLift} scroll />
   return (
     <div
       className="relative h-full w-full"

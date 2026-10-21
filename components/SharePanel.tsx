@@ -77,7 +77,6 @@ export default function SharePanel({
   }
 
   const fileName = `stih-dana-${verse.id}-${format}.jpg`
-  const link = typeof location !== 'undefined' ? `${location.origin}/stih/${verse.id}` : ''
   const caption = `„${oneLine(asWritten(verse.text))}“ — ${BRAND.name}, ${verse.song}`
 
   const imageFile = async () => {
@@ -98,7 +97,7 @@ export default function SharePanel({
   const shareImage = async (withText: boolean) => {
     const file = await imageFile()
     if (!file || !navigator.canShare?.({ files: [file] })) return false
-    await navigator.share(withText ? { files: [file], text: `${caption}\n${link}` } : { files: [file] })
+    await navigator.share(withText ? { files: [file], text: caption } : { files: [file] })
     return true
   }
 
