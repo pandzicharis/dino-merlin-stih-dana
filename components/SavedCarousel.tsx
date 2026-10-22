@@ -100,6 +100,8 @@ export function SavedCarousel({
   const strip = useRef<HTMLDivElement>(null)
   // zadnji pomak trake — pjesma se mijenja tek kad karta odstoji (DWELL)
   const movedAt = useRef(0)
+  // traka ide za plejerom (sam prešao na sljedeću) — usput se ništa ne pušta
+  const following = useRef(false)
   const versesRef = useRef(verses)
   const nearRef = useRef(near)
   useEffect(() => {
@@ -172,6 +174,7 @@ export function SavedCarousel({
     }
     const settle = () => {
       clearTimeout(t)
+      following.current = false
       const i = nearest()
       step = 0
       if (i < 0) return
@@ -230,6 +233,24 @@ export function SavedCarousel({
   useEffect(() => {
     live.current = { playing: player.playing, verses }
   }, [player.playing, verses])
+  // čim nova karta pređe na sredinu (i kratko ostane — brzo listanje ne pušta
+  // svaku usput), svira njena pjesma; ne čeka se da traka sasvim stane
+  const prevCur = useRef(cur)
+  useEffect(() => {
+    // samo kad se prednja karta promijeni (ne pri otvaranju ni ponovnom pokazivanju)
+    if (prevCur.current === cur) return
+    prevCur.current = cur
+    if (following.current) return
+    const t = window.setTimeout(() => {
+      if (following.current) return
+      const vs = live.current.verses
+      const v = vs[cur]
+      if (!live.current.playing || !v) return
+      if (v.id !== savedVerse()?.id) playSaved(v)
+      warmSaved([vs[cur + 1], vs[cur - 1]])
+    }, 160)
+    return () => clearTimeout(t)
+  }, [cur])
   useEffect(() => {
     if (lastRest.current === restN) return
     lastRest.current = restN
@@ -257,7 +278,9 @@ export function SavedCarousel({
   useEffect(() => {
     const onTrack = (e: Event) => {
       const i = verses.findIndex((v) => v.id === (e as CustomEvent).detail)
-      if (i >= 0) go(i)
+      if (i < 0) return
+      if (i !== curRef.current) following.current = true
+      go(i)
     }
     window.addEventListener(SAVED_TRACK, onTrack)
     return () => window.removeEventListener(SAVED_TRACK, onTrack)
