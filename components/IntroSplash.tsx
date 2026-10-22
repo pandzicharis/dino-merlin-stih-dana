@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion, type Easing } from 'motion/r
 import { COLORS, rng } from './deck/PaperToPhone'
 import { TIPS_ON, startTips, stopTips } from './Tips'
 import { deckParam, inDeck } from '@/lib/deck'
-import { formatFullDateBs } from '@/lib/date'
+import { formatFullDateBs, shownDay } from '@/lib/date'
 import { haptic } from '@/lib/haptic'
 import { SPLASH_ARRIVE } from './VerseText'
 import { paperText, asWritten } from '@/lib/text'
@@ -744,7 +744,7 @@ function Tombola({
         transition={{ duration: phase === 'fly' ? 0.4 : 0.9, delay: phase === 'fly' ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
       >
         <p className="tabular text-[11px] font-semibold uppercase tracking-[0.3em]" style={{ color: accent, opacity: 0.8 }}>
-          {formatFullDateBs(date)}
+          {formatFullDateBs(shownDay(date))}
         </p>
         <div className="relative mt-3 h-[2.6rem]">
           {(['Tvoj stih te čeka', 'Tvoj stih za danas'] as const).map((t, j) => (

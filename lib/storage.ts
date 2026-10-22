@@ -3,7 +3,7 @@
  * Svaki pristup je u try/catch: private mode i blokirani storage ne smiju srušiti ekran.
  */
 
-import { addDays, getActiveDate } from './date'
+import { addDays, getActiveDate, shownDay } from './date'
 
 const SEEN = 'stihdana:lastSeen'
 const NOTIFY = 'stihdana:notify'
@@ -133,7 +133,8 @@ export function toggleFavorite(id: string): boolean {
   const on = !list.includes(id)
   write(FAVORITES, on ? [id, ...list] : list.filter((x) => x !== id))
   const dates = { ...read<Record<string, string>>(FAVORITE_DATES, {}) }
-  if (on) dates[id] = getActiveDate()
+  // dan kad je sačuvan — pravi datum (lib/date.ts shownDay), i ujutro
+  if (on) dates[id] = shownDay(getActiveDate())
   else delete dates[id]
   write(FAVORITE_DATES, dates)
   window.dispatchEvent(new Event('favchange'))
@@ -161,7 +162,7 @@ export function favoriteDate(id: string): string | undefined {
 export function savedDay(id: string): string {
   const known = favoriteDate(id)
   if (known) return known
-  const day = getActiveDate()
+  const day = shownDay(getActiveDate())
   write(FAVORITE_DATES, { ...read<Record<string, string>>(FAVORITE_DATES, {}), [id]: day })
   return day
 }

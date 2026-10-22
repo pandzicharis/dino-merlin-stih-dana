@@ -88,11 +88,12 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           FORCE: ${{ inputs.force }}
         run: |
-          adresa="${APP_URL%/}/api/cron/send-daily"
+          # now=1: ručni test ide odmah — ruta inače šalje samo u podne (sarajevski sat)
+          adresa="${APP_URL%/}/api/cron/send-daily?now=1"
           # `[ ... ] && ...` ovdje ne valja: korak se vrti pod `bash -e`, pa
           # bi neispunjen uslov kao zadnja naredba oborio cijeli korak.
           if [ "$FORCE" = "true" ]; then
-            adresa="$adresa?force=1"
+            adresa="$adresa&force=1"
           fi
 
           # Bez `-f`, namjerno: kod greške nam treba TIJELO odgovora, a ne

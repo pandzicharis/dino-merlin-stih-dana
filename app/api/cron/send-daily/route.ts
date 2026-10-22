@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { supabase } from '@/lib/supabase'
-import { todayInTz } from '@/lib/date'
+import { SEND_HOUR, TZ, hourInTz, todayInTz } from '@/lib/date'
 import { INVITE } from '@/lib/notify'
 
 /**
@@ -13,8 +13,11 @@ import { INVITE } from '@/lib/notify'
  * stih nego poziv — ista poruka za sve, bez ijednog čitanja stihova
  * (lib/notify.ts).
  *
- * O VREMENU ODLUČUJE OKIDAČ, NE RUTA. Kad god se pozove, šalje svima koji
- * još nisu dobili stih za taj dan. Raspored crona je jedino mjesto gdje se
+ * O VREMENU ODLUČUJE OKIDAČ — ruta samo pazi na sarajevski sat: šalje tek od
+ * podneva (do 14h). Ljetno/zimsko vrijeme tako ne pomjera obavijest: okidač
+ * smije zvati i u 10:00 i u 11:00 UTC (podne ljeti i zimi), raniji poziv samo
+ * javi da nije vrijeme. Kad god se pozove u tom roku, šalje svima koji još
+ * nisu dobili stih za taj dan. Raspored crona je jedino mjesto gdje se
  * podešava kad to biva — ranije je uslov stajao i u upitu, pa se vrijeme
  * mijenjalo na dva mjesta i lako razilazilo.
  *
@@ -276,10 +279,22 @@ export async function POST(req: Request) {
   //           oznaku dana, pa test ne može pojesti pravo slanje
   // ?dry=1    ništa ne šalje, samo javi kome bi otišlo
   // ?worker=  interno: ovaj zahtjev je jedan od podignutih workera
+  // ?now=1    ručni test (GitHub → Run workflow) — bez provjere sata
   const q = new URL(req.url).searchParams
   const force = q.get('force') === '1'
   const dry = q.get('dry') === '1'
   const workerRun = q.get('worker')
+
+  // podne po sarajevskom satu — ljeti i zimi isto (vidi gore)
+  if (!workerRun && !force && !dry && q.get('now') !== '1') {
+    const h = hourInTz()
+    // par minuta ranije je isto podne — okidač čiji sat malo žuri ne preskoči dan
+    const m = Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, minute: '2-digit' }).format(new Date()))
+    const early = h === SEND_HOUR - 1 && m >= 55
+    if (!early && (h < SEND_HOUR || h > SEND_HOUR + 2)) {
+      return NextResponse.json({ skipped: `U Sarajevu je ${h}h — obavijest ide u ${SEND_HOUR}h`, due: 0 })
+    }
+  }
 
   const today = todayInTz()
   // poziv, ne stih — dodir otvara aplikaciju, a stih se tamo izvlači

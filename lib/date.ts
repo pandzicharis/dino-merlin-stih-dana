@@ -48,6 +48,16 @@ export function verseDayInTz(now: Date = new Date()): string {
 }
 
 /**
+ * Datum za ispis uz stih (ekran, slika za dijeljenje, dan kad je sačuvan):
+ * pravi današnji datum. Dan stiha se mijenja tek u podne, pa bi ujutro pisalo
+ * jučer — a stih je i dalje jučerašnji, samo s današnjim datumom. Zadani dan
+ * (dev traka, prezentacija) ostaje kakav je.
+ */
+export function shownDay(verseDay: string, now: Date = new Date()): string {
+  return verseDay === verseDayInTz(now) ? todayInTz(now) : verseDay
+}
+
+/**
  * Pomak zone u milisekundama za dati trenutak. Čita se iz same zone, pa
  * ljetno/zimsko vrijeme nije poseban slučaj.
  */

@@ -162,6 +162,9 @@ zadnji put commitao:
 2. URL: `https://tvoja-adresa.vercel.app/api/cron/send-daily`
 3. Schedule: **svaki dan u 12:00**, uz timezone `Europe/Sarajevo` — jedini od
    troje koji zna za vremensku zonu, pa ljeti i zimi stiže u isti sat.
+   Ako je zona UTC: zakaži **10:00 i 11:00 UTC** (podne ljeti i zimi). Ruta
+   šalje samo između 12 i 14h po sarajevskom satu, pa raniji poziv ne radi
+   ništa, a drugi zatekne prazan red — obavijest uvijek stiže u 12h.
 4. **Advanced → Headers**:
    ```
    x-cron-secret: <CRON_SECRET>

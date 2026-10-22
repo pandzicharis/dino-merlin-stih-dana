@@ -4,7 +4,7 @@ import { memo, useEffect, useLayoutEffect, useRef } from 'react'
 import { motion } from 'motion/react'
 import { MOODS, FIGURE_SRC, type Mood } from '@/data/moods'
 import type { Verse } from '@/data/verses'
-import { OVERRIDE_ON, formatFullDateBs } from '@/lib/date'
+import { OVERRIDE_ON, formatFullDateBs, shownDay } from '@/lib/date'
 import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { MoodBackground } from './MoodBackground'
 import { albumOf } from '@/data/albums'
@@ -181,7 +181,7 @@ export function VerseScreen({
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.9, delay: 0.2, ease: 'easeOut' }}
               >
-                {formatFullDateBs(date)}
+                {formatFullDateBs(shownDay(date))}
               </motion.p>
             </div>
           )}
@@ -200,7 +200,7 @@ export function VerseScreen({
               {/* radnje stiha: sačuvaj i podijeli, jedno do drugog */}
               <div className="flex items-center gap-2.5">
                 <FavoriteButton id={verse.id} accent={m.accent} />
-                <ShareButton verse={verse} accent={m.accent} date={date} pill />
+                <ShareButton verse={verse} accent={m.accent} date={shownDay(date)} pill />
               </div>
             </motion.div>
           )}
