@@ -61,6 +61,9 @@ export function playable(verse: Verse): boolean {
 export type Player = HTMLAudioElement & { fails?: Set<() => void> }
 
 /** Zvuk pjesme: statični fajl, pa server ako fajla nema. `data-want`: treba svirati. */
+/** stih otvoren — njegova pjesma krene sama (detail: id stiha; components/SongCredit.tsx) */
+export const AUTOPLAY = 'stihdana:autoplay'
+
 export function createPlayer(src: string, fallback: string): Player {
   const a: Player = new Audio()
   // pjesma je s druge adrese (Cloudflare) — CORS, da Web Audio (utišavanje) ne bude tih

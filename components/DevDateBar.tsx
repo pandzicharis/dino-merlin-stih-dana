@@ -6,6 +6,7 @@ import { TIPS_ON, startTips } from './Tips'
 import { playIntro, playTombola } from './IntroSplash'
 import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
 import { redraw } from '@/lib/draw'
+import { isFirstVerse } from '@/lib/text'
 import { Icon, TOAST_BAD, TOAST_OK, dismissToast, toast, type Toast } from './Toast'
 
 /** Sve poruke aplikacije redom — svaki klik na "poruke" pokaže sljedeću. */
@@ -138,7 +139,17 @@ export function DevDateBar({
       <button onClick={() => playTombola()} className="px-1.5 text-white/50 hover:text-white">
         tombola
       </button>
-      <button onClick={() => playIntro(true)} className="px-1.5 text-white/50 hover:text-white">
+      {/* uvod kao novi korisnik — sa "Mir svim dobrim ljudima" (prvi stih), ako ga ima */}
+      <button
+        onClick={() => {
+          const first = verses.find((v) => isFirstVerse(v.text))
+          if (!first || first.id === verseId) return playIntro(true)
+          pickVerse(first.id)
+          // novi stih je novi uvod (IntroHost po stihu) — tek kad se složi
+          window.setTimeout(() => playIntro(true), 150)
+        }}
+        className="px-1.5 text-white/50 hover:text-white"
+      >
         splash
       </button>
       {/* nova verzija, obavijesti, dijeljenje — redom (components/Toast.tsx) */}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { Verse } from '@/data/verses'
 import { addDays } from './date'
 import { isFirstVerse } from './text'
+import { playable } from './player'
 
 /**
  * SVAKOM SVOJ STIH — izvlačenje na uređaju.
@@ -152,6 +153,19 @@ function settle(s: State, today: string, pool: string[], known: Set<string>, avo
   return { days }
 }
 
+/**
+ * Iz čega se izvlači: aktivni stihovi čija je pjesma već u aplikaciji — bez
+ * nje bi plejer ispod stiha bio nijem. Pjesma stigne (admin, workflow) → stih
+ * ulazi u izvlačenje. Nijedan nema pjesmu (ili su svi arhivirani) → svi, da
+ * špil nikad nije prazan.
+ */
+function poolOf(verses: ListVerse[]): string[] {
+  const a = verses.filter((v) => v.active !== false)
+  const base = a.length ? a : verses
+  const ready = base.filter(playable)
+  return (ready.length ? ready : base).map((v) => v.id)
+}
+
 /** Probni stih koji je upravo zamijenjen — pravo izvlačenje ga zaobiđe. */
 let avoid: string | undefined
 
@@ -162,13 +176,10 @@ let avoid: string | undefined
 export function useDraw(date: string, verses: ListVerse[], on = true): { verse: Verse; fresh: boolean } | null {
   const raw = useSyncExternalStore(subscribe, snapshot, () => null)
   const byId = useMemo(() => new Map<string, Verse>(verses.map((v) => [v.id, v])), [verses])
-  const pool = useMemo(() => {
-    const a = verses.filter((v) => v.active !== false)
-    return (a.length ? a : verses).map((v) => v.id)
-  }, [verses])
+  const pool = useMemo(() => poolOf(verses), [verses])
 
-  // prvi stih svakom novom korisniku (lib/text.ts) — i kad je arhiviran
-  const first = useMemo(() => verses.find((v) => isFirstVerse(v.text))?.id, [verses])
+  // prvi stih svakom novom korisniku (lib/text.ts) — i kad je arhiviran; samo s pjesmom
+  const first = useMemo(() => verses.find((v) => isFirstVerse(v.text) && playable(v))?.id, [verses])
 
   const entry = raw == null ? undefined : parse(raw).days[date]
   const verse = entry ? byId.get(entry.id) : undefined
@@ -214,9 +225,7 @@ export function unseat(date: string, verses: ListVerse[]): boolean {
   delete s.days[date]
   avoid = e.id
   // pravi stih odmah, u istom potezu — ekran ni na frejm ne ostane bez stiha
-  const active = verses.filter((v) => v.active !== false)
-  const pool = (active.length ? active : verses).map((v) => v.id)
-  save(settle(s, date, pool, new Set(verses.map((v) => v.id)), avoid))
+  save(settle(s, date, poolOf(verses), new Set(verses.map((v) => v.id)), avoid))
   return true
 }
 

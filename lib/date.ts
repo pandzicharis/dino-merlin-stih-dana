@@ -7,7 +7,7 @@
  * sarajevskom satu (`verseDayInTz`). Ujutro je još jučerašnji stih.
  */
 
-import { deckParam, inDeck, DECK_VERSE } from './deck'
+import { deckParam, deckVerseId, inDeck } from './deck'
 
 export const TZ = 'Europe/Sarajevo'
 export const EPOCH = '2026-01-01'
@@ -148,7 +148,7 @@ export function readDevParams(): DevParams {
   const empty: DevParams = { date: null, verseId: null, mood: null }
   if (typeof window === 'undefined') return empty
   if (!OVERRIDE_ON) {
-    return inDeck() ? { date: null, verseId: deckParam('verse') ?? DECK_VERSE, mood: deckParam('mood') } : empty
+    return inDeck() ? { date: null, verseId: deckVerseId(), mood: deckParam('mood') } : empty
   }
 
   const q = new URLSearchParams(window.location.search)
@@ -166,7 +166,7 @@ export function readDevParams(): DevParams {
   }
 
   // u prezentaciji (i lokalno) telefon nosi stih prezentacije
-  return { date, verseId: q.get('verse') ?? (inDeck() ? DECK_VERSE : null), mood: q.get('mood') }
+  return { date, verseId: q.get('verse') ?? (inDeck() ? deckVerseId() : null), mood: q.get('mood') }
 }
 
 /** Dan stiha koji aplikacija smatra "danas" — jedini izvor istine u UI-ju. */

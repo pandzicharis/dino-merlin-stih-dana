@@ -1406,11 +1406,11 @@ function Pristup() {
 
 /** Stih se sačuva, broj u zaglavlju otvori sačuvane: karte jedna do druge, raširena karta. */
 function Sacuvano() {
-  const { os, setOs, manual } = useDeck()
+  const { os, setOs, manual, both } = useDeck()
   return (
     <>
       {/* scena po sistemu: kad iPhone završi, ista ide na Androidu (prekidač ide s njom) */}
-      <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
+      <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && both && setOs('android')} />
       <Text>
         „Sačuvaj“ ispod stiha, a gore se pojavi ikonica plejera s brojem — dodir otvara Player pjesama: sačuvani
         stihovi kao karte jedna do druge, svaka s danom kad je sačuvana, pjesmom i albumom. Prevuci za sljedeći —
@@ -1454,7 +1454,7 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
  * spušten pluta na početnoj kao mini plejer.
  */
 function Plejer() {
-  const { os, setOs, manual, phone } = useDeck()
+  const { os, setOs, manual, both, phone } = useDeck()
   useKeepSaved()
   // odlaskom s koraka muzika stane (i sačuvani na početnoj) — odmah, ne tek kad nestane
   const present = useIsPresent()
@@ -1471,7 +1471,7 @@ function Plejer() {
   }, [phone, present])
   return (
     <>
-      <PlejerScene key={os} onDone={() => os === 'ios' && !manual && setOs('android')} />
+      <PlejerScene key={os} onDone={() => os === 'ios' && !manual && both && setOs('android')} />
       <Text>
         Sačuvani su plejer: ikonica gore otvara Player pjesama — stihovi kao karte, pjesme sa cijelim stihom,
         albumi i omiljene (zvjezdica, redom koliko se slušaju). Plejer je u boji stiha, kontrole kao u Apple Musicu,
@@ -1626,7 +1626,7 @@ function Slusanje() {
  * stigne sama. Prvo na iPhoneu, a onda isto na Androidu (prekidač ide s njim).
  */
 function Obavijest({ d }: { d: DeckData }) {
-  const { simulate, os, setOs, manual } = useDeck()
+  const { simulate, os, setOs, manual, both } = useDeck()
   // stih tek stiže — još ništa nije sačuvano: ispod stiha stoji "Sačuvaj"
   // (čuvanje dolazi na svom koraku, poslije)
   useEffect(() => {
@@ -1642,13 +1642,13 @@ function Obavijest({ d }: { d: DeckData }) {
   // cijeli tok na iPhoneu (obavijest → dodir → izvlačenje →
   // stih) traje ~15 s — odmah zatim isto na Androidu
   useEffect(() => {
-    if (os !== 'ios' || manual) return
+    if (os !== 'ios' || manual || !both) return
     const t = setTimeout(() => {
       setOs('android')
       simulate('lock')
     }, 16000)
     return () => clearTimeout(t)
-  }, [os, setOs, manual, replay, simulate])
+  }, [os, setOs, manual, both, replay, simulate])
   return (
     <>
       <Text>

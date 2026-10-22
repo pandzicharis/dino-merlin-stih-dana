@@ -10,7 +10,7 @@ import { BRAND } from '@/lib/brand'
 import { albumLine, audioSlug, asWritten, sameVerse, youtubeId } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
-import { DevicePreview, DeviceSwitch, phoneWidth, type Device } from './DevicePreview'
+import { DevicePreview, DeviceSwitch, phoneWidth, useWarmPreview, type Device } from './DevicePreview'
 import { PrintSlips } from './PrintSlips'
 import { VerseDesigner } from './VerseDesigner'
 import { SongEdit, SongPicker, SongPlayer, type KnownSong } from './SongPicker'
@@ -65,6 +65,8 @@ export function AdminPanel() {
   // papirići za štampu (modal)
   const [printing, setPrinting] = useState(false)
   const [printCount, setPrintCount] = useState(0)
+  // pregled u uređivanju se učita unaprijed, u pozadini — otvori se odmah
+  useWarmPreview(data?.verses)
 
   const flash = useCallback((text: string, bad = false) => {
     toast(
@@ -252,7 +254,7 @@ export function AdminPanel() {
                   if (!ok) return
                   setEditor(null)
                   // pjesma se sprema odmah — dok stih uđe u izvlačenje, pušta se bez čekanja
-                  if (songs.of(draft.song)?.state !== 'ready') songs.fetch(draft.song, draft.youtube)
+                  if (draft.youtube.trim() && songs.of(draft.song)?.state !== 'ready') songs.fetch(draft.song, draft.youtube)
                 }}
               />
             )}
@@ -420,15 +422,16 @@ function SongIssue({ info, mode, onRetry }: { info: SongInfo | null; mode: Songs
       </span>
     )
   }
-  const hint = info.error ?? (mode === 'off' ? 'Na računaru: npm run audio, pa push.' : 'Pjesma još nije u aplikaciji.')
+  // bez pjesme stih ne ulazi u izvlačenje (lib/draw.ts) — plejer bi bio nijem
+  const hint = `${info.error ?? (mode === 'off' ? 'Na računaru: npm run audio, pa push.' : 'Pjesma još nije u aplikaciji.')} Dok ne stigne, stih se ne izvlači.`
   return (
     <span className="flex shrink-0 items-center gap-1" data-song-state={info.state}>
       <span
         title={hint}
         className="rounded-full border border-rose-300/25 bg-rose-300/[0.07] px-2 py-0.5 text-[10px] text-rose-200/85"
       >
-        <span className="sm:hidden">bez pjesme</span>
-        <span className="hidden sm:inline">{info.state === 'error' ? 'pjesma nije preuzeta' : 'bez pjesme'}</span>
+        <span className="sm:hidden">ne izvlači se</span>
+        <span className="hidden sm:inline">{info.state === 'error' ? 'pjesma nije preuzeta' : 'bez pjesme'} · ne izvlači se</span>
       </span>
       {mode !== 'off' && (
         <button
@@ -714,7 +717,19 @@ function Library({
                 </p>
               </div>
               {/* pjesma koja nije preuzeta: natpis i diskretno dugme, pored ikonica */}
-              <SongIssue info={songs.of(v.song)} mode={songs.mode} onRetry={() => songs.fetch(v.song, v.youtube)} />
+              {v.youtube ? (
+                <SongIssue info={songs.of(v.song)} mode={songs.mode} onRetry={() => songs.fetch(v.song, v.youtube)} />
+              ) : (
+                // bez linka — ispod stiha je samo naziv pjesme, bez plejera
+                <span
+                  title="Bez YouTube linka — ispod stiha samo naziv pjesme i album"
+                  className="shrink-0 rounded-full border border-amber-200/25 bg-amber-200/[0.07] px-2 py-0.5 text-[10px] text-amber-100/80"
+                  data-no-link
+                >
+                  <span className="sm:hidden">bez linka</span>
+                  <span className="hidden sm:inline">bez YouTube linka</span>
+                </span>
+              )}
               {writable && (
                 <div className="flex shrink-0 gap-1">
                   {!archived && (
@@ -1311,7 +1326,8 @@ function Editor({
           {song?.state === 'ready' ? (
             <SongPlayer key={audioSlug(d.song)} song={d.song} />
           ) : (
-            d.song.trim() && (
+            // bez linka nema pjesme — ni napomene o preuzimanju
+            d.song.trim() && youtubeId(d.youtube) && (
               <p className="col-span-2 -mt-1 flex items-center gap-2 text-[11px] text-white/45" data-song-hint>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill={BRAND.gold} aria-hidden>
                   <path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z" />
@@ -1321,9 +1337,11 @@ function Editor({
                     ? 'Pjesma se upravo preuzima.'
                     : song?.state === 'error'
                       ? <span className="text-rose-200/85">Pjesma nije preuzeta.</span>
-                      : 'Ove pjesme još nema — preuzeće se jednom, kad sačuvaš stih, i ostaje za sve njene stihove.'}
+                      : initial?.id
+                        ? 'Pjesma još nije preuzeta — dok ne stigne, stih se ne izvlači.'
+                        : 'Ove pjesme još nema — preuzeće se jednom, kad sačuvaš stih, i ostaje za sve njene stihove.'}
                 </span>
-                {/* ponovni pokušaj odmah, bez čuvanja stiha */}
+                {/* ponovni pokušaj odmah, bez čuvanja stiha (lokalno preuzme, na produkciji pokrene GitHub posao) */}
                 {song?.state !== 'loading' && songsMode !== 'off' && youtubeId(d.youtube) && (
                   <button
                     type="button"

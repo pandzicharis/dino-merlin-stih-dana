@@ -9,7 +9,7 @@ import { MagazaLogo } from '../MagazaLogo'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { DeckContext } from './context'
 import { LiveDesktop, LivePhone } from './Stages'
-import { DemoToggle, OsToggle } from './ui'
+import { DemoToggle, OsToggle, PhonesToggle } from './ui'
 import { PaperToPhone } from './PaperToPhone'
 import { SLIDES, cleanSlate } from './slides'
 import { deviceOuter, type DeviceKind } from './Devices'
@@ -89,6 +89,20 @@ function phoneTarget(i: number, d: DeckData, frame?: DeviceKind): string {
   return '/'
 }
 
+/** prekidač "+ Android" (traka) — pamti se između otvaranja */
+const BOTH_KEY = 'stihdana:deck-android'
+function readBoth() {
+  try {
+    return localStorage.getItem(BOTH_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+function subscribeBoth(f: () => void) {
+  window.addEventListener(BOTH_KEY, f)
+  return () => window.removeEventListener(BOTH_KEY, f)
+}
+
 function where(frame: HTMLIFrameElement | null): string | null {
   try {
     const l = frame?.contentWindow?.location
@@ -148,6 +162,22 @@ export function Deck({ data }: { data: DeckData }) {
     pickOs('ios')
   }, [stop.id])
   const osRef = useRef(os)
+  // samo iPhone (zadano) ili iPhone pa Android — prekidač u traci, pamti se
+  const both = useSyncExternalStore(subscribeBoth, readBoth, () => false)
+  const bothRef = useRef(both)
+  useEffect(() => {
+    bothRef.current = both
+  }, [both])
+  const setBoth = useCallback((on: boolean) => {
+    try {
+      if (on) localStorage.setItem(BOTH_KEY, '1')
+      else localStorage.removeItem(BOTH_KEY)
+    } catch {
+      /* privatni prozor */
+    }
+    window.dispatchEvent(new Event(BOTH_KEY))
+    if (!on) pickOs('ios')
+  }, [])
 
   const phoneRef = useRef<HTMLIFrameElement>(null)
   const phone = useCallback(() => phoneRef.current, [])
@@ -231,7 +261,7 @@ export function Deck({ data }: { data: DeckData }) {
   // Režirana scena (instalacija, dozvola): kad iPhone završi, sama krene na
   // Androidu — prekidač se pomjeri s njom. Izbor sistema se dalje ne dira.
   const onScriptDone = useCallback(() => {
-    if (osRef.current === 'ios') pickOs('android')
+    if (bothRef.current && osRef.current === 'ios') pickOs('android')
   }, [])
 
   // aplikacija u telefonu crta svoje modale i fontove po sistemu (globals.css);
@@ -482,11 +512,13 @@ export function Deck({ data }: { data: DeckData }) {
       setOs: pickOs,
       manual,
       setManual,
+      both,
+      setBoth,
       phone,
       desk,
       tapAt,
     }),
-    [data, index, stop.step, setStep, phoneSrc, frame, openPhone, reloadPhone, openDesktop, simulate, os, pickOs, manual],
+    [data, index, stop.step, setStep, phoneSrc, frame, openPhone, reloadPhone, openDesktop, simulate, os, pickOs, manual, both, setBoth],
   )
 
   // isti, današnji stih svuda: zaključan ekran, obavijest, WhatsApp
@@ -577,7 +609,8 @@ export function Deck({ data }: { data: DeckData }) {
                     width: `min(100cqw, calc((100cqh - 3.6em) * ${(deviceOuter(frame).w / deviceOuter(frame).h).toFixed(4)}))`,
                   }}
                 >
-                  <OsToggle />
+                  {/* izbor sistema samo kad su uključena oba (traka: "+ Android") */}
+                  {both && <OsToggle />}
                 </div>
               </div>
               </div>
@@ -790,6 +823,8 @@ function Bar({
       <div className="ml-auto flex items-center gap-2 md:ml-0">
         {/* demo na telefonu: sam, ili ga prezenter klikće — važi za sve korake */}
         <DemoToggle small />
+        {/* samo iPhone, ili iPhone pa Android */}
+        <PhonesToggle />
         <span className="tabular mx-2 text-[12px] text-white/40">
           <span className="text-white/80">{String(index + 1).padStart(2, '0')}</span> / {SLIDES.length}
         </span>

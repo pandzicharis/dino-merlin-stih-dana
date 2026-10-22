@@ -28,7 +28,8 @@ const ALIAS = path.join(ROOT, 'data', 'audio-alias.json')
 export const YT_FORMAT = 'bestaudio[ext=m4a]/bestaudio'
 
 /** Preuzimanje i kodiranje: lokalno (dev), `npm run audio` i GitHub (.github/workflows/audio.yml). */
-export const CAN_FETCH = process.env.NODE_ENV === 'development' || process.env.STIH_AUDIO_FETCH === '1'
+// i produkcijski build na računaru (localhost) — tu ima yt-dlp-a; na Vercelu nikad
+export const CAN_FETCH = process.env.NODE_ENV === 'development' || process.env.STIH_AUDIO_FETCH === '1' || !process.env.VERCEL
 
 export type SongState = 'ready' | 'loading' | 'missing' | 'error'
 

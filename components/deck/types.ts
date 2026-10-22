@@ -83,6 +83,9 @@ export type DeckApi = {
   setOs: (os: 'ios' | 'android') => void
   /** režirane scene (instalacija, dozvola): same ili klikom prezentera */
   manual: boolean
+  /** i Android: scene poslije iPhonea same pređu na Android (prekidač u traci); inače samo iPhone */
+  both: boolean
+  setBoth: (both: boolean) => void
   /** iframe telefona — za korake koji nešto pritisnu u aplikaciji */
   phone: () => HTMLIFrameElement | null
   /** iframe računara (admin) */

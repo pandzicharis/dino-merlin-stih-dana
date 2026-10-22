@@ -162,6 +162,50 @@ function PreviewFrame({
   )
 }
 
+/**
+ * Pregled je prava stranica aplikacije u okviru — učita se tek kad se otvori
+ * uređivanje, pa je kasnio. Zato se jednom, kad se admin smiri, u pozadini
+ * (nevidljiv okvir) učita `/pregled` i prođe kroz po jedan stih svakog albuma:
+ * skripte, fontovi i omoti su onda u kešu, i pravi pregled se pokaže odmah.
+ */
+export function useWarmPreview(verses: Verse[] | undefined) {
+  // lista se čita jednom, kad stigne — izmjene stihova ne prekidaju zagrijavanje
+  const latest = useRef(verses)
+  useEffect(() => {
+    latest.current = verses
+  }, [verses])
+  const ready = Boolean(verses?.length)
+  useEffect(() => {
+    const all = latest.current
+    if (!ready || !all?.length) return
+    const list = all.filter((v, i) => all.findIndex((x) => x.album === v.album) === i)
+    let f: HTMLIFrameElement | null = null
+    const timers: number[] = []
+    const start = window.setTimeout(() => {
+      f = document.createElement('iframe')
+      f.src = `/pregled?top=${STATUS_BAR}`
+      f.tabIndex = -1
+      f.setAttribute('aria-hidden', 'true')
+      f.style.cssText = `position:fixed;left:-9999px;top:0;width:${IPHONE.w}px;height:${IPHONE.h}px;border:0;opacity:0;pointer-events:none`
+      document.body.appendChild(f)
+      const onReady = (e: MessageEvent) => {
+        if (e.source !== f?.contentWindow || e.data?.type !== 'stihdana:preview-ready') return
+        window.removeEventListener('message', onReady)
+        list.forEach((verse, i) =>
+          timers.push(window.setTimeout(() => f?.contentWindow?.postMessage({ type: 'stihdana:preview', verse, instant: true }, location.origin), i * 400)),
+        )
+        timers.push(window.setTimeout(() => f?.remove(), list.length * 400 + 1500))
+      }
+      window.addEventListener('message', onReady)
+    }, 600)
+    return () => {
+      clearTimeout(start)
+      timers.forEach(clearTimeout)
+      f?.remove()
+    }
+  }, [ready])
+}
+
 /** Šalje stih u pregled — odmah, i kad god `/pregled` javi da je spreman. */
 function usePreviewFeed(frame: RefObject<HTMLIFrameElement | null>, verse: Verse, date: string | undefined, on = true) {
   useEffect(() => {

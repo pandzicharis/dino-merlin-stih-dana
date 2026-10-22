@@ -4,7 +4,7 @@ import { parseFont, preloadFonts, wordFont } from '@/lib/fonts'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { AnimatePresence, motion, useReducedMotion, type Easing } from 'motion/react'
 import { COLORS, rng } from './deck/PaperToPhone'
-import { startTips, stopTips } from './Tips'
+import { TIPS_ON, startTips, stopTips } from './Tips'
 import { deckParam, inDeck } from '@/lib/deck'
 import { formatFullDateBs } from '@/lib/date'
 import { haptic } from '@/lib/haptic'
@@ -41,6 +41,8 @@ export function playIntro(force = false) {
   window.dispatchEvent(new CustomEvent(EVENT, { detail: { force } }))
 }
 
+/** Uvod ili tombola završeni — stih stoji na ekranu (detail: `first` — uvod). */
+export const INTRO_DONE = 'stihdana:uvod-gotov'
 /** Dev: tombola odmah, sa stihom koji je na ekranu (i izabranim u dev traci). */
 const TOMBOLA = 'stihdana:tombola'
 export function playTombola() {
@@ -220,8 +222,19 @@ export function IntroHost({
     return () => clearTimeout(t)
   }, [pending, gate])
 
+  const onRef = useRef(on)
+  useEffect(() => {
+    onRef.current = on
+  }, [on])
   const done = useCallback(() => {
     setHold(false)
+    // stih je sad na ekranu — tek tad kreće pjesma (DailyVerse)
+    const first = Boolean(onRef.current?.first)
+    window.dispatchEvent(new CustomEvent(INTRO_DONE, { detail: { first } }))
+    // prezentacija: bez savjeta dobrodošlica ("Mir svim dobrim ljudima") stiže
+    // odmah poslije uvoda — telefon na slajdu je nacrta kao obavijest (Deck.tsx)
+    if (first && inDeck() && !TIPS_ON)
+      window.setTimeout(() => window.parent.postMessage({ type: 'stihdana:tips-done' }, window.location.origin), 700)
     setOn((cur) => {
       // savjeti tek kad se stih ispiše i smiri — u prezentaciji ih pokreće njihov korak
       if (cur?.first && !inDeck()) window.setTimeout(() => startTips(), 2600)

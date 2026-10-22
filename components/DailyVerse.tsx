@@ -7,6 +7,8 @@ import { useDevParams } from '@/lib/client-store'
 import { isProbe, markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
 import { bumpStreak, peekStreak, setLastSeen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
+import { AUTOPLAY } from '@/lib/player'
+import { isFirstVerse } from '@/lib/text'
 import { clearBadge, clearPushMark, hasPushMark, reportSeen } from '@/lib/push-client'
 import { cover, handledToday, markHandled, markUsed, mayWait, uncover } from '@/lib/cekaj'
 import { MOODS } from '@/data/moods'
@@ -16,7 +18,7 @@ import { Onboarding } from './Onboarding'
 import { Tips } from './Tips'
 import { UpdatePrompt } from './UpdatePrompt'
 import { PullRefresh } from './PullRefresh'
-import { IntroHost, playDraw } from './IntroSplash'
+import { INTRO_DONE, IntroHost, playDraw } from './IntroSplash'
 
 /**
  * Rješava KOJI stih se prikazuje.
@@ -68,6 +70,7 @@ export function DailyVerse({
   const [replay, setReplay] = useState(0)
   // papirić otvoren = stih izvučen (tek tad, ne kad se tombola pokaže) i
   // obavijest pročitana
+  const firstVerse = verse && isFirstVerse(verse.text) ? verse.id : null
   const land = useCallback(() => {
     setReplay((r) => r + 1)
     if (!verseId) markSeen(date)
@@ -85,6 +88,21 @@ export function DailyVerse({
     markHandled()
     uncover()
   }, [verseId, date])
+  // "Mir svim dobrim ljudima": pjesma krene sama kad se uvod (ili tombola)
+  // završi i ekran stiha se smiri (dugmad, gramofon) — ne usred splasha
+  useEffect(() => {
+    if (!firstVerse) return
+    let t = 0
+    const go = () => {
+      clearTimeout(t)
+      t = window.setTimeout(() => window.dispatchEvent(new CustomEvent(AUTOPLAY, { detail: firstVerse })), 1800)
+    }
+    window.addEventListener(INTRO_DONE, go)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener(INTRO_DONE, go)
+    }
+  }, [firstVerse])
   const reduced = useReducedMotion()
 
   // danas još nije zavrćen — stih se izvlači pred očima (i poslije ubijene

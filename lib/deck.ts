@@ -18,6 +18,13 @@
  */
 export const DECK_VERSE = 'koliko-mi-znacis'
 
+/**
+ * Stih uvoda u prezentaciji — kao novom korisniku: dozvola za obavijesti pa
+ * papirići (`?uvod=dozvola`) i prvo otvaranje kod izloga (`?intro`). Poslije
+ * (obavijest, plejer, plakati…) je opet DECK_VERSE.
+ */
+export const DECK_INTRO_VERSE = 'mir-svim-dobrim-ljudima'
+
 export function inDeck(): boolean {
   if (typeof window === 'undefined' || window.self === window.top) return false
   try {
@@ -31,4 +38,9 @@ export function inDeck(): boolean {
 /** Parametar iz adrese, samo kad je aplikacija u prezentaciji. */
 export function deckParam(name: string): string | null {
   return inDeck() ? new URLSearchParams(window.location.search).get(name) : null
+}
+
+/** Stih telefona u prezentaciji za ovu adresu: `?verse=`, uvod, ili stih prezentacije. */
+export function deckVerseId(): string {
+  return deckParam('verse') ?? (deckParam('uvod') === 'dozvola' || deckParam('intro') !== null ? DECK_INTRO_VERSE : DECK_VERSE)
 }

@@ -3,11 +3,11 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
-import { albumLine, youtubeId } from '@/lib/text'
+import { albumLine, isFirstVerse, youtubeId } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
-import { SHARED, SHARED_GONE, SOLO, createPlayer, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
+import { AUTOPLAY, SHARED, SHARED_GONE, SOLO, createPlayer, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
 import { warmAudio } from '@/lib/sw-cache'
 import { FitLines } from './deck/FitLines'
 
@@ -32,7 +32,7 @@ export function SongCredit({
   share?: boolean
 }) {
   const id = youtubeId(verse.youtube)
-  // dok audio ne pukne, dodir pušta pjesmu; ako server ne može do zvuka, ostaje YouTube link
+  // dok audio ne pukne, dodir pušta pjesmu; ako server ne može do zvuka, ostaje samo naziv
   // pamti se ZA KOJU pjesmu je zvuk pao — nova pjesma kreće ispočetka sama
   const [failedId, setFailedId] = useState<string | null>(null)
   const failed = failedId === id
@@ -43,59 +43,10 @@ export function SongCredit({
       <AudioSong key={`${id}-${share}`} verse={verse} {...sourceOf(verse, id)} onFail={() => setFailedId(id)} preview={preview} share={share} />
     )
 
+  // bez pjesme (nema linka ili zvuk nije stigao): samo naziv i album, bez znaka
   return (
     <div className="flex w-full flex-col items-center">
-      {id ? (
-        /* Naziv i znak su JEDAN link: hover i dodir zumiraju oboje zajedno,
-           a prst pogodi bilo koji od njih. */
-        <motion.a
-          href={`https://www.youtube.com/watch?v=${id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Poslušaj "${verse.song}" na YouTubeu`}
-          title="Poslušaj na YouTubeu"
-          data-tip="song"
-          className="group flex items-center gap-3 no-underline"
-          whileHover={{ scale: 1.06 }}
-          whileTap={{ scale: 0.94 }}
-          transition={{ type: 'spring', stiffness: 460, damping: 20 }}
-        >
-          <SongTitle song={verse.song} withIcon />
-          <span className="relative flex h-[26px] w-[38px] items-center justify-center">
-            {/* sjaj iza znaka — jača na hover */}
-            <span
-              className="absolute -inset-3 rounded-full opacity-50 blur-md transition-opacity duration-300 group-hover:opacity-90"
-              style={{ background: `radial-gradient(circle, ${BRAND.gold}55 0%, transparent 70%)` }}
-              aria-hidden
-            />
-            <svg width="38" height="26" viewBox="0 0 38 26" className="relative drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" aria-hidden>
-              <defs>
-                <linearGradient id="yt-gold" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#F1E2BF" />
-                  <stop offset="0.45" stopColor={BRAND.gold} />
-                  <stop offset="1" stopColor="#8A7148" />
-                </linearGradient>
-                <linearGradient id="yt-shine" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#fff" stopOpacity="0.45" />
-                  <stop offset="0.5" stopColor="#fff" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              {/* oblik YouTube znaka: blago ispupčen pravougaonik */}
-              <path
-                d="M37.2 4.1A4.8 4.8 0 0 0 33.8.7C30.8 0 19 0 19 0S7.2 0 4.2.7A4.8 4.8 0 0 0 .8 4.1C0 7.1 0 13 0 13s0 5.9.8 8.9a4.8 4.8 0 0 0 3.4 3.4C7.2 26 19 26 19 26s11.8 0 14.8-.7a4.8 4.8 0 0 0 3.4-3.4c.8-3 .8-8.9.8-8.9s0-5.9-.8-8.9z"
-                fill="url(#yt-gold)"
-              />
-              <path
-                d="M37.2 4.1A4.8 4.8 0 0 0 33.8.7C30.8 0 19 0 19 0S7.2 0 4.2.7A4.8 4.8 0 0 0 .8 4.1C.3 6 .1 9.2 0 11h38c-.1-1.8-.3-5-.8-6.9z"
-                fill="url(#yt-shine)"
-              />
-              <path d="M15.3 7.6v10.8L24.6 13z" fill="#16110A" />
-            </svg>
-          </span>
-        </motion.a>
-      ) : (
-        <SongTitle song={verse.song} withIcon={false} />
-      )}
+      <SongTitle song={verse.song} withIcon={false} />
 
       <p className="mt-4 text-[12px] uppercase tracking-[0.24em] text-white/55">
         {albumLine(verse)}
@@ -159,9 +110,10 @@ function useSong({
       setCur(a.currentTime)
       if (Number.isFinite(a.duration)) setDur(a.duration)
     }
-    const waiting = () => setState('loading')
+    // otključavanje (unlock) pusti pa odmah zaustavi — plejer to ne pokazuje
+    const waiting = () => !a.dataset.unlock && setState('loading')
     const playing = () => setState('playing')
-    const pause = () => setState((s) => (s === 'idle' ? s : 'paused'))
+    const pause = () => !a.dataset.unlock && setState((s) => (s === 'idle' ? s : 'paused'))
     const ended = () => setState('paused')
     const fail = () => {
       setState('idle')
@@ -291,6 +243,24 @@ function useSong({
     return fresh
   }
 
+  /**
+   * iPhone pušta zvuk samo iz dodira. Pjesma koja kreće sama se zato
+   * otključa prvim dodirom bilo gdje (kapija, dozvola): pusti i odmah stane,
+   * bez zvuka — poslije je preglednik pusti i bez prsta. Plejer to ne vidi.
+   */
+  function unlock() {
+    // samo telefon (iPhone) — računar pušta i bez ovoga, a Chrome bi poslije
+    // javio "učitava se" i pustio šum igle usred splasha
+    if (!matchMedia('(pointer: coarse)').matches) return
+    const a = player()
+    if (!a.paused || a.dataset.want) return
+    // oznaka ostaje dok pjesma stvarno ne krene (toggle) — zakašnjeli događaji
+    // učitavanja ne pokreću ploču ni pucketanje
+    a.dataset.unlock = '1'
+    a.play().catch(() => {})
+    a.pause()
+  }
+
   /** Preuzmi početak pjesme unaprijed — dodir je onda trenutan. */
   function prime() {
     const a = player()
@@ -327,6 +297,7 @@ function useSong({
       warmAudio([src])
       // prošao kroz Web Audio, ili zapeo (greška) — dolazi svjež
       if (isRouted(a) || a.error) a = renew(a)
+      delete a.dataset.unlock
       a.dataset.want = '1'
       // zvuk gramofona: kontekst se otvara iz dodira, tup kad igla legne
       unlockVinyl()
@@ -354,7 +325,7 @@ function useSong({
 
   const progress = dur ? cur / dur : 0
   const time = !dur ? '--:--' : cur > 0 ? `-${clock(dur - cur)}` : clock(dur)
-  return { state, progress, time, toggle, seek, prime }
+  return { state, progress, time, toggle, seek, prime, unlock }
 }
 
 /**
@@ -553,8 +524,34 @@ function Tonearm({ size, down, progress }: { size: number; down: boolean; progre
  */
 function AudioSong({ preview = false, share = false, ...props }: Source & { preview?: boolean; share?: boolean }) {
   // pregled (samo za gledanje): bez pripreme i preuzimanja pjesme
-  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: !preview && !share, share })
+  const { state, progress, time, toggle, seek, prime, unlock } = useSong({ ...props, preload: !preview && !share, share })
   const { verse, fallback } = props
+
+  // "Mir svim dobrim ljudima" (prvi stih novom korisniku): kad se stih otvori
+  // (papirić sleti), pjesma krene sama. Prvi dodir bilo gdje je otključa.
+  const auto = !preview && !share && isFirstVerse(verse.text)
+  const live = useRef({ state, toggle, unlock })
+  useEffect(() => {
+    live.current = { state, toggle, unlock }
+  })
+  useEffect(() => {
+    if (!auto) return
+    const kinds = ['touchend', 'click', 'keydown'] as const
+    const off = () => kinds.forEach((k) => window.removeEventListener(k, first, true))
+    function first() {
+      off()
+      live.current.unlock()
+    }
+    kinds.forEach((k) => window.addEventListener(k, first, true))
+    const go = (e: Event) => {
+      if ((e as CustomEvent).detail === verse.id && live.current.state === 'idle') live.current.toggle()
+    }
+    window.addEventListener(AUTOPLAY, go)
+    return () => {
+      off()
+      window.removeEventListener(AUTOPLAY, go)
+    }
+  }, [auto, verse.id])
 
   // Lokalno server pripremi pjesmu čim se stih pojavi — dodir je onda trenutan.
   // Na Vercelu nema yt-dlp-a, pa tamo svira samo statični fajl i ovo ne treba.

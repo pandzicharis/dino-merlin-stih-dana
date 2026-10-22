@@ -305,6 +305,32 @@ export function OsToggle() {
 }
 
 /** Auto / Ručno — režirana scena ide sama, ili je prezenter klikće na telefonu. */
+/** Telefon u prezentaciji: samo iPhone (zadano), ili iPhone pa isto na Androidu. */
+export function PhonesToggle() {
+  const { both, setBoth } = useDeck()
+  return (
+    <div className="dk-os dk-os--sm" role="radiogroup" aria-label="Telefoni" title="Telefon u prezentaciji">
+      {(
+        [
+          [false, 'iPhone'],
+          [true, '+ Android'],
+        ] as const
+      ).map(([b, label]) => (
+        <button key={label} type="button" role="radio" aria-checked={both === b} onClick={() => setBoth(b)}>
+          {both === b && (
+            <motion.span
+              layoutId="dk-phones-pill"
+              className="dk-os-pill"
+              transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+            />
+          )}
+          <span className="relative">{label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function DemoToggle({ small }: { small?: boolean }) {
   const { manual, setManual } = useDeck()
   return (

@@ -112,9 +112,16 @@ function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 
   big.forEach((n) => fade(n, toBig, toBig ? total * 0.35 : 0, total * (toBig ? 0.4 : 0.28)))
   // dugmad u uglu: na maloj karti krupna za prst — raširena ih vrati na
   // pravu veličinu, kao na ekranu stiha
+  // Tačno suprotno od karte u svakom kadru: karta se smanjuje linearno po
+  // razmjeri, pa obrnuta razmjera nije prava linija — u više tačaka, inače
+  // dugmad usput narastu (~6 %) i "plešu"
+  const frames = Array.from({ length: 9 }, (_, i) => {
+    const p = i / 8
+    const card = toBig ? 1 / k + (1 - 1 / k) * p : 1 + (1 / k - 1) * p
+    return { transform: `scale(${1 / (k * card)})` }
+  })
   el.querySelectorAll<HTMLElement>('[data-shrink]').forEach((n) => {
-    const kf = [{ transform: 'none' }, { transform: `scale(${1 / k})` }]
-    n.animate(toBig ? kf : kf.reverse(), { duration: total, delay: lead, easing: ease, fill: 'both' })
+    n.animate(frames, { duration: total, delay: lead, easing: ease, fill: 'both' })
   })
   // stih: raširena karta je viša — klizne na njenu sredinu, i nazad
   // gramofon: ista ploča (bez uvećavanja — slova ostaju oštra) klizne na dno, i nazad
@@ -276,8 +283,12 @@ function SavedFull({
       const curve = fromTransform === 'none' ? CLOSE : FLING
       for (const n of [extras.current, grab.current])
         n?.animate([{ opacity: Number(n.style.opacity || 1) }, { opacity: 0 }], { duration: curve.duration * 0.4, easing: 'ease-out', fill: 'forwards' })
-      // sleti tačno na malu kartu, pa se kratko pretopi u nju — bez treptaja
-      const moved = el.animate([{ transform: fromTransform }, { transform: small }], { ...curve, fill: 'forwards' })
+      // sleti tačno na malu kartu, pa se kratko pretopi u nju — bez treptaja.
+      // Mjesto male se izmjeri sad: traka se poslije otvaranja zna dosjesti
+      // za djelić piksela, pa bi ikonice na kraju malo skočile
+      const now = cardOf(verse.id)?.getBoundingClientRect()
+      const land = now && Math.abs(now.width - from.width) < 0.5 ? `translate(${now.left - left}px, ${now.top - top}px) scale(${1 / k})` : small
+      const moved = el.animate([{ transform: fromTransform }, { transform: land }], { ...curve, fill: 'forwards' })
       clip.current?.animate([{ transform: 'none' }, { transform: cut }], { ...curve, fill: 'forwards' })
       shift.current?.animate([{ transform: 'none' }, { transform: back }], { ...curve, fill: 'forwards' })
       moved.finished
@@ -287,7 +298,7 @@ function SavedFull({
       moving(el, curve.duration + SETTLE)
       shade.current?.animate([{ opacity: Number(shade.current.style.opacity || 1) }, { opacity: 0 }], { ...curve, fill: 'forwards' })
     },
-    [small, k, cut, back, onClosed],
+    [small, k, cut, back, onClosed, verse.id, from.width, left, top],
   )
   const collapse = useCallback(() => close(), [close])
 

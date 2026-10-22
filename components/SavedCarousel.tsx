@@ -98,6 +98,8 @@ export function SavedCarousel({
   const [near, setNear] = useState(cur)
 
   const strip = useRef<HTMLDivElement>(null)
+  // zadnji pomak trake — pjesma se mijenja tek kad karta odstoji (DWELL)
+  const movedAt = useRef(0)
   const versesRef = useRef(verses)
   const nearRef = useRef(near)
   useEffect(() => {
@@ -117,8 +119,8 @@ export function SavedCarousel({
     },
     [n, scrollToCard],
   )
-  // raširi: karta prvo tačno na sredinu (dodir usred dosjedanja je zaustavi
-  // gdje je stala), pa se mjeri; dodir usred zaleta samo dovede kartu
+  // raširi: karta prvo tačno na sredinu (i usred dosjedanja ili zaleta — dodir
+  // na prednju kartu je uvijek otvara, nikad samo dovede), pa se mjeri
   const open = useMemo(
     () =>
       onOpen &&
@@ -128,8 +130,8 @@ export function SavedCarousel({
         const card = el?.querySelectorAll<HTMLElement>('[data-card]')[i]
         if (el && card) {
           const want = card.offsetLeft + card.offsetWidth / 2 - el.clientWidth / 2
-          if (Math.abs(el.scrollLeft - want) > 24) return el.scrollTo({ left: want, behavior: 'smooth' })
-          el.scrollTo({ left: want, behavior: 'instant' })
+          // već stoji — ne dira se (offsetLeft je zaokružen, pa bi je pomjerio za djelić piksela)
+          if (Math.abs(el.scrollLeft - want) > 1) el.scrollTo({ left: want, behavior: 'instant' })
         }
         onOpen(v)
       }),
@@ -180,6 +182,7 @@ export function SavedCarousel({
       startTransition(() => setNear(i))
     }
     const onScroll = () => {
+      movedAt.current = performance.now()
       if (!raf) raf = requestAnimationFrame(live)
       clearTimeout(t)
       t = window.setTimeout(settle, 90)
@@ -219,8 +222,9 @@ export function SavedCarousel({
     const v = verses[restN]
     if (v) onFront?.(v)
   }, [restN, verses, onFront])
-  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma, kad
-  // listanje stane. Kad plejer pređe na drugu pjesmu, špil je stiže — tad se ništa ne pušta
+  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma, ali tek
+  // kad se na njoj zadrži (DWELL): dok se lista, u pozadini svira ona koja je
+  // svirala. Kad plejer pređe na drugu pjesmu, špil je stiže — tad se ništa ne pušta
   const lastRest = useRef(restN)
   const live = useRef({ playing: player.playing, verses })
   useEffect(() => {
@@ -229,8 +233,16 @@ export function SavedCarousel({
   useEffect(() => {
     if (lastRest.current === restN) return
     lastRest.current = restN
-    const v = live.current.verses[restN]
-    if (live.current.playing && v && v.id !== savedVerse()?.id) playSaved(v)
+    let t = 0
+    const check = () => {
+      // traka se opet pomjera — čeka se da stane i odstoji
+      const still = performance.now() - movedAt.current
+      if (still < DWELL) return void (t = window.setTimeout(check, DWELL - still))
+      const v = live.current.verses[restN]
+      if (live.current.playing && v && v.id !== savedVerse()?.id) playSaved(v)
+    }
+    t = window.setTimeout(check, DWELL)
+    return () => clearTimeout(t)
   }, [restN])
   // prikaz opet vidljiv (Activity) — prednja je pjesma koja sad svira
   useEffect(() => {
@@ -366,6 +378,9 @@ function keepDecoded(src: string) {
   img.src = src
   img.decode().catch(() => stills.delete(src))
 }
+
+/** koliko karta mora stajati na sredini da njena pjesma zamijeni onu koja svira (ms) */
+const DWELL = 1100
 
 /** razmak između karata u traci (px) */
 const STRIP_GAP = 14

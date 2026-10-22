@@ -169,6 +169,9 @@ function useProgress(
   }, [id, fill, now, left, known, dot])
 }
 
+/** pjesma bez albuma — umjesto omota logo aplikacije (potpis) */
+const art = (cover?: string) => `url(${cover ? (thumbOf(cover) ?? cover) : '/icons/icon-192.png?v=2'})`
+
 /** Omot albuma pjesme — samo slika (u plejeru i mini plejeru). */
 function Cover({ verse, size }: { verse: Verse; size: number }) {
   const m = MOODS[verse.mood]
@@ -180,7 +183,7 @@ function Cover({ verse, size }: { verse: Verse; size: number }) {
         width: size,
         height: size,
         // sličica od 240 px (data/albums.ts), ne omot od 1200+
-        backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined,
+        backgroundImage: art(cover),
         backgroundColor: m.gradient[1],
         boxShadow: '0 6px 18px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.08)',
       }}
@@ -532,7 +535,7 @@ const SongItem = memo(function SongItem({ v, on, playing }: { v: Verse; on: bool
       >
         <span
           className="relative flex h-[46px] w-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-cover bg-center"
-          style={{ backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+          style={{ backgroundImage: art(cover), backgroundColor: m.gradient[2], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
         >
           {on && (
             <span className="absolute inset-0 flex items-center justify-center bg-black/50">
@@ -666,7 +669,7 @@ const AlbumCard = memo(
         <div className="relative flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
           <span
             className="block h-[72px] w-[72px] shrink-0 rounded-[14px] bg-cover bg-center"
-            style={{ backgroundImage: cover ? `url(${thumbOf(cover) ?? cover})` : undefined, backgroundColor: m.gradient[2], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }}
+            style={{ backgroundImage: art(cover), backgroundColor: m.gradient[2], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }}
             aria-hidden
           />
           <div className="min-w-0">
