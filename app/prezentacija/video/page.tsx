@@ -18,6 +18,7 @@ export default async function VideoPage({ searchParams }: { searchParams: Promis
     <VideoScene
       format={format === 'objava' ? 'objava' : 'story'}
       verse={data.todayVerse}
+      verses={data.verses}
       date={data.today}
       host={data.host}
       rec={rec === '1'}

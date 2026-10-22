@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
-import { albumOf, softOf, thumbOf } from '@/data/albums'
+import { ALBUMS, albumOf, softOf, thumbOf } from '@/data/albums'
 import { haptic } from '@/lib/haptic'
 import { albumLine, asWritten } from '@/lib/text'
 import { EqBars } from './EqBars'
@@ -610,23 +610,26 @@ export const SavedList = memo(function SavedList({ verses, front, active = true 
   )
 })
 
-/** sačuvani po albumima, redom kako su sačuvani (najnoviji prvi) */
+/** album bez sačuvanih stihova — isti (prazan) niz, da se kartica ne crta iznova */
+const NONE: Verse[] = []
+
+/**
+ * Sačuvani po albumima, po godini od kraja (najnoviji album prvi). Svi albumi
+ * su tu — oni iz kojih još nema stiha su prazni (zatamnjeni), na svom mjestu
+ * u diskografiji. Pjesme bez (poznatog) albuma — jedna kartica, zadnja.
+ */
 function byAlbum(verses: Verse[]) {
-  const albums: { name: string; list: Verse[] }[] = []
-  // pjesme bez (poznatog) albuma — sve u jednoj kartici, na kraju
+  const got = new Map<string, Verse[]>()
   const loose: Verse[] = []
   for (const v of verses) {
     const name = albumOf(v.album)?.title
-    if (!name) {
-      loose.push(v)
-      continue
-    }
-    const a = albums.find((x) => x.name === name)
-    if (a) a.list.push(v)
-    else albums.push({ name, list: [v] })
+    if (!name) loose.push(v)
+    else if (got.has(name)) got.get(name)!.push(v)
+    else got.set(name, [v])
   }
-  if (loose.length) albums.push({ name: 'Bez albuma', list: loose })
-  return albums
+  // ALBUMS su poredani od najstarijeg
+  const all = [...ALBUMS].reverse().map((a) => ({ name: a.title, list: got.get(a.title) ?? NONE }))
+  return loose.length ? [...all, { name: 'Bez albuma', list: loose }] : all
 }
 
 /**
@@ -657,38 +660,74 @@ const AlbumCard = memo(
     onBring: () => void
   }) {
     const first = list[0]
-    const m = MOODS[first.mood]
     const album = albumOf(name)
     const cover = album?.cover
+    const box = {
+      'aria-label': name,
+      'aria-hidden': !ahead,
+      'data-album': true,
+      className: 'relative flex shrink-0 snap-center snap-always flex-col overflow-hidden rounded-[24px] border border-white/[0.07]',
+      // svoj stalni sloj: kartica (i zamućeni omot u njoj) nacrta se jednom, a skrol je samo pomjera
+      style: { width: width || 'calc(100% - 40px)', height: ALBUM_H, contain: 'layout paint', willChange: 'transform' },
+      onClickCapture: (e: React.MouseEvent) => {
+        if (ahead) return
+        e.stopPropagation()
+        onBring()
+      },
+    } as const
+    // još nijedan stih s ovog albuma — zatamnjen: omot jedva, bez pjesama
+    if (!first) {
+      const soft = softOf(cover)
+      return (
+        <section {...box}>
+          <div
+            className="absolute inset-0"
+            style={{ background: `linear-gradient(180deg, rgba(10,10,12,0.8) 0%, rgba(8,8,10,0.92) 100%)${soft ? `, url(${soft}) center / cover` : ''}, #0b0b0d` }}
+            aria-hidden
+          />
+          <div className="relative flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
+            <span
+              className="block h-[72px] w-[72px] shrink-0 rounded-[14px] bg-cover bg-center opacity-35"
+              style={{ backgroundImage: art(cover), boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }}
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-semibold uppercase leading-tight tracking-[0.2em] text-white/45">{name}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.22em] text-white/30">{album?.year} · još bez stiha</p>
+            </div>
+          </div>
+          {/* ploča — mjesto za album koji tek dođe */}
+          <div className="relative flex flex-1 items-center justify-center pb-6 text-white/[0.08]" aria-hidden>
+            <svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="6.5" />
+              <circle cx="12" cy="12" r="3" />
+              <circle cx="12" cy="12" r="0.5" fill="currentColor" />
+            </svg>
+          </div>
+        </section>
+      )
+    }
     return (
-      <section
-        aria-label={name}
-        aria-hidden={!ahead}
-        data-album
-        className="relative flex shrink-0 snap-center snap-always flex-col overflow-hidden rounded-[24px] border border-white/[0.07]"
-        // svoj stalni sloj: kartica (i zamućeni omot u njoj) nacrta se jednom, a skrol je samo pomjera
-        style={{ width: width || 'calc(100% - 40px)', height: 'min(46dvh, 400px)', contain: 'layout paint', willChange: 'transform' }}
-        onClickCapture={(e) => {
-          if (ahead) return
-          e.stopPropagation()
-          onBring()
-        }}
-      >
-        {/* boja stiha preko zamućenog omota albuma (slika se nacrta jednom u sloj kartice) */}
-        <div className="absolute inset-0" style={{ background: moodBg(first, 0.5) }} aria-hidden />
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.6) 100%)' }} aria-hidden />
+      <section {...box}>
+        {/* boje albuma — samo zamućen omot, bez atmosfere stiha (slika se nacrta jednom u sloj kartice) */}
+        <div
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.7) 100%)${softOf(cover) ? `, url(${softOf(cover)}) center / cover` : ''}, #141416` }}
+          aria-hidden
+        />
 
         {/* album: omot, naziv, godina, broj pjesama — u liniji s pjesmama ispod
             (omot albuma počinje gdje i kartica pjesme) */}
         <div className="relative flex shrink-0 items-center gap-3 px-4 pb-3 pt-4">
           <span
             className="block h-[72px] w-[72px] shrink-0 rounded-[14px] bg-cover bg-center"
-            style={{ backgroundImage: art(cover), backgroundColor: m.gradient[2], boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }}
+            style={{ backgroundImage: art(cover), backgroundColor: '#141416', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)' }}
             aria-hidden
           />
           <div className="min-w-0">
-            {/* naziv albuma velikim slovima — kao naziv pjesme ispod stiha */}
-            <p className="truncate text-[14px] font-semibold uppercase leading-tight tracking-[0.2em]" style={{ color: m.accent }}>
+            {/* naziv albuma velikim slovima — bijelo, boje daje omot */}
+            <p className="truncate text-[14px] font-semibold uppercase leading-tight tracking-[0.2em] text-white">
               {name}
             </p>
             <p className="mt-1 text-[10px] uppercase tracking-[0.22em] text-white/55">
@@ -794,6 +833,9 @@ export function SavedLoved({
   )
 }
 
+/** visina kartice albuma */
+export const ALBUM_H = 'min(46dvh, 400px)'
+
 /** razmak između kartica albuma (px) */
 const ALBUM_GAP = 12
 
@@ -823,9 +865,17 @@ export function SavedAlbums({
   const nowKey = nowKeyOf(p.id)
   const cur = (nowKey ? verses.find((v) => keyOf(v) === nowKey) : undefined) ?? front
   const albums = useMemo(() => byAlbum(verses), [verses])
+  // za slušače (traka, pjesma se promijenila) — uvijek trenutni niz
+  const shelf = useRef(albums)
+  useEffect(() => {
+    shelf.current = albums
+  }, [albums])
   const n = albums.length
-  // na početku je ispred album pjesme koja svira — inače prvi album
-  const [at, setAt] = useState(() => Math.max(0, albums.findIndex((a) => a.list.some((v) => keyOf(v) === nowKey))))
+  // na početku je ispred album pjesme koja svira — inače prvi koji ima pjesme
+  const [at, setAt] = useState(() => {
+    const k = albums.findIndex((a) => a.list.some((v) => keyOf(v) === nowKey))
+    return k >= 0 ? k : Math.max(0, albums.findIndex((a) => a.list.length))
+  })
   const i = Math.min(at, n - 1)
   // tačkica ispod — prati listanje odmah (album ispred i red plejera tek kad stane)
   const [dot, setDot] = useState(i)
@@ -901,7 +951,7 @@ export function SavedAlbums({
 
   // prikaz opet vidljiv (Activity) — ispred je album pjesme koja sad svira
   useEffect(() => {
-    const k = byAlbum(verses).findIndex((a) => a.list.some((v) => keyOf(v) === nowKeyOf(savedVerse()?.id ?? null)))
+    const k = albums.findIndex((a) => a.list.some((v) => keyOf(v) === nowKeyOf(savedVerse()?.id ?? null)))
     if (k < 0) return
     const r = requestAnimationFrame(() => {
       scrollTo(k, false)
@@ -918,7 +968,7 @@ export function SavedAlbums({
   useEffect(() => {
     const onTrack = (e: Event) => {
       const key = nowKeyOf(String((e as CustomEvent).detail))
-      const k = byAlbum(verses).findIndex((a) => a.list.some((v) => keyOf(v) === key))
+      const k = shelf.current.findIndex((a) => a.list.some((v) => keyOf(v) === key))
       if (k >= 0) scrollTo(k, true)
     }
     window.addEventListener(SAVED_TRACK, onTrack)
@@ -934,7 +984,8 @@ export function SavedAlbums({
   const queue = albums[playingAlbum >= 0 ? playingAlbum : i]?.list
   const queueKey = queue?.map((v) => v.id).join('|') ?? ''
   useEffect(() => {
-    if (queue && active) onQueue?.(queue)
+    // album bez pjesama — plejer ostaje na redu koji je imao
+    if (queue?.length && active) onQueue?.(queue)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queueKey, onQueue, active])
 
@@ -971,7 +1022,15 @@ export function SavedAlbums({
         <div className="mt-3 flex items-center justify-center gap-1.5">
           {albums.map(({ name, list }, k) => (
             <button key={name} type="button" onClick={() => go(k)} aria-label={name} aria-current={k === dot} className="flex h-6 items-center px-0.5">
-              <span className="block h-1.5 w-1.5 rounded-full" style={{ background: k === dot ? MOODS[list[0].mood].accent : 'rgba(255,255,255,0.22)' }} />
+              {/* album bez stiha — prazan kružić */}
+              <span
+                className="block h-1.5 w-1.5 rounded-full"
+                style={
+                  list.length
+                    ? { background: k === dot ? '#fff' : 'rgba(255,255,255,0.22)' }
+                    : { boxShadow: `inset 0 0 0 1px rgba(255,255,255,${k === dot ? 0.7 : 0.22})` }
+                }
+              />
             </button>
           ))}
         </div>

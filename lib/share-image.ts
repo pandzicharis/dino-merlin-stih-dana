@@ -105,9 +105,9 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
  * postaviti (bez njih je Fraunces "krivi" rez: WONK 1, SOFT 0, opsz po
  * veličini). Zato su te ose unaprijed upečene u ovaj font (public/fonts).
  */
-const SHARE_SERIF = '"Fraunces Share"'
+export const SHARE_SERIF = '"Fraunces Share"'
 let shareFaces: Promise<unknown> | null = null
-function loadShareSerif(): Promise<unknown> {
+export function loadShareSerif(): Promise<unknown> {
   if (shareFaces || typeof FontFace === 'undefined') return shareFaces ?? Promise.resolve()
   const faces = [
     new FontFace('Fraunces Share', 'url(/fonts/fraunces-share.woff2) format("woff2")', { weight: '100 900', style: 'normal' }),

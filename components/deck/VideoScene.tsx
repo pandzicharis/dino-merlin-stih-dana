@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { audioFile } from '@/lib/audio-name'
+import { seedMonth } from '@/lib/storage'
+import { recapDate } from '../RecapHost'
 import { LivePhone } from './Stages'
 import { MagazaMark } from './Screens'
 import { Backdrop, Sheet } from './Poster'
@@ -13,7 +15,7 @@ import type { Simulation } from './types'
 export type VideoFormat = 'story' | 'objava'
 
 /** Koraci videa — svaki ima svoj natpis. */
-type Step = 'notify' | 'tombola' | 'verse' | 'save' | 'play' | 'end'
+type Step = 'notify' | 'tombola' | 'verse' | 'save' | 'play' | 'month' | 'end'
 
 const CAPTIONS: Record<Step, { eyebrow: string; a: string; b: string }> = {
   notify: { eyebrow: 'Svaki dan u 12:00', a: 'Stigne obavijest.', b: 'Tvoj stih te čeka.' },
@@ -21,6 +23,7 @@ const CAPTIONS: Record<Step, { eyebrow: string; a: string; b: string }> = {
   verse: { eyebrow: 'Stih dana', a: 'Riječi koje', b: 'danas trebaš.' },
   save: { eyebrow: 'Sačuvaj', a: 'Da ti ostane', b: 'za kasnije.' },
   play: { eyebrow: 'Player pjesama', a: 'Sačuvani stihovi', b: 'su tvoj plejer.' },
+  month: { eyebrow: 'Moj mjesec', a: 'Svaki mjesec', b: 'kao priča.' },
   end: { eyebrow: 'Besplatno · iPhone · Android', a: 'Jedan stih.', b: 'Svaki dan.' },
 }
 
@@ -43,18 +46,22 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /**
  * Video za story (9:16) i objavu (4:5): cijeli tok u pravom telefonu —
- * obavijest → dodir → tombola → stih → sačuvaj → pjesma iz sačuvanih — uz natpise.
+ * obavijest → dodir → tombola → stih → sačuvaj → pjesma iz sačuvanih → moj
+ * mjesec (pregled mjeseca prođe sam, na probnim podacima) — uz natpise.
  * `rec`: bez dugmadi, čeka da ga skripta pokrene (snimanje kroz Chrome).
  */
 export function VideoScene({
   format,
   verse,
+  verses,
   date,
   host,
   rec = false,
 }: {
   format: VideoFormat
   verse: Verse
+  /** svi stihovi — probni podaci za pregled mjeseca */
+  verses: Verse[]
   date: string
   host: string
   rec?: boolean
@@ -159,13 +166,29 @@ export function VideoScene({
     await press('[role="dialog"][aria-label="Player pjesama"] button[aria-label="Spusti"]', id)
     await wait(3000)
 
+    // 5 — moj mjesec: probni podaci mjeseca (telefon dijeli localStorage s
+    // ovom stranicom), ikonica kalendara gore — priča prođe sama, pa se zatvori
+    if (!alive()) return
+    setStep('month')
+    const day = Number(date.slice(8, 10))
+    const prev = recapDate(date)
+    if (day <= 7) seedMonth(verses, prev.slice(0, 7), Number(prev.slice(8, 10)))
+    else seedMonth(verses, date.slice(0, 7), day - 1)
+    await wait(900)
+    await press('button[aria-label="Moj mjesec"]', id)
+    await until(() => Boolean(doc()?.querySelector('[data-recap-end]')), 40000)
+    await wait(2600)
+    if (!alive()) return
+    await press('[data-recap-end]', id)
+    await wait(1200)
+
     // 5 — kraj: poruka i link
     if (!alive()) return
     setStep('end')
     mark('end')
     await wait(4000)
     if (alive() && window.__video) window.__video.done = true
-  }, [press, until])
+  }, [press, until, date, verses])
 
   // aplikacija je spremna kad je stih na ekranu (iframe se zna učitati prije
   // hidratacije, pa se ne čeka njegov onLoad)

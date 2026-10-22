@@ -38,7 +38,7 @@ export function PreviewScreen() {
   const top = Number(new URLSearchParams(location.search).get('top')) || 0
   return (
     <div inert style={top ? ({ '--sat': `${top}px` } as React.CSSProperties) : undefined}>
-      <VerseScreen verse={msg.verse} date={msg.date ?? verseDayInTz()} instant={msg.instant} preview />
+      <VerseScreen verse={msg.verse} date={msg.date ?? verseDayInTz()} instant={msg.instant} preview month />
     </div>
   )
 }

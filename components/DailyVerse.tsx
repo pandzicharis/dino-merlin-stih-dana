@@ -5,7 +5,7 @@ import { useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
 import { isProbe, markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
-import { bumpStreak, peekStreak, setLastSeen } from '@/lib/storage'
+import { bumpStreak, noteOpen, peekStreak, setLastSeen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
 import { AUTOPLAY } from '@/lib/player'
 import { isFirstVerse } from '@/lib/text'
@@ -14,6 +14,7 @@ import { cover, handledToday, markHandled, markUsed, mayWait, uncover } from '@/
 import { MOODS } from '@/data/moods'
 import { VerseScreen } from './VerseScreen'
 import { DevDateBar } from './DevDateBar'
+import { RecapHost } from './RecapHost'
 import { Onboarding } from './Onboarding'
 import { Tips } from './Tips'
 import { UpdatePrompt } from './UpdatePrompt'
@@ -78,6 +79,8 @@ export function DailyVerse({
     // Probni stih s dana instalacije se ne broji: obavijest ga zamijeni pravim
     if (!verseId && !isProbe(date))
       void hasPushMark().then((fromPush) => {
+        // pregled mjeseca: kad je stih otvoren i je li iz obavijesti
+        noteOpen(date, fromPush)
         // izvučeno s obavijesti — kasna ili ponovljena oznaka danas ne pokreće tombolu
         if (fromPush) markUsed(date)
         clearPushMark()
@@ -212,7 +215,7 @@ export function DailyVerse({
       <Onboarding mood={tone} seed={verse?.id ?? 'stih-dana'} />
       {/* dok uređaj ne izvuče stih (prvi frejm), ekran je prazan — pozadina
           i stih uđu zajedno, kao i inače */}
-      {verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} streak={verseId ? 0 : streak} />}
+      {verse && <VerseScreen verse={verse} date={date} mood={mood} replay={replay} streak={verseId ? 0 : streak} month />}
       {/* povuci nadolje — osvježi (instalirana aplikacija) */}
       <PullRefresh />
       {/* key: novi stih — zastor od prvog frejma, prije tombole */}
@@ -220,6 +223,8 @@ export function DailyVerse({
       <Tips />
       <UpdatePrompt accent={MOODS[tone].accent} />
       {verse && <DevDateBar date={date} verseId={verse.id} mood={tone} verses={verses} />}
+      {/* mjesečni pregled — ponudi se u novom mjesecu, otvara se i iz postavki */}
+      {verse && <RecapHost verses={verses} date={date} />}
     </>
   )
 }

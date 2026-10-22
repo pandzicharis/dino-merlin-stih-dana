@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { BRAND } from '@/lib/brand'
-import { SEND_TIME } from '@/lib/date'
+import { SEND_TIME, getActiveDate, monthBs, shownDay } from '@/lib/date'
+import { CalendarIcon, openRecap, recapDate } from './RecapHost'
 import { unsubscribeFromPush } from '@/lib/push-client'
 import { haptic } from '@/lib/haptic'
 import { useNotify, type NotifyState } from './Notify'
@@ -145,6 +146,10 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
                   />
                 </Section>
 
+                <Section title="Tvoj mjesec">
+                  <Recap onClose={onClose} />
+                </Section>
+
                 {/* visoko, da se QR vidi čim se otvori */}
                 <Section title="Podijeli">
                   <ShareApp />
@@ -250,6 +255,25 @@ function Row({
       <Text title={title} sub={sub} />
       {right}
     </button>
+  )
+}
+
+/** Pregled mjeseca — do 7. prošli mjesec, poslije tekući. Postavke se sklone pa se otvori. */
+function Recap({ onClose }: { onClose: () => void }) {
+  const date = recapDate(shownDay(getActiveDate()))
+  return (
+    <Row
+      tile={<CalendarIcon />}
+      title={`Tvoj ${monthBs(date)}`}
+      sub="Pjesme, stihovi, niz"
+      right={<Chevron />}
+      label="Pregled mjeseca"
+      onClick={() => {
+        haptic(5)
+        onClose()
+        window.setTimeout(() => openRecap(date), 260)
+      }}
+    />
   )
 }
 

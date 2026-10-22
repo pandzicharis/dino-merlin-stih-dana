@@ -10,7 +10,7 @@ import { SavedCarousel } from './SavedCarousel'
 import { SAVED_TRACK, closeSaved, setSavedPlaylist } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
 import { loose } from '@/lib/text'
-import { SavedAlbums, SavedList, SavedLoved, SavedPlayer, keyOf, type View } from './SavedPlayer'
+import { ALBUM_H, SavedAlbums, SavedList, SavedLoved, SavedPlayer, keyOf, type View } from './SavedPlayer'
 
 /** Kako se sačuvani prikazuju iznad plejera: špil karata, lista ili albumi. */
 export type SavedView = View
@@ -42,7 +42,7 @@ function paneHeight(view: SavedView, songs: number, loved: number, page: boolean
     // karta: visina iz FIT, ili širina panela (do 440) ako je uža
     return `calc(12px + min(${page ? 'min(56dvh, 560px)' : FIT}, (min(100vw, 440px) - 108px) * ${(620 / 390).toFixed(4)}))`
   }
-  if (view === 'albums') return `calc(min(46dvh, 400px) + ${44 + UNDER + 8}px)`
+  if (view === 'albums') return `calc(${ALBUM_H} + ${44 + UNDER + 8}px)`
   const n = view === 'loved' ? loved : songs
   if (!n) return `${200 + UNDER}px`
   return `${Math.round(Math.min(n, MAX_ROWS) * ROW + 12 + UNDER)}px`

@@ -7,6 +7,8 @@ import { MOODS } from '@/data/moods'
 import { albumOf, ALBUMS, blurOf, glowOf, thumbOf } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
 import { playable } from '@/lib/player'
+import { seedMonth } from '@/lib/storage'
+import { recapDate } from '../RecapHost'
 import { DECK_VERSE } from '@/lib/deck'
 import { useDeck } from './context'
 import { TIPS_ON } from '../Tips'
@@ -103,6 +105,13 @@ const STIH: FeatureDef[] = [
     id: 'dijeljenje',
     title: 'Podijeli kao sliku',
     body: () => <Dijeljenje />,
+  },
+  {
+    // pregled mjeseca kao priča — prođe sam kroz sve kartice
+    id: 'mjesec',
+    title: 'Priča o tvom mjesecu',
+    enter: '/',
+    body: (d) => <Mjesec d={d} />,
   },
 ]
 
@@ -839,7 +848,14 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
         if (q('[data-full]')) w?.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }))
         const x = q('[aria-label="Zatvori plejer"]')
         if (x) x.click()
-        else if (q('[role="dialog"][aria-modal="true"]')) q('button[aria-label="Zatvori"]')?.click()
+        // ostali otvoreni prozori (dijeljenje, postavke, pregled mjeseca…) — i kad je plejer
+        // u stranici, inače bi dijeljenje ostalo otvoreno ispod sljedećeg koraka
+        for (const dlg of w?.document.querySelectorAll('[role="dialog"][aria-modal="true"]') ?? []) {
+          if (dlg.getAttribute('aria-label') === 'Player pjesama') continue
+          const b = dlg.querySelector<HTMLElement>('button[aria-label="Zatvori"]')
+          if (b) b.click()
+          else w?.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }))
+        }
         w?.dispatchEvent(new w.Event('stihdana:stop-audio'))
       } catch {
         /* tuđa adresa */
@@ -1638,6 +1654,37 @@ function Dijeljenje() {
         ]}
       />
     </>
+  )
+}
+
+/**
+ * Moj mjesec: telefon dobije probne podatke za mjesec (isti svaki put, i na
+ * produkciji gdje nema istorije), ikonica kalendara se pritisne i priča sama
+ * prođe kroz sve kartice, do sažetka. Kartice bez podataka se ne prikazuju.
+ */
+function Mjesec({ d }: { d: DeckData }) {
+  useKeepSaved()
+  // telefon dijeli localStorage s prezentacijom; pregled čita podatke kad se otvori
+  useEffect(() => {
+    const day = Number(d.today.slice(8, 10))
+    const prev = recapDate(d.today)
+    // prvih dana u mjesecu — cio prošli mjesec, inače ovaj do jučer
+    if (day <= 7) seedMonth(d.verses, prev.slice(0, 7), Number(prev.slice(8, 10)))
+    else seedMonth(d.verses, d.today.slice(0, 7), day - 1)
+  }, [d.today, d.verses])
+  useScene(async ({ wait, find, press, home, alive }) => {
+    if (!(await home())) return
+    await wait(900)
+    if (!(await press('button[aria-label="Moj mjesec"]'))) return
+    // priče idu same — do zadnje kartice (sažetak)
+    await find('[data-recap-end]', 60000)
+    if (alive()) await wait(3500)
+  })
+  return (
+    <Text>
+      Mjesec dana kao priča: kalendar izvučenih stihova, sačuvani kao ploče, najslušanija pjesma i album, pa tri broja.
+      Sve ostaje na telefonu, bez naloga.
+    </Text>
   )
 }
 

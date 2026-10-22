@@ -285,9 +285,12 @@ export function VerseMock({
             <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
             <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
           </div>
-          {/* sačuvani i postavke — kao VerseScreen (obavijesti su u postavkama) */}
+          {/* sačuvani, moj mjesec i postavke — kao VerseScreen (obavijesti su u postavkama) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8em', color: 'rgba(255,255,255,0.82)' }}>
             {savedCount > 0 && <SavedIcon count={savedCount} />}
+            <span style={{ ...HDR_BTN, width: '34em' }}>
+              <Calendar />
+            </span>
             <span style={{ ...HDR_BTN, width: '34em' }}>
               <Gear />
             </span>
@@ -556,6 +559,17 @@ function StreakPill({ n }: { n: number }) {
       </svg>
       {n}. stih dana
     </span>
+  )
+}
+
+/** Kalendar "Moj mjesec" — isti kao `MonthButton` u aplikaciji. */
+function Calendar() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: '16em', height: '16em' }} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+      <circle cx="12" cy="15" r="1.3" fill="currentColor" stroke="none" />
+    </svg>
   )
 }
 

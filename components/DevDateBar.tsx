@@ -7,9 +7,10 @@ import { playIntro, playTombola } from './IntroSplash'
 import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
 import { redraw } from '@/lib/draw'
 import { isFirstVerse } from '@/lib/text'
-import { saveAllFavorites } from '@/lib/storage'
+import { saveAllFavorites, seedMonth } from '@/lib/storage'
 import { loadVerses } from '@/lib/verses-client'
 import { Icon, TOAST_BAD, TOAST_OK, dismissToast, toast, type Toast } from './Toast'
+import { openRecap, recapDate } from './RecapHost'
 
 /** Sve poruke aplikacije redom — svaki klik na "poruke" pokaže sljedeću. */
 const SAMPLES: Toast[] = [
@@ -171,6 +172,86 @@ export function DevDateBar({
         className="px-1.5 text-white/50 hover:text-white"
       >
         sačuvaj sve
+      </button>
+      {/* pregled mjeseca: probni podaci za ovaj mjesec (pa nova stranica — izvlačenje čita iznova) */}
+      <button
+        onClick={() => {
+          // ovaj mjesec do jučer (ili cio prošli, prvih dana u mjesecu)
+          const day = Number(date.slice(8, 10))
+          const prev = addDays(`${date.slice(0, 7)}-01`, -1)
+          if (day <= 7) seedMonth(verses, prev.slice(0, 7), Number(prev.slice(8, 10)))
+          else seedMonth(verses, date.slice(0, 7), day - 1)
+          window.location.reload()
+        }}
+        className="px-1.5 text-white/50 hover:text-white"
+      >
+        popuni mjesec
+      </button>
+      {/* pregled mjeseca, scenariji: mjesec bez ijednog podatka (prvi u mjesecu) … */}
+      <button
+        onClick={() => {
+          // prvi sljedeći mjesec u kojem na ovom telefonu nema ni izvučenog ni sačuvanog stiha
+          const used = (ym: string) => {
+            try {
+              const days = Object.keys(JSON.parse(localStorage.getItem('stihdana:draw') || '{}')?.days ?? {})
+              const saved = Object.values(JSON.parse(localStorage.getItem('stihdana:favoriteDates') || '{}') as Record<string, string>)
+              return [...days, ...saved].some((d) => d.startsWith(ym))
+            } catch {
+              return false
+            }
+          }
+          const [y, m] = date.split('-').map(Number)
+          let k = 0
+          let first = ''
+          do {
+            first = new Date(Date.UTC(y, m + k, 1)).toISOString().slice(0, 10)
+            k++
+          } while (used(first.slice(0, 7)) && k < 36)
+          openRecap(first)
+        }}
+        className="px-1.5 text-white/50 hover:text-white"
+      >
+        prazan mjesec
+      </button>
+      {/* … tek prva 3 dana u mjesecu … */}
+      <button
+        onClick={() => {
+          const used = (ym: string) => {
+            try {
+              return Object.keys(JSON.parse(localStorage.getItem('stihdana:draw') || '{}')?.days ?? {}).some((d) => d.startsWith(ym))
+            } catch {
+              return false
+            }
+          }
+          const [y, m] = date.split('-').map(Number)
+          let k = 0
+          let first = ''
+          do {
+            first = new Date(Date.UTC(y, m + k, 1)).toISOString().slice(0, 10)
+            k++
+          } while (used(first.slice(0, 7)) && k < 36)
+          seedMonth(verses, first.slice(0, 7), 3, 0)
+          openRecap(first)
+        }}
+        className="px-1.5 text-white/50 hover:text-white"
+      >
+        prva 3 dana
+      </button>
+      {/* … i preko 20 sačuvanih (svi stihovi iz baze) */}
+      <button
+        onClick={() => {
+          const target = recapDate(date)
+          const day = Number(date.slice(8, 10))
+          seedMonth(verses, target.slice(0, 7), day <= 7 ? Number(target.slice(8, 10)) : day - 1, verses.length)
+          openRecap(target)
+        }}
+        className="px-1.5 text-white/50 hover:text-white"
+      >
+        20+ sačuvanih
+      </button>
+      {/* mjesečni pregled — tekući mjesec */}
+      <button onClick={() => openRecap(date)} className="px-1.5 text-white/50 hover:text-white">
+        mjesec
       </button>
       {(['ios', 'android'] as const).map((o) => (
         <button

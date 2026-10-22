@@ -9,6 +9,8 @@ import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
 import { AUTOPLAY, SHARED, SHARED_GONE, SOLO, createPlayer, playOn, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
 import { warmAudio } from '@/lib/sw-cache'
+import { bumpMonth } from '@/lib/storage'
+import { audioFile } from '@/lib/audio-name'
 import { FitLines } from './deck/FitLines'
 
 /**
@@ -323,6 +325,7 @@ function useSong({
       dropNeedle(0.3)
       window.dispatchEvent(new CustomEvent(SOLO, { detail: a }))
       session(a, verse)
+      bumpMonth('plays', audioFile(verse.song))
       setCur(0)
       if (!a.paused) return setState('playing')
       setState('loading')
@@ -348,6 +351,8 @@ function useSong({
       dropNeedle(0.3)
       window.dispatchEvent(new CustomEvent(SOLO, { detail: a }))
       session(a, verse)
+      // slušanje mjeseca — pjesma od početka, ne nastavak poslije pauze
+      if (a.currentTime < 1) bumpMonth('plays', audioFile(verse.song))
       setState('loading')
       playOn(a, () => setState('paused'))
     } else {

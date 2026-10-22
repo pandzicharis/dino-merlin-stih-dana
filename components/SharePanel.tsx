@@ -16,6 +16,7 @@ import { recordStory, videoSupported } from '@/lib/share-video'
 import { haptic } from '@/lib/haptic'
 import { DrawerIcon } from './DrawerIcon'
 import { Icon, TOAST_BAD, TOAST_OK, toast } from './Toast'
+import { bumpMonth } from '@/lib/storage'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
 type Target = 'share' | 'save'
@@ -112,12 +113,14 @@ export default function SharePanel({
           // Sistemski share telefona: odatle ide u Instagram Story, WhatsApp,
           // Viber… Na desktopu toga nema, pa se slika preuzme.
           if (await shareImage(true)) {
+            bumpMonth('shared')
             toast({ id: 'share', title: 'Podijeljeno', color: TOAST_OK, icon: <Icon.ok /> })
             break
           }
           const file = await imageFile()
           if (file) {
             download(file)
+            bumpMonth('shared')
             toast({ id: 'share', title: 'Slika je preuzeta', sub: 'Dijeljenje nije podržano', icon: <Icon.download /> })
           }
           break

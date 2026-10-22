@@ -118,6 +118,11 @@ const MJESECI = [
 ]
 const DANI = ['nedjelja', 'ponedjeljak', 'utorak', 'srijeda', 'četvrtak', 'petak', 'subota']
 
+/** Mjesec datuma: "oktobar" */
+export function monthBs(iso: string): string {
+  return MJESECI[Number(iso.slice(5, 7)) - 1]
+}
+
 export function formatDateBs(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return `${d}. ${MJESECI[m - 1]} ${y}.`

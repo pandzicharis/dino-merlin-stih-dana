@@ -17,6 +17,7 @@ import { ShareButton } from './ShareSheet'
 import { Signature } from './Signature'
 import { FavoriteButton } from './FavoriteButton'
 import { SavedLink } from './SavedLink'
+import { MonthButton } from './RecapHost'
 import { MagazaLogo } from './MagazaLogo'
 import { StreakLine } from './Streak'
 import { useSavedPlayerSelect } from '@/lib/player'
@@ -36,6 +37,7 @@ export function VerseScreen({
   instant = false,
   preview = false,
   streak = 0,
+  month = false,
 }: {
   verse: Verse
   date: string
@@ -50,6 +52,8 @@ export function VerseScreen({
   preview?: boolean
   /** dana zaredom (lib/storage.ts) — tiho iznad datuma, tek od drugog dana */
   streak?: number
+  /** dugme "Moj mjesec" u zaglavlju — samo na početnoj (tamo je pregled mjeseca) */
+  month?: boolean
 }) {
   const m = MOODS[mood ?? verse.mood]
   // mini plejer pjesama pluta na dnu — sadržaj se podigne iznad njega. Mjesto
@@ -152,6 +156,7 @@ export function VerseScreen({
               {/* obavijesti rade u pozadini; prekidač je u postavkama */}
               <NotifySync />
               <SavedLink />
+              {month && <MonthButton />}
               <SettingsButton />
             </motion.div>
           )}
