@@ -7,8 +7,6 @@ import { BRAND } from '@/lib/brand'
 import { SEND_TIME } from '@/lib/date'
 import { unsubscribeFromPush } from '@/lib/push-client'
 import { haptic } from '@/lib/haptic'
-import { saveAllFavorites } from '@/lib/storage'
-import { loadVerses } from '@/lib/verses-client'
 import { useNotify, type NotifyState } from './Notify'
 import { Icon, TOAST_OK, toast } from './Toast'
 import { MagazaLogo } from './MagazaLogo'
@@ -180,8 +178,6 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
                 </Section>
 
                 <Section title="Aplikacija">
-                  {/* PRIVREMENO — test opterećenja plejera, obrisati poslije */}
-                  <SaveAll />
                   <Wipe />
                 </Section>
 
@@ -385,33 +381,6 @@ function Switch({ on, busy, disabled }: { on: boolean; busy: boolean; disabled: 
  * service worker, i odjavi obavijesti — pa se učita ispočetka, kao prvi
  * put. Traži drugi dodir, da se ne desi slučajno.
  */
-/** PRIVREMENO — test opterećenja plejera: svi stihovi u sačuvane. Obrisati poslije testa. */
-function SaveAll() {
-  const [busy, setBusy] = useState(false)
-  const run = async () => {
-    if (busy) return
-    setBusy(true)
-    haptic(10)
-    try {
-      const n = saveAllFavorites((await loadVerses()).map((v) => v.id))
-      toast({ id: 'save-all', title: n ? `Dodano ${n} stihova` : 'Svi su već sačuvani', sub: 'Test plejera', color: TOAST_OK, icon: <Icon.ok /> }, 3000)
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <button onClick={run} className={ROW}>
-      <Tile>
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={BRAND.gold} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </Tile>
-      <Text title={busy ? 'Dodajem…' : 'Sačuvaj sve stihove'} sub="Test plejera — privremeno" />
-      <Chevron />
-    </button>
-  )
-}
-
 function Wipe() {
   const [armed, setArmed] = useState(false)
   const [busy, setBusy] = useState(false)
