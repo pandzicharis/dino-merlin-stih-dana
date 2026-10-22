@@ -1052,22 +1052,22 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
             </div>
             <Credit verse={v} size={12} track={0.1} />
           </div>
-          <Btn label="Prethodna" onPress={prevSaved} size={32}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <Btn label="Prethodna" onPress={prevSaved} size={38}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               {PREV}
             </svg>
           </Btn>
-          <Btn label={p.playing ? 'Pauza' : 'Pusti'} onPress={() => toggle(v, p.playing)} size={38}>
-            <PlayGlyph playing={p.playing} size={24} />
+          <Btn label={p.playing ? 'Pauza' : 'Pusti'} onPress={() => toggle(v, p.playing)} size={44}>
+            <PlayGlyph playing={p.playing} size={28} />
           </Btn>
-          <Btn label="Sljedeća" onPress={nextSaved} size={32}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <Btn label="Sljedeća" onPress={nextSaved} size={38}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               {NEXT}
             </svg>
           </Btn>
           {/* × — muzika stane, mini plejer ode */}
-          <Btn label="Zatvori plejer" onPress={stopSaved} size={28} color="rgba(255,255,255,0.5)" zoom={1.35}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
+          <Btn label="Zatvori plejer" onPress={stopSaved} size={32} color="rgba(255,255,255,0.5)" zoom={1.3}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
           </Btn>

@@ -16,7 +16,7 @@ import { FontedLines, MagazaMark } from './deck/Screens'
 import { CardAtmosphere } from './CardAtmosphere'
 import { FitLines } from './deck/FitLines'
 import { SongRow } from './SongCredit'
-import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayerSelect } from '@/lib/player'
+import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayerSelect, warmSaved } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
 import { dragScroll } from '@/lib/drag-scroll'
 import { tapProps } from '@/lib/tap'
@@ -222,9 +222,9 @@ export function SavedCarousel({
     const v = verses[restN]
     if (v) onFront?.(v)
   }, [restN, verses, onFront])
-  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma, ali tek
-  // kad se na njoj zadrži (DWELL): dok se lista, u pozadini svira ona koja je
-  // svirala. Kad plejer pređe na drugu pjesmu, špil je stiže — tad se ništa ne pušta
+  // i obrnuto: prevučena karta dok muzika svira — svira njena pjesma, čim traka
+  // stane na njoj (DWELL); usred zaleta se ne mijenja. Kad plejer pređe na
+  // drugu pjesmu, špil je stiže — tad se ništa ne pušta
   const lastRest = useRef(restN)
   const live = useRef({ playing: player.playing, verses })
   useEffect(() => {
@@ -238,8 +238,11 @@ export function SavedCarousel({
       // traka se opet pomjera — čeka se da stane i odstoji
       const still = performance.now() - movedAt.current
       if (still < DWELL) return void (t = window.setTimeout(check, DWELL - still))
-      const v = live.current.verses[restN]
+      const vs = live.current.verses
+      const v = vs[restN]
       if (live.current.playing && v && v.id !== savedVerse()?.id) playSaved(v)
+      // dok svira, susjedne su spremne — sljedeće prevlačenje svira odmah
+      if (live.current.playing) warmSaved([vs[restN + 1], vs[restN - 1]])
     }
     t = window.setTimeout(check, DWELL)
     return () => clearTimeout(t)
@@ -379,8 +382,8 @@ function keepDecoded(src: string) {
   img.decode().catch(() => stills.delete(src))
 }
 
-/** koliko karta mora stajati na sredini da njena pjesma zamijeni onu koja svira (ms) */
-const DWELL = 1100
+/** koliko karta mora stajati na sredini da njena pjesma zamijeni onu koja svira (ms) — 0: čim traka stane */
+const DWELL = 0
 
 /** razmak između karata u traci (px) */
 const STRIP_GAP = 14

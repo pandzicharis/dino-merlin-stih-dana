@@ -160,8 +160,9 @@ export function startCrackle(owner: object) {
 export function stopCrackle(owner?: object) {
   if (!ctx || !live || (owner && live.owner !== owner)) return
   const { src, gain } = live
-  gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08)
-  src.stop(ctx.currentTime + 0.4)
+  // odmah — samo par milisekundi da ne pukne
+  gain.gain.setTargetAtTime(0, ctx.currentTime, 0.008)
+  src.stop(ctx.currentTime + 0.05)
   live = null
 }
 

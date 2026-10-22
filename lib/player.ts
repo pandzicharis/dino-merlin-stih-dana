@@ -295,6 +295,12 @@ function sourceFor(verse: Verse) {
   return id && playable(verse) ? sourceOf(verse, id) : null
 }
 
+/** Pjesme susjednih karata unaprijed u keš — prevučena karta svira odmah. */
+export function warmSaved(verses: (Verse | undefined)[]) {
+  const urls = verses.map((v) => v && sourceFor(v)?.src).filter((u): u is string => Boolean(u))
+  warmAudio(urls)
+}
+
 /** Sačuvani stih koji je u plejeru (ako ga ima). */
 export function savedVerse(): Verse | null {
   // i kad pjesma nije u trenutnom redu (npr. otvorene Omiljene, a svira druga)
@@ -380,7 +386,7 @@ function carrierEl(): Player {
   return a
 }
 
-/** Utišaj pa stani (jačina gdje se može; na iPhoneu se ne može — odmah stane). */
+/** Pauza i zatvaranje staju istog trena — utišavanje u toku (stari način) se prekine. */
 let fading = 0
 function cancelSoft(a: Player) {
   if (!fading) return
@@ -390,35 +396,6 @@ function cancelSoft(a: Player) {
     a.volume = 1
   } catch {}
 }
-function softPause(a: Player, ms: number): Promise<void> {
-  cancelSoft(a)
-  if (a.paused) return Promise.resolve()
-  try {
-    a.volume = 0.999
-  } catch {}
-  if (Math.abs(a.volume - 0.999) > 0.0005) {
-    a.pause()
-    return Promise.resolve()
-  }
-  const t0 = performance.now()
-  return new Promise((resolve) => {
-    fading = window.setInterval(() => {
-      const p = Math.min(1, (performance.now() - t0) / ms)
-      try {
-        a.volume = 1 - p
-      } catch {}
-      if (p < 1) return
-      clearInterval(fading)
-      fading = 0
-      a.pause()
-      try {
-        a.volume = 1
-      } catch {}
-      resolve()
-    }, 30)
-  })
-}
-
 /** Stavi pjesmu `verse` u plejer (ako već nije): stare karte se otkače, nove prikače. */
 function load(verse: Verse): Player | null {
   const s = sourceFor(verse)
@@ -512,9 +489,11 @@ export function pauseSaved() {
   // zvuk je već stao, a dugme to ne zna — samo se uskladi
   if (!a || a.paused) return setState({ playing: false })
   a.dataset.want = ''
-  setState({ playing: false })
+  // istog trena — bez utišavanja u koracima (kasni i "grmi")
+  cancelSoft(a)
+  a.pause()
   stopCrackle(a)
-  void softPause(a, 450)
+  setState({ playing: false })
 }
 
 /** Pređi na stih `v` — isti element, nova pjesma (bez dodira radi i sa zaključanog ekrana). */
@@ -568,11 +547,12 @@ export function stopSaved() {
   if (a) {
     a.dataset.want = ''
     stopCrackle(a)
-    // kratko stišavanje — zatvaranje se čuje odmah, ne tek za sekundu
-    void softPause(a, 320).then(() => {
-      // u međuvremenu je možda pokrenuta nova — ne diraj je
-      if (!a.dataset.want) a.currentTime = 0
-    })
+    // zatvaranje — stane istog trena, ispočetka
+    cancelSoft(a)
+    a.pause()
+    try {
+      a.currentTime = 0
+    } catch {}
   }
   if (loaded) window.dispatchEvent(new CustomEvent(SHARED_GONE, { detail: loaded.src }))
   shared.clear()

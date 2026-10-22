@@ -72,6 +72,13 @@ type State = 'idle' | 'loading' | 'playing' | 'paused'
 type Source = { verse: Verse; src: string; fallback: string; dur?: number; onFail: () => void }
 
 /**
+ * Pjesma otključana prvim dodirom (svira nečujno, vidi `unlock`), po izvoru.
+ * Podnožje ekrana stiha se pri slijetanju papirića složi iznova — novi plejer
+ * preuzme baš ovaj zvuk; nov bi iPhone bez dodira ne pustio.
+ */
+const primed = new Map<string, Player>()
+
+/**
  * Zvuk jedne pjesme: statični fajl, pa server; stanje, vrijeme, premotavanje.
  *
  * Da dodir pusti pjesmu odmah, početak se preuzme unaprijed: plejer ispod
@@ -200,7 +207,8 @@ function useSong({
       unbind.current?.()
       unbind.current = null
       // zajednički zvuk svira dalje — gasi ga tek zatvaranje sačuvanih
-      if (!share) audio.current?.pause()
+      // otključana (nečujna) svira dalje — preuzme je sljedeći plejer iste pjesme
+      if (!share && !audio.current?.dataset.unlock) audio.current?.pause()
       audio.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,7 +229,7 @@ function useSong({
 
   function player(): Player {
     if (audio.current) return audio.current
-    const a = createPlayer(src, fallback)
+    const a = primed.get(src) ?? createPlayer(src, fallback)
     attach(a)
     return a
   }
@@ -260,8 +268,10 @@ function useSong({
     a.dataset.unlock = '1'
     a.muted = true
     a.preload = 'auto'
+    primed.set(src, a)
     a.play().catch(() => {
       delete a.dataset.unlock
+      primed.delete(src)
       a.muted = false
     })
     unlockVinyl()
@@ -269,6 +279,7 @@ function useSong({
     window.setTimeout(() => {
       if (!a.dataset.unlock) return
       delete a.dataset.unlock
+      primed.delete(src)
       a.pause()
       a.currentTime = 0
       a.muted = false
@@ -302,6 +313,7 @@ function useSong({
     // otključana prvim dodirom — svira nečujno od tad; sad od početka i naglas
     if (a.dataset.unlock) {
       delete a.dataset.unlock
+      primed.delete(src)
       a.muted = false
       try {
         a.currentTime = 0
@@ -339,12 +351,13 @@ function useSong({
       setState('loading')
       playOn(a, () => setState('paused'))
     } else {
-      // pauza — ploča, dugme i pucketanje odmah stanu, pjesma se utiša pa stane
+      // pauza — sve stane istog trena: pjesma, pucketanje, ploča (bez utišavanja
+      // u koracima — ono kasni i "grmi")
       a.dataset.want = ''
-      setState('paused')
+      cancelFade(a)
+      a.pause()
       stopCrackle()
-      // kratko — pauza se čuje odmah (iPhone: staje odmah, lib/vinyl.ts)
-      fadeOut(a, 220)
+      setState('paused')
     }
   }
 
