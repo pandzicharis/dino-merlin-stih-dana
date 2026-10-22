@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
-import { youtubeId } from '@/lib/text'
+import { albumLine, youtubeId } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
@@ -98,7 +98,7 @@ export function SongCredit({
       )}
 
       <p className="mt-4 text-[12px] uppercase tracking-[0.24em] text-white/55">
-        {verse.album} &middot; {verse.year}
+        {albumLine(verse)}
       </p>
     </div>
   )
@@ -566,7 +566,7 @@ function AudioSong({ preview = false, share = false, ...props }: Source & { prev
     <div data-tip="song" className="flex items-center gap-4 text-left" style={{ width: CARD_W }}>
       {/* ploča visoka koliko i tekst s trakom desno */}
       {/* sačuvani sviraju — samo ploča (rupa), dugmad su ispod; današnji ima pusti */}
-      <Vinyl size={62} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} deck arm hole={share} />
+      <Vinyl size={72} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} deck arm hole={share} />
       <div className="min-w-0 flex-1">
         {/* dodir na naziv radi isto što i ploča */}
         <div className="flex cursor-pointer items-center gap-2" onClick={toggle} onPointerDown={prime}>
@@ -578,7 +578,7 @@ function AudioSong({ preview = false, share = false, ...props }: Source & { prev
           </p>
         </div>
         <p className="mt-2 truncate text-[10.5px] uppercase leading-none tracking-[0.22em] text-white/60">
-          {verse.album} &middot; {verse.year}
+          {albumLine(verse)}
         </p>
         <div className="mt-1 flex items-center gap-2.5">
           <Seek value={progress} onSeek={seek} />
@@ -655,7 +655,7 @@ function RowText({ verse, onClick, fit = false, small = false }: { verse: Verse;
         {line(verse.song)}
       </p>
       <p className={`mt-1 ${cut} ${small ? 'text-[8.5px] tracking-[0.14em]' : 'text-[10px] tracking-[0.16em]'} uppercase text-white/55`}>
-        {line(<>{verse.album} &middot; {verse.year}</>)}
+        {line(albumLine(verse))}
       </p>
     </div>
   )

@@ -109,7 +109,7 @@ export function session(a: HTMLAudioElement, verse: Verse, tracks?: { prev: () =
   ms.metadata = new MediaMetadata({
     title: verse.song,
     artist: BRAND.name,
-    album: verse.album,
+    album: verse.album || verse.description || '',
     artwork: [
       ...(lock ? [{ src: abs(lock), sizes: '512x512', type: 'image/jpeg' }] : []),
       ...(cover ? [{ src: abs(cover), sizes: '1200x1200', type: 'image/webp' }] : []),

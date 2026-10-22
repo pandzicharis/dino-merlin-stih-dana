@@ -305,6 +305,9 @@ alter table verses add column if not exists active boolean not null default true
 -- font stiha iz admina (lib/fonts.ts): "cormorant;4-6:greatvibes.b"; prazno = Fraunces
 alter table verses add column if not exists font text;
 
+-- opis uz album ili umjesto njega (pjesma bez albuma: singl, uživo…)
+alter table verses add column if not exists description text;
+
 -- Sitna podešavanja kataloga; za sada samo `plan_start` — dan od kojeg se
 -- raspored računa (sve prije njega je zaključano u verse_schedule).
 create table if not exists catalog_meta (

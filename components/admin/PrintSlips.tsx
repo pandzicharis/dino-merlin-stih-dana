@@ -149,7 +149,7 @@ export function PrintSlips({ verses, onCount }: { verses: AdminVerse[]; onCount?
                       {v.text.replace(/\n/g, ' / ')}
                     </span>
                     <span className="block truncate text-[10px] uppercase tracking-[0.16em] text-white/35">
-                      {v.song} · {v.album}
+                      {[v.song, v.album || v.description].filter(Boolean).join(' · ')}
                       {!v.active && ' · arhiviran'}
                     </span>
                   </span>

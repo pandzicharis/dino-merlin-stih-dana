@@ -7,7 +7,7 @@ import type { Verse } from '@/data/verses'
 import { MOODS, MOOD_KEYS, type Mood } from '@/data/moods'
 import { ALBUMS, albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
-import { audioSlug, asWritten, sameVerse, youtubeId } from '@/lib/text'
+import { albumLine, audioSlug, asWritten, sameVerse, youtubeId } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview, DeviceSwitch, phoneWidth, type Device } from './DevicePreview'
@@ -24,7 +24,7 @@ type Snapshot = {
   source: 'supabase' | 'file' | 'static'
   writable: 'supabase' | 'file' | null
 }
-type Draft = { text: string; song: string; album: string; year: string; mood: Mood; youtube: string; font: string }
+type Draft = { text: string; song: string; album: string; description: string; year: string; mood: Mood; youtube: string; font: string }
 /** pjesma stiha u aplikaciji (/api/admin/audio) */
 type SongInfo = { state: 'ready' | 'loading' | 'missing' | 'error'; error?: string }
 type SongsSnapshot = { mode: 'local' | 'github' | 'off'; job: string | null; songs: Record<string, SongInfo> }
@@ -708,7 +708,7 @@ function Library({
                   {songs.of(v.song)?.state === 'ready' && <SongBadge info={songs.of(v.song)} mode={songs.mode} onFetch={() => {}} />}
                   <span className="truncate">
                   <span className="text-white/30">
-                    {v.album} · {v.year}
+                    {albumLine(v)}
                   </span>
                   </span>
                 </p>
@@ -1026,6 +1026,7 @@ function Editor({
     text: initial?.text ?? '',
     song: initial?.song ?? '',
     album: initial?.album ?? '',
+    description: initial?.description ?? '',
     year: String(initial?.year ?? ''),
     mood: initial?.mood ?? 'nostalgija',
     youtube: initial?.youtube ?? '',
@@ -1085,7 +1086,8 @@ function Editor({
       id: initial?.id ?? 'pregled',
       text: d.text.trim() || 'Ovdje se vidi stih…',
       song: d.song.trim() || 'Pjesma',
-      album: d.album.trim() || 'Album',
+      album: d.album.trim(),
+      ...(d.description.trim() ? { description: d.description.trim() } : {}),
       year: Number(d.year) || new Date().getFullYear(),
       mood: d.mood,
       ...(d.youtube.trim() ? { youtube: d.youtube.trim() } : {}),
@@ -1107,7 +1109,7 @@ function Editor({
       ...d,
       song,
       ...(known && !d.youtube.trim() ? { youtube: known.youtube! } : {}),
-      ...(known && !d.album ? { album: known.album, year: String(known.year) } : {}),
+      ...(known && !d.album ? { album: known.album, description: known.description ?? d.description, year: String(known.year) } : {}),
     }, 'song')
   }
   const song = d.song.trim() ? songOf(d.song) : null
@@ -1221,8 +1223,8 @@ function Editor({
             style={{ fontFamily: 'var(--font-serif), serif' }}
           />
           <span className="mt-2 flex items-center justify-between text-[11px] tabular-nums">
-            <span style={{ color: lines.length > 3 ? '#fda4af' : 'rgba(255,255,255,0.4)' }}>
-              {lines.length}/3 reda
+            <span style={{ color: lines.length > 4 ? '#fda4af' : 'rgba(255,255,255,0.4)' }}>
+              {lines.length}/4 reda
             </span>
             <span style={{ color: chars > 110 ? '#fda4af' : 'rgba(255,255,255,0.4)' }}>{chars}/110 znakova</span>
           </span>
@@ -1248,7 +1250,7 @@ function Editor({
               ready={(s) => songOf(s)?.state === 'ready'}
               onType={setSong}
               // izbor s liste: link, album i godina te pjesme
-              onPick={(s) => setD({ ...d, song: s.song, youtube: s.youtube ?? d.youtube, album: s.album, year: String(s.year) })}
+              onPick={(s) => setD({ ...d, song: s.song, youtube: s.youtube ?? d.youtube, album: s.album, description: s.description ?? '', year: String(s.year) })}
               onEdit={setEditSong}
               className={field}
             />
@@ -1268,12 +1270,10 @@ function Editor({
                   const a = ALBUMS.find((x) => x.title === e.target.value)
                   setD({ ...d, album: e.target.value, year: a ? String(a.year) : d.year })
                 }}
-                required
                 className={`${field} appearance-none [color-scheme:dark] ${album ? 'pl-12' : ''}`}
               >
-                <option value="" disabled>
-                  Izaberi album
-                </option>
+                {/* bez albuma — pozadina je Dinin portret, a ispod pjesme opis */}
+                <option value="">Bez albuma</option>
                 {ALBUMS.map((a) => (
                   <option key={a.id} value={a.title}>
                     {a.title} · {a.year}
@@ -1283,6 +1283,19 @@ function Editor({
                 {d.album && !album && <option value={d.album}>{d.album}</option>}
               </select>
             </span>
+          </label>
+          <label className="col-span-2 block">
+            <span className={labelCls}>
+              Opis <span className="normal-case tracking-normal text-white/30">— piše se poslije albuma</span>
+            </span>
+            <input
+              name="description"
+              value={d.description}
+              onChange={set('description')}
+              maxLength={60}
+              placeholder={album ? 'neobavezno' : 'npr. singl, uživo'}
+              className={`mt-2 ${field}`}
+            />
           </label>
           <label className="block">
             <span className={labelCls}>Godina</span>

@@ -46,7 +46,8 @@ export type Catalog = {
 
 const TAG = 'catalog'
 const FILE = join(process.cwd(), '.data', 'catalog.json')
-const DEV = process.env.NODE_ENV !== 'production'
+// lokalni fajl: u razvoju i u produkcijskom buildu na računaru (localhost) — na Vercelu nikad
+const DEV = process.env.NODE_ENV !== 'production' || !process.env.VERCEL
 
 /* ── čitanje ────────────────────────────────────────────────── */
 
@@ -60,6 +61,8 @@ type VerseRow = {
   youtube: string | null
   /** font stiha (lib/fonts.ts); kolone nema dok se ne pokrene shema */
   font?: string | null
+  /** opis uz album (ili umjesto njega); kolone nema dok se ne pokrene shema */
+  description?: string | null
   sort: number
   active: boolean | null
 }
@@ -75,6 +78,7 @@ function fromRow(r: VerseRow): CatalogVerse {
     mood: (MOOD_KEYS as string[]).includes(r.mood) ? (r.mood as Mood) : 'nostalgija',
     ...(r.youtube ? { youtube: r.youtube } : {}),
     ...(r.font ? { font: r.font } : {}),
+    ...(r.description ? { description: r.description } : {}),
     active: r.active !== false,
   }
 }
@@ -88,8 +92,9 @@ async function readSupabase(): Promise<Catalog | null> {
   const db = supabase()
   if (!db) return null
   const read = (cols: string) => db.from('verses').select(cols).order('sort').order('id').range(0, 9999)
-  let v = await read('id,text,song,album,year,mood,youtube,font,sort,active')
-  // kolona `font` još nije dodana u bazu — stihovi i dalje rade, bez fonta
+  let v = await read('id,text,song,album,year,mood,youtube,font,description,sort,active')
+  // kolone `description` / `font` još nisu dodane u bazu — stihovi i dalje rade, bez njih
+  if (v.error?.code === '42703') v = await read('id,text,song,album,year,mood,youtube,font,sort,active')
   if (v.error?.code === '42703') v = await read('id,text,song,album,year,mood,youtube,sort,active')
   if (v.error) {
     if (missing(v.error.code)) return null
@@ -199,6 +204,8 @@ async function save(next: Draft, target: 'supabase' | 'file') {
     youtube: v.youtube ?? null,
     // font samo kad ga neki stih ima — tako upis radi i bez kolone u bazi
     ...(next.verses.some((x) => x.font) ? { font: v.font ?? null } : {}),
+    // opis isto — samo kad ga neki stih ima
+    ...(next.verses.some((x) => x.description) ? { description: v.description ?? null } : {}),
     sort: i,
     active: v.active,
     updated_at: new Date().toISOString(),
@@ -206,7 +213,7 @@ async function save(next: Draft, target: 'supabase' | 'file') {
   const up = await db.from('verses').upsert(rows)
   if (up.error && missing(up.error.code)) {
     throw new CatalogError(
-      'Font se ne može sačuvati — u Supabase SQL Editoru pokreni: alter table verses add column if not exists font text;',
+      'Font ili opis se ne može sačuvati — u Supabase SQL Editoru pokreni: alter table verses add column if not exists font text; alter table verses add column if not exists description text;',
     )
   }
   if (up.error) throw new CatalogError(up.error.message)
@@ -266,6 +273,8 @@ export function validateVerse(input: Partial<Verse>): { verse?: Omit<Verse, 'id'
     .join('\n')
   const song = String(input.song ?? '').trim()
   const album = String(input.album ?? '').trim()
+  // opis uz album ili umjesto njega (pjesma bez albuma)
+  const description = String(input.description ?? '').trim().replace(/\s+/g, ' ')
   const year = Number(input.year)
   const mood = String(input.mood ?? '')
   const youtube = String(input.youtube ?? '').trim()
@@ -274,16 +283,25 @@ export function validateVerse(input: Partial<Verse>): { verse?: Omit<Verse, 'id'
   const cleanFont = font ? stringifyFont(parseFont(font)) : undefined
 
   if (!text) return { error: 'Stih je prazan.' }
-  if (text.split('\n').length > 3) return { error: 'Najviše 3 reda.' }
+  if (text.split('\n').length > 4) return { error: 'Najviše 4 reda.' }
   if (text.length > 110) return { error: 'Stih je predug (najviše ~110 znakova).' }
   if (!song) return { error: 'Nedostaje naziv pjesme.' }
-  if (!album) return { error: 'Nedostaje album.' }
+  if (description.length > 60) return { error: 'Opis je predug (najviše 60 znakova).' }
   if (!Number.isInteger(year) || year < 1970 || year > 2100) return { error: 'Godina nije ispravna.' }
   if (!(MOOD_KEYS as string[]).includes(mood)) return { error: 'Nepoznato raspoloženje.' }
   // svaki stih ima pjesmu: plejer i preuzimanje (lib/audio-files.ts) idu preko ovog linka
   if (!youtube) return { error: 'Nedostaje YouTube link pjesme.' }
   if (!youtubeId(youtube)) return { error: 'YouTube link nije ispravan.' }
   return {
-    verse: { text, song, album, year, mood: mood as Mood, ...(youtube ? { youtube } : {}), ...(cleanFont ? { font: cleanFont } : {}) },
+    verse: {
+      text,
+      song,
+      album,
+      ...(description ? { description } : {}),
+      year,
+      mood: mood as Mood,
+      ...(youtube ? { youtube } : {}),
+      ...(cleanFont ? { font: cleanFont } : {}),
+    },
   }
 }

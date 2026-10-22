@@ -29,6 +29,18 @@ export function sameVerse(a: VerseKey, b: VerseKey): boolean {
   return loose(a.song) === loose(b.song) || (ya !== null && ya === youtubeId(b.youtube))
 }
 
+/**
+ * Red ispod pjesme: album, pa opis (pjesma bez albuma — singl, uživo…),
+ * pa godina. Što nema, ne piše se.
+ */
+export function albumLine(v: { album?: string; description?: string; year?: number }): string {
+  return [v.album, v.description, v.year].filter(Boolean).join(' · ')
+}
+
+/** Prvi stih svakom novom korisniku, poslije uvoda (lib/draw.ts) */
+const FIRST_VERSE = 'mir svim dobrim ljudima'
+export const isFirstVerse = (text: string) => loose(text) === FIRST_VERSE
+
 /** `Moj je život Švicarska` → `moj-je-zivot-svicarska` — ime fajla pjesme u public/audio */
 export function audioSlug(song: string): string {
   return song

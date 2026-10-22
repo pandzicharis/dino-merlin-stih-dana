@@ -7,7 +7,7 @@
 import { VERSES, youtubeId } from '../data/verses'
 import { MOODS, MOOD_KEYS } from '../data/moods'
 
-const MAX_LINES = 3
+const MAX_LINES = 4
 const MAX_CHARS = 90
 const MIN_POOL = 30
 
@@ -31,7 +31,7 @@ for (const v of VERSES) {
   if (v.text.length > MAX_CHARS) errors.push(`${at} ${v.text.length} znakova (max ${MAX_CHARS})`)
   if (!v.text.trim()) errors.push(`${at} prazan tekst`)
 
-  for (const [field, val] of [['song', v.song], ['album', v.album]] as const) {
+  for (const [field, val] of [['song', v.song]] as const) {
     if (!String(val).trim()) errors.push(`${at} prazan "${field}"`)
   }
   if (!Number.isInteger(v.year) || v.year < 1980 || v.year > new Date().getFullYear() + 1) {

@@ -8,6 +8,7 @@ import { OVERRIDE_ON, formatFullDateBs } from '@/lib/date'
 import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { MoodBackground } from './MoodBackground'
 import { albumOf } from '@/data/albums'
+import { albumLine } from '@/lib/text'
 import { SPLASH_ARRIVE, VerseText, verseTail } from './VerseText'
 import { SongCredit } from './SongCredit'
 import { NotifySync } from './Notify'
@@ -225,7 +226,7 @@ export function VerseScreen({
                   {verse.song}
                 </p>
                 <p className="mt-1.5 text-[10px] uppercase tracking-[0.22em] text-white/50">
-                  {verse.album} &middot; {verse.year}
+                  {albumLine(verse)}
                 </p>
               </div>
             ) : (

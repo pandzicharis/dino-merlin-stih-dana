@@ -12,7 +12,7 @@
  *
  * PRAVILA (`npm run verses:check` ovo provjerava):
  *   • stihovi su kratki — par riječi do jedne rečenice
- *   • max 3 reda, max ~90 znakova
+ *   • max 4 reda, max ~90 znakova
  *   • bez praznog teksta u produkcijskom buildu
  *
  * TESTIRANJE:
@@ -28,10 +28,13 @@ import type { Mood } from './moods'
 export type Verse = {
   /** jedinstven, kebab-case, NE mijenjati nakon objave */
   id: string
-  /** stih; novi red = \n; max 3 reda */
+  /** stih; novi red = \n; max 4 reda */
   text: string
   song: string
+  /** prazno = pjesma bez albuma (pozadina: Dinin portret) */
   album: string
+  /** opis uz album ili umjesto njega (singl, uživo…) */
+  description?: string
   year: number
   /** paleta / atmosfera — vidi data/moods.ts */
   mood: Mood

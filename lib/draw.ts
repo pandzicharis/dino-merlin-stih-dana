@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { Verse } from '@/data/verses'
 import { addDays } from './date'
+import { isFirstVerse } from './text'
 
 /**
  * SVAKOM SVOJ STIH — izvlačenje na uređaju.
@@ -131,7 +132,7 @@ function next(days: State['days'], past: string[], pool: string[], avoid?: strin
  * Sredi stanje za `today`: današnji stih ostaje kakav je, a ako ga nema —
  * izvuče se. Istorija starija od KEEP dana se zaboravi.
  */
-function settle(s: State, today: string, pool: string[], known: Set<string>, avoid?: string): State {
+function settle(s: State, today: string, pool: string[], known: Set<string>, avoid?: string, first?: string): State {
   const days: State['days'] = {}
   const oldest = addDays(today, -KEEP)
   for (const [d, e] of Object.entries(s.days)) {
@@ -141,10 +142,12 @@ function settle(s: State, today: string, pool: string[], known: Set<string>, avo
     days[d] = e
   }
   if (!days[today]) {
-    const e = next(days, Object.keys(days).sort(), pool, avoid)
-    // prvi stih ikad na ovom uređaju — uvod, probni. Zamjena probnog
-    // (`avoid`) je pravi stih — inače bi ga obavijest mijenjala u krug.
-    days[today] = Object.keys(s.days).length || avoid ? e : { ...e, pre: 1 }
+    // prvi stih ikad na ovom uređaju — uvod, probni: svima "Mir svim dobrim
+    // ljudima" (ako ga ima u katalogu). Zamjena probnog (`avoid`) je pravi
+    // stih — inače bi ga obavijest mijenjala u krug.
+    const firstEver = !Object.keys(s.days).length && !avoid
+    const e = firstEver && first ? { id: first, r: 0 } : next(days, Object.keys(days).sort(), pool, avoid)
+    days[today] = firstEver ? { ...e, pre: 1 } : e
   }
   return { days }
 }
@@ -164,6 +167,9 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
     return (a.length ? a : verses).map((v) => v.id)
   }, [verses])
 
+  // prvi stih svakom novom korisniku (lib/text.ts) — i kad je arhiviran
+  const first = useMemo(() => verses.find((v) => isFirstVerse(v.text))?.id, [verses])
+
   const entry = raw == null ? undefined : parse(raw).days[date]
   const verse = entry ? byId.get(entry.id) : undefined
   const ready = raw != null
@@ -172,8 +178,8 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
   // novi dan (i "izvuci ponovo" u dev traci): izvuci današnji
   useEffect(() => {
     if (!on || !missing) return
-    save(settle(parse(snapshot()), date, pool, new Set(byId.keys()), avoid))
-  }, [on, missing, date, pool, byId])
+    save(settle(parse(snapshot()), date, pool, new Set(byId.keys()), avoid, first))
+  }, [on, missing, date, pool, byId, first])
 
   if (!on || !verse || !entry) return null
   return { verse, fresh: !entry.seen }

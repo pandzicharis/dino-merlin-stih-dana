@@ -8,7 +8,7 @@ import { ShareButton } from './ShareSheet'
 import { MOODS } from '@/data/moods'
 import { albumOf, cardArtOf, cardStillOf, thumbOf } from '@/data/albums'
 import { lookCss, lookScale, parseFont, preloadFonts } from '@/lib/fonts'
-import { asWritten } from '@/lib/text'
+import { albumLine, asWritten } from '@/lib/text'
 import { savedDay, toggleFavorite } from '@/lib/storage'
 import { formatFullDateBs } from '@/lib/date'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
@@ -19,6 +19,7 @@ import { SongRow } from './SongCredit'
 import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayerSelect } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
 import { dragScroll } from '@/lib/drag-scroll'
+import { tapProps } from '@/lib/tap'
 
 /**
  * Sačuvani kao traka karata: svaka karta je ekran aplikacije u malom (isti
@@ -115,6 +116,24 @@ export function SavedCarousel({
       scrollToCard(Math.max(0, Math.min(n - 1, i)), smooth)
     },
     [n, scrollToCard],
+  )
+  // raširi: karta prvo tačno na sredinu (dodir usred dosjedanja je zaustavi
+  // gdje je stala), pa se mjeri; dodir usred zaleta samo dovede kartu
+  const open = useMemo(
+    () =>
+      onOpen &&
+      ((v: Verse) => {
+        const el = strip.current
+        const i = versesRef.current.findIndex((x) => x.id === v.id)
+        const card = el?.querySelectorAll<HTMLElement>('[data-card]')[i]
+        if (el && card) {
+          const want = card.offsetLeft + card.offsetWidth / 2 - el.clientWidth / 2
+          if (Math.abs(el.scrollLeft - want) > 24) return el.scrollTo({ left: want, behavior: 'smooth' })
+          el.scrollTo({ left: want, behavior: 'instant' })
+        }
+        onOpen(v)
+      }),
+    [onOpen],
   )
 
   // Listanje vodi sistem (vodoravni skrol uz zaustavljanje na karti): prst,
@@ -293,7 +312,7 @@ export function SavedCarousel({
             index={i}
             front={i === cur}
             full={Math.abs(i - near) <= 3}
-            onOpen={onOpen}
+            onOpen={open}
             onPick={go}
           />
         ))}
@@ -386,10 +405,7 @@ const Card = memo(function Card({
     )
   }
   // dodir na prednju kartu je otvara (dugmad rade svoje)
-  const tap = (e: React.MouseEvent) => {
-    if ((e.target as Element).closest('button, a, input, [data-nodrag]')) return
-    onOpen?.(verse)
-  }
+  const tap = front && onOpen ? tapProps(() => onOpen(verse), 'button, a, input, [data-nodrag]') : undefined
   return (
     <div
       data-card
@@ -410,7 +426,7 @@ const Card = memo(function Card({
           data-stih={front && onOpen ? verse.id : undefined}
           className={`absolute inset-0 ${front && onOpen ? 'cursor-pointer' : ''}`}
           style={front ? undefined : { pointerEvents: 'none' }}
-          onClick={front ? tap : undefined}
+          {...tap}
         >
           <CardFace verse={verse} o={0} onOpen={onOpen} />
         </div>
@@ -540,7 +556,7 @@ function CardFaceView({
             {(onOpen || onCollapse) && (
               <button
                 data-nodrag
-                onClick={() => (onCollapse ? onCollapse() : onOpen?.(verse))}
+                {...tapProps(() => (onCollapse ? onCollapse() : onOpen?.(verse)))}
                 aria-label={onCollapse ? 'Skupi' : 'Raširi'}
                 title={onCollapse ? 'Skupi' : 'Raširi'}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80 transition-transform active:scale-90"
@@ -626,7 +642,7 @@ function CardFaceView({
             className="absolute flex items-center gap-2.5"
             style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, bottom: '18em', opacity: 0, transformOrigin: 'center bottom' }}
           >
-            <SongRow verse={verse} accent={m.accent} fit vinyl={46} />
+            <SongRow verse={verse} accent={m.accent} fit vinyl={54} />
           </div>
         )}
       </div>
@@ -643,7 +659,7 @@ function CardFaceView({
           {verse.song}
         </p>
         <p className="max-w-full truncate uppercase" style={{ fontSize: '9.5em', letterSpacing: '0.24em', color: 'rgba(255,255,255,0.55)' }}>
-          {verse.album} · {verse.year}
+          {albumLine(verse)}
         </p>
       </div>
 

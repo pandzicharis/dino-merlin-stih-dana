@@ -5,7 +5,7 @@ import { ImageResponse } from 'next/og'
 import { MOODS } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
 import { findVerse, getCatalog } from '@/lib/catalog'
-import { asWritten } from '@/lib/text'
+import { albumLine, asWritten } from '@/lib/text'
 
 /**
  * Share slika — jedini kanal rasta koji nam treba.
@@ -126,7 +126,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
 
   const text = asWritten(verse.text)
   // i velika/mala slova — dizajn stiha zna ih promijeniti
-  const chars = `${text}${text.toLocaleUpperCase('bs')}${text.toLocaleLowerCase('bs')}${verse.song}${verse.album}${verse.year}Stih dana${BRAND.name}`
+  const chars = `${text}${text.toLocaleUpperCase('bs')}${text.toLocaleLowerCase('bs')}${verse.song}${albumLine(verse)}Stih dana${BRAND.name}`
   const [serif, sans] = await Promise.all([
     frauncesFont(false, false) ?? loadFont('Fraunces:opsz,wght@9..144,400', chars),
     loadFont('Rubik:wght@500', chars.toUpperCase() + chars),
@@ -262,7 +262,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; fo
             {verse.song.toUpperCase()}
           </div>
           <div style={{ display: 'flex', fontSize: 22, letterSpacing: 3, color: 'rgba(255,255,255,0.4)' }}>
-            {verse.album.toUpperCase()} · {verse.year}
+            {albumLine(verse).toUpperCase()}
           </div>
         </div>
       </div>

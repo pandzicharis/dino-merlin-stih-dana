@@ -287,6 +287,7 @@ function ShareApp() {
     try {
       if (navigator.share) {
         await navigator.share({ title: 'Stih dana', text: 'Jedan stih Dine Merlina, svaki dan u 12:00h', url })
+        toast({ id: 'app-link', title: 'Poslano', color: TOAST_OK, icon: <Icon.ok /> })
         return
       }
       await navigator.clipboard.writeText(url)

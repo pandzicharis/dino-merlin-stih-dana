@@ -4,10 +4,10 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
-import { audioSlug } from '@/lib/text'
+import { audioSlug, albumLine } from '@/lib/text'
 import { audioFile } from '@/lib/audio-name'
 
-export type KnownSong = { song: string; album: string; year: number; youtube?: string }
+export type KnownSong = { song: string; album: string; description?: string; year: number; youtube?: string }
 
 const NOTE = 'M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z'
 
@@ -150,7 +150,7 @@ export function SongPicker({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] text-white/90">{s.song}</span>
                   <span className="block truncate text-[10px] uppercase tracking-[0.12em] text-white/35">
-                    {s.album} · {s.year}
+                    {albumLine(s)}
                   </span>
                 </span>
                 {ready(s.song) && (

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
 import { haptic } from '@/lib/haptic'
+import { swallowClick } from '@/lib/tap'
 import { CardFace } from './SavedCarousel'
 
 /*
@@ -26,12 +27,12 @@ import { CardFace } from './SavedCarousel'
 
 const cardOf = (id: string) => document.querySelector<HTMLElement>(`[data-stih="${CSS.escape(id)}"]`)
 // sporije i mekano na oba kraja — jasno se vidi kako karta raste i vraća se
-const OPEN = { duration: 760, easing: 'cubic-bezier(0.45, 0, 0.15, 1)' }
-const CLOSE = { duration: 640, easing: 'cubic-bezier(0.45, 0, 0.15, 1)' }
+const OPEN = { duration: 600, easing: 'cubic-bezier(0.45, 0, 0.15, 1)' }
+const CLOSE = { duration: 500, easing: 'cubic-bezier(0.45, 0, 0.15, 1)' }
 /** spuštena prstom — nastavi brzinom prsta (bez sporog početka), pa mekano sjedne */
-const FLING = { duration: 520, easing: 'cubic-bezier(0.22, 0.75, 0.2, 1)' }
+const FLING = { duration: 440, easing: 'cubic-bezier(0.22, 0.75, 0.2, 1)' }
 /** kratko pretapanje kopije i male karte na početku i kraju */
-const SETTLE = 180
+const SETTLE = 140
 /** zaobljenje karte u špilu (SavedCarousel) */
 const RADIUS = 26
 /** koliko viri svaka karta iza */
@@ -137,9 +138,10 @@ function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 
   })
 }
 
-type Opened = { verse: Verse; from: Rect }
+type Opened = { verse: Verse; from: Rect; n: number }
 /** otvaranje ide pravo u sloj raširene karte — špil i plejer se ne crtaju iznova */
 let show: ((o: Opened | null) => void) | null = null
+let opened = 0
 
 /** `saved`: svi sačuvani redom — dvije sljedeće vire iza raširene. */
 export function useSavedFull(saved: Verse[] = []): { open: (verse: Verse) => void; view: ReactNode } {
@@ -151,7 +153,8 @@ export function useSavedFull(saved: Verse[] = []): { open: (verse: Verse) => voi
     // plejer ispod špila prekriva dno karte — kopija počinje (i sleti) iznad njega
     const player = document.querySelector('[data-player]')?.getBoundingClientRect()
     const visible = player && player.top > r.top ? Math.min(r.height, player.top - r.top) : r.height
-    show?.({ verse, from: { left: r.left, top: r.top, width: r.width, height: r.height, visible } })
+    // svako otvaranje nova karta — i ista dok se još skuplja (inače dodir propadne)
+    show?.({ verse, from: { left: r.left, top: r.top, width: r.width, height: r.height, visible }, n: ++opened })
   }, [])
   const view = useMemo(() => <SavedFullLayer saved={saved} />, [saved])
   return { open, view }
@@ -174,7 +177,7 @@ function SavedFullLayer({ saved }: { saved: Verse[] }) {
     behind = behind.filter((v, d) => behind.findIndex((x) => x.id === v.id) === d)
   }
 
-  return full && <SavedFull key={full.verse.id} verse={full.verse} from={full.from} behind={behind} onClosed={done} />
+  return full && <SavedFull key={full.n} verse={full.verse} from={full.from} behind={behind} onClosed={done} />
 }
 
 function SavedFull({
@@ -198,7 +201,12 @@ function SavedFull({
   const extras = useRef<HTMLDivElement>(null)
   const grab = useRef<HTMLDivElement>(null)
   const closing = useRef(false)
-  const drag = useRef<{ x0: number; y0: number; dy: number; id: number; on: boolean } | null>(null)
+  const drag = useRef<{ x0: number; y0: number; dy: number; id: number; on: boolean; last: [number, number][] } | null>(null)
+  // dodir na kartu je skupi tek kad je raširena — nestrpljiv drugi dodir ne vrati je odmah
+  const born = useRef(0)
+  useEffect(() => {
+    born.current = performance.now()
+  }, [])
   const [{ k, left, top, W, H, small, cut, back }] = useState(() => layout(from))
 
   // otvaranje: velika karta stoji nevidljiva na mjestu male dok se ne iscrta,
@@ -289,7 +297,7 @@ function SavedFull({
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
     if (closing.current) return
     if ((e.target as Element).closest('button, a, input, [role="slider"], [data-nodrag]')) return
-    drag.current = { x0: e.clientX, y0: e.clientY, dy: 0, id: e.pointerId, on: false }
+    drag.current = { x0: e.clientX, y0: e.clientY, dy: 0, id: e.pointerId, on: false, last: [[e.clientY, e.timeStamp]] }
   }
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
@@ -306,18 +314,30 @@ function SavedFull({
       }
     }
     d.dy = Math.max(0, dy)
+    d.last = [...d.last.slice(-3), [e.clientY, e.timeStamp]]
     box.current.style.transform = `translateY(${d.dy}px)`
     if (shade.current) shade.current.style.opacity = String(Math.max(0.3, 1 - d.dy / 500))
     // rubovi ostalih karata gore se mekano gube dok se karta vuče — ne stoje kao zalijepljeni
     if (extras.current) extras.current.style.opacity = String(Math.max(0, 1 - d.dy / 160))
   }
-  const onUp = () => {
+  const onUp = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
     drag.current = null
-    if (!d || !d.on || !box.current) return
+    if (!d || !box.current) return
+    // dodir (bez povlačenja) po karti — skupi je, kao što ju je dodir raširio
+    if (!d.on) {
+      if (e.type !== 'pointerup' || Math.hypot(e.clientX - d.x0, e.clientY - d.y0) > 10) return
+      if (performance.now() - born.current < SETTLE + OPEN.duration) return
+      swallowClick()
+      return close()
+    }
     const at = `translateY(${d.dy}px)`
     box.current.style.transform = ''
-    if (d.dy > 110) return close(at)
+    // dovoljno nisko ili brz potez nadolje
+    const [y0, t0] = d.last[0]
+    const [y1, t1] = d.last[d.last.length - 1]
+    const v = t1 > t0 ? (y1 - y0) / (t1 - t0) : 0
+    if (d.dy > 110 || (d.dy > 24 && v > 0.5)) return close(at)
     box.current.animate([{ transform: at }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' })
     if (extras.current) extras.current.style.opacity = ''
     if (shade.current) shade.current.style.opacity = ''

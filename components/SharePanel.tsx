@@ -111,7 +111,10 @@ export default function SharePanel({
         case 'share': {
           // Sistemski share telefona: odatle ide u Instagram Story, WhatsApp,
           // Viber… Na desktopu toga nema, pa se slika preuzme.
-          if (await shareImage(true)) break
+          if (await shareImage(true)) {
+            toast({ id: 'share', title: 'Podijeljeno', color: TOAST_OK, icon: <Icon.ok /> })
+            break
+          }
           const file = await imageFile()
           if (file) {
             download(file)
@@ -123,7 +126,10 @@ export default function SharePanel({
           // Na telefonu "Sačuvaj sliku" je u sistemskom shareu; download u
           // PWA-u na iPhoneu bi je zakopao u Fajlove.
           const touch = window.matchMedia('(pointer: coarse)').matches
-          if (touch && (await shareImage(false))) break
+          if (touch && (await shareImage(false))) {
+            toast({ id: 'share', title: 'Slika je sačuvana', color: TOAST_OK, icon: <Icon.ok /> })
+            break
+          }
           const file = await imageFile()
           if (file) {
             download(file)
@@ -153,10 +159,8 @@ export default function SharePanel({
       try {
         const touch = window.matchMedia('(pointer: coarse)').matches
         if (touch && navigator.canShare?.({ files: [vid.file] })) await navigator.share({ files: [vid.file] })
-        else {
-          download(vid.file)
-          toast({ id: 'share', title: 'Video je sačuvan', color: TOAST_OK, icon: <Icon.ok /> })
-        }
+        else download(vid.file)
+        toast({ id: 'share', title: 'Video je sačuvan', color: TOAST_OK, icon: <Icon.ok /> })
       } catch (e) {
         if ((e as Error)?.name !== 'AbortError') toast({ id: 'share', title: 'Nije uspjelo', sub: 'Pokušaj ponovo', color: TOAST_BAD, icon: <Icon.bad /> })
       }

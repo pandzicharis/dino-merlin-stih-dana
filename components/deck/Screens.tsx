@@ -7,7 +7,7 @@ import { albumOf, ALBUMS, blurOf } from '@/data/albums'
 import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
 import { MAGAZA_PATH } from '@/lib/magaza-path'
 import { formatDateBs, formatDayBs, formatFullDateBs } from '@/lib/date'
-import { asWritten } from '@/lib/text'
+import { albumLine, asWritten } from '@/lib/text'
 import { INVITE } from '@/lib/notify'
 import { audioFile } from '@/lib/audio-name'
 import AUDIO from '@/data/audio.json'
@@ -710,7 +710,7 @@ function PlayerMock({ verse, w }: { verse: Verse; w: number }) {
             color: 'rgba(255,255,255,0.6)',
           }}
         >
-          {verse.album} · {verse.year}
+          {albumLine(verse)}
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '10em', height: '24em', marginTop: '4em' }}>
           <span style={{ position: 'relative', flex: 1, height: '2em', borderRadius: '2em', background: 'rgba(255,255,255,0.15)' }}>

@@ -14,7 +14,7 @@ import { albumOf } from '@/data/albums'
 import type { Verse } from '@/data/verses'
 import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP, MAGAZA_RATIO } from './brand'
 import { formatFullDateBs } from './date'
-import { asWritten } from './text'
+import { albumLine, asWritten } from './text'
 import { VERSE_FONTS, caseOf, lookScale, lookSpacing, parseFont, styleOf, type FontMap } from './fonts'
 
 /* ── formati i stilovi ──────────────────────────────────────── */
@@ -149,6 +149,33 @@ function setSpacing(ctx: CanvasRenderingContext2D, px: number) {
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${px}px`
 }
 
+/*
+ * Razmak slova stiha (na ekranu -0.02em) — Safari na iPhoneu `letterSpacing`
+ * na platnu nema, pa je stih na slici bio širi i rjeđi nego uživo. Tamo se
+ * riječ crta slovo po slovo: svako slovo na mjestu koje mu daje širina
+ * riječi do njega (parovi slova ostaju kao u fontu) + razmak, kao u CSS-u.
+ */
+const nativeLs = (ctx: CanvasRenderingContext2D) => typeof (ctx as { letterSpacing?: unknown }).letterSpacing === 'string'
+function wordWidth(ctx: CanvasRenderingContext2D, word: string, ls: number) {
+  if (nativeLs(ctx)) {
+    setSpacing(ctx, ls)
+    return ctx.measureText(word).width
+  }
+  return ctx.measureText(word).width + [...word].length * ls
+}
+function fillWord(ctx: CanvasRenderingContext2D, word: string, x: number, y: number, ls: number) {
+  if (nativeLs(ctx) || !ls) {
+    setSpacing(ctx, ls)
+    return ctx.fillText(word, x, y)
+  }
+  const chars = [...word]
+  let before = ''
+  chars.forEach((ch, i) => {
+    ctx.fillText(ch, x + (before ? ctx.measureText(before).width : 0) + i * ls, y)
+    before += ch
+  })
+}
+
 /** Redovi stiha (prelom kako se pjeva, pa po širini) — riječi s izmjerenim širinama u svom fontu. */
 function layoutVerse(ctx: CanvasRenderingContext2D, text: string, maxW: number, size: number, map: FontMap, serif: string): VLine[] {
   setSpacing(ctx, 0)
@@ -168,10 +195,9 @@ function layoutVerse(ctx: CanvasRenderingContext2D, text: string, maxW: number, 
       const em = size * (st.font === 'fraunces' ? 1 : f.scale) * ((st.size ?? 100) / 100)
       const ls = f.kind === 'pisani' ? 0 : em * (lookSpacing(map.look) + (st.upper ? 0.05 : 0))
       ctx.font = css
-      setSpacing(ctx, ls)
       // pisani nemaju "zraka" sa strane — isto kao na ekranu (0.09em)
       const pad = f.kind === 'pisani' ? em * 0.09 : 0
-      const ww = ctx.measureText(word).width + pad * 2
+      const ww = wordWidth(ctx, word, ls) + pad * 2
       if (cur.length && w + space + ww > maxW) {
         out.push({ runs: cur, width: w })
         cur = []
@@ -249,9 +275,8 @@ function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, y:
     let x = cx - l.width / 2
     for (const r of l.runs) {
       ctx.font = r.css
-      setSpacing(ctx, r.ls)
       ctx.fillStyle = r.color ?? (r.accent && accent ? accent : base)
-      ctx.fillText(r.text, x + r.pad, y + i * lh)
+      fillWord(ctx, r.text, x + r.pad, y + i * lh, r.ls)
       opts.boxes?.push({ x, y: y + i * lh - lh / 2, w: r.width, h: lh, line: i })
       x += r.width + space
     }
@@ -338,7 +363,7 @@ const drawn = new Map<string, HTMLCanvasElement>()
 const pending = new Map<string, Promise<HTMLCanvasElement>>()
 
 function key({ verse, date, format }: ShareInput) {
-  return [verse.id, verse.text, verse.mood, verse.song, verse.album, verse.year, verse.font ?? '', date, format].join('|')
+  return [verse.id, verse.text, verse.mood, verse.song, verse.album, verse.description ?? '', verse.year, verse.font ?? '', date, format].join('|')
 }
 
 function show(target: HTMLCanvasElement, c: HTMLCanvasElement) {
@@ -711,7 +736,7 @@ async function render(input: ShareInput, opts: VerseOpts = {}): Promise<HTMLCanv
     y += songSize + g2
     ctx.font = `500 ${albumSize}px ${fonts.sans}`
     ctx.fillStyle = p.light ? 'rgba(27,20,11,0.7)' : 'rgba(255,255,255,0.62)'
-    spaced(ctx, `${verse.album} · ${verse.year}`.toUpperCase(), W / 2, y + albumSize / 2, W * 0.005)
+    spaced(ctx, albumLine(verse).toUpperCase(), W / 2, y + albumSize / 2, W * 0.005)
 
     // dno: potpis | Magaza, na sredini, između svjetiljke i kamere
     const tint = (img: HTMLImageElement, w: number, h: number) => {
@@ -833,7 +858,7 @@ async function render(input: ShareInput, opts: VerseOpts = {}): Promise<HTMLCanv
   ctx.font = `500 ${albumSize}px ${fonts.sans}`
   ctx.fillStyle = p.light ? 'rgba(27,20,11,0.7)' : 'rgba(255,255,255,0.62)'
   if (!opts.bare) {
-    const t = `${verse.album} · ${verse.year}`.toUpperCase()
+    const t = albumLine(verse).toUpperCase()
     spaced(ctx, t, W / 2, bottom - albumSize / 2, W * 0.0055)
     const aw = spacedWidth(ctx, t, W * 0.0055)
     opts.marks?.push({ kind: 'album', x: W / 2 - aw / 2, y: bottom - albumSize, w: aw, h: albumSize })

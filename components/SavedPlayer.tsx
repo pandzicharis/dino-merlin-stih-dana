@@ -6,7 +6,7 @@ import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
 import { albumOf, thumbOf } from '@/data/albums'
 import { haptic } from '@/lib/haptic'
-import { asWritten } from '@/lib/text'
+import { albumLine, asWritten } from '@/lib/text'
 import { EqBars } from './EqBars'
 import { toggleLoved } from '@/lib/storage'
 import { audioFile } from '@/lib/audio-name'
@@ -313,7 +313,7 @@ function Credit({ verse, size = 12.5, track = 0.18 }: { verse: Verse; size?: num
         {verse.song}
       </p>
       <p className="mt-1.5 truncate text-[10px] uppercase tracking-[0.22em] text-white/55">
-        {verse.album} · {verse.year}
+        {albumLine(verse)}
       </p>
     </div>
   )
@@ -605,9 +605,11 @@ export const SavedList = memo(function SavedList({ verses, front, active = true 
 function byAlbum(verses: Verse[]) {
   const albums: { name: string; list: Verse[] }[] = []
   for (const v of verses) {
-    const a = albums.find((x) => x.name === v.album)
+    // pjesme bez albuma — svoja kartica
+    const name = v.album || 'Bez albuma'
+    const a = albums.find((x) => x.name === name)
     if (a) a.list.push(v)
-    else albums.push({ name: v.album, list: [v] })
+    else albums.push({ name, list: [v] })
   }
   return albums
 }
