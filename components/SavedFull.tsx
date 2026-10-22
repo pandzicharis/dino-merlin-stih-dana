@@ -110,6 +110,15 @@ function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 
   // mjestu — dvije ikone napola vidljive jedna preko druge izgledaju kao mig
   small.forEach((n) => fade(n, !toBig, toBig ? 0 : total * 0.25, total * (toBig ? 0.28 : 0.5)))
   big.forEach((n) => fade(n, toBig, toBig ? total * 0.35 : 0, total * (toBig ? 0.4 : 0.28)))
+  // raširi ⇄ skupi: strelice se okrenu (pola kruga, uvijek na istu stranu)
+  el.querySelectorAll<HTMLElement>('[data-flip]').forEach((n) => {
+    n.animate([{ transform: `rotate(${toBig ? 0 : 180}deg)` }, { transform: `rotate(${toBig ? 180 : 360}deg)` }], {
+      duration: total * 0.6,
+      delay: lead + total * 0.2,
+      easing: 'ease-in-out',
+      fill: 'both',
+    })
+  })
   // dugmad u uglu: na maloj karti krupna za prst — raširena ih vrati na
   // pravu veličinu, kao na ekranu stiha
   // Tačno suprotno od karte u svakom kadru: karta se smanjuje linearno po
@@ -231,6 +240,7 @@ function SavedFull({
         n.style.opacity = '1'
         n.style.visibility = ''
       })
+      el.querySelectorAll<HTMLElement>('[data-flip]').forEach((n) => (n.style.transform = 'rotate(180deg)'))
       el.querySelectorAll<HTMLElement>('[data-drop]').forEach((n) => (n.style.transform = `translateY(${n.dataset.drop}em)`))
       el.querySelectorAll<HTMLElement>('[data-grow]').forEach((n) => (n.style.transform = n.dataset.grow!))
       el.querySelectorAll<HTMLElement>('[data-shrink]').forEach((n) => (n.style.transform = `scale(${1 / k})`))

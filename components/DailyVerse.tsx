@@ -93,7 +93,9 @@ export function DailyVerse({
   useEffect(() => {
     if (!firstVerse) return
     let t = 0
-    const go = () => {
+    const go = (e: Event) => {
+      // samo poslije prvog uvoda — ne pri svakoj tomboli (obavijest) istog dana
+      if (!(e as CustomEvent<{ first?: boolean }>).detail?.first) return
       clearTimeout(t)
       // splash se pretapa 0,4 s — pjesma odmah poslije, čim stih stoji
       t = window.setTimeout(() => window.dispatchEvent(new CustomEvent(AUTOPLAY, { detail: firstVerse })), 700)

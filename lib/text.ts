@@ -17,7 +17,8 @@ export function youtubeId(input?: string): string | null {
 }
 
 /** tekst bez velikih slova, kvačica, interpunkcije i viška razmaka */
-const loose = (s = '') =>
+/** mala slova, bez kvačica i interpunkcije (đ → dj) — za poređenje i pretragu */
+export const loose = (s = '') =>
   s.toLowerCase().replace(/đ/g, 'dj').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 
 type VerseKey = { text: string; song: string; album?: string; youtube?: string }

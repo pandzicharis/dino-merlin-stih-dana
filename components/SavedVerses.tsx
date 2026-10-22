@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Activity, memo, startTransition, useCallback, useEffect, useMemo, useState } from 'react'
+import { Activity, memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { useFavorites, useLovedIds, useMounted } from '@/lib/client-store'
 import { BRAND } from '@/lib/brand'
@@ -9,6 +9,7 @@ import { useSavedFull } from './SavedFull'
 import { SavedCarousel } from './SavedCarousel'
 import { SAVED_TRACK, closeSaved, setSavedPlaylist } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
+import { loose } from '@/lib/text'
 import { SavedAlbums, SavedList, SavedLoved, SavedPlayer, keyOf, type View } from './SavedPlayer'
 
 /** Kako se sačuvani prikazuju iznad plejera: špil karata, lista ili albumi. */
@@ -47,6 +48,23 @@ function paneHeight(view: SavedView, songs: number, loved: number, page: boolean
   return `${Math.round(Math.min(n, MAX_ROWS) * ROW + 12 + UNDER)}px`
 }
 
+/**
+ * Pretraga pjesama: svaka riječ upita negdje u nazivu, albumu ili stihu (bez
+ * kvačica — "sta" nađe "šta"). Pjesme kojima naziv odgovara su prve.
+ */
+function search(songs: Verse[], query: string): Verse[] {
+  const words = loose(query).split(' ').filter(Boolean)
+  if (!words.length) return songs
+  const hits: [Verse, number][] = []
+  for (const v of songs) {
+    const title = loose(v.song)
+    const all = `${title} ${loose(v.album)} ${loose(v.description)} ${loose(v.text)}`
+    if (!words.every((w) => all.includes(w))) continue
+    hits.push([v, title.startsWith(words[0]) ? 0 : words.every((w) => title.includes(w)) ? 1 : 2])
+  }
+  return hits.sort((a, b) => a[1] - b[1]).map(([v]) => v)
+}
+
 /** prikazi po redu — svi ostaju montirani, pa je prebacivanje samo pretapanje */
 const VIEWS: SavedView[] = ['cards', 'list', 'albums', 'loved']
 
@@ -59,9 +77,12 @@ export const SavedVerses = memo(function SavedVerses({
   onClose,
   view: shown,
   onView,
+  query = '',
 }: {
   verses: Verse[]
   onClose?: () => void
+  /** pretraga (zaglavlje panela) — "Pjesme" pokazuju samo pogotke */
+  query?: string
   /** špil ili lista — panel ga pamti; bez toga (stranica /sacuvano) drži se ovdje */
   view?: SavedView
   onView?: (v: SavedView) => void
@@ -89,12 +110,20 @@ export const SavedVerses = memo(function SavedVerses({
       return true
     })
   }, [list])
+  const found = useMemo(() => (query.trim() ? search(songs, query) : songs), [songs, query])
+  // novi upit — pogoci od vrha
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const pane = box.current?.querySelector<HTMLElement>('[data-pane="list"]')
+    if (pane && query) pane.scrollTop = 0
+  }, [query])
   // red plejera — u svakom prikazu (ne samo u špilu): sljedeća pjesma, mini
   // plejer i zaključan ekran znaju šta svira. U albumima: samo pjesme albuma
   // koji se sluša (SavedAlbums javi koji je)
   const [queue, setQueue] = useState<Verse[] | null>(null)
   // (prazne Omiljene — plejer ostaje na pjesmama)
   const albums = (view === 'albums' || view === 'loved') && queue?.length ? queue : null
+  // pretraga ne mijenja red — plejer i dalje pokazuje pjesmu koja svira
   const order = albums ?? (view === 'cards' ? list : songs)
   useEffect(() => setSavedPlaylist(order), [order])
   // "Raširi" na karti: ista karta, uvećana; ostale vire iza (components/SavedFull.tsx)
@@ -143,7 +172,9 @@ export const SavedVerses = memo(function SavedVerses({
         {/* prikazi jedan preko drugog, svaki sa svojim skrolom; vidi se samo
             izabrani (pretopi se). isolate: karte ostaju ispod plejera */}
         <div
+          ref={box}
           className="relative isolate min-h-0 shrink"
+          // pretraga: visina kao cijela lista — panel ne skače dok se kuca
           style={{ height: paneHeight(view, songs.length, loved, !onClose) }}
         >
           {VIEWS.filter((v) => made.includes(v)).map((v) => {
@@ -162,7 +193,11 @@ export const SavedVerses = memo(function SavedVerses({
                     osvježi samo ono što se vidi; stanje (mjesto u špilu, skrol) ostaje */}
                 <Activity mode={on ? 'visible' : 'hidden'}>
                   {v === 'list' ? (
-                    <SavedList verses={songs} front={front} active={on} />
+                    found.length ? (
+                      <SavedList verses={found} front={front} active={on} />
+                    ) : (
+                      <p className="flex h-full items-center justify-center pb-6 text-[13px] text-white/45">Nema takve pjesme</p>
+                    )
                   ) : v === 'albums' ? (
                     <SavedAlbums verses={songs} front={front} onQueue={setQueue} active={on} />
                   ) : v === 'loved' ? (

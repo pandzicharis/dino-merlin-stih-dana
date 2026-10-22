@@ -1077,7 +1077,7 @@ export function Ostalo({ d }: { d: DeckData }) {
     'Atmosfera po raspoloženju, album u pozadini',
     'Pjesma uz stih, u pozadini',
     'Sačuvani kao karte, s pjesmom',
-    'Player pjesama: stihovi, pjesme, albumi, omiljene',
+    'Player pjesama: stihovi, pjesme, albumi, omiljene, pretraga',
     'Mini plejer dok muzika svira',
     'Dijeljenje kao slika',
     'Link koji izgleda kao poster',

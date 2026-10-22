@@ -736,6 +736,8 @@ type Scene = {
   home: () => Promise<boolean>
   /** prevuci karte sačuvanih za `n` (minus — nazad), kao prstom */
   swipe: (n: number) => Promise<boolean>
+  /** ukucaj tekst u polje, slovo po slovo (tastatura se vrati prezentaciji) */
+  type: (sel: string, text: string, speed?: number) => Promise<boolean>
   alive: () => boolean
 }
 
@@ -800,6 +802,22 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
       await wait(1000)
       return alive
     }
+    const type = async (sel: string, text: string, speed = 110) => {
+      const e = (await find(sel)) as HTMLInputElement | null
+      if (!e || !alive) return false
+      const win = e.ownerDocument.defaultView as Window & typeof globalThis
+      const set = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!
+      const chars = Array.from(text)
+      for (let i = 1; i <= chars.length && alive; i++) {
+        set.call(e, chars.slice(0, i).join(''))
+        e.dispatchEvent(new win.Event('input', { bubbles: true }))
+        await wait(speed + Math.random() * speed * 0.5)
+      }
+      // tastatura nazad prezentaciji — inače polje pojede strelice
+      e.blur()
+      window.focus()
+      return alive
+    }
     // prozor koji je ostao otvoren s prošlog koraka
     const home = async () => {
       for (let t = 0; t < 80 && alive; t++) {
@@ -829,7 +847,7 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
     }
     close()
     // Ručno: prezenter sam klikće po telefonu
-    if (!manual || always) void run({ wait, find, press, home, swipe, alive: () => alive })
+    if (!manual || always) void run({ wait, find, press, home, swipe, type, alive: () => alive })
     return () => {
       alive = false
       timers.forEach(clearTimeout)
@@ -1500,7 +1518,8 @@ function Plejer() {
       <PlejerScene key={os} onDone={() => os === 'ios' && !manual && both && setOs('android')} />
       <Text>
         Sačuvani su plejer: ikonica gore otvara Player pjesama — stihovi kao karte, pjesme sa cijelim stihom,
-        albumi i omiljene (zvjezdica, redom koliko se slušaju). Plejer je u boji stiha, kontrole kao u Apple Musicu,
+        albumi i omiljene (zvjezdica, redom koliko se slušaju), a lupa gore traži pjesmu po nazivu ili stihu. Plejer
+        je u boji stiha, kontrole kao u Apple Musicu,
         a naprijed i natrag idu kroz album ili omiljene u kojima si. Spusti ga — na početnoj pluta mini plejer,
         muzika ide dalje, a na zaključanom ekranu je omot albuma koji svira.
       </Text>
@@ -1524,7 +1543,7 @@ async function seedSaved(win: Window | null | undefined, n = 4) {
 
 function PlejerScene({ onDone }: { onDone: () => void }) {
   const { phone } = useDeck()
-  useScene(async ({ wait, press, home, swipe, alive }) => {
+  useScene(async ({ wait, press, home, swipe, type, find, alive }) => {
     if (!(await home())) return
     await seedSaved(phone()?.contentWindow, 5)
     await wait(900)
@@ -1551,6 +1570,20 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     await wait(2200)
     if (alive()) await press('[data-view="loved"]')
     await wait(1800)
+    // pretraga: lupa gore, par slova naziva pjesme, pusti pogodak, × zatvori
+    if (alive()) {
+      await press('button[aria-label="Traži pjesmu"]')
+      await wait(500)
+      // pjesma iz liste koja ne svira — da se vidi da pogodak zasvira
+      const rows = [...((await find('[data-pane="list"]', 1500))?.querySelectorAll('li:not([data-now="true"]) [aria-current] > .min-w-0 > span:first-child') ?? [])]
+      const song = rows[2]?.textContent?.trim() || rows[0]?.textContent?.trim() || 'Svila'
+      await type('input[aria-label="Traži pjesmu"]', song.slice(0, 5).toLocaleLowerCase('bs'))
+      await wait(1300)
+      if (alive()) await press('[data-pane="list"] li [aria-current]')
+      await wait(2400)
+      if (alive()) await press('[aria-label="Zatvori pretragu"]')
+      await wait(1000)
+    }
     if (alive()) await press('[data-view="cards"]')
     await wait(1200)
     // spusti — na početnoj pluta mini plejer, muzika ide dalje

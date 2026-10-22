@@ -13,6 +13,8 @@ const VOLUME = 0.55
 let ctx: AudioContext | null = null
 let crackle: AudioBuffer | null = null
 let live: { owner: object; src: AudioBufferSourceNode; gain: GainNode } | null = null
+/** pjesma koja je svirala kad je aplikacija otišla u pozadinu — pucketanje se vrati uz nju */
+let away: object | null = null
 
 export function unlockVinyl() {
   try {
@@ -139,6 +141,8 @@ function makeCrackle(c: AudioContext): AudioBuffer {
 
 /** Pucketanje dok svira pjesma `owner`; nova pjesma preuzme ga od stare. */
 export function startCrackle(owner: object) {
+  // u pozadini se ne čuje — krene pri povratku, ako pjesma još svira
+  if (document.hidden) return void (away = owner)
   if (!ctx || ctx.state !== 'running' || live?.owner === owner) return
   stopCrackle()
   crackle ??= makeCrackle(ctx)
@@ -158,6 +162,7 @@ export function startCrackle(owner: object) {
 
 /** Utiša pucketanje — samo ako je baš ova pjesma vlasnik (ili bez vlasnika: svako). */
 export function stopCrackle(owner?: object) {
+  if (!owner || away === owner) away = null
   if (!ctx || !live || (owner && live.owner !== owner)) return
   const { src, gain } = live
   // odmah — samo par milisekundi da ne pukne
@@ -168,7 +173,9 @@ export function stopCrackle(owner?: object) {
 
 /** Igla legne na ploču: mekan, dubok tup i par pucketa — za `delay` sekundi. */
 export function dropNeedle(delay: number) {
-  if (!ctx) return
+  // u pozadini (sljedeća pjesma na zaključanom ekranu) — tup bi čekao i
+  // zasvirao tek pri povratku u aplikaciju
+  if (!ctx || document.hidden) return
   try {
     const c = ctx
     const len = Math.floor(c.sampleRate * 0.3)
@@ -187,4 +194,27 @@ export function dropNeedle(delay: number) {
   } catch {
     /* tišina */
   }
+}
+
+// Aplikacija ode u pozadinu: pucketanje stane odmah (iOS uspava kontekst, pa
+// bi ga pri povratku probudio usred zvuka — čulo bi se pucketanje bez pjesme).
+// Pri povratku se vrati samo uz pjesmu koja stvarno svira.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (!ctx || !live) return
+      const { owner, src, gain } = live
+      gain.gain.value = 0
+      try {
+        src.stop()
+      } catch {}
+      live = null
+      away = owner
+      return
+    }
+    const o = away
+    away = null
+    if (!ctx || !(o instanceof HTMLMediaElement) || o.paused) return
+    void ctx.resume().then(() => !o.paused && !document.hidden && startCrackle(o), () => {})
+  })
 }

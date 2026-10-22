@@ -11,6 +11,8 @@ import { MiniPlayer, PlayerIconPaths } from './SavedPlayer'
 import { DrawerIcon } from './DrawerIcon'
 import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
+import { useFavorites } from '@/lib/client-store'
+import { haptic } from '@/lib/haptic'
 import { AfterOpen, SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 
 /**
@@ -56,18 +58,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   const wasOpen = useRef(false)
   // otvoren baš sad — posao odgođen pri zatvaranju se ne radi ako je panel u međuvremenu opet otvoren
   const openNow = useRef(open)
-  useEffect(() => {
-    openNow.current = open
-    if (open) {
-      dismissing.current = false
-      expandSaved()
-    } else if (wasOpen.current && !dismissing.current) {
-      const t = window.setTimeout(() => !openNow.current && closeSaved(), LAG)
-      wasOpen.current = open
-      return () => clearTimeout(t)
-    }
-    wasOpen.current = open
-  }, [open])
   // spušten: panel stoji dolje, viri samo mini plejer. Sluša se samo ovo — promjena
   // pjesme ili pauza ne crta panel iznova
   const hasId = useSavedPlayerSelect((s) => Boolean(s.id))
@@ -82,15 +72,60 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
       return 'cards'
     }
   })
+  // pretraga pjesama: polje u zaglavlju, pogoci u "Pjesme"; `null` — zatvorena
+  const [query, setQuery] = useState<string | null>(null)
+  const input = useRef<HTMLInputElement>(null)
+  /** pogled prije pretrage — × ga vrati */
+  const before = useRef<SavedView>('cards')
+  const hasSaved = useFavorites().length > 0
+  const searching = query !== null
+  const searchOn = useRef(false)
+  const startSearch = () => {
+    haptic(5)
+    // fokus iz samog dodira — iPhone inače ne otvori tastaturu
+    input.current?.focus()
+    searchOn.current = true
+    before.current = view
+    setView('list')
+    setQuery('')
+  }
+  const endSearch = useCallback((to?: SavedView) => {
+    input.current?.blur()
+    if (!searchOn.current) return
+    searchOn.current = false
+    setQuery(null)
+    setView(to ?? before.current)
+  }, [])
   // stalan (useCallback) — sadržaj (SavedVerses, memo) se ne crta iznova pri otvaranju
   const pick = useCallback((v: SavedView) => {
+    // tab ispod plejera usred pretrage — pretraga se zatvori
+    endSearch(v)
     setView(v)
     try {
       localStorage.setItem(VIEW, v)
     } catch {
       /* privatni prozor */
     }
-  }, [])
+  }, [endSearch])
+  useEffect(() => {
+    openNow.current = open
+    if (open) {
+      dismissing.current = false
+      expandSaved()
+      wasOpen.current = open
+      return
+    }
+    if (!wasOpen.current) return
+    wasOpen.current = open
+    // tastatura ode odmah, pretraga se zatvori tek kad panel ode
+    input.current?.blur()
+    const t = window.setTimeout(() => !openNow.current && endSearch(), 460)
+    const u = dismissing.current ? 0 : window.setTimeout(() => !openNow.current && closeSaved(), LAG)
+    return () => {
+      clearTimeout(t)
+      clearTimeout(u)
+    }
+  }, [open, endSearch])
   // otvoren, a ništa ne svira — počinje od "Stihovi" (zapamćen pogled važi
   // dok se sluša)
   const idle = !hasId
@@ -176,8 +211,57 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
               className="shrink-0 cursor-grab touch-none px-5 pt-3 active:cursor-grabbing"
             >
               <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="relative mb-3 flex items-center justify-between">
+                {/* pretraga — preko naslova i dugmadi, pretopi se */}
+                <div
+                  className={`absolute inset-0 z-[1] flex items-center gap-3 transition-opacity duration-200 ${searching ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <label
+                    className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border bg-white/[0.04] pl-3.5 pr-1.5 transition-colors"
+                    style={{ borderColor: query ? `${BRAND.gold}55` : 'rgba(255,255,255,0.1)' }}
+                  >
+                    <SearchGlyph className="shrink-0 text-white/40" />
+                    <input
+                      ref={input}
+                      type="search"
+                      enterKeyHint="search"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      tabIndex={searching ? 0 : -1}
+                      value={query ?? ''}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') e.currentTarget.blur()
+                        if (e.key === 'Escape') {
+                          e.stopPropagation()
+                          endSearch()
+                        }
+                      }}
+                      placeholder="Traži pjesmu"
+                      aria-label="Traži pjesmu"
+                      // 16 px — iPhone inače uveća stranicu pri kucanju
+                      className="min-w-0 flex-1 appearance-none bg-transparent text-[16px] text-white/90 outline-none placeholder:text-white/35 [&::-webkit-search-cancel-button]:hidden"
+                    />
+                    {/* × — pretraga se zatvori, sve kao prije */}
+                    <button
+                      type="button"
+                      tabIndex={searching ? 0 : -1}
+                      onClick={() => {
+                        haptic(5)
+                        endSearch()
+                      }}
+                      aria-label="Zatvori pretragu"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:text-white active:scale-90"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden>
+                        <path d="M6 6l12 12M18 6 6 18" />
+                      </svg>
+                    </button>
+                  </label>
+                </div>
+                <div className={`flex items-center gap-3 transition-opacity duration-200 ${searching ? 'pointer-events-none opacity-0' : ''}`}>
                   {/* ista ikona kao dugme u zaglavlju: plejer pjesama */}
                   <DrawerIcon>
                     <PlayerIconPaths />
@@ -191,7 +275,18 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 transition-opacity duration-200 ${searching ? 'pointer-events-none opacity-0' : ''}`}>
+                  {/* traži pjesmu među sačuvanima */}
+                  {hasSaved && (
+                    <button
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={startSearch}
+                      aria-label="Traži pjesmu"
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:text-white"
+                    >
+                      <SearchGlyph />
+                    </button>
+                  )}
                   {/* spusti — muzika ide dalje, na dnu početne viri mini plejer */}
                   <button
                     onPointerDown={(e) => e.stopPropagation()}
@@ -230,7 +325,7 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
               {verses ? (
                 // karte i plejer se slože dok panel već klizi
                 <AfterOpen fallback={<Skeleton />}>
-                  <SavedVerses verses={verses} onClose={onClose} view={view} onView={pick} />
+                  <SavedVerses verses={verses} onClose={onClose} view={view} onView={pick} query={query ?? ''} />
                 </AfterOpen>
               ) : (
                 <Skeleton />
@@ -240,6 +335,16 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
           </SheetSlide>
     </SheetLayer>,
     document.body,
+  )
+}
+
+/** lupa — pretraga pjesama */
+function SearchGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m20 20-4.6-4.6" />
+    </svg>
   )
 }
 

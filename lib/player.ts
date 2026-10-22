@@ -486,9 +486,10 @@ export function playOn(a: HTMLAudioElement, onFail?: () => void, left = 4) {
 /** Pauza — dugme i ploča odmah stanu, zvuk se utiša (gdje se može) pa stane. */
 export function pauseSaved() {
   const a = currentSaved()
+  // i kad je zvuk već stao — da ga greška mreže poslije ne pusti sama
+  if (a) a.dataset.want = ''
   // zvuk je već stao, a dugme to ne zna — samo se uskladi
   if (!a || a.paused) return setState({ playing: false })
-  a.dataset.want = ''
   // istog trena — bez utišavanja u koracima (kasni i "grmi")
   cancelSoft(a)
   a.pause()
@@ -576,8 +577,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('stihdana:stop-audio', () => state.id && stopSaved())
   // povratak u aplikaciju: iOS zna zaustaviti zvuk u pozadini bez "pause" —
   // dugme i ploča se usklade sa stvarnim stanjem
+  // (i više ne "želi" svirati — inače je greška mreže pri povratku pusti sama)
   const sync = () => {
-    if (!document.hidden && carrier && state.playing && carrier.paused) setState({ playing: false })
+    if (document.hidden || !carrier || !carrier.paused) return
+    carrier.dataset.want = ''
+    stopCrackle(carrier)
+    if (state.playing) setState({ playing: false })
   }
   document.addEventListener('visibilitychange', sync)
   window.addEventListener('pageshow', sync)

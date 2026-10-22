@@ -2,7 +2,7 @@
 
 import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import type { Verse } from '@/data/verses'
-import { ExpandIcon } from './ExpandIcon'
+import { ExpandMorph } from './ExpandIcon'
 import { FavoriteButton } from './FavoriteButton'
 import { ShareButton } from './ShareSheet'
 import { MOODS } from '@/data/moods'
@@ -314,6 +314,8 @@ export function SavedCarousel({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // strelice u polju za pretragu pomjeraju kursor, ne špil
+      if ((e.target as Element | null)?.closest?.('input, textarea, [contenteditable]')) return
       if (e.key === 'ArrowRight') go(cur + 1)
       if (e.key === 'ArrowLeft') go(cur - 1)
     }
@@ -602,18 +604,8 @@ function CardFaceView({
                 title={onCollapse ? 'Skupi' : 'Raširi'}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80 transition-transform active:scale-90"
               >
-                {/* na raširenoj karti obje ikone, jedna preko druge — pretapaju se dok
-                    karta raste (components/SavedFull.tsx `data-small` / `data-big`) */}
-                <span className="relative block h-[15px] w-[15px]">
-                  <span data-small className="absolute inset-0" style={layer}>
-                    <ExpandIcon />
-                  </span>
-                  {onCollapse && (
-                    <span data-big className="absolute inset-0" style={{ ...layer, opacity: 0 }}>
-                      <ExpandIcon collapse />
-                    </span>
-                  )}
-                </span>
+                {/* strelice se okrenu dok karta raste i skuplja se (SavedFull `data-flip`) */}
+                <ExpandMorph layer={layer} />
               </button>
             )}
             {/* srce — i na raširenoj karti */}

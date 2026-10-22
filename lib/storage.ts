@@ -167,6 +167,19 @@ export function savedDay(id: string): string {
   return day
 }
 
+/** Samo localhost (dev traka): sačuvaj sve stihove iz baze — postojeći ostaju na vrhu. Vraća koliko je dodano. */
+export function saveAllFavorites(ids: string[]): number {
+  const list = getFavorites()
+  const add = ids.filter((id) => !list.includes(id))
+  write(FAVORITES, [...list, ...add])
+  const day = shownDay(getActiveDate())
+  const dates = { ...read<Record<string, string>>(FAVORITE_DATES, {}) }
+  for (const id of add) dates[id] ??= day
+  write(FAVORITE_DATES, dates)
+  window.dispatchEvent(new Event('favchange'))
+  return add.length
+}
+
 /** Izbaci sačuvane id-eve kojih više nema (obrisan stih, stari test). */
 export function pruneFavorites(valid: Set<string>) {
   const list = getFavorites()

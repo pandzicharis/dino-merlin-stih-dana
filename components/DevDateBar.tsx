@@ -7,6 +7,8 @@ import { playIntro, playTombola } from './IntroSplash'
 import { OVERRIDE_ON, addDays, daysSinceEpoch, setDevDate } from '@/lib/date'
 import { redraw } from '@/lib/draw'
 import { isFirstVerse } from '@/lib/text'
+import { saveAllFavorites } from '@/lib/storage'
+import { loadVerses } from '@/lib/verses-client'
 import { Icon, TOAST_BAD, TOAST_OK, dismissToast, toast, type Toast } from './Toast'
 
 /** Sve poruke aplikacije redom — svaki klik na "poruke" pokaže sljedeću. */
@@ -76,6 +78,8 @@ export function DevDateBar({
     if (!OVERRIDE_ON) return
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
+      // kuca se (pretraga pjesama) — slova nisu prečice
+      if ((e.target as Element | null)?.closest?.('input, textarea, select, [contenteditable]')) return
       if (e.key === '[') move(-1)
       else if (e.key === ']') move(1)
       else if (e.key === '\\') reset()
@@ -157,6 +161,16 @@ export function DevDateBar({
       {/* zaboravi današnji (i dalje) — izvuče se ponovo, s animacijom */}
       <button onClick={() => redraw(date)} className="px-1.5 text-white/50 hover:text-white" title="i">
         izvuci
+      </button>
+      {/* svi stihovi iz baze u sačuvane — za rad na plejeru */}
+      <button
+        onClick={async () => {
+          const n = saveAllFavorites((await loadVerses()).map((v) => v.id))
+          toast({ id: 'save-all', title: n ? `Dodano ${n} stihova` : 'Svi su već sačuvani', color: TOAST_OK, icon: <Icon.ok /> })
+        }}
+        className="px-1.5 text-white/50 hover:text-white"
+      >
+        sačuvaj sve
       </button>
       {(['ios', 'android'] as const).map((o) => (
         <button
