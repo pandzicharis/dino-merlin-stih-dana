@@ -77,8 +77,6 @@ function readDraw(): Record<string, { id?: string }> {
 
 /** sličica omota stiha (240 px) — bez albuma znak aplikacije */
 const thumb = (v?: Verse) => thumbOf(albumOf(v?.album)?.cover) ?? ICON
-/** "21. oktobar" — bez godine */
-const dayMonth = (iso: string) => formatDateBs(iso).replace(/ \d{4}\.$/, '')
 
 function monthData(verses: Verse[], date: string) {
   const ym = date.slice(0, 7)
@@ -245,7 +243,7 @@ async function drawImage(d: Data): Promise<Blob | null> {
   const [sig, mag] = await Promise.all([
     loadImage('/brand/signature.webp?v=2'),
     magazaWhite(),
-    ...[`400 100px ${fSerif}`, `500 30px ${fSans}`, `italic 400 100px ${fCorm}`, `400 100px ${fScript}`].map((f) => document.fonts?.load(f, 'Moj oktobar').catch(() => null)),
+    ...[`400 100px ${fSerif}`, `500 30px ${fSans}`, `italic 700 100px ${fCorm}`, `400 100px ${fScript}`].map((f) => document.fonts?.load(f, 'Moj oktobar').catch(() => null)),
   ])
   const spaced = (n: number) => {
     if ('letterSpacing' in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${n}px`
@@ -272,16 +270,20 @@ async function drawImage(d: Data): Promise<Blob | null> {
   const top = Math.max(70, hc * 0.085)
   // "Moj" tankim kurzivom, mjesec zlatnim pisanim slovima — kao na ekranu
   const s1 = px(40)
-  const s2 = px(60)
-  ctx.font = `italic 400 ${s1}px ${fCorm}, ${fSerif}`
+  const s2 = px(64)
+  ctx.font = `italic 700 ${s1}px ${fCorm}, ${fSerif}`
   spaced(0)
   const w1 = ctx.measureText('Moj').width
   ctx.font = `400 ${s2}px ${fScript}, cursive`
   const w2 = ctx.measureText(d.month).width
   const tg = px(9)
   const tx0 = (W - (w1 + tg + w2)) / 2
-  text('Moj', tx0, px(top + 42), `italic 400 ${s1}px ${fCorm}, ${fSerif}`, 'rgba(255,255,255,0.92)', 'left')
-  text(d.month, tx0 + w1 + tg, px(top + 42), `400 ${s2}px ${fScript}, cursive`, GOLD, 'left')
+  text('Moj', tx0, px(top + 42), `italic 700 ${s1}px ${fCorm}, ${fSerif}`, '#ffffff', 'left')
+  text(d.month, tx0 + w1 + tg, px(top + 42), `400 ${s2}px ${fScript}, cursive`, '#D9C08F', 'left')
+  // podebljano kao na ekranu (tanak obrub)
+  ctx.strokeStyle = '#D9C08F'
+  ctx.lineWidth = s2 * 0.022
+  ctx.strokeText(d.month, tx0 + w1 + tg, px(top + 42))
   text(d.year, W / 2, px(top + 70), `400 ${px(10)}px ${fSans}`, 'rgba(255,255,255,0.5)', 'center', px(5))
 
   // dolje: potpis | Magaza, kao u okviru kartice
@@ -469,15 +471,27 @@ function MonthTitle({ month, size }: { month: string; size: number }) {
     const root = getComputedStyle(document.documentElement)
     const corm = root.getPropertyValue('--font-cormorant').trim()
     const script = root.getPropertyValue('--font-greatvibes').trim()
-    if (corm) void document.fonts.load(`italic 400 40px ${corm}`, 'Moj').catch(() => {})
+    if (corm) void document.fonts.load(`italic 700 40px ${corm}`, 'Moj').catch(() => {})
     if (script) void document.fonts.load(`400 40px ${script}`, month).catch(() => {})
   }, [month])
   return (
     <p className="flex items-baseline justify-center leading-none" style={{ fontSize: size, gap: '0.22em' }}>
-      <span className="text-white/90" style={{ fontFamily: 'var(--font-cormorant), var(--font-serif), serif', fontStyle: 'italic', fontWeight: 400, letterSpacing: '0.01em' }}>
+      <span className="text-white" style={{ fontFamily: 'var(--font-cormorant), var(--font-serif), serif', fontStyle: 'italic', fontWeight: 700, letterSpacing: '0.01em' }}>
         Moj
       </span>
-      <span style={{ fontFamily: 'var(--font-greatvibes), cursive', color: GOLD, fontSize: '1.5em', lineHeight: 1, textShadow: `0 0 24px ${GOLD}55` }}>{month}</span>
+      {/* pisana slova imaju samo jednu debljinu — tanak obrub ih podeblja */}
+      <span
+        style={{
+          fontFamily: 'var(--font-greatvibes), cursive',
+          color: '#D9C08F',
+          fontSize: '1.6em',
+          lineHeight: 1,
+          WebkitTextStroke: '0.022em #D9C08F',
+          textShadow: `0 0 26px ${GOLD}66`,
+        }}
+      >
+        {month}
+      </span>
     </p>
   )
 }
@@ -594,8 +608,8 @@ function glow(a: string) {
   return `radial-gradient(90% 45% at 50% 32%, ${GOLD}${a} 0%, transparent 70%), #0b0b0d`
 }
 
-/** dodir unutar ovoga ne lista priču i ne drži je */
-const keep = { onClick: (e: SyntheticEvent) => e.stopPropagation(), onPointerDown: (e: SyntheticEvent) => e.stopPropagation() }
+/** dodir unutar ovoga ne lista priču (povlačenje dolje i dalje zatvara, bilo gdje) */
+const keep = { onClick: (e: SyntheticEvent) => e.stopPropagation() }
 
 /* ── puštanje pjesme dodirom ──────────────────────────────────── */
 
@@ -616,23 +630,8 @@ function toggleSong(v: Verse, playing: boolean) {
   else playSaved(v)
 }
 
-/** zlatni krug: pusti ⇄ pauza */
-function PlayGlyph({ playing, size = 30 }: { playing: boolean; size?: number }) {
-  return (
-    <span className="flex shrink-0 items-center justify-center rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.45)]" style={{ width: size, height: size, background: GOLD, color: '#14100A' }} aria-hidden>
-      <svg width={size * 0.42} height={size * 0.42} viewBox="0 0 24 24" fill="currentColor">
-        {playing ? (
-          <path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z" />
-        ) : (
-          <path d="M7 4.6v14.8a1.1 1.1 0 0 0 1.68.93l11.8-7.4a1.1 1.1 0 0 0 0-1.86L8.68 3.67A1.1 1.1 0 0 0 7 4.6z" />
-        )}
-      </svg>
-    </span>
-  )
-}
-
 /** Veliki omot — dodir pusti/pauzira pjesmu `v`. */
-function Cover({ cover, v, onPlay }: { cover?: string; v?: Verse; onPlay: () => void }) {
+function Cover({ cover, v, onPlay, ok }: { cover?: string; v?: Verse; onPlay: () => void; ok: () => boolean }) {
   const now = useNow(v)
   const can = canPlay(v)
   return (
@@ -640,6 +639,8 @@ function Cover({ cover, v, onPlay }: { cover?: string; v?: Verse; onPlay: () => 
       type="button"
       disabled={!can}
       onClick={() => {
+        // kraj povlačenja nije dodir
+        if (!ok()) return
         onPlay()
         if (can) toggleSong(v, now.playing)
       }}
@@ -713,16 +714,12 @@ const ICONS = {
 const DAYS = ['P', 'U', 'S', 'Č', 'P', 'S', 'N']
 
 /**
- * Kalendar izvučenih stihova — dan sa stihom nosi omot albuma i datum.
- * Dodir na dan: oblačić iznad njega (pjesma, kad i kako je otvoren; dodir
- * na oblačić pusti pjesmu). Ispod kalendara ništa.
+ * Kalendar izvučenih stihova — dan sa stihom nosi omot albuma i datum, danas
+ * je istaknut. Samo za gledanje (dodir ide priči: naprijed/nazad).
  */
-function Calendar({ d, onTouch }: { d: Data; onTouch: () => void }) {
-  const [sel, setSel] = useState<string | null>(null)
-  const v = sel ? d.byDay[sel] : undefined
-  const now = useNow(v)
+function Calendar({ d }: { d: Data }) {
   return (
-    <div {...keep} className="grid grid-cols-7 gap-1.5">
+    <div className="grid grid-cols-7 gap-1.5">
       {DAYS.map((l, i) => (
         <span key={`h${i}`} className="pb-1 text-center text-[9px] font-medium uppercase tracking-[0.1em] text-white/35">
           {l}
@@ -734,86 +731,36 @@ function Calendar({ d, onTouch }: { d: Data; onTouch: () => void }) {
       {Array.from({ length: d.count }, (_, i) => {
         const iso = isoOf(d, i + 1)
         const on = iso in d.byDay
-        const picked = iso === sel
         // današnji dan — istaknut zlatnim obrubom i tačkicom
         const isToday = iso === d.today
-        const col = (d.lead + i) % 7
-        const open = d.opened[iso]
         return (
           <motion.div
             key={iso}
-            className="relative"
-            style={{ zIndex: picked ? 3 : undefined }}
-            initial={{ opacity: 0, scale: 0.7 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 0.55 + i * 0.016, ease }}
+            aria-label={formatDateBs(iso)}
+            className="tabular relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[8px] bg-cover bg-center text-[10px]"
+            style={{
+              backgroundImage: on ? `url(${thumb(d.byDay[iso])})` : undefined,
+              backgroundColor: on ? undefined : 'rgba(255,255,255,0.04)',
+              color: isToday ? GOLD : iso > d.today ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.32)',
+              fontWeight: isToday ? 700 : undefined,
+              boxShadow: isToday ? `0 0 0 1.5px ${GOLD}, 0 0 14px ${GOLD}66` : on ? `inset 0 0 0 1px ${GOLD}66` : undefined,
+            }}
+            initial={{ opacity: 0, transform: 'scale(0.7)' }}
+            animate={{ opacity: 1, transform: 'scale(1)' }}
+            transition={{ duration: 0.4, delay: 0.45 + i * 0.014, ease }}
           >
-            <button
-              type="button"
-              disabled={!on}
-              onClick={() => {
-                haptic(4)
-                setSel(picked ? null : iso)
-                onTouch()
-              }}
-              aria-label={formatDateBs(iso)}
-              aria-pressed={picked}
-              className="tabular relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-[8px] bg-cover bg-center text-[10px] transition-transform duration-200"
-              style={{
-                backgroundImage: on ? `url(${thumb(d.byDay[iso])})` : undefined,
-                backgroundColor: on ? undefined : 'rgba(255,255,255,0.04)',
-                color: isToday ? GOLD : iso > d.today ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.32)',
-                fontWeight: isToday ? 700 : undefined,
-                boxShadow: picked
-                  ? `0 0 0 2px ${GOLD}, 0 6px 16px rgba(0,0,0,0.5)`
-                  : isToday
-                    ? `0 0 0 1.5px ${GOLD}, 0 0 14px ${GOLD}66`
-                    : on
-                      ? `inset 0 0 0 1px ${GOLD}66`
-                      : undefined,
-                transform: picked ? 'scale(1.08)' : undefined,
-              }}
-            >
-              {isToday && <span className="absolute right-[3px] top-[3px] h-[5px] w-[5px] rounded-full" style={{ background: GOLD, boxShadow: `0 0 6px ${GOLD}` }} aria-hidden />}
-              {on ? (
-                // datum i preko omota — u donjem uglu, na tamnom
-                <span
-                  className="absolute inset-x-0 bottom-0 pb-[2px] pr-[4px] pt-2 text-right text-[9.5px] font-semibold leading-none text-white"
-                  style={{ background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.75))', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
-                >
-                  {i + 1}
-                </span>
-              ) : (
-                i + 1
-              )}
-            </button>
-
-            {/* oblačić iznad dana */}
-            <AnimatePresence>
-              {picked && v && (
-                <motion.button
-                  type="button"
-                  onClick={() => canPlay(v) && toggleSong(v, now.playing)}
-                  className={`absolute bottom-[calc(100%+8px)] flex w-[212px] items-center gap-2.5 rounded-[14px] border border-white/15 bg-[#1a1a1d]/95 p-2.5 text-left shadow-[0_12px_30px_rgba(0,0,0,0.6)] ${
-                    col <= 1 ? 'left-0' : col >= 5 ? 'right-0' : 'left-1/2 -translate-x-1/2'
-                  }`}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4, transition: { duration: 0.12 } }}
-                  transition={{ duration: 0.22, ease }}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: now.on ? GOLD : '#fff' }}>
-                      {v.song}
-                    </span>
-                    <span className="mt-1 block truncate text-[9.5px] text-white/55">
-                      {dayMonth(iso)} · {open ? `${open.push ? 'obavijest' : 'otvoren'} ${open.t}` : 'otvoren'}
-                    </span>
-                  </span>
-                  {canPlay(v) && <PlayGlyph playing={now.playing} size={26} />}
-                </motion.button>
-              )}
-            </AnimatePresence>
+            {isToday && <span className="absolute right-[3px] top-[3px] h-[5px] w-[5px] rounded-full" style={{ background: GOLD, boxShadow: `0 0 6px ${GOLD}` }} aria-hidden />}
+            {on ? (
+              // datum i preko omota — u donjem uglu, na tamnom
+              <span
+                className="absolute inset-x-0 bottom-0 pb-[2px] pr-[4px] pt-2 text-right text-[9.5px] font-semibold leading-none text-white"
+                style={{ background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.75))', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
+              >
+                {i + 1}
+              </span>
+            ) : (
+              i + 1
+            )}
           </motion.div>
         )
       })}
@@ -828,8 +775,10 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
   const video = useMemo(() => inVideo(), [])
   const dur = video ? VIDEO_DUR : deck ? DECK_DUR : DUR
   // na iPhoneu traka priče ne smije biti uz samu statusnu traku (zamagli se) — malo niže
-  const topPad = deck ? 'calc(var(--sat) + 18px)' : 'calc(max(14px, var(--sat)) + 12px)'
+  const topPad = deck ? 'calc(var(--sat) + 18px)' : 'calc(max(14px, var(--sat)) + 26px)'
   const [k, setK] = useState(0)
+  // smjer zadnjeg prelaza (1 naprijed, -1 nazad) — kartica klizne s te strane
+  const [dir, setDir] = useState<1 | -1>(1)
   const [held, setHeld] = useState(false)
   // dodir u kartici (dan, pjesma) — kartica stoji dok se ne ode dalje
   const [stay, setStay] = useState(false)
@@ -844,12 +793,41 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
   const [rounded, setRounded] = useState(false)
   const songCover = albumOf(d.song?.v.album)?.cover
   const hold = () => setStay(true)
+  // dugme koje je bilo pod prstom kad se vuklo dolje ne reaguje (to nije dodir)
+  const tapOk = () => !swiped.current
   const stats = statsOf(d)
   const few = d.drawn <= 3
 
+  // sve slike priče se preuzmu i dekodiraju odmah pri otvaranju — prelaz na
+  // sljedeću karticu ne čeka dekoder (omoti od 960 px su teški)
+  const decoded = useRef<HTMLImageElement[]>([])
+  useEffect(() => {
+    const urls = new Set<string>()
+    const add = (u?: string) => {
+      if (u) urls.add(u)
+    }
+    for (const c of d.covers) {
+      add(thumbOf(c) ?? c)
+      add(softOf(c))
+    }
+    for (const iso of d.days) add(thumb(d.byDay[iso]))
+    for (const v of d.savedList.slice(0, 6)) add(thumb(v))
+    for (const { v } of d.top) add(thumb(v))
+    for (const c of [albumOf(d.song?.v.album)?.cover, d.album?.cover]) {
+      add(c ? (cardArtOf(c) ?? c) : undefined)
+      add(softOf(c))
+    }
+    decoded.current = [...urls].map((u) => {
+      const img = new Image()
+      img.src = u
+      void img.decode?.().catch(() => {})
+      return img
+    })
+  }, [d])
+
   // "Podijeli" — zadnja kartica kao slika veličine ekrana se preuzme
   const save = async () => {
-    if (busy) return
+    if (busy || !tapOk()) return
     setBusy(true)
     haptic(6)
     try {
@@ -920,7 +898,7 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
             <span className="text-[11px] uppercase tracking-[0.24em] text-white/60">{pl(d.drawn, 'stih izvučen', 'stiha izvučena', 'stihova izvučeno')}</span>
           </motion.p>
           <div className="mt-7 w-full">
-            <Calendar d={d} onTouch={hold} />
+            <Calendar d={d} />
           </div>
         </>
       ),
@@ -952,7 +930,7 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
             body: (
               <>
                 <Label>Najslušanija pjesma</Label>
-                <Cover cover={songCover} v={d.song.v} onPlay={hold} />
+                <Cover cover={songCover} v={d.song.v} onPlay={hold} ok={tapOk} />
                 <Title name={d.song.v.song} sub={albumLine(d.song.v)} />
                 <CountLine>
                   {d.song.n} {pl(d.song.n, 'put puštena', 'puta puštena', 'puta puštena')}
@@ -971,7 +949,7 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
             body: (
               <>
                 <Label>Najslušaniji album</Label>
-                <Cover cover={d.album.cover} v={d.albumSong} onPlay={hold} />
+                <Cover cover={d.album.cover} v={d.albumSong} onPlay={hold} ok={tapOk} />
                 <Title name={d.album.title} sub={String(d.album.year)} />
                 <CountLine>
                   {d.albumPlays} {pl(d.albumPlays, 'puštanje', 'puštanja', 'puštanja')}
@@ -1093,16 +1071,18 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
   // veći logotipi dolje: početna kartica i prazan mjesec ("Tek je početak")
   const big = slides[k].key === 'intro' || slides[k].key === 'start'
   const last = slides.length - 1
-  const go = (dir: 1 | -1) => {
+  const go = (to: 1 | -1) => {
     setStay(false)
-    setK((x) => Math.max(0, Math.min(last, x + dir)))
+    setDir(to)
+    setK((x) => Math.max(0, Math.min(last, x + to)))
   }
   /** sa ikonice dolje ili reda sažetka na karticu */
   const jump = (key: string) => {
     const i = slides.findIndex((x) => x.key === key)
-    if (i < 0) return
+    if (i < 0 || !tapOk()) return
     haptic(5)
     setStay(false)
+    setDir(i >= k ? 1 : -1)
     setK(i)
   }
 
@@ -1114,6 +1094,7 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
       }
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         setStay(false)
+        setDir(e.key === 'ArrowRight' ? 1 : -1)
         setK((x) => Math.max(0, Math.min(last, x + (e.key === 'ArrowRight' ? 1 : -1))))
       }
     }
@@ -1193,15 +1174,23 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
       <style>{`@keyframes recap-fill { from { transform: scaleX(0) } to { transform: scaleX(1) } }`}</style>
 
       {/* kartice — pretapaju se jedna u drugu; sadržaj u istom kalupu, na sredini */}
-      <AnimatePresence initial={false}>
+      {/* prelaz: nova kartica klizne malo sa strane dodira i pretopi se — samo pomak i
+          prozirnost (grafički procesor), slike su unaprijed dekodirane */}
+      <AnimatePresence initial={false} custom={dir}>
         <motion.div
           key={k}
+          custom={dir}
           className="absolute inset-0"
-          style={{ background: slides[k].bg }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.45 }}
+          style={{ background: slides[k].bg, willChange: 'transform, opacity' }}
+          variants={{
+            enter: (to: number) => ({ opacity: 0, transform: `translateX(${to * 26}px)` }),
+            center: { opacity: 1, transform: 'translateX(0px)' },
+            exit: (to: number) => ({ opacity: 0, transform: `translateX(${to * -26}px)` }),
+          }}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
         >
           <div
             className="mx-auto flex h-full max-w-[440px] flex-col items-center justify-center px-7"
