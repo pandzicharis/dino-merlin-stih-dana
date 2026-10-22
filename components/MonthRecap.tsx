@@ -238,12 +238,11 @@ async function drawImage(d: Data): Promise<Blob | null> {
   const cs = getComputedStyle(document.documentElement)
   const fSerif = cs.getPropertyValue('--font-serif').trim() || 'Georgia, serif'
   const fSans = cs.getPropertyValue('--font-sans').trim() || 'system-ui, sans-serif'
-  const fCorm = cs.getPropertyValue('--font-cormorant').trim() || fSerif
-  const fScript = cs.getPropertyValue('--font-greatvibes').trim() || 'cursive'
+  const fTitle = cs.getPropertyValue('--font-playfair').trim() || fSerif
   const [sig, mag] = await Promise.all([
     loadImage('/brand/signature.webp?v=2'),
     magazaWhite(),
-    ...[`400 100px ${fSerif}`, `500 30px ${fSans}`, `italic 700 100px ${fCorm}`, `400 100px ${fScript}`].map((f) => document.fonts?.load(f, 'Moj oktobar').catch(() => null)),
+    ...[`400 100px ${fSerif}`, `500 30px ${fSans}`, `italic 700 100px ${fTitle}`].map((f) => document.fonts?.load(f, 'Moj oktobar').catch(() => null)),
   ])
   const spaced = (n: number) => {
     if ('letterSpacing' in ctx) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${n}px`
@@ -268,22 +267,16 @@ async function drawImage(d: Data): Promise<Blob | null> {
   // gore: Moj oktobar (slova stiha) i godina
   const hc = H / k
   const top = Math.max(70, hc * 0.085)
-  // "Moj" tankim kurzivom, mjesec zlatnim pisanim slovima — kao na ekranu
-  const s1 = px(40)
-  const s2 = px(64)
-  ctx.font = `italic 700 ${s1}px ${fCorm}, ${fSerif}`
+  // "Moj" i mjesec istim podebljanim kurzivom — kao na ekranu
+  const tf = `italic 700 ${px(44)}px ${fTitle}, ${fSerif}`
+  ctx.font = tf
   spaced(0)
   const w1 = ctx.measureText('Moj').width
-  ctx.font = `400 ${s2}px ${fScript}, cursive`
   const w2 = ctx.measureText(d.month).width
-  const tg = px(9)
+  const tg = px(10)
   const tx0 = (W - (w1 + tg + w2)) / 2
-  text('Moj', tx0, px(top + 42), `italic 700 ${s1}px ${fCorm}, ${fSerif}`, '#ffffff', 'left')
-  text(d.month, tx0 + w1 + tg, px(top + 42), `400 ${s2}px ${fScript}, cursive`, '#D9C08F', 'left')
-  // podebljano kao na ekranu (tanak obrub)
-  ctx.strokeStyle = '#D9C08F'
-  ctx.lineWidth = s2 * 0.022
-  ctx.strokeText(d.month, tx0 + w1 + tg, px(top + 42))
+  text('Moj', tx0, px(top + 42), tf, '#ffffff', 'left')
+  text(d.month, tx0 + w1 + tg, px(top + 42), tf, '#D9C08F', 'left')
   text(d.year, W / 2, px(top + 70), `400 ${px(10)}px ${fSans}`, 'rgba(255,255,255,0.5)', 'center', px(5))
 
   // dolje: potpis | Magaza, kao u okviru kartice
@@ -462,36 +455,21 @@ const rise = (i: number) => ({
 })
 
 /**
- * "Moj oktobar" kao na početnom ekranu: "Moj" tankim kurzivom, mjesec zlatnim
- * pisanim slovima (fontovi stihova — lib/fonts.ts).
+ * "Moj oktobar": obje riječi istim podebljanim kurzivom (Playfair Display 700 —
+ * lib/fonts.ts), "Moj" bijelo, mjesec zlatno. Bez sjaja i obruba oko slova.
  */
+const TITLE_FONT = { fontFamily: 'var(--font-playfair), var(--font-serif), serif', fontStyle: 'italic' as const, fontWeight: 700 }
+
 function MonthTitle({ month, size }: { month: string; size: number }) {
-  // fontovi se učitavaju tek kad zatrebaju — odmah, da naslov od prvog kadra ima pravo pismo
+  // font se učitava tek kad zatreba — odmah, da naslov od prvog kadra ima pravo pismo
   useEffect(() => {
-    const root = getComputedStyle(document.documentElement)
-    const corm = root.getPropertyValue('--font-cormorant').trim()
-    const script = root.getPropertyValue('--font-greatvibes').trim()
-    if (corm) void document.fonts.load(`italic 700 40px ${corm}`, 'Moj').catch(() => {})
-    if (script) void document.fonts.load(`400 40px ${script}`, month).catch(() => {})
+    const family = getComputedStyle(document.documentElement).getPropertyValue('--font-playfair').trim()
+    if (family) void document.fonts.load(`italic 700 40px ${family}`, `Moj ${month}`).catch(() => {})
   }, [month])
   return (
-    <p className="flex items-baseline justify-center leading-none" style={{ fontSize: size, gap: '0.22em' }}>
-      <span className="text-white" style={{ fontFamily: 'var(--font-cormorant), var(--font-serif), serif', fontStyle: 'italic', fontWeight: 700, letterSpacing: '0.01em' }}>
-        Moj
-      </span>
-      {/* pisana slova imaju samo jednu debljinu — tanak obrub ih podeblja */}
-      <span
-        style={{
-          fontFamily: 'var(--font-greatvibes), cursive',
-          color: '#D9C08F',
-          fontSize: '1.6em',
-          lineHeight: 1,
-          WebkitTextStroke: '0.022em #D9C08F',
-          textShadow: `0 0 26px ${GOLD}66`,
-        }}
-      >
-        {month}
-      </span>
+    <p className="flex items-baseline justify-center leading-none" style={{ ...TITLE_FONT, fontSize: size, gap: '0.24em', letterSpacing: '-0.01em' }}>
+      <span className="text-white">Moj</span>
+      <span style={{ color: '#D9C08F' }}>{month}</span>
     </p>
   )
 }
@@ -775,7 +753,7 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
   const video = useMemo(() => inVideo(), [])
   const dur = video ? VIDEO_DUR : deck ? DECK_DUR : DUR
   // na iPhoneu traka priče ne smije biti uz samu statusnu traku (zamagli se) — malo niže
-  const topPad = deck ? 'calc(var(--sat) + 18px)' : 'calc(max(14px, var(--sat)) + 26px)'
+  const topPad = deck ? 'calc(var(--sat) + 18px)' : 'calc(max(14px, var(--sat)) + 40px)'
   const [k, setK] = useState(0)
   // smjer zadnjeg prelaza (1 naprijed, -1 nazad) — kartica klizne s te strane
   const [dir, setDir] = useState<1 | -1>(1)
