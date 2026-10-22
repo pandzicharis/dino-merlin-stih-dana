@@ -95,7 +95,8 @@ export function DailyVerse({
     let t = 0
     const go = () => {
       clearTimeout(t)
-      t = window.setTimeout(() => window.dispatchEvent(new CustomEvent(AUTOPLAY, { detail: firstVerse })), 1800)
+      // splash se pretapa 0,4 s — pjesma odmah poslije, čim stih stoji
+      t = window.setTimeout(() => window.dispatchEvent(new CustomEvent(AUTOPLAY, { detail: firstVerse })), 700)
     }
     window.addEventListener(INTRO_DONE, go)
     return () => {

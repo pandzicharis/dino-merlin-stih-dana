@@ -41,6 +41,12 @@ export function fadeOut(a: HTMLMediaElement, ms = 500): { routed: boolean; done:
   fades.get(a)?.()
   if (a.paused) return { routed: gains.has(a), done: Promise.resolve() }
   let g = gains.get(a)
+  // iPhone: jačina se ne da mijenjati, a prebacivanje u Web Audio usred
+  // pjesme napravi rupu u zvuku (čuje se prekid, pa tišina) — tamo stane odmah
+  if (!g && !volumeWorks(a)) {
+    a.pause()
+    return { routed: false, done: Promise.resolve() }
+  }
   if (!g && ctx && ctx.state === 'running') {
     try {
       const src = ctx.createMediaElementSource(a)
@@ -91,6 +97,19 @@ export function fadeOut(a: HTMLMediaElement, ms = 500): { routed: boolean; done:
     })
   })
   return { routed: Boolean(g), done }
+}
+
+/** Može li se `<audio>` utišati jačinom (računar, Android) — iPhone je drži na 1. */
+function volumeWorks(a: HTMLMediaElement): boolean {
+  const v = a.volume
+  try {
+    a.volume = v > 0.5 ? v - 0.01 : v + 0.01
+    const ok = a.volume !== v
+    a.volume = v
+    return ok
+  } catch {
+    return false
+  }
 }
 
 /** Utišavanje u toku — prekini ga (pjesma svira dalje, punom jačinom). */

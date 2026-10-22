@@ -734,6 +734,8 @@ type Scene = {
   press: (target: string | HTMLElement) => Promise<boolean>
   /** sačekaj da je telefon na početnoj stranici aplikacije, učitan */
   home: () => Promise<boolean>
+  /** prevuci karte sačuvanih za `n` (minus — nazad), kao prstom */
+  swipe: (n: number) => Promise<boolean>
   alive: () => boolean
 }
 
@@ -785,6 +787,19 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
       await wait(380)
       return true
     }
+    const swipe = async (n: number) => {
+      const el = await find('[aria-roledescription="carousel"]')
+      if (!el || !alive) return false
+      const cards = el.querySelectorAll<HTMLElement>('[data-card]')
+      const step = cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : 0
+      if (!step) return false
+      // dodir gdje prst kreće, pa traka klizi (pravi skrol sa zaustavljanjem na karti)
+      const r = el.getBoundingClientRect()
+      tapAt(r.left + r.width * (n > 0 ? 0.72 : 0.28), r.top + r.height * 0.45)
+      el.scrollBy({ left: step * n, behavior: 'smooth' })
+      await wait(1000)
+      return alive
+    }
     // prozor koji je ostao otvoren s prošlog koraka
     const home = async () => {
       for (let t = 0; t < 80 && alive; t++) {
@@ -814,7 +829,7 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
     }
     close()
     // Ručno: prezenter sam klikće po telefonu
-    if (!manual || always) void run({ wait, find, press, home, alive: () => alive })
+    if (!manual || always) void run({ wait, find, press, home, swipe, alive: () => alive })
     return () => {
       alive = false
       timers.forEach(clearTimeout)
@@ -1425,7 +1440,8 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
   // na ulasku (i na drugom sistemu) ništa nije sačuvano — i u Ručno. Sačuvano
   // odavde dalje ostaje kroz sve naredne korake; briše se tek ispočetka.
   useEffect(() => cleanSlate(), [])
-  useScene(async ({ wait, find, press, home, alive }) => {
+  const { phone } = useDeck()
+  useScene(async ({ wait, find, press, home, swipe, alive }) => {
     if (!(await home())) return
     await wait(300)
     const save = await find('[data-tip="save"]')
@@ -1436,10 +1452,20 @@ function SacuvanoScene({ onDone }: { onDone: () => void }) {
     // ...pa gore iskoči ikonica s brojem, i ona se dodirne
     await find('[data-tip="saved"]', 3000)
     await wait(1300)
+    // i par ranije sačuvanih — da se u sačuvanima ima šta listati
+    await seedSaved(phone()?.contentWindow, 4)
+    await wait(400)
     if (alive()) await press('[data-tip="saved"]')
+    // karte jedna do druge: prevuci par naprijed, pa jednu nazad
+    await wait(1800)
+    if (alive()) await swipe(1)
+    await wait(500)
+    if (alive()) await swipe(1)
+    await wait(500)
+    if (alive()) await swipe(-1)
     // "Raširi" — stih preko cijelog ekrana, kao na početnoj; "Skupi" ga
     // vrati među karte — pa isto na drugom sistemu
-    await wait(2200)
+    await wait(900)
     if (alive()) await press('[aria-label="Raširi"]')
     await wait(3400)
     if (alive()) await press('[data-full] [aria-label="Skupi"]')
@@ -1482,13 +1508,13 @@ function Plejer() {
   )
 }
 
-/** Uz sačuvani iz prošlog koraka doda još dva s pjesmom — da plejer ima šta listati. */
-async function seedSaved(win: Window | null | undefined) {
+/** Uz sačuvane doda još `n` s pjesmom — da plejer ima šta listati. */
+async function seedSaved(win: Window | null | undefined, n = 4) {
   if (!win) return
   try {
     const all = (await fetch('/api/verses').then((r) => r.json())) as Verse[]
     const have: string[] = JSON.parse(win.localStorage.getItem('stihdana:favorites') || '[]')
-    const more = all.filter((v) => v.youtube && playable(v) && !have.includes(v.id)).slice(0, 2).map((v) => v.id)
+    const more = all.filter((v) => v.youtube && playable(v) && !have.includes(v.id)).slice(0, n).map((v) => v.id)
     win.localStorage.setItem('stihdana:favorites', JSON.stringify([...have, ...more]))
     win.dispatchEvent(new Event('favchange'))
   } catch {
@@ -1498,13 +1524,18 @@ async function seedSaved(win: Window | null | undefined) {
 
 function PlejerScene({ onDone }: { onDone: () => void }) {
   const { phone } = useDeck()
-  useScene(async ({ wait, press, home, alive }) => {
+  useScene(async ({ wait, press, home, swipe, alive }) => {
     if (!(await home())) return
-    await seedSaved(phone()?.contentWindow)
+    await seedSaved(phone()?.contentWindow, 5)
     await wait(900)
     // ikonica plejera gore — otvara se Player pjesama (karte stihova)
     if (alive()) await press('[data-tip="saved"]')
-    await wait(1800)
+    await wait(1600)
+    // prvo se prelista špil — plejer ispod pokazuje pjesmu karte na sredini
+    if (alive()) await swipe(1)
+    await wait(500)
+    if (alive()) await swipe(1)
+    await wait(700)
     // pusti pa sljedeća — karte klize za pjesmom
     if (alive()) await press('[data-player] [aria-label="Pusti"]')
     await wait(2600)

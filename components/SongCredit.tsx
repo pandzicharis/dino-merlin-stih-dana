@@ -7,7 +7,7 @@ import { albumLine, isFirstVerse, youtubeId } from '@/lib/text'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
-import { AUTOPLAY, SHARED, SHARED_GONE, SOLO, createPlayer, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
+import { AUTOPLAY, SHARED, SHARED_GONE, SOLO, createPlayer, playOn, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
 import { warmAudio } from '@/lib/sw-cache'
 import { FitLines } from './deck/FitLines'
 
@@ -106,13 +106,14 @@ function useSong({
   function attach(a: Player) {
     if (audio.current === a && unbind.current) return
     unbind.current?.()
+    // otključana pjesma (unlock) svira nečujno do samopokretanja — plejer to ne pokazuje
     const time = () => {
+      if (a.dataset.unlock) return
       setCur(a.currentTime)
       if (Number.isFinite(a.duration)) setDur(a.duration)
     }
-    // otključavanje (unlock) pusti pa odmah zaustavi — plejer to ne pokazuje
     const waiting = () => !a.dataset.unlock && setState('loading')
-    const playing = () => setState('playing')
+    const playing = () => !a.dataset.unlock && setState('playing')
     const pause = () => !a.dataset.unlock && setState((s) => (s === 'idle' ? s : 'paused'))
     const ended = () => setState('paused')
     const fail = () => {
@@ -249,16 +250,29 @@ function useSong({
    * bez zvuka — poslije je preglednik pusti i bez prsta. Plejer to ne vidi.
    */
   function unlock() {
-    // samo telefon (iPhone) — računar pušta i bez ovoga, a Chrome bi poslije
-    // javio "učitava se" i pustio šum igle usred splasha
+    // samo telefon (iPhone) — računar pušta i bez ovoga
     if (!matchMedia('(pointer: coarse)').matches) return
     const a = player()
     if (!a.paused || a.dataset.want) return
-    // oznaka ostaje dok pjesma stvarno ne krene (toggle) — zakašnjeli događaji
-    // učitavanja ne pokreću ploču ni pucketanje
+    // Pjesma stvarno krene iz dodira, ali bez zvuka — iPhone je poslije pusti
+    // naglas i bez prsta (samo "pusti pa stani" nije uvijek dovoljno). Oznaka
+    // drži ploču, traku i pucketanje mirnim dok samopokretanje ne krene (toggle).
     a.dataset.unlock = '1'
-    a.play().catch(() => {})
-    a.pause()
+    a.muted = true
+    a.preload = 'auto'
+    a.play().catch(() => {
+      delete a.dataset.unlock
+      a.muted = false
+    })
+    unlockVinyl()
+    // samopokretanje nije stiglo (uvod preskočen, bez animacija) — tiho stane
+    window.setTimeout(() => {
+      if (!a.dataset.unlock) return
+      delete a.dataset.unlock
+      a.pause()
+      a.currentTime = 0
+      a.muted = false
+    }, 120000)
   }
 
   /** Preuzmi početak pjesme unaprijed — dodir je onda trenutan. */
@@ -285,6 +299,24 @@ function useSong({
       return
     }
     let a = player()
+    // otključana prvim dodirom — svira nečujno od tad; sad od početka i naglas
+    if (a.dataset.unlock) {
+      delete a.dataset.unlock
+      a.muted = false
+      try {
+        a.currentTime = 0
+      } catch {}
+      a.dataset.want = '1'
+      unlockVinyl()
+      dropNeedle(0.3)
+      window.dispatchEvent(new CustomEvent(SOLO, { detail: a }))
+      session(a, verse)
+      setCur(0)
+      if (!a.paused) return setState('playing')
+      setState('loading')
+      playOn(a, () => setState('paused'))
+      return
+    }
     // utišava se (pauza upravo dodirnuta) — novi dodir je vrati punom jačinom
     if (!a.paused && !a.dataset.want) {
       cancelFade(a)
@@ -305,13 +337,14 @@ function useSong({
       window.dispatchEvent(new CustomEvent(SOLO, { detail: a }))
       session(a, verse)
       setState('loading')
-      a.play().catch(() => setState('paused'))
+      playOn(a, () => setState('paused'))
     } else {
       // pauza — ploča, dugme i pucketanje odmah stanu, pjesma se utiša pa stane
       a.dataset.want = ''
       setState('paused')
       stopCrackle()
-      fadeOut(a, 450)
+      // kratko — pauza se čuje odmah (iPhone: staje odmah, lib/vinyl.ts)
+      fadeOut(a, 220)
     }
   }
 
@@ -538,17 +571,36 @@ function AudioSong({ preview = false, share = false, ...props }: Source & { prev
     if (!auto) return
     const kinds = ['touchend', 'click', 'keydown'] as const
     const off = () => kinds.forEach((k) => window.removeEventListener(k, first, true))
-    function first() {
+    function first(e: Event) {
+      // pravi dodir — ne "klik" kojim lib/haptic.ts pravi trzaj
+      if (!e.isTrusted) return
       off()
       live.current.unlock()
     }
     kinds.forEach((k) => window.addEventListener(k, first, true))
+    // telefon ipak nije dao zvuk bez prsta (npr. nije bilo nijednog dodira prije
+    // stiha) — pjesma krene na prvi dodir bilo gdje (osim same ploče, ona to radi sama)
+    let retry = 0
+    const late = (e: Event) => {
+      if (!e.isTrusted || (e.target as Element | null)?.closest?.('[data-deck="play"]')) return
+      offLate()
+      if (live.current.state !== 'playing' && live.current.state !== 'loading') live.current.toggle()
+    }
+    const offLate = () => kinds.forEach((k) => window.removeEventListener(k, late, true))
     const go = (e: Event) => {
-      if ((e as CustomEvent).detail === verse.id && live.current.state === 'idle') live.current.toggle()
+      if ((e as CustomEvent).detail !== verse.id || live.current.state !== 'idle') return
+      live.current.toggle()
+      clearTimeout(retry)
+      retry = window.setTimeout(() => {
+        if (live.current.state === 'playing' || live.current.state === 'loading') return
+        kinds.forEach((k) => window.addEventListener(k, late, true))
+      }, 1500)
     }
     window.addEventListener(AUTOPLAY, go)
     return () => {
       off()
+      offLate()
+      clearTimeout(retry)
       window.removeEventListener(AUTOPLAY, go)
     }
   }, [auto, verse.id])

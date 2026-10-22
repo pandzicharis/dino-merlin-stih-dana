@@ -484,15 +484,26 @@ export function playSaved(verse: Verse): boolean {
   if (history[history.length - 1] !== verse.id) history = [...history.slice(-30), verse.id]
   setState({ id: verse.id })
   window.dispatchEvent(new CustomEvent(SAVED_TRACK, { detail: verse.id }))
-  if (a.paused)
-    a.play().catch((e: unknown) => {
-      // učitavanje prekinuto (nova adresa usred puštanja) — još jednom, ako se i dalje želi
-      if ((e as DOMException)?.name === 'AbortError' && a.dataset.want) return a.play().catch(() => setState({ playing: false }))
-      setState({ playing: false })
-    })
+  if (a.paused) playOn(a)
   // dugme i ploča odmah — zvuk krene čim se učita (ne čeka mrežu, pa nema drugog dodira)
   setState({ playing: true })
   return true
+}
+
+/**
+ * Pusti — i kad iPhone prvi pokušaj prekine jer se pjesma tek mijenja/učitava
+ * (AbortError): još par puta, dok se pjesma i dalje želi. Inače bi trebao
+ * drugi dodir na "Pusti".
+ */
+export function playOn(a: HTMLAudioElement, onFail?: () => void, left = 4) {
+  a.play().catch((e: unknown) => {
+    if ((e as DOMException)?.name === 'AbortError' && a.dataset.want && left > 0) {
+      window.setTimeout(() => a.dataset.want && a.paused && playOn(a, onFail, left - 1), 120)
+      return
+    }
+    if (onFail) onFail()
+    else setState({ playing: false })
+  })
 }
 
 /** Pauza — dugme i ploča odmah stanu, zvuk se utiša (gdje se može) pa stane. */
