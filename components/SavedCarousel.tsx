@@ -6,7 +6,7 @@ import { ExpandMorph } from './ExpandIcon'
 import { FavoriteButton } from './FavoriteButton'
 import { ShareButton } from './ShareSheet'
 import { MOODS } from '@/data/moods'
-import { albumOf, cardArtOf, cardStillOf, thumbOf } from '@/data/albums'
+import { albumOf, cardArtOf, cardStillOf, softOf, thumbOf } from '@/data/albums'
 import { lookCss, lookScale, parseFont, preloadFonts } from '@/lib/fonts'
 import { albumLine, asWritten } from '@/lib/text'
 import { savedDay, toggleFavorite } from '@/lib/storage'
@@ -293,8 +293,12 @@ export function SavedCarousel({
   useEffect(() => {
     const urls = new Set<string>(['/brand/signature.webp?v=2'])
     for (const v of verses) {
-      const thumb = thumbOf(albumOf(v.album)?.cover)
+      const cover = albumOf(v.album)?.cover
+      const thumb = thumbOf(cover)
       if (thumb) urls.add(thumb)
+      // zamućen omot — pozadina plejera i kartica albuma
+      const soft = softOf(cover)
+      if (soft) urls.add(soft)
     }
     return whenCalm(() => urls.forEach(decodeOnce), 800)
   }, [verses])

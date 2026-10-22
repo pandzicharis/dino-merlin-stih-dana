@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
-import { albumOf, thumbOf } from '@/data/albums'
+import { albumOf, softOf, thumbOf } from '@/data/albums'
 import { haptic } from '@/lib/haptic'
 import { albumLine, asWritten } from '@/lib/text'
 import { EqBars } from './EqBars'
@@ -291,17 +291,23 @@ function toggle(cur: Verse, playing: boolean) {
   if (!playSaved(cur)) nextSaved()
 }
 
-/** Pozadina u atmosferi stiha — plejer i mini plejer nose boju karte iznad. */
-function moodBg(v: Verse) {
+/**
+ * Pozadina u atmosferi stiha — plejer i mini plejer nose boju karte iznad.
+ * `see` (0…1): koliko se ispod boje vidi omot albuma — unaprijed zamućena
+ * slika od 128 px kao obična pozadina (bez CSS blura i pretapanja).
+ */
+function moodBg(v: Verse, see = 0) {
   const m = MOODS[v.mood]
-  return `radial-gradient(130% 120% at 15% 0%, ${m.gradient[2]}66 0%, transparent 55%), radial-gradient(120% 120% at 100% 100%, ${m.gradient[1]}aa 0%, transparent 60%), linear-gradient(180deg, ${m.gradient[1]} 0%, ${m.gradient[0]} 100%)`
+  const soft = see ? softOf(albumOf(v.album)?.cover) : undefined
+  const a = soft ? Math.round((1 - see) * 255).toString(16).padStart(2, '0') : ''
+  return `radial-gradient(130% 120% at 15% 0%, ${m.gradient[2]}66 0%, transparent 55%), radial-gradient(120% 120% at 100% 100%, ${m.gradient[1]}aa 0%, transparent 60%), linear-gradient(180deg, ${m.gradient[1]}${a} 0%, ${m.gradient[0]}${a} 100%)${soft ? `, url(${soft}) center / cover, ${m.gradient[1]}` : ''}`
 }
 
-/** Atmosfera stiha iza plejera — samo boje (bez zamućenog omota i pretapanja). */
+/** Atmosfera stiha iza plejera — boje stiha, a ispod njih jedva omot albuma. */
 function Atmosphere({ verse }: { verse: Verse }) {
   return (
     <div className="absolute inset-0" aria-hidden>
-      <div className="absolute inset-0" style={{ background: moodBg(verse) }} />
+      <div className="absolute inset-0" style={{ background: moodBg(verse, 0.22) }} />
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.4) 100%)' }} />
     </div>
   )
@@ -607,13 +613,19 @@ export const SavedList = memo(function SavedList({ verses, front, active = true 
 /** sačuvani po albumima, redom kako su sačuvani (najnoviji prvi) */
 function byAlbum(verses: Verse[]) {
   const albums: { name: string; list: Verse[] }[] = []
+  // pjesme bez (poznatog) albuma — sve u jednoj kartici, na kraju
+  const loose: Verse[] = []
   for (const v of verses) {
-    // pjesme bez albuma — svoja kartica
-    const name = v.album || 'Bez albuma'
+    const name = albumOf(v.album)?.title
+    if (!name) {
+      loose.push(v)
+      continue
+    }
     const a = albums.find((x) => x.name === name)
     if (a) a.list.push(v)
     else albums.push({ name, list: [v] })
   }
+  if (loose.length) albums.push({ name: 'Bez albuma', list: loose })
   return albums
 }
 
@@ -646,7 +658,8 @@ const AlbumCard = memo(
   }) {
     const first = list[0]
     const m = MOODS[first.mood]
-    const cover = albumOf(name)?.cover
+    const album = albumOf(name)
+    const cover = album?.cover
     return (
       <section
         aria-label={name}
@@ -661,7 +674,8 @@ const AlbumCard = memo(
           onBring()
         }}
       >
-        <div className="absolute inset-0" style={{ background: moodBg(first) }} aria-hidden />
+        {/* boja stiha preko zamućenog omota albuma (slika se nacrta jednom u sloj kartice) */}
+        <div className="absolute inset-0" style={{ background: moodBg(first, 0.5) }} aria-hidden />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.6) 100%)' }} aria-hidden />
 
         {/* album: omot, naziv, godina, broj pjesama — u liniji s pjesmama ispod
@@ -678,7 +692,8 @@ const AlbumCard = memo(
               {name}
             </p>
             <p className="mt-1 text-[10px] uppercase tracking-[0.22em] text-white/55">
-              {first.year} · {pjesme(list.length)}
+              {/* bez albuma — samo broj pjesama */}
+              {album ? `${album.year} · ${pjesme(list.length)}` : pjesme(list.length)}
             </p>
           </div>
         </div>

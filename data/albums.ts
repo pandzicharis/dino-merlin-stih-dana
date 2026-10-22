@@ -135,6 +135,11 @@ export const COVER_BLURS = [
   { dir: 'blur-card', sigma: 55 / (620 * 1.3) },
 ] as const
 
+/** Omot jače zamućen (blur-card, 128 px) — pozadina albuma i plejera, bez CSS blura. */
+export function softOf(cover?: string): string | undefined {
+  return blurOf(cover, COVER_BLURS[1].sigma)
+}
+
 /**
  * Unaprijed zamućen omot za `blur(...) saturate(1.2)` čije je zamućenje `sigma`
  * (dio prikazane stranice omota). Nema varijante unutar ±10% → undefined (ostaje CSS blur).
