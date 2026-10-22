@@ -827,7 +827,8 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
   const deck = useMemo(() => inDeck(), [])
   const video = useMemo(() => inVideo(), [])
   const dur = video ? VIDEO_DUR : deck ? DECK_DUR : DUR
-  const topPad = deck ? 'calc(var(--sat) + 18px)' : 'max(14px, var(--sat))'
+  // na iPhoneu traka priče ne smije biti uz samu statusnu traku (zamagli se) — malo niže
+  const topPad = deck ? 'calc(var(--sat) + 18px)' : 'calc(max(14px, var(--sat)) + 12px)'
   const [k, setK] = useState(0)
   const [held, setHeld] = useState(false)
   // dodir u kartici (dan, pjesma) — kartica stoji dok se ne ode dalje
@@ -839,7 +840,8 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
   // pregled prati prst dok se vuče dolje (smanji se i zaobli), pa se spusti
   const y = useMotionValue(0)
   const scale = useTransform(y, [0, 320], [1, 0.9])
-  const radius = useTransform(y, [0, 140], [0, 34])
+  // zaobljeni uglovi dok se vuče ili zatvara — uključe se jednom (ne mijenjaju se u svakom kadru)
+  const [rounded, setRounded] = useState(false)
   const songCover = albumOf(d.song?.v.album)?.cover
   const hold = () => setStay(true)
   const stats = statsOf(d)
@@ -1070,6 +1072,7 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
               data-recap-end
               onClick={(e) => {
                 e.stopPropagation()
+                setRounded(true)
                 onClose()
               }}
               className="h-12 rounded-full border border-white/15 px-6 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80"
@@ -1087,6 +1090,8 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
   // ikonice kartica dolje — po jedna za svaku karticu koja se prikazuje
   const NAV_ICON: Record<string, ReactNode> = { intro: ICONS.star, days: ICONS.days, saved: ICONS.saved, song: ICONS.plays, album: ICONS.albums, summary: ICONS.grid }
   const nav = slides.filter((x) => NAV_ICON[x.key]).map((x) => ({ key: x.key, icon: NAV_ICON[x.key] }))
+  // veći logotipi dolje: početna kartica i prazan mjesec ("Tek je početak")
+  const big = slides[k].key === 'intro' || slides[k].key === 'start'
   const last = slides.length - 1
   const go = (dir: 1 | -1) => {
     setStay(false)
@@ -1103,7 +1108,10 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        setRounded(true)
+        onClose()
+      }
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         setStay(false)
         setK((x) => Math.max(0, Math.min(last, x + (e.key === 'ArrowRight' ? 1 : -1))))
@@ -1114,17 +1122,29 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
   }, [onClose, last])
 
   return (
+    // otvaranje i zatvaranje: cijeli pregled kao jedan sloj — samo pomak, veličina i
+    // prozirnost (grafički procesor, ništa se ne iscrtava iznova), pa spuštanje ne zastaje
+    <motion.div
+      className="fixed inset-0 z-[120]"
+      style={{ transformOrigin: '50% 100%', willChange: 'transform, opacity' }}
+      initial={{ opacity: 0, transform: 'translateY(48px) scale(1)' }}
+      animate={{ opacity: 1, transform: 'translateY(0px) scale(1)' }}
+      // zatvaranje: klizne glatko do ispod ekrana i putem se malo smanji; tek pri dnu izblijedi
+      exit={{
+        opacity: 0,
+        transform: 'translateY(100%) scale(0.92)',
+        transition: { transform: { duration: 0.55, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.55, ease: [0.7, 0, 1, 1] } },
+      }}
+      transition={{ duration: 0.45, ease }}
+    >
     <motion.div
       role="dialog"
       aria-modal
       aria-label={`Moj ${d.month}`}
-      className="fixed inset-0 z-[120] touch-none select-none overflow-hidden bg-black"
-      style={{ y, scale, borderRadius: radius, transformOrigin: '50% 100%' }}
-      initial={{ opacity: 0, y: 60, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      // zatvaranje: spusti se, smanji i zaobli, pa nestane
-      exit={{ opacity: 0, y: 260, scale: 0.88, transition: { duration: 0.42, ease: [0.5, 0, 0.9, 0.4] } }}
-      transition={{ duration: 0.45, ease }}
+      className="absolute inset-0 touch-none select-none overflow-hidden bg-black"
+      // prst: pregled ga prati (pomak i veličina — samo transform); uglovi se zaoble
+      // odjednom (jedno iscrtavanje), ne kroz tranziciju koja bi crtala u svakom kadru
+      style={{ y, scale, transformOrigin: '50% 100%', borderRadius: rounded ? 34 : 0 }}
       onPointerDown={(e) => {
         down.current = e.clientY
         downAt.current = performance.now()
@@ -1135,6 +1155,7 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
         const dy = e.clientY - down.current
         if (dy > 10) {
           swiped.current = true
+          setRounded(true)
           y.set(dy * 0.9)
         }
       }}
@@ -1143,18 +1164,20 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
         const y0 = down.current
         down.current = null
         if (y0 == null) return
-        // povučeno dolje — zatvori (dodir koji slijedi se ne broji), inače se vrati
-        if (e.clientY - y0 > 90) {
+        // povučeno dolje (ili kratko, brzo potegnuto) — zatvori; dodir koji slijedi se ne broji; inače se vrati
+        const dy = e.clientY - y0
+        if (dy > 90 || (dy > 36 && performance.now() - downAt.current < 260)) {
           haptic(6)
+          setRounded(true)
           onClose()
         } else if (y.get() > 0) {
-          animate(y, 0, { type: 'spring', stiffness: 420, damping: 36 })
+          animate(y, 0, { type: 'spring', stiffness: 420, damping: 36, onComplete: () => setRounded(false) })
         } else swiped.current = false
       }}
       onPointerCancel={() => {
         setHeld(false)
         down.current = null
-        animate(y, 0, { type: 'spring', stiffness: 420, damping: 36 })
+        animate(y, 0, { type: 'spring', stiffness: 420, damping: 36, onComplete: () => setRounded(false) })
       }}
       onClick={(e) => {
         if (swiped.current) return (swiped.current = false)
@@ -1184,7 +1207,7 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
             className="mx-auto flex h-full max-w-[440px] flex-col items-center justify-center px-7"
             // gore: okvir (traka i naslov); dolje: ikonice kartica (osim na sažetku —
             // tamo su redovi) i logotipi
-            style={{ paddingTop: `calc(${topPad} + ${slides[k].key === 'intro' ? 30 : 136}px)`, paddingBottom: `calc(max(22px, env(safe-area-inset-bottom)) + ${slides[k].key === 'intro' ? 84 : slides[k].key === 'summary' || nav.length < 2 ? 58 : 144}px)` }}
+            style={{ paddingTop: `calc(${topPad} + ${slides[k].key === 'intro' ? 30 : 136}px)`, paddingBottom: `calc(max(22px, env(safe-area-inset-bottom)) + ${big ? 84 : slides[k].key === 'summary' || nav.length < 2 ? 58 : 144}px)` }}
           >
             {slides[k].body}
           </div>
@@ -1241,11 +1264,12 @@ export default function MonthRecap({ verses, date, onClose }: { verses: Verse[];
             })}
           </div>
         )}
-        {/* na početnoj kartici logotipi su veći (lagano narastu) */}
-        <div style={{ transform: slides[k].key === 'intro' ? 'scale(1.7)' : 'scale(1)', transformOrigin: '50% 100%', transition: 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)' }}>
+        {/* na početnoj kartici i na "Tek je početak" logotipi su veći (lagano narastu) */}
+        <div style={{ transform: big ? 'scale(1.7)' : 'scale(1)', transformOrigin: '50% 100%', transition: 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)' }}>
           <BrandLockup height={26} delay={0.15} />
         </div>
       </div>
+    </motion.div>
     </motion.div>
   )
 }

@@ -279,6 +279,8 @@ export function seedMonth(list: { id: string; song: string }[], ym: string, upto
   all[ym] = { plays: Object.values(songs).reduce((a, b) => a + b, 0), shared: 3 + rnd(6), songs }
   write(MONTH, all)
   window.dispatchEvent(new Event('favchange'))
+  // izvlačenje (lib/draw.ts) drži dane u memoriji — neka ih pročita iznova, da ih ne pregazi
+  window.dispatchEvent(new StorageEvent('storage', { key: 'stihdana:draw' }))
 }
 
 /** Izbaci sačuvane id-eve kojih više nema (obrisan stih, stari test). */

@@ -5,7 +5,9 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { BRAND } from '@/lib/brand'
 import { SEND_TIME, getActiveDate, monthBs, shownDay } from '@/lib/date'
-import { CalendarIcon, openRecap, recapDate } from './RecapHost'
+import { openRecap, recapDate } from './RecapHost'
+import { seedMonth } from '@/lib/storage'
+import { loadVerses } from '@/lib/verses-client'
 import { unsubscribeFromPush } from '@/lib/push-client'
 import { haptic } from '@/lib/haptic'
 import { useNotify, type NotifyState } from './Notify'
@@ -146,8 +148,9 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
                   />
                 </Section>
 
+                {/* PRIVREMENO — za probu pregleda (i na produkciji); poslije se briše */}
                 <Section title="Tvoj mjesec">
-                  <Recap onClose={onClose} />
+                  <SeedRecap onClose={onClose} />
                 </Section>
 
                 {/* visoko, da se QR vidi čim se otvori */}
@@ -258,20 +261,42 @@ function Row({
   )
 }
 
-/** Pregled mjeseca — do 7. prošli mjesec, poslije tekući. Postavke se sklone pa se otvori. */
-function Recap({ onClose }: { onClose: () => void }) {
-  const date = recapDate(shownDay(getActiveDate()))
+/**
+ * PRIVREMENO (za probu, poslije se briše): mjesec pregleda se popuni
+ * nasumičnim podacima iz pravih stihova — izvučeni dani, sačuvani, puštene
+ * pjesme, podijeljeni — pa se pregled otvori. Podaci ostaju samo na ovom telefonu.
+ */
+function SeedRecap({ onClose }: { onClose: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const today = shownDay(getActiveDate())
+  const date = recapDate(today)
   return (
     <Row
-      tile={<CalendarIcon />}
-      title={`Tvoj ${monthBs(date)}`}
-      sub="Pjesme, stihovi, niz"
+      tile={
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
+        </svg>
+      }
+      title={`Popuni ${monthBs(date)}`}
+      sub="Probni podaci — privremeno"
       right={<Chevron />}
-      label="Pregled mjeseca"
-      onClick={() => {
-        haptic(5)
-        onClose()
-        window.setTimeout(() => openRecap(date), 260)
+      label="Popuni mjesec probnim podacima"
+      onClick={async () => {
+        if (busy) return
+        setBusy(true)
+        haptic(6)
+        try {
+          const list = await loadVerses()
+          // prvih dana u mjesecu — cio prošli mjesec, inače ovaj do jučer
+          const day = Number(today.slice(8, 10))
+          if (day <= 7) seedMonth(list, date.slice(0, 7), Number(date.slice(8, 10)))
+          else seedMonth(list, today.slice(0, 7), day - 1)
+          toast({ id: 'seed', title: 'Mjesec popunjen', color: TOAST_OK, icon: <Icon.ok /> })
+          onClose()
+          window.setTimeout(() => openRecap(date), 300)
+        } finally {
+          setBusy(false)
+        }
       }}
     />
   )
