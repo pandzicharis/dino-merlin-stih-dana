@@ -10,7 +10,8 @@ import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { DeckContext } from './context'
 import { LiveDesktop, LivePhone } from './Stages'
 import { DemoToggle, OsToggle, PhonesToggle } from './ui'
-import { PaperToPhone } from './PaperToPhone'
+import { PaperToPhone, rng } from './PaperToPhone'
+import { isFirstVerse } from '@/lib/text'
 import { SLIDES, cleanSlate } from './slides'
 import { deviceOuter, type DeviceKind } from './Devices'
 import type { DeckApi, DeckData, FeatureDef, Section, Simulation, SlideDef } from './types'
@@ -329,6 +330,8 @@ export function Deck({ data }: { data: DeckData }) {
   // stih; svaki papirić koji uleti (PaperToPhone) donese sljedeći.
   // /pregled javi kad je spreman, pa redoslijed učitavanja nije bitan.
   const preview = slide.preview
+  // prije papirića telefon pokaže "Mir svim dobrim ljudima" (ako je u katalogu)
+  const first = useMemo(() => data.verses.find((v) => isFirstVerse(v.text)), [data.verses])
   const landed = useRef<Verse | null>(null)
   const sendPreview = useCallback(() => {
     if (!landed.current) return
@@ -340,9 +343,9 @@ export function Deck({ data }: { data: DeckData }) {
 
   useEffect(() => {
     if (!preview) return
-    // telefon odmah pokazuje stih sa slajda; papirići ga zatim mijenjaju —
+    // telefon odmah pokazuje prvi stih; papirići ga zatim mijenjaju —
     // a jednom promijenjen se više ne vraća na prvi (bez skoka unazad)
-    landed.current ??= preview
+    landed.current ??= first ?? preview
     if (where(phoneRef.current) === '/pregled') sendPreview()
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== phoneRef.current?.contentWindow) return
@@ -350,7 +353,7 @@ export function Deck({ data }: { data: DeckData }) {
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [preview, sendPreview])
+  }, [preview, first, sendPreview])
 
   const onLand = useCallback(
     (v: Verse) => {
@@ -359,11 +362,19 @@ export function Deck({ data }: { data: DeckData }) {
     },
     [sendPreview],
   )
-  // stih sa slajda je već na telefonu — papirići nose ostale, on dolazi zadnji
-  const paperVerses = useMemo(
-    () => (preview ? [...data.verses.filter((v) => v.id !== preview.id), preview] : []),
-    [preview, data.verses],
-  )
+  // prvi papirić nosi stih sa slajda, ostali su izmiješani — svaki put drugačije
+  const [mix] = useState(() => Math.floor(Math.random() * 2 ** 31))
+  const paperVerses = useMemo(() => {
+    if (!preview) return []
+    const rest = data.verses.filter((v) => v.id !== preview.id && v.id !== first?.id)
+    const r = rng(mix)
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1))
+      ;[rest[i], rest[j]] = [rest[j], rest[i]]
+    }
+    // bez "Mir svim…" stih sa slajda je već na telefonu — ne ponavlja se
+    return first ? [preview, ...rest] : rest
+  }, [preview, first, data.verses, mix])
 
   // Strelice rade i kad je fokus u aplikaciji: okvir je na istoj adresi, pa
   // mu se tastatura može slušati direktno.

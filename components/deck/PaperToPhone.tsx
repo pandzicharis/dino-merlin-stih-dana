@@ -152,7 +152,8 @@ export function PaperToPhone({
       {slots.map((s, k) => {
         const flying = flight?.idx === k
         const lifted = lift === k && !flying
-        const verse = verses[(batch * slots.length + k) % verses.length]
+        // vrh gomile (zadnji nacrtan) nosi prvi stih — on prvi i odleti
+        const verse = verses[(batch * slots.length + slots.length - 1 - k) % verses.length]
         const isGone = gone.has(k)
         return (
           <motion.div
