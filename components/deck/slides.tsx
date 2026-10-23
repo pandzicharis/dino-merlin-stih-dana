@@ -1265,10 +1265,23 @@ function Dizajn() {
     const text = (await find('textarea[name="text"]')) as HTMLTextAreaElement | null
     if (!text || !alive()) return
     // tačno tri reda — bez kucanja, korak je o dizajnu
+    const win = text.ownerDocument.defaultView as Window & typeof globalThis
     if (text.value !== VOLIM_TE) {
-      const win = text.ownerDocument.defaultView as Window & typeof globalThis
       Object.getOwnPropertyDescriptor(win.HTMLTextAreaElement.prototype, 'value')!.set!.call(text, VOLIM_TE)
       text.dispatchEvent(new win.Event('input', { bubbles: true }))
+    }
+    // i pjesma s albumom — ako stiha nema na listi, otvoren je neki drugi
+    const song = text.ownerDocument.querySelector<HTMLInputElement>('input[name="song"]')
+    if (song && song.value !== 'U kandžama jastreba') {
+      await wait(50)
+      Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value')!.set!.call(song, 'U kandžama jastreba')
+      song.dispatchEvent(new win.Event('input', { bubbles: true }))
+    }
+    const album = text.ownerDocument.querySelector<HTMLSelectElement>('select[name="album"]')
+    if (album && album.value !== 'Kokuzna vremena') {
+      await wait(50)
+      Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, 'value')!.set!.call(album, 'Kokuzna vremena')
+      album.dispatchEvent(new win.Event('change', { bubbles: true }))
     }
     await find('[data-edit-line="2"]')
     await wait(700)
