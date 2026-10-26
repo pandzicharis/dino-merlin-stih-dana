@@ -611,7 +611,9 @@ function CardFaceView({
                   {...tapProps(() => (onCollapse ? onCollapse() : onOpen?.(verse)))}
                   aria-label={onCollapse ? 'Skupi' : 'Raširi'}
                   title={onCollapse ? 'Skupi' : 'Raširi'}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80 transition-transform active:scale-90"
+                  // bez pritiska (scale): karta se širi/skuplja odmah na dodir — kopija i karta
+                  // ispod se pretapaju, pa bi dugme usred pritiska na tren bilo dvostruko
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80"
                 >
                   {/* strelice se okrenu dok karta raste i skuplja se (SavedFull `data-flip`) */}
                   <ExpandMorph layer={layer} />

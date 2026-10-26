@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { oneLine, asWritten } from '@/lib/text'
+import { oneLine, asWritten, paperText } from '@/lib/text'
 import {
   SHARE_FORMATS,
   canvasToBlob,
@@ -324,7 +324,8 @@ export default function SharePanel({
                     className="mt-2 max-w-[15rem] truncate text-[15px] text-[#1a1614]"
                     style={{ fontFamily: 'var(--font-serif), serif' }}
                   >
-                    {oneLine(asWritten(verse.text))}
+                    {/* kao na papiriću: malim slovima, prvo veliko (i imena) */}
+                    {paperText(verse.text)}
                   </p>
                   <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#8C7449' }}>
                     {verse.song}
