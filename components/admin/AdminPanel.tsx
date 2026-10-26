@@ -14,6 +14,7 @@ import { DevicePreview, DeviceSwitch, phoneWidth, useWarmPreview, type Device } 
 import { PrintSlips } from './PrintSlips'
 import { VerseDesigner } from './VerseDesigner'
 import { SongEdit, SongPicker, SongPlayer, type KnownSong } from './SongPicker'
+import { LyricsBadge, LyricsRow } from './LyricsPreview'
 import { audioFile } from '@/lib/audio-name'
 import { DrawerIcon } from '../DrawerIcon'
 import { Icon, TOAST_BAD, TOAST_OK, toast } from '../Toast'
@@ -26,7 +27,12 @@ type Snapshot = {
 }
 type Draft = { text: string; song: string; album: string; description: string; year: string; mood: Mood; youtube: string; font: string }
 /** pjesma stiha u aplikaciji (/api/admin/audio) */
-type SongInfo = { state: 'ready' | 'loading' | 'missing' | 'error'; error?: string }
+type SongInfo = {
+  state: 'ready' | 'loading' | 'missing' | 'error'
+  error?: string
+  /** tekst pjesme (data/lyrics.json): prati pjesmu, običan, nije spremljen, preuzima se */
+  lyrics?: 'synced' | 'plain' | 'missing' | 'loading'
+}
 type SongsSnapshot = { mode: 'local' | 'github' | 'off'; job: string | null; songs: Record<string, SongInfo> }
 type Op =
   | { op: 'add'; verse: Draft }
@@ -146,6 +152,8 @@ export function AdminPanel() {
       }
       right={
         <div className="flex items-center gap-2">
+        {/* sve iz baze: pjesme i tekstovi koji fale */}
+        <SyncButton disabled={!data} flash={flash} onDone={songs.reload} />
         {/* papirići za pult — A4 za štampu na papir u boji */}
         <button
           type="button"
@@ -237,6 +245,7 @@ export function AdminPanel() {
                 verses={data.verses}
                 songOf={songs.of}
                 fetchSong={songs.fetch}
+                fetchLyrics={songs.fetchLyrics}
                 songsMode={songs.mode}
                 onSongSaved={(snap, note) => {
                   setData(snap)
@@ -340,6 +349,8 @@ type Songs = {
   mode: SongsSnapshot['mode'] | null
   of: (song: string) => SongInfo | null
   fetch: (song: string, youtube?: string) => void
+  /** preuzmi tekst pjesme sada */
+  fetchLyrics: (song: string) => void
   reload: () => void
 }
 
@@ -352,6 +363,8 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
   const [snap, setSnap] = useState<SongsSnapshot | null>(null)
   // poslano maloprije: GitHubu treba par sekundi da uopšte prijavi posao
   const [pending, setPending] = useState<Record<string, number>>({})
+  // i tekstovi (lokalno par sekundi, na produkciji dok GitHub ne objavi)
+  const [pendingLyrics, setPendingLyrics] = useState<Record<string, number>>({})
   const load = useCallback(async () => {
     const r = await fetch('/api/admin/audio', { cache: 'no-store' }).catch(() => null)
     if (r?.ok) setSnap((await r.json()) as SongsSnapshot)
@@ -366,19 +379,25 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
     (song: string): SongInfo | null => {
       const k = audioSlug(song)
       const s = snap?.songs[k] ?? null
-      if (s?.state === 'ready') return s
-      if (pending[k] && Date.now() - pending[k] < 90_000) return { state: 'loading' }
-      return s
+      const lyrics = pendingLyrics[k] && Date.now() - pendingLyrics[k] < 90_000 && s?.lyrics === 'missing' ? 'loading' : s?.lyrics
+      if (s?.state === 'ready') return { ...s, lyrics }
+      if (pending[k] && Date.now() - pending[k] < 90_000) return { state: 'loading', lyrics }
+      return s && { ...s, lyrics }
     },
-    [snap, pending],
+    [snap, pending, pendingLyrics],
   )
 
   // dok se nešto sprema, pitaj ponovo (lokalno brzo, GitHub sporije)
-  const busy = Boolean(snap) && (Object.values(snap!.songs).some((s) => s.state === 'loading') || Object.keys(pending).length > 0)
+  const busy =
+    Boolean(snap) &&
+    (Object.values(snap!.songs).some((s) => s.state === 'loading' || s.lyrics === 'loading') ||
+      Object.keys(pending).length > 0 ||
+      Object.keys(pendingLyrics).length > 0)
   useEffect(() => {
     if (!live || !busy) return
     const t = setTimeout(() => {
       setPending((p) => Object.fromEntries(Object.entries(p).filter(([k, at]) => Date.now() - at < 90_000 && snap?.songs[k]?.state !== 'ready')))
+      setPendingLyrics((p) => Object.fromEntries(Object.entries(p).filter(([k, at]) => Date.now() - at < 90_000 && snap?.songs[k]?.lyrics === 'missing')))
       void load()
     }, snap?.mode === 'local' ? 2000 : 7000)
     return () => clearTimeout(t)
@@ -403,7 +422,122 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
     [live, load, flash],
   )
 
-  return { mode: snap?.mode ?? null, of, fetch: fetchSong, reload: () => void load() }
+  const fetchLyrics = useCallback(
+    async (song: string) => {
+      if (!live || !song.trim()) return
+      const k = audioSlug(song)
+      setPendingLyrics((p) => ({ ...p, [k]: Date.now() }))
+      const r = await fetch('/api/admin/lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ song }),
+      }).catch(() => null)
+      if (!r?.ok) {
+        setPendingLyrics(({ [k]: _drop, ...p }) => (void _drop, p))
+        flash(((await r?.json().catch(() => null)) as { error?: string } | null)?.error ?? 'Tekst se nije mogao pokrenuti', true)
+      }
+      void load()
+    },
+    [live, load, flash],
+  )
+
+  return { mode: snap?.mode ?? null, of, fetch: fetchSong, fetchLyrics, reload: () => void load() }
+}
+
+type SyncSnap = {
+  mode: 'local' | 'github' | 'off'
+  songs: number
+  audio: number
+  lyrics: number
+  synced: number
+  running: boolean
+  done: number
+  total: number
+  current: string | null
+  failed: string[]
+}
+
+/**
+ * Sinhronizuj: svaka pjesma iz baze dobije zvuk i tekst (lib/catalog-sync.ts).
+ * Lokalno se vidi napredak (3/25); na produkciji posao preuzme GitHub.
+ * Zlatna tačka: nekoj pjesmi fali zvuk ili tekst.
+ */
+function SyncButton({ disabled, flash, onDone }: { disabled: boolean; flash: (t: string, bad?: boolean) => void; onDone: () => void }) {
+  const [s, setS] = useState<SyncSnap | null>(null)
+  // svako povećanje = stanje iznova sa servera
+  const [ask, setAsk] = useState(0)
+  useEffect(() => {
+    if (disabled) return
+    let on = true
+    fetch('/api/admin/sync', { cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<SyncSnap>) : null))
+      .then((b) => on && b && setS(b))
+      .catch(() => {})
+    return () => {
+      on = false
+    }
+  }, [disabled, ask])
+  // dok radi — napredak svake sekunde i po; na kraju poruka (onDone je nov u svakom crtanju — preko refa)
+  const was = useRef(false)
+  const done = useRef(onDone)
+  useEffect(() => {
+    done.current = onDone
+  })
+  useEffect(() => {
+    if (!s) return
+    if (s.running) {
+      was.current = true
+      const t = setTimeout(() => setAsk((n) => n + 1), 1500)
+      return () => clearTimeout(t)
+    }
+    if (!was.current) return
+    was.current = false
+    flash(s.failed.length ? `Sinhronizovano · fali ${s.failed.length}` : 'Sve sinhronizovano', s.failed.length > 0)
+    done.current()
+  }, [s, flash])
+
+  const running = Boolean(s?.running)
+  const missing = s ? Math.max(s.songs - s.audio, s.songs - s.lyrics) : 0
+  const start = async () => {
+    if (running) return
+    if (inDeck()) return flash('U prezentaciji se pjesme ne mijenjaju.')
+    const r = await fetch('/api/admin/sync', { method: 'POST' }).catch(() => null)
+    const body = (await r?.json().catch(() => null)) as { state?: string; error?: string } | null
+    if (!r?.ok) return flash(body?.error ?? 'Sinhronizacija nije pokrenuta', true)
+    if (body?.state === 'github') flash('Pokrenuto — stiže za par minuta')
+    setAsk((n) => n + 1)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={start}
+      disabled={disabled || s?.mode === 'off'}
+      aria-busy={running}
+      title={s ? `Pjesme ${s.audio}/${s.songs} · tekstovi ${s.lyrics}/${s.songs}` : undefined}
+      data-sync
+      className="relative flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white disabled:opacity-40"
+      style={running ? { color: BRAND.gold, borderColor: `${BRAND.gold}55` } : undefined}
+    >
+      <motion.svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        animate={{ rotate: running ? 360 : 0 }}
+        transition={running ? { duration: 1, repeat: Infinity, ease: 'linear' } : { duration: 0.3 }}
+        aria-hidden
+      >
+        <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+      </motion.svg>
+      <span className="tabular">{running ? `${s!.done}/${s!.total}` : 'Sinhronizuj'}</span>
+      {!running && missing > 0 && <i className="absolute right-1.5 top-1.5 block h-1.5 w-1.5 rounded-full" style={{ background: BRAND.gold }} aria-label={`Fali ${missing}`} />}
+    </button>
+  )
 }
 
 /** Desno u boxu stiha: pjesma se preuzima, ili nije preuzeta (natpis + ponovi). */
@@ -709,6 +843,8 @@ function Library({
                 <p className="mt-1 flex min-w-0 items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
                   <span className="shrink-0" style={{ color: BRAND.gold }}>{v.song}</span>
                   {songs.of(v.song)?.state === 'ready' && <SongBadge info={songs.of(v.song)} mode={songs.mode} onFetch={() => {}} />}
+                  {/* tekst: spremljen (prati pjesmu / bez vremena), preuzima se, ili nije */}
+                  {songs.of(v.song)?.state === 'ready' && <LyricsBadge info={songs.of(v.song)} />}
                   <span className="truncate">
                   <span className="text-white/30">
                     {albumLine(v)}
@@ -1017,6 +1153,7 @@ function Editor({
   verses,
   songOf,
   fetchSong,
+  fetchLyrics,
   songsMode,
   onSongSaved,
   busy,
@@ -1029,6 +1166,8 @@ function Editor({
   songOf: Songs['of']
   /** preuzmi pjesmu sada (ponovni pokušaj iz forme) */
   fetchSong: Songs['fetch']
+  /** preuzmi tekst pjesme sada */
+  fetchLyrics: Songs['fetchLyrics']
   songsMode: Songs['mode']
   /** pjesma preimenovana (lista pjesama → olovka) — nova lista stihova */
   onSongSaved: (snap: Snapshot, note: string | null) => void
@@ -1126,6 +1265,16 @@ function Editor({
       ...(known && !d.youtube.trim() ? { youtube: known.youtube! } : {}),
       ...(known && !d.album ? { album: known.album, description: known.description ?? d.description, year: String(known.year) } : {}),
     }, 'song')
+  }
+  // link nove pjesme stigne sa dinomerlin.com poslije izbora — samo ako je pjesma
+  // i dalje ta, a polje prazno
+  const latest = useRef(d)
+  useEffect(() => {
+    latest.current = d
+  })
+  const setLink = (song: string, youtube: string) => {
+    const cur = latest.current
+    if (audioSlug(cur.song) === audioSlug(song) && !cur.youtube.trim()) setD({ ...cur, youtube }, 'song')
   }
   const song = d.song.trim() ? songOf(d.song) : null
   // uredi pjesmu iz liste: naziv i ime fajla
@@ -1265,7 +1414,18 @@ function Editor({
               ready={(s) => songOf(s)?.state === 'ready'}
               onType={setSong}
               // izbor s liste: link, album i godina te pjesme
-              onPick={(s) => setD({ ...d, song: s.song, youtube: s.youtube ?? d.youtube, album: s.album, description: s.description ?? '', year: String(s.year) })}
+              onPick={(s) =>
+                setD({
+                  ...d,
+                  song: s.song,
+                  // nova pjesma bez linka: link prethodne pjesme ne ostaje (stiže sa sajta — onLink)
+                  youtube: s.youtube ?? (audioSlug(s.song) === audioSlug(d.song) ? d.youtube : ''),
+                  album: s.album,
+                  description: s.description ?? '',
+                  year: s.year ? String(s.year) : d.year,
+                })
+              }
+              onLink={setLink}
               onEdit={setEditSong}
               className={field}
             />
@@ -1357,6 +1517,28 @@ function Editor({
                 )}
               </p>
             )
+          )}
+          {/* tekst pjesme — pregled kad je spremljen, inače napomena i preuzimanje, kao za pjesmu */}
+          {d.song.trim() && youtubeId(d.youtube) && (
+            <LyricsRow
+              key={`tekst-${audioSlug(d.song)}`}
+              song={d.song}
+              info={song}
+              canFetch={songsMode !== 'off'}
+              onFetch={() => fetchLyrics(d.song)}
+              onOffset={async (offset) => {
+                if (inDeck()) return 'U prezentaciji se tekst ne mijenja.'
+                const r = await fetch('/api/admin/lyrics', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ song: d.song, offset }),
+                }).catch(() => null)
+                const body = (await r?.json().catch(() => null)) as { error?: string; note?: string } | null
+                if (!r?.ok) return body?.error ?? 'Pomak nije sačuvan.'
+                if (body?.note) toast({ id: 'admin', title: body.note, color: TOAST_OK, icon: <Icon.ok /> }, 3200)
+                return null
+              }}
+            />
           )}
         </div>
 

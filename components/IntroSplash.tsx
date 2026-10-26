@@ -1601,7 +1601,7 @@ function VerseLines({ text, font }: { text: string; font?: string }) {
 }
 
 /** Stih na papiriću — uvijek osnovni font (fontovi stiha su samo na ekranu). */
-function PaperVerse({ text, font }: { text: string; font?: string }) {
+export function PaperVerse({ text, font }: { text: string; font?: string }) {
   const map = parseFont(font)
   let n = 0
   return (

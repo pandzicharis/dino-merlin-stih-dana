@@ -3,8 +3,7 @@ import { notFound } from 'next/navigation'
 import { findVerse, getCatalog } from '@/lib/catalog'
 import { oneLine, asWritten } from '@/lib/text'
 import { verseDayInTz } from '@/lib/date'
-import { VerseScreen } from '@/components/VerseScreen'
-import { BackLink } from '@/components/BackLink'
+import { GiftVerse } from '@/components/GiftArrival'
 import { OG_BASE } from '@/lib/og'
 
 /** Trajni link na jedan stih — meta za WhatsApp/IG preview. */
@@ -42,10 +41,5 @@ export default async function StihPage({ params }: { params: Promise<{ id: strin
   const verse = await findVerse(id)
   if (!verse) notFound()
 
-  return (
-    <>
-      <BackLink />
-      <VerseScreen verse={verse} date={verseDayInTz()} />
-    </>
-  )
+  return <GiftVerse verse={verse} date={verseDayInTz()} />
 }

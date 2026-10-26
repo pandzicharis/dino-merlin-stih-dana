@@ -1,20 +1,62 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { albumOf } from '@/data/albums'
+import { albumOf, thumbOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { audioSlug, albumLine } from '@/lib/text'
 import { audioFile } from '@/lib/audio-name'
+import type { SitePick } from '@/lib/dino-site'
 
-export type KnownSong = { song: string; album: string; description?: string; year: number; youtube?: string }
+export type KnownSong = {
+  song: string
+  album: string
+  description?: string
+  /** 0 = nepoznata (nova pjesma sa sajta bez albuma s liste) */
+  year: number
+  youtube?: string
+  /** stranica pjesme na dinomerlin.com — po njoj stigne YouTube link nove pjesme */
+  page?: string
+}
 
 const NOTE = 'M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z'
 
+/* lista s dinomerlin.com — jednom po otvaranju admina */
+let siteList: Promise<SitePick[] | null> | null = null
+const loadSite = () =>
+  (siteList ??= fetch('/api/admin/songs', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((b: { songs?: SitePick[] } | null) => b?.songs ?? null)
+    .catch(() => null)
+    .then((v) => {
+      if (!v) siteList = null
+      return v
+    }))
+
+/** Pjesme s dinomerlin.com/tekstovi-pjesama; null dok ne stignu (ili ako sajt ne odgovori). */
+function useSiteSongs(): SitePick[] | null {
+  const [list, setList] = useState<SitePick[] | null>(null)
+  useEffect(() => {
+    let on = true
+    void loadSite().then((v) => on && setList(v))
+    return () => {
+      on = false
+    }
+  }, [])
+  return list
+}
+
+type Item = KnownSong & { known: boolean; title?: string; siteAlbum?: string }
+
+/** za pretragu: bez kvačica i velikih slova, Ð (islandsko) kao Đ */
+const norm = (s: string) => audioSlug(s.replace(/[ðÐ]/g, 'đ'))
+
 /**
- * Pjesma stiha: kucaš, a ispod je lista pjesama koje već imaju stih (s
- * omotom i albumom) — izbor popuni link, album i godinu. Pjesma koje nema
- * ostaje upisana kao nova i preuzme se kad se stih sačuva.
+ * Pjesma stiha: bira se s liste pjesama sa dinomerlin.com (pretraga po
+ * nazivu i albumu). Pjesma koja već ima stih nosi svoj link, album i
+ * godinu (i ♪ ako je u aplikaciji); nova dobije album sa sajta, a YouTube
+ * link sa stranice pjesme — po njemu se preuzme kad se stih sačuva.
+ * Dok lista ne stigne (ili ako sajt ne odgovori), naziv se upisuje kao prije.
  */
 export function SongPicker({
   value,
@@ -22,58 +64,129 @@ export function SongPicker({
   ready,
   onType,
   onPick,
+  onLink,
   onEdit,
   className,
 }: {
   value: string
+  /** pjesme iz kataloga (već imaju stih) */
   songs: KnownSong[]
   /** je li pjesma već u aplikaciji (♪) */
   ready: (song: string) => boolean
   onType: (song: string) => void
   onPick: (s: KnownSong) => void
+  /** YouTube link nove pjesme — stigne sa sajta malo poslije izbora */
+  onLink?: (song: string, youtube: string) => void
   /** olovka uz pjesmu — uredi njen naziv i ime fajla */
   onEdit?: (s: KnownSong) => void
   className: string
 }) {
+  const site = useSiteSongs()
+  // bez liste sa sajta: slobodan upis (kao prije)
+  const free = !site
   const [open, setOpen] = useState(false)
+  // pretraga — naziv stiha se mijenja tek izborom s liste
+  const [query, setQuery] = useState<string | null>(null)
   const [active, setActive] = useState(0)
   const box = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const listId = useId()
+
+  const close = () => {
+    setOpen(false)
+    setQuery(null)
+  }
 
   // zatvori na klik van liste (ne na blur — prezentacija kuca pa skloni fokus)
   useEffect(() => {
     if (!open) return
     const off = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false)
+      if (!box.current?.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery(null)
+      }
     }
     document.addEventListener('pointerdown', off)
     return () => document.removeEventListener('pointerdown', off)
   }, [open])
 
-  const q = audioSlug(value)
-  const exact = songs.find((s) => audioSlug(s.song) === q)
-  // izabrana pjesma — cijela lista, da se lako promijeni; inače po onome što je otkucano
-  const list = (exact || !q ? [...songs] : songs.filter((s) => audioSlug(`${s.song} ${s.album}`).includes(q))).sort(
-    (a, b) => Number(audioSlug(b.song).startsWith(q)) - Number(audioSlug(a.song).startsWith(q)) || a.song.localeCompare(b.song, 'bs'),
+  // katalog + sajt: pjesma s oba mjesta je jedna (podaci iz kataloga), pa ostale sa sajta,
+  // pa pjesme iz kataloga kojih na sajtu nema
+  const all = useMemo<Item[]>(() => {
+    const own = new Map(songs.map((s) => [audioSlug(s.song), s]))
+    if (!site) return songs.map((s) => ({ ...s, known: true }))
+    const listed = new Set<string>()
+    const out: Item[] = site.map((p) => {
+      const k = audioSlug(p.song)
+      listed.add(k)
+      const o = own.get(k)
+      return o ? { ...o, page: p.page, title: p.title, known: true } : { song: p.song, album: p.album, year: p.year ?? 0, page: p.page, title: p.title, known: false, siteAlbum: p.siteAlbum }
+    })
+    return [...out, ...songs.filter((s) => !listed.has(audioSlug(s.song))).map((s) => ({ ...s, known: true }))]
+  }, [songs, site])
+
+  const q = norm(query ?? (free ? value : ''))
+  const exact = free && value.trim() ? all.find((s) => audioSlug(s.song) === audioSlug(value)) : undefined
+  const chosen = audioSlug(value)
+  // izabrana pjesma (ili prazna pretraga) — cijela lista, da se lako promijeni; inače po onome što je otkucano
+  // i po nazivu sa sajta ("Đula", "Bosnom (svuda)…") kad pjesma u katalogu ima svoj
+  const list = (exact || !q ? [...all] : all.filter((s) => norm(`${s.song} ${s.title ?? ''} ${s.album}`).includes(q))).sort(
+    (a, b) => Number(norm(b.song).startsWith(q)) - Number(norm(a.song).startsWith(q)) || a.song.localeCompare(b.song, 'bs'),
   )
-  const pick = (s: KnownSong) => {
+
+  // poslije izbora fokus ostaje, a naziv je označen — sljedeće kucanje traži iznova, ne dopisuje
+  const [picked, setPicked] = useState(0)
+  useLayoutEffect(() => {
+    if (picked && document.activeElement === input.current) input.current?.select()
+  }, [picked])
+
+  // otvorena lista: izabrana pjesma u vidu
+  useEffect(() => {
+    if (open) listRef.current?.querySelector('[data-chosen]')?.scrollIntoView({ block: 'nearest' })
+  }, [open])
+
+  const pick = (s: Item) => {
     onPick(s)
-    setOpen(false)
+    close()
+    if (!free) setPicked((n) => n + 1)
+    // nova pjesma: link sa njene stranice na sajtu
+    if (!s.youtube && s.page && onLink) {
+      fetch(`/api/admin/songs?page=${encodeURIComponent(s.page)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((b: { youtube?: string | null } | null) => b?.youtube && onLink(s.song, `https://www.youtube.com/watch?v=${b.youtube}`))
+        .catch(() => {})
+    }
   }
 
   return (
     <div ref={box} className="relative mt-2">
       <input
+        ref={input}
         name="song"
-        value={value}
+        value={free ? value : (query ?? value)}
         onChange={(e) => {
-          onType(e.target.value)
+          if (free) onType(e.target.value)
+          else setQuery(e.target.value)
           setOpen(true)
           setActive(0)
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={(e) => {
+          setOpen(true)
+          if (free) return
+          // kucanje odmah traži — izabrana pjesma ostaje dok se ne izabere druga
+          e.currentTarget.select()
+          setActive(Math.max(0, list.findIndex((s) => audioSlug(s.song) === chosen)))
+        }}
+        onClick={(e) => {
+          // već u fokusu (poslije izbora) — dodir opet otvori listu
+          if (open || free) return
+          setOpen(true)
+          e.currentTarget.select()
+          setActive(Math.max(0, list.findIndex((s) => audioSlug(s.song) === chosen)))
+        }}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') setOpen(false)
+          if (e.key === 'Escape') close()
           else if (e.key === 'ArrowDown') {
             e.preventDefault()
             setOpen(true)
@@ -83,26 +196,28 @@ export function SongPicker({
             setActive((a) => Math.max(a - 1, 0))
           } else if (e.key === 'Enter' && open) {
             e.preventDefault()
-            // s liste ako ima pogodaka, inače ostaje upisana nova pjesma
+            // s liste ako ima pogodaka, inače (slobodan upis) ostaje upisana nova pjesma
             if (list[active] && !exact) pick(list[active])
-            else setOpen(false)
+            else close()
           }
         }}
         required
-        placeholder="Izaberi ili upiši pjesmu"
+        placeholder={free ? 'Izaberi ili upiši pjesmu' : 'Traži pjesmu'}
         autoComplete="off"
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
         className={`${className} pr-9`}
+        data-song-input={free ? 'free' : 'site'}
       />
       <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/35" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-        <path d="m6 9 6 6 6-6" />
+        {free ? <path d="m6 9 6 6 6-6" /> : <path d="m20 20-4.2-4.2M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14z" />}
       </svg>
 
       {open && (list.length > 0 || q) && (
         <motion.div
+          ref={listRef}
           role="listbox"
           id={listId}
           initial={{ opacity: 0, y: -4 }}
@@ -110,12 +225,12 @@ export function SongPicker({
           transition={{ duration: 0.15 }}
           className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-72 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#15130f] p-1 shadow-[0_18px_50px_rgba(0,0,0,0.6)]"
         >
-          {q && !exact && (
+          {free && q && !exact && (
             // nova pjesma: klik (ili Enter) potvrdi upisani naziv i zatvori listu
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => setOpen(false)}
+              onClick={close}
               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] text-white/55 transition-colors hover:bg-white/[0.05]"
               data-song-new
             >
@@ -126,11 +241,13 @@ export function SongPicker({
               </span>
             </button>
           )}
+          {!free && q && !list.length && <p className="px-3 py-3 text-[12px] text-white/40">Nema te pjesme na dinomerlin.com</p>}
           {list.map((s, i) => {
             const cover = albumOf(s.album)?.cover
-            const on = exact ? audioSlug(s.song) === q : i === active
+            const on = exact ? s === exact : i === active
+            const isChosen = !free && audioSlug(s.song) === chosen
             return (
-              <div key={s.song} className="group flex items-center rounded-lg transition-colors" style={{ background: on ? `${BRAND.gold}1f` : 'transparent' }}>
+              <div key={s.page ?? s.song} className="group flex items-center rounded-lg transition-colors" style={{ background: on ? `${BRAND.gold}1f` : 'transparent' }} {...(isChosen ? { 'data-chosen': '' } : {})}>
               <button
                 type="button"
                 role="option"
@@ -143,14 +260,16 @@ export function SongPicker({
               >
                 {cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={cover} alt="" className="h-8 w-8 shrink-0 rounded-md object-cover" />
+                  <img src={thumbOf(cover) ?? cover} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded-md object-cover" />
                 ) : (
                   <span className="h-8 w-8 shrink-0 rounded-md bg-white/5" />
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] text-white/90">{s.song}</span>
+                  <span className="block truncate text-[13px]" style={{ color: isChosen ? BRAND.gold : 'rgba(255,255,255,0.9)' }}>
+                    {s.song}
+                  </span>
                   <span className="block truncate text-[10px] uppercase tracking-[0.12em] text-white/35">
-                    {albumLine(s)}
+                    {albumLine(s) || s.siteAlbum}
                   </span>
                 </span>
                 {ready(s.song) && (
@@ -159,12 +278,12 @@ export function SongPicker({
                   </svg>
                 )}
               </button>
-              {onEdit && (
+              {onEdit && s.known && (
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
-                    setOpen(false)
+                    close()
                     onEdit(s)
                   }}
                   title="Uredi pjesmu (naziv i fajl)"

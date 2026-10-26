@@ -27,6 +27,33 @@ html[data-sheet],
 html[data-sheet] body {
   overscroll-behavior: none;
 }
+/* plejer kao poseban ekran (components/SavedPanel.tsx): sadržaj stiha klizne
+   udesno i utihne, a plejer uđe s lijeva — kriva iOS prelaza */
+main {
+  transition: transform 0.55s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.55s ease;
+}
+html[data-page='player'] main {
+  transform: translateX(28%);
+  opacity: 0.3;
+}
+/* link poklona (components/GiftArrival.tsx): do preusmjeravanja na početnu se vidi
+   samo boja stiha — stranica stiha (i "nazad") ni trenutak */
+.gift-cover {
+  display: none;
+}
+html[data-gift] .gift-cover {
+  display: block;
+}
+html[data-gift] [data-gift-hide] {
+  visibility: hidden;
+}
+
+/* pomaknut sadržaj ne smije raširiti stranicu (telefon bi je smanjio) */
+html,
+body {
+  overflow-x: clip;
+}
+
 /* plejer u panelu ne skrola ništa — povlačenje po njemu je samo za panel */
 .os-sheet [data-player] {
   touch-action: none;

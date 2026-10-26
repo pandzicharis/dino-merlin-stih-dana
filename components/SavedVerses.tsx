@@ -20,11 +20,11 @@ export type SavedView = View
  * lista, a ispod njih zamućeni plejer. Samo na ovom uređaju.
  */
 /**
- * Visina karte u panelu: panel (96dvh) bez zaglavlja i plejera — plejer
- * malo prekrije dno karte, koja se u njega pretapa. Širinu karta i dalje
- * uzme koliko ima (SavedCarousel).
+ * Visina karte na ekranu plejera (SavedPanel): cijeli ekran bez zaglavlja i
+ * plejera — plejer malo prekrije dno karte, koja se u njega pretapa. Širinu
+ * karta i dalje uzme koliko ima (SavedCarousel).
  */
-const FIT = 'calc(96dvh - 250px - env(safe-area-inset-bottom, 0px))'
+const FIT = 'calc(100dvh - 300px - var(--sat, 0px) - env(safe-area-inset-bottom, 0px))'
 /** visina reda pjesme (omot 46 + razmak) — liste su visoke koliko pjesama ima */
 const ROW = 70
 /** najviše ovoliko redova se vidi odjednom — ostalo se skrola (pola reda viri) */
@@ -40,7 +40,8 @@ const UNDER = 80
 function paneHeight(view: SavedView, songs: number, loved: number, page: boolean): string {
   if (view === 'cards') {
     // karta: visina iz FIT, ili širina panela (do 440) ako je uža
-    return `calc(12px + min(${page ? 'min(56dvh, 560px)' : FIT}, (min(100vw, 440px) - 108px) * ${(620 / 390).toFixed(4)}))`
+    // + mjesto ispod karte: plejer (-mt-20) joj prekrije samo tamno dno
+    return `calc(76px + min(${page ? 'min(56dvh, 560px)' : FIT}, (min(100vw, 440px) - 108px) * ${(590 / 390).toFixed(4)}))`
   }
   if (view === 'albums') return `calc(${ALBUM_H} + ${44 + UNDER + 8}px)`
   const n = view === 'loved' ? loved : songs
@@ -169,6 +170,8 @@ export const SavedVerses = memo(function SavedVerses({
   if (list.length)
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        {/* karte stoje tik iznad plejera — višak visine ide iznad njih */}
+        <div className={view === 'cards' ? 'flex-1' : ''} aria-hidden />
         {/* prikazi jedan preko drugog, svaki sa svojim skrolom; vidi se samo
             izabrani (pretopi se). isolate: karte ostaju ispod plejera */}
         <div
@@ -212,6 +215,8 @@ export const SavedVerses = memo(function SavedVerses({
         </div>
         {/* plejer uz dno panela — karta se pretapa u njega (prekrije joj dno);
             uvijek isto mjesto, pa se ništa ne pomjera pri prebacivanju */}
+        {/* višak visine (ekran plejera, niži prikaz) ide ovdje — plejer ostaje uz dno */}
+        <div className={view === 'cards' ? '' : 'flex-1'} aria-hidden />
         <div className="relative z-10 -mt-20 shrink-0">
           <SavedPlayer verses={order} front={front} view={view} onView={setView} />
         </div>

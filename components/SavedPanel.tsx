@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
+import { MOODS } from '@/data/moods'
+import { albumOf, softOf } from '@/data/albums'
 import { SavedVerses, type SavedView } from './SavedVerses'
 import { closeSaved, dismissSaved, expandSaved, stopSaved, useSavedPlayerSelect } from '@/lib/player'
 import { MiniPlayer, PlayerIconPaths } from './SavedPlayer'
@@ -13,7 +15,8 @@ import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
 import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
-import { AfterOpen, SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
+import { AfterOpen, useSheetOpen } from './Sheet'
+import { Pocket } from './Pocket'
 
 /**
  * Zatvaranje: prvo samo kretnja, a sve ostalo (stanje plejera, gašenje
@@ -27,10 +30,12 @@ const LAG = 120
 const VIEW = 'stihdana:savedView'
 
 /**
- * Plejer pjesama — sačuvani stihovi kao donji panel: stihovi (špil karata),
- * pjesme ili albumi, a ispod plejer. Strelica (i povlačenje dolje) ga
- * spušta: muzika ide dalje, a iznad dna početne pluta mini plejer
- * (MiniPlayer). Dodir ga podigne; povlačenje dolje gasi muziku.
+ * Plejer pjesama — sačuvani stihovi kao poseban ekran: stihovi (špil
+ * karata), pjesme ili albumi, a ispod plejer. Izlazi s lijeva (džep na
+ * početnoj), a ekran stiha klizne udesno i utihne (globals.css
+ * `html[data-page]`). Džep uz desnu ivicu (ili strelica) vraća na stih dana:
+ * muzika ide dalje, a iznad dna početne pluta mini plejer (MiniPlayer).
+ * Dodir ga vrati; povlačenje dolje gasi muziku.
  */
 export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
   const [verses, setVerses] = useState<Verse[] | null>(null)
@@ -77,7 +82,11 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   const input = useRef<HTMLInputElement>(null)
   /** pogled prije pretrage — × ga vrati */
   const before = useRef<SavedView>('cards')
-  const hasSaved = useFavorites().length > 0
+  const favs = useFavorites()
+  const hasSaved = favs.length > 0
+  // pozadina ekrana — pjesma koja svira, inače prvi sačuvani stih
+  const nowId = useSavedPlayerSelect((s) => s.id)
+  const backdrop = verses ? (verses.find((v) => v.id === nowId) ?? verses.find((v) => favs.includes(v.id)) ?? null) : null
   const searching = query !== null
   const searchOn = useRef(false)
   const startSearch = () => {
@@ -160,8 +169,13 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
       closeSaved()
     }, LAG)
   }, [onClose])
-  // povuci nadolje bilo gdje — prst se samo prati, skrol unutra ne čeka JavaScript
-  const sheetDrag = useSheetDrag(dismiss, open, { passive: true })
+  // ekran stiha klizne udesno dok je plejer otvoren (globals.css)
+  useEffect(() => {
+    const d = document.documentElement
+    if (open) d.dataset.page = 'player'
+    else delete d.dataset.page
+    return () => void delete d.dataset.page
+  }, [open])
 
   // Escape zatvara, a stranica ispod ne skrola dok je panel otvoren
   useEffect(() => {
@@ -182,23 +196,27 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   return createPortal(
     // uvijek montiran (SavedLink ga složi u tišini): otvoren, spušten do mini
     // plejera, ili sklonjen ispod ekrana — otvaranje je samo kretnja
-    <SheetLayer className={`fixed inset-0 z-[100] flex items-end justify-center ${open ? 'sm:items-center' : 'pointer-events-none'}`}>
-          {/* mini plejer je ispod zatamnjenja i panela — pri podizanju ga prirodno prekriju */}
+    <div className="pointer-events-none fixed inset-0 z-[100]">
+          {/* mini plejer je ispod ekrana plejera — pri otvaranju ga prirodno prekrije */}
           <AnimatePresence custom={open ? 'open' : 'stop'}>{peek && <MiniPlayer key="mini" onOpen={onOpen} />}</AnimatePresence>
-          <AnimatePresence>{open && <SheetBackdrop key="backdrop" onClose={dismiss} />}</AnimatePresence>
 
-          <SheetSlide away={!open} rise={rise}>
+          {/* ekran plejera — izađe s lijeva, ode na lijevo; zatvoren se ne crta */}
           <motion.div
             role="dialog"
             aria-modal={open}
             aria-label="Player pjesama"
             aria-hidden={!open}
-            className={`os-sheet ${open ? 'pointer-events-auto' : ''} relative flex max-h-[96dvh] w-full max-w-[440px] flex-col rounded-t-[30px] border border-b-0 border-white/10 sm:border-b sm:rounded-[30px]`}
-            {...sheetDrag}
+            data-player-page
+            className={`os-sheet ${open ? 'pointer-events-auto' : ''} absolute inset-0 mx-auto flex max-w-[520px] flex-col sm:border-x sm:border-white/10`}
             style={{
-              ...sheetDrag.style,
-              background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
+              borderRadius: 0,
+              paddingTop: 'max(0.75rem, var(--sat, 0px))',
+              background: '#0a0909',
+              willChange: 'transform',
             }}
+            initial={false}
+            animate={open ? { x: '0%', visibility: 'visible' } : { x: '-100%', transitionEnd: { visibility: 'hidden' } }}
+            transition={{ duration: rise ? 0.6 : 0.55, ease: [0.32, 0.72, 0, 1] }}
           >
             <span
               className="pointer-events-none absolute inset-x-10 top-0 h-px"
@@ -206,11 +224,11 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
               aria-hidden
             />
 
-            {/* zaglavlje se povlači za zatvaranje; lista ispod normalno skrola */}
-            <div
-              className="shrink-0 cursor-grab touch-none px-5 pt-3 active:cursor-grabbing"
-            >
-              <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
+            {/* pozadina ekrana: atmosfera pjesme (boja stiha, zamućen omot) — pretopi se s pjesmom */}
+            <Backdrop verse={backdrop} />
+
+            {/* zaglavlje — kao na ekranu stiha; lista ispod normalno skrola */}
+            <div className="relative z-[1] shrink-0 px-5 pb-1 pt-3">
               <div className="relative mb-3 flex items-center justify-between">
                 {/* pretraga — preko naslova i dugmadi, pretopi se */}
                 <div
@@ -282,20 +300,20 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={startSearch}
                       aria-label="Traži pjesmu"
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:text-white"
+                      className="hdr-btn w-[34px]"
                     >
                       <SearchGlyph />
                     </button>
                   )}
-                  {/* spusti — muzika ide dalje, na dnu početne viri mini plejer */}
+                  {/* na stih dana — muzika ide dalje, na dnu početne viri mini plejer */}
                   <button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={dismiss}
-                    aria-label="Spusti"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:text-white"
+                    aria-label="Na stih dana"
+                    className="hdr-btn w-[34px]"
                   >
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m6 9 6 6 6-6" />
+                      <path d="m9 6 6 6-6 6" />
                     </svg>
                   </button>
                   {/* zatvori — muzika stane, plejer ode do kraja (bez mini plejera) */}
@@ -307,7 +325,7 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                       window.setTimeout(() => !openNow.current && stopSaved(), LAG)
                     }}
                     aria-label="Zatvori plejer"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:text-white"
+                    className="hdr-btn w-[34px]"
                     whileHover={{ scale: 1.15 }}
                     whileTap={{ scale: 0.88 }}
                     transition={{ type: 'spring', stiffness: 460, damping: 24 }}
@@ -321,7 +339,7 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
             </div>
 
             {/* špil (ili lista) i plejer ispod — SavedVerses sam rasporedi i skrola */}
-            <div className="flex min-h-[200px] flex-1 flex-col">
+            <div className="relative z-[1] flex min-h-[200px] flex-1 flex-col">
               {verses ? (
                 // karte i plejer se slože dok panel već klizi
                 <AfterOpen fallback={<Skeleton />}>
@@ -331,10 +349,39 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                 <Skeleton />
               )}
             </div>
+
+            {/* džep uz desnu ivicu — nazad na stih dana */}
+            {open && (
+              <Pocket side="right" kind="paper" label="Stih dana" onOpen={dismiss} />
+            )}
           </motion.div>
-          </SheetSlide>
-    </SheetLayer>,
+    </div>,
     document.body,
+  )
+}
+
+/**
+ * Pozadina ekrana plejera — kao ekran stiha: boja raspoloženja pjesme i
+ * zamućen omot albuma (unaprijed, bez CSS blura), pa tama prema plejeru.
+ * Druga pjesma — pozadina se pretopi u njenu.
+ */
+function Backdrop({ verse }: { verse: Verse | null }) {
+  const m = verse ? MOODS[verse.mood] : null
+  const cover = albumOf(verse?.album)?.cover
+  const img = softOf(cover) ?? cover
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      <AnimatePresence initial={false}>
+        <motion.div key={verse?.id ?? 'none'} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.9, ease: 'easeInOut' }}>
+          <div className="absolute inset-0" style={{ background: m ? `radial-gradient(120% 70% at 50% 0%, ${m.gradient[2]}cc, transparent 65%), ${m.gradient[0]}` : `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a, transparent 60%), #0a0909` }} />
+          {img && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full scale-125 object-cover opacity-40" style={softOf(cover) ? undefined : { filter: 'blur(48px)' }} />
+          )}
+        </motion.div>
+      </AnimatePresence>
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.82))' }} />
+    </div>
   )
 }
 

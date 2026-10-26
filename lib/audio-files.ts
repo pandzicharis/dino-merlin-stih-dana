@@ -4,6 +4,7 @@
  * Pjesma je spremna za brzo puštanje kad su oba tu:
  *   public/audio/<pjesma>.m4a   HE-AAC 64 kbps — sa CDN-a, pola prenosa AAC-a 128
  *   data/audio.json             trajanje — plejer po njemu zna da pjesma postoji
+ *   data/lyrics.json            tekst (i vrijeme redova) — spremi se uz pjesmu (lib/lyrics-store.ts)
  *
  * Bez trajanja plejer na produkciji pjesmu ne pušta (nego YouTube znak), pa
  * se fajl i trajanje uvijek pišu zajedno, ovdje. Preuzimanje (yt-dlp) i
@@ -20,6 +21,7 @@ import { audioSlug, youtubeId } from './text'
 import BUNDLED from '../data/audio.json'
 import BUNDLED_ALIAS from '../data/audio-alias.json'
 import { audioFile } from './audio-name'
+import { storeLyrics, updateLyrics } from './lyrics-store'
 
 const ROOT = process.cwd()
 export const AUDIO_DIR = path.join(ROOT, 'public', 'audio')
@@ -99,7 +101,12 @@ function prepareFile(slug: string, song: string, youtube?: string): Promise<void
           if (!got) throw new Error('yt-dlp nije napravio fajl')
           src = path.join(tmp, got)
         }
-        await finalizeSong(slug, src, tmp)
+        const secs = await finalizeSong(slug, src, tmp)
+        // tekst uz pjesmu, jednom (ne čeka se — pjesma je spremna odmah); ne uspije li, `npm run audio` ga spremi
+        storeLyrics(slug, song, secs).then(
+          (ok) => !ok && console.warn('[tekst]', slug, 'izvor nije odgovorio — npm run audio -- --lyrics'),
+          (e: Error) => console.error('[tekst]', slug, e.message),
+        )
       } finally {
         await rm(tmp, { recursive: true, force: true })
       }
@@ -117,8 +124,8 @@ function prepareFile(slug: string, song: string, youtube?: string): Promise<void
   return job
 }
 
-/** Fajl pjesme → public/audio/<slug>.m4a (HE-AAC) + trajanje u data/audio.json. */
-export async function finalizeSong(slug: string, src: string, work?: string) {
+/** Fajl pjesme → public/audio/<slug>.m4a (HE-AAC) + trajanje u data/audio.json. Vrati trajanje. */
+export async function finalizeSong(slug: string, src: string, work?: string): Promise<number> {
   const tmp = work ?? (await mkdtemp(path.join(tmpdir(), 'stih-song-')))
   try {
     await mkdir(AUDIO_DIR, { recursive: true })
@@ -131,6 +138,7 @@ export async function finalizeSong(slug: string, src: string, work?: string) {
     })
     const secs = await duration(path.join(AUDIO_DIR, `${slug}.m4a`))
     await writeDuration(slug, secs)
+    return secs
   } finally {
     if (!work) await rm(tmp, { recursive: true, force: true })
   }
@@ -216,6 +224,13 @@ export async function renameSong(from: string, to: string, file: string): Promis
       await writeDurations(d)
       changed = true
     }
+    // tekst ide za fajlom
+    await updateLyrics((l) => {
+      if (!(oldFile in l)) return
+      l[file] = l[oldFile]
+      delete l[oldFile]
+      changed = true
+    })
   }
   const next = { ...alias }
   delete next[audioSlug(from)]

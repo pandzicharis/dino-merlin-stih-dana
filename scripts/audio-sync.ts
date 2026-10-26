@@ -6,8 +6,12 @@
  *   npm run audio                  stihovi s produkcije (/api/verses)
  *   npm run audio -- --local       stihovi iz lokalnog admina (.data/catalog.json)
  *   npm run audio -- --check       samo provjera, ništa ne preuzima (izlaz 1 ako fali)
+ *   npm run audio -- --lyrics      samo tekstovi pjesama koje već imaju zvuk
  *
- * Poslije preuzimanja: commit public/audio + data/audio.json i push. Na
+ * Uz svaku pjesmu sa zvukom jednom se spremi i njen tekst (data/lyrics.json,
+ * lib/lyrics-store.ts) — aplikacija ga onda ne traži ni od jednog sajta.
+ *
+ * Poslije preuzimanja: commit public/audio + data/audio.json + data/lyrics.json i push. Na
  * GitHubu (.github/workflows/audio.yml) to ide samo, kad admin na produkciji
  * sačuva stih — pjesmu koju je poslao dobije i kroz AUDIO_SONG/AUDIO_YOUTUBE,
  * za slučaj da /api/verses na CDN-u još nije osvježen.
@@ -16,12 +20,15 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { PUBLIC_URL } from '../lib/site'
 import { audioSlug, youtubeId } from '../lib/text'
-import { prepareSong, readDurations, songState } from '../lib/audio-files'
+import { prepareSong, readAlias, readDurations, songState } from '../lib/audio-files'
+import { readLyrics, storeLyrics } from '../lib/lyrics-store'
+import { audioFile } from '../lib/audio-name'
 
 type V = { id: string; song: string; youtube?: string; active?: boolean }
 
 const local = process.argv.includes('--local')
 const check = process.argv.includes('--check')
+const lyricsOnly = process.argv.includes('--lyrics')
 
 async function verses(): Promise<V[]> {
   const sent: V[] = process.env.AUDIO_SONG ? [{ id: '(iz admina)', song: process.env.AUDIO_SONG, youtube: process.env.AUDIO_YOUTUBE || undefined }] : []
@@ -63,7 +70,7 @@ async function main() {
     console.log(`  ${ok ? '✓' : '·'}  ${s.song.padEnd(26)} ${ok ? `${durations[k].toFixed(0)} s` : 'fali'}   ${s.ids.join(', ')}`)
   }
 
-  if (todo.length && !check) {
+  if (todo.length && !check && !lyricsOnly) {
     console.log(`\nPreuzimam ${todo.length}…`)
     for (const k of todo) {
       const s = songs.get(k)!
@@ -78,9 +85,26 @@ async function main() {
 
   const left = (await Promise.all(todo.map((k) => songState(songs.get(k)!.song)))).filter((s) => s.state !== 'ready').length
   console.log(`\n${songs.size} pjesama za ${list.length} stihova · ${left ? `${left} bez zvuka` : 'sve spremne'}${noLink ? ` · ${noLink} bez linka` : ''}\n`)
-  if (todo.length && !left && !check) console.log('Sad: git add public/audio data/audio.json, commit i push.\n')
-  // preuzimanje: greška samo kad pjesma fali (stih bez linka javi provjera)
-  if (left || (check && noLink)) process.exit(1)
+
+  // tekstovi: pjesma sa zvukom, a bez spremljenog teksta (trajanje treba za vrijeme redova)
+  const [stored, alias, secs] = await Promise.all([readLyrics(), readAlias(), readDurations()])
+  const bare = [...songs.values()].filter((s) => audioFile(s.song, alias) in secs && !(audioFile(s.song, alias) in stored))
+  let lyricsLeft = bare.length
+  if (bare.length && !check) {
+    console.log(`Tekstovi: ${bare.length}…`)
+    for (const s of bare) {
+      const f = audioFile(s.song, alias)
+      const ok = await storeLyrics(f, s.song, secs[f]).catch(() => false)
+      if (ok) lyricsLeft--
+      const l = ok ? (await readLyrics())[f] : null
+      console.log(`  ${ok ? '✓' : '✖'}  ${s.song.padEnd(26)} ${l ? `${l.lines.length} redova${l.synced ? ' · prati pjesmu' : ''}` : 'izvor nije odgovorio'}`)
+    }
+  }
+  console.log(`\nTekstovi: ${Object.keys(stored).length + bare.length - lyricsLeft} spremljeno${lyricsLeft ? ` · ${lyricsLeft} fali` : ''}\n`)
+
+  if (!check && ((todo.length && !left) || bare.length > lyricsLeft)) console.log('Sad: git add public/audio data/audio.json data/lyrics.json, commit i push.\n')
+  // preuzimanje: greška samo kad pjesma fali (stih bez linka javi provjera); tekst nije obavezan
+  if (!lyricsOnly && (left || (check && noLink))) process.exit(1)
 }
 
 main().catch((e) => {

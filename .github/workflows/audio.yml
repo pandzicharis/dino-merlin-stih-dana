@@ -3,7 +3,7 @@ name: Stih dana — pjesme
 # Admin na produkciji sačuva stih s pjesmom koje još nema → ruta
 # /api/admin/audio pošalje `repository_dispatch` → ovdje se pjesma preuzme
 # (yt-dlp), kodira u HE-AAC 64 kbps (afconvert — zato macOS), upiše joj se
-# trajanje, sve pjesme odu na Cloudflare (odatle ih aplikacija pušta —
+# trajanje i spremi tekst (data/lyrics.json), sve pjesme odu na Cloudflare (odatle ih aplikacija pušta —
 # lib/site.ts AUDIO_BASE) i sve se commita na trunk. Vercel objavi novi
 # build i pjesma se pušta odmah. Isto što lokalno rade `npm run audio` i
 # `npm run audio:deploy`.
@@ -14,8 +14,9 @@ name: Stih dana — pjesme
 # YouTube naloga iz tajne YT_COOKIES (npm run cookies, DEPLOY.md → Pjesme).
 on:
   repository_dispatch:
-    # audio: preuzmi pjesme koje fale; audio-rename: admin je preimenovao pjesmu
-    types: [audio, audio-rename]
+    # audio: preuzmi pjesme (i tekstove) koje fale; audio-rename: admin je preimenovao
+    # pjesmu; lyrics-offset: admin je podesio pomak teksta
+    types: [audio, audio-rename, lyrics-offset]
   workflow_dispatch:
 
 concurrency:
@@ -68,8 +69,16 @@ jobs:
           AUDIO_FILE: ${{ github.event.client_payload.file }}
         run: npx -y tsx@4.23.13 scripts/audio-rename.ts
 
+      - name: Pomak teksta
+        if: github.event.action == 'lyrics-offset'
+        env:
+          STIH_AUDIO_FETCH: '1'
+          AUDIO_SONG: ${{ github.event.client_payload.song }}
+          LYRICS_OFFSET: ${{ github.event.client_payload.offset }}
+        run: npx -y tsx@4.23.13 scripts/lyrics-offset.ts
+
       - name: Preuzmi pjesme koje fale
-        if: github.event.action != 'audio-rename'
+        if: github.event.action == 'audio' || github.event_name == 'workflow_dispatch'
         # naziv i link idu kroz env, ne u skriptu — bez ubacivanja u shell
         env:
           STIH_AUDIO_FETCH: '1'
@@ -97,13 +106,16 @@ jobs:
         # i kad neka pjesma ne prođe — one koje jesu idu gore
         if: ${{ !cancelled() }}
         run: |
-          git add -A public/audio data/audio.json data/audio-alias.json
+          git add -A public/audio data/audio.json data/audio-alias.json data/lyrics.json
           if git diff --cached --quiet; then
             echo "Nema novih pjesama."
             exit 0
           fi
           nove=$(git diff --cached --name-only --diff-filter=AMR -- public/audio | xargs -n1 basename | sed 's/\.m4a$//' | paste -sd ', ' -)
-          [ -n "$nove" ] || nove="nazivi"
+          # bez nove pjesme: samo tekstovi, ili preimenovanje
+          if [ -z "$nove" ]; then
+            if git diff --cached --quiet -- data/lyrics.json; then nove="nazivi"; else nove="tekstovi"; fi
+          fi
           # autor je vlasnik projekta — Vercel objavljuje samo njegove commite
           git -c user.name="Haris Pandžić" -c user.email="42070972+pandzicharis@users.noreply.github.com" \
             commit -q -m "Pjesme: $nove"

@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { albumLine, isFirstVerse, youtubeId } from '@/lib/text'
+import { albumOf, thumbOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
@@ -12,6 +13,7 @@ import { warmAudio } from '@/lib/sw-cache'
 import { bumpMonth } from '@/lib/storage'
 import { audioFile } from '@/lib/audio-name'
 import { FitLines } from './deck/FitLines'
+import { LyricsButton, LyricsPanel, primeLyrics, type LyricsClock } from './Lyrics'
 
 /**
  * Potpis pjesme ispod stiha.
@@ -376,7 +378,7 @@ function useSong({
 
   const progress = dur ? cur / dur : 0
   const time = !dur ? '--:--' : cur > 0 ? `-${clock(dur - cur)}` : clock(dur)
-  return { state, progress, time, toggle, seek, prime, unlock }
+  return { state, progress, dur, time, toggle, seek, prime, unlock, audio }
 }
 
 /**
@@ -393,11 +395,14 @@ function Vinyl({
   deck = false,
   arm = false,
   hole = false,
+  cover,
 }: {
   size: number
   state: State
   progress: number
   song: string
+  /** omot albuma — etiketa ploče (bez omota zlatna) */
+  cover?: string
   onClick: () => void
   /** prst je na ploči — pjesma se počne preuzimati prije klika */
   onPrime?: () => void
@@ -414,6 +419,9 @@ function Vinyl({
   const spinning = playing || state === 'loading'
   const disc = Math.round((size * 66) / 76)
   const icon = Math.max(10, Math.round((size * 14) / 76))
+  // zlatno dugme na sredini etikete — znak pusti/pauza na njemu
+  const knob = Math.round(icon * 1.85)
+  const label = cover ? (thumbOf(cover) ?? cover) : null
   return (
     <motion.button
       type="button"
@@ -440,6 +448,25 @@ function Vinyl({
       <svg width={size} height={size} viewBox="0 0 60 60" className="absolute inset-0" aria-hidden>
         <circle cx="30" cy="30" r="28.5" fill="none" stroke={`${BRAND.gold}47`} strokeWidth="1.5" />
       </svg>
+      {/* pjesma se učitava — zlatni luk kruži po prstenu */}
+      <AnimatePresence>
+        {state === 'loading' && (
+          <motion.svg
+            key="arc"
+            width={size}
+            height={size}
+            viewBox="0 0 60 60"
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, rotate: 360 }}
+            exit={{ opacity: 0 }}
+            transition={{ opacity: { duration: 0.25 }, rotate: { duration: 1.1, repeat: Infinity, ease: 'linear' } }}
+            aria-hidden
+          >
+            <circle cx="30" cy="30" r="28.5" fill="none" stroke="#F1E2BF" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="34 145" />
+          </motion.svg>
+        )}
+      </AnimatePresence>
       {/* ploča — vrti se i stane tačno gdje je pauzirana (vinyl-disc: i dok je panel otvoren, globals.css) */}
       <svg
         width={disc}
@@ -475,12 +502,40 @@ function Vinyl({
         {/* odsjaj na brazdama — vrti se s pločom, pa se vidi da svira */}
         <path d="M26 2.5A23.5 23.5 0 0 1 46.4 14.3L26 26z" fill="#fff" fillOpacity="0.13" />
         <path d="M26 49.5A23.5 23.5 0 0 1 5.6 37.7L26 26z" fill="#fff" fillOpacity="0.08" />
-        <circle cx="26" cy="26" r="12" fill={`url(#${uid}l)`} />
-        <circle cx="26" cy="26" r="12" fill="none" stroke="#5E4C30" strokeWidth="0.6" />
-        <circle cx="26" cy="26" r="9.5" fill="none" stroke="#16110A" strokeOpacity="0.2" strokeWidth="0.5" />
+        {label ? (
+          <>
+            {/* etiketa je omot albuma — vrti se s pločom */}
+            <clipPath id={`${uid}c`}>
+              <circle cx="26" cy="26" r="12" />
+            </clipPath>
+            <image href={label} x="14" y="14" width="24" height="24" preserveAspectRatio="xMidYMid slice" clipPath={`url(#${uid}c)`} />
+            <circle cx="26" cy="26" r="12" fill="#000" fillOpacity="0.12" />
+            <circle cx="26" cy="26" r="12" fill="none" stroke={`url(#${uid}r)`} strokeWidth="0.8" />
+          </>
+        ) : (
+          <>
+            <circle cx="26" cy="26" r="12" fill={`url(#${uid}l)`} />
+            <circle cx="26" cy="26" r="12" fill="none" stroke="#5E4C30" strokeWidth="0.6" />
+            <circle cx="26" cy="26" r="9.5" fill="none" stroke="#16110A" strokeOpacity="0.2" strokeWidth="0.5" />
+          </>
+        )}
       </svg>
-      {/* znak na etiketi — ne vrti se */}
+      {/* znak na etiketi — ne vrti se; na omotu stoji na zlatnom dugmetu */}
       <span className="absolute inset-0 flex items-center justify-center">
+        {label && !hole && (
+          <span
+            className="absolute rounded-full"
+            style={{
+              width: knob,
+              height: knob,
+              background: `linear-gradient(145deg, #F1E2BF, ${BRAND.gold} 55%, #8A7148)`,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.55), inset 0 0 0 0.5px rgba(94,76,48,0.8)',
+            }}
+            aria-hidden
+          />
+        )}
+        {/* iznad zlatnog dugmeta */}
+        <span className="relative flex items-center justify-center">
         <AnimatePresence mode="wait" initial={false}>
           {state === 'loading' && !hole ? (
             <motion.span
@@ -517,6 +572,7 @@ function Vinyl({
             </motion.svg>
           )}
         </AnimatePresence>
+        </span>
       </span>
       {arm && <Tonearm size={size} down={playing || state === 'loading'} progress={progress} />}
     </motion.button>
@@ -575,8 +631,15 @@ function Tonearm({ size, down, progress }: { size: number; down: boolean; progre
  */
 function AudioSong({ preview = false, share = false, ...props }: Source & { preview?: boolean; share?: boolean }) {
   // pregled (samo za gledanje): bez pripreme i preuzimanja pjesme
-  const { state, progress, time, toggle, seek, prime, unlock } = useSong({ ...props, preload: !preview && !share, share })
+  const { state, progress, dur, time, toggle, seek, prime, unlock, audio } = useSong({ ...props, preload: !preview && !share, share })
   const { verse, fallback } = props
+  const cover = albumOf(verse.album)?.cover
+  // tekst pjesme (components/Lyrics.tsx) — isti zvuk, plejer i u panelu
+  const [lyrics, setLyrics] = useState(false)
+  // pjesma svira — tekst se pripremi, da se panel otvori pun
+  useEffect(() => {
+    if (state === 'playing' && !preview) primeLyrics(verse.song)
+  }, [state, preview, verse.song])
 
   // "Mir svim dobrim ljudima" (prvi stih novom korisniku): kad se stih otvori
   // (papirić sleti), pjesma krene sama. Prvi dodir bilo gdje je otključa.
@@ -629,30 +692,135 @@ function AudioSong({ preview = false, share = false, ...props }: Source & { prev
     if (!preview && process.env.NODE_ENV === 'development') fetch(`${fallback}&warm=1`).catch(() => {})
   }, [fallback, preview])
 
+  // tekst prati ovaj zvuk (components/Lyrics.tsx) — vrijeme se čita u svakom kadru
+  const clock: LyricsClock = () => {
+    const a = audio.current
+    const on = Boolean(a && !a.dataset.unlock)
+    return { t: on ? a!.currentTime : 0, d: a && Number.isFinite(a.duration) && a.duration > 0 ? a.duration : dur, playing: on && !a!.paused, loading: state === 'loading' }
+  }
+  const row = { verse, state, progress, time, cover, onToggle: toggle, onPrime: prime, onSeek: seek }
+
   return (
-    <div data-tip="song" className="flex items-center gap-4 text-left" style={{ width: CARD_W }}>
+    <>
+      <GramophoneRow
+        {...row}
+        tip
+        deck
+        hole={share}
+        icon={!preview}
+        // dugme ne mijenja visinu reda — samo stoji na sredini reda s nazivom
+        extra={
+          !preview && (
+            <span className="-my-2.5">
+              <LyricsButton song={verse.song} onOpen={() => setLyrics(true)} playing={state === 'playing'} />
+            </span>
+          )
+        }
+      />
+      {!preview && (
+        <LyricsPanel
+          open={lyrics}
+          verse={verse}
+          clock={clock}
+          // dodir na red: pjesma odatle (i krene, ako je stajala)
+          onSeek={(t) => {
+            const d = clock().d
+            if (d) seek(Math.min(1, t / d))
+            if (state !== 'playing' && state !== 'loading') toggle()
+          }}
+          controls={{ toggle, seek }}
+          onClose={() => setLyrics(false)}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * Gramofon s pjesmom ispod stiha: ploča (s ručicom), pored nje naziv, album
+ * i traka. `extra`: desno u redu s nazivom (dugme za tekst).
+ */
+function GramophoneRow({
+  verse,
+  state,
+  progress,
+  time,
+  cover,
+  onToggle,
+  onPrime,
+  onSeek,
+  tip = false,
+  deck = false,
+  hole = false,
+  icon = false,
+  extra,
+}: {
+  verse: Verse
+  state: State
+  progress: number
+  time: string
+  cover?: string
+  onToggle: () => void
+  onPrime: () => void
+  onSeek: (fraction: number) => void
+  /** savjet (Tips) se kači na ovaj red — samo ispod stiha */
+  tip?: boolean
+  /** dugme koje prezentacija sama pritisne — samo ispod stiha */
+  deck?: boolean
+  hole?: boolean
+  /** u redu s nazivom ima mjesta za dugme (naziv se smanji) */
+  icon?: boolean
+  extra?: React.ReactNode
+}) {
+  const loading = state === 'loading'
+  return (
+    <div data-tip={tip ? 'song' : undefined} className="flex items-center gap-4 text-left" style={{ width: CARD_W }}>
       {/* ploča visoka koliko i tekst s trakom desno */}
       {/* sačuvani sviraju — samo ploča (rupa), dugmad su ispod; današnji ima pusti */}
-      <Vinyl size={72} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} deck arm hole={share} />
+      <Vinyl size={72} state={state} progress={progress} song={verse.song} cover={cover} onClick={onToggle} onPrime={onPrime} deck={deck} arm hole={hole} />
       <div className="min-w-0 flex-1">
         {/* dodir na naziv radi isto što i ploča */}
-        <div className="flex cursor-pointer items-center gap-2" onClick={toggle} onPointerDown={prime}>
+        <div className="flex items-center gap-2.5">
           <p
-            className="min-w-0 flex-1 truncate font-semibold uppercase leading-none tracking-[0.18em]"
-            style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song) }}
+            className="min-w-0 flex-1 cursor-pointer truncate font-semibold uppercase leading-none tracking-[0.18em]"
+            style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song, icon) }}
+            onClick={onToggle}
+            onPointerDown={onPrime}
           >
             {verse.song}
           </p>
+          {extra}
         </div>
-        <p className="mt-2 truncate text-[10.5px] uppercase leading-none tracking-[0.22em] text-white/60">
-          {albumLine(verse)}
-        </p>
+        <p className="mt-2 truncate text-[10.5px] uppercase leading-none tracking-[0.22em] text-white/60">{albumLine(verse)}</p>
         <div className="mt-1 flex items-center gap-2.5">
-          <Seek value={progress} onSeek={seek} />
-          <span className="tabular w-9 text-right text-[10.5px] tracking-[0.06em] text-white/60">{time}</span>
+          <Seek value={progress} onSeek={onSeek} loading={loading} />
+          <Time loading={loading} text={time} className="w-9 text-[10.5px]" />
         </div>
       </div>
     </div>
+  )
+}
+
+/** Vrijeme pjesme; dok se učitava, tri tačke koje dišu. */
+function Time({ loading, text, className }: { loading: boolean; text: string; className: string }) {
+  return (
+    <span className={`tabular flex justify-end text-right tracking-[0.06em] text-white/60 ${className}`}>
+      {loading ? (
+        <span className="flex gap-[3px]" role="status" aria-label="Pjesma se učitava">
+          {[0, 1, 2].map((i) => (
+            <motion.i
+              key={i}
+              className="block h-[3px] w-[3px] rounded-full"
+              style={{ background: BRAND.gold }}
+              animate={{ opacity: [0.25, 1, 0.25] }}
+              transition={{ duration: 1, repeat: Infinity, delay: i * 0.16 }}
+            />
+          ))}
+        </span>
+      ) : (
+        text
+      )}
+    </span>
   )
 }
 
@@ -695,16 +863,17 @@ function AudioRow({ fit, hole, vinyl, ...props }: Source & { fit: boolean; hole:
   // plejer na karti sačuvanih — zajednički zvuk, ne staje kad se karta skupi ili prevuče
   const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: false, share: true })
   const { verse } = props
+  const loading = state === 'loading'
   // mala ploča (karta u špilu) — i slova sitnija
   const small = vinyl < 56
   return (
     <>
-      <Vinyl size={vinyl} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} arm hole={hole} />
+      <Vinyl size={vinyl} state={state} progress={progress} song={verse.song} cover={albumOf(verse.album)?.cover} onClick={toggle} onPrime={prime} arm hole={hole} />
       <div className="min-w-0 flex-1">
         <RowText verse={verse} onClick={toggle} fit={fit} small={small} />
         <div className={`flex items-center ${small ? 'gap-2' : 'gap-2.5'}`}>
-          <Seek value={progress} onSeek={seek} />
-          <span className={`tabular text-right tracking-[0.06em] text-white/60 ${small ? 'w-7 text-[8.5px]' : 'w-9 text-[10px]'}`}>{time}</span>
+          <Seek value={progress} onSeek={seek} loading={loading} />
+          <Time loading={loading} text={time} className={small ? 'w-7 text-[8.5px]' : 'w-9 text-[10px]'} />
         </div>
       </div>
     </>
@@ -729,7 +898,7 @@ function RowText({ verse, onClick, fit = false, small = false }: { verse: Verse;
 }
 
 /** Traka napretka — dodir ili povlačenje prstom premota pjesmu. */
-export function Seek({ value, onSeek }: { value: number; onSeek: (fraction: number) => void }) {
+export function Seek({ value, onSeek, loading = false }: { value: number; onSeek: (fraction: number) => void; loading?: boolean }) {
   const [drag, setDrag] = useState<number | null>(null)
   const shown = drag ?? value
   const at = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -755,7 +924,19 @@ export function Seek({ value, onSeek }: { value: number; onSeek: (fraction: numb
       }}
       onPointerCancel={() => setDrag(null)}
     >
-      <span className="absolute inset-x-0 h-[2px] rounded-full bg-white/15" />
+      <span className="absolute inset-x-0 h-[2px] overflow-hidden rounded-full bg-white/15">
+        {/* pjesma se učitava — zlatni odsjaj prelazi preko trake */}
+        {loading && (
+          <motion.span
+            className="absolute inset-y-0 w-2/5 rounded-full"
+            style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}, transparent)` }}
+            initial={{ left: '-40%' }}
+            animate={{ left: '100%' }}
+            transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+            aria-hidden
+          />
+        )}
+      </span>
       <span
         className="absolute left-0 h-[2px] rounded-full"
         style={{ width: `calc(${shown} * (100% - 10px) + 5px)`, background: `linear-gradient(90deg, #8A7148, ${BRAND.gold})` }}
@@ -773,9 +954,10 @@ export function Seek({ value, onSeek }: { value: number; onSeek: (fraction: numb
 /** širina reda s gramofonom — skoro do ivica ekrana, da duži naziv stane */
 const CARD_W = 'min(calc(100vw - 2.5rem), 360px)'
 
-function cardSongSize(song: string): string {
+function cardSongSize(song: string, icon = false): string {
   const em = Math.max(song.length, 1) * 0.9 + 0.18
-  return `min(15px, calc((${CARD_W} - 108px) / ${em.toFixed(2)}))`
+  // ploča i razmak; uz dugme za tekst još njegova širina
+  return `min(15px, calc((${CARD_W} - ${icon ? 152 : 108}px) / ${em.toFixed(2)}))`
 }
 
 export function clock(s: number): string {

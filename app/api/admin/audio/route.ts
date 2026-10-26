@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { isAdmin } from '@/lib/admin-auth'
 import { readCatalog } from '@/lib/catalog'
-import { CAN_FETCH, prepareSong, readDurations, songState, type SongState } from '@/lib/audio-files'
+import { CAN_FETCH, prepareSong, readAlias, readDurations, songState, type SongState } from '@/lib/audio-files'
+import { audioFile } from '@/lib/audio-name'
+import { lyricsState, readLyrics, type StoredLyrics } from '@/lib/lyrics-store'
 import { audioSlug } from '@/lib/text'
+import BUNDLED_LYRICS from '@/data/lyrics.json'
 import { GITHUB_TOKEN, dispatchAudio, gh } from '@/lib/github'
 
 export const runtime = 'nodejs'
@@ -46,16 +49,23 @@ function remote(job: Job | null): { state: SongState; error?: string } {
   }
 }
 
-/** Stanje svake pjesme iz kataloga: { slug: stanje }. */
+/** Stanje svake pjesme iz kataloga: { slug: stanje } — zvuk i tekst (data/lyrics.json). */
 export async function GET() {
   if (!(await isAdmin())) return denied()
-  const [cat, durations, job] = await Promise.all([readCatalog(), readDurations(), CAN_FETCH ? null : lastJob()])
-  const songs: Record<string, { state: SongState; error?: string }> = {}
+  const [cat, durations, job, alias, stored] = await Promise.all([
+    readCatalog(),
+    readDurations(),
+    CAN_FETCH ? null : lastJob(),
+    readAlias(),
+    // tekstovi: lokalno svježi, na produkciji iz builda (kao trajanja)
+    CAN_FETCH ? readLyrics() : (BUNDLED_LYRICS as Record<string, StoredLyrics>),
+  ])
+  const songs: Record<string, { state: SongState; error?: string; lyrics: ReturnType<typeof lyricsState> }> = {}
   for (const v of cat.verses) {
     const slug = audioSlug(v.song)
     if (slug in songs) continue
     const st = await songState(v.song, durations)
-    songs[slug] = st.state === 'ready' || CAN_FETCH ? st : remote(job)
+    songs[slug] = { ...(st.state === 'ready' || CAN_FETCH ? st : remote(job)), lyrics: lyricsState(audioFile(v.song, alias), stored) }
   }
   return NextResponse.json(
     { mode: CAN_FETCH ? 'local' : GITHUB_TOKEN ? 'github' : 'off', job: job?.url ?? null, songs },

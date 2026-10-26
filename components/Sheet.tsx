@@ -73,8 +73,10 @@ export function useSheetDrag(onClose: () => void, open: boolean, { passive = fal
       closeRef.current()
     }
     let g: { x0: number; y0: number; scroller: HTMLElement | null; h: boolean; pull: boolean; off: boolean; last: [number, number][] } | null = null
+    // `data-sheet-pull`: skrol koji se ne vraća prstom nadolje (tekst pjesme ide sam) — povlačenje je panelova
     const scrollerOf = (t: Element | null) => {
       for (let n = t as HTMLElement | null; n && n !== root; n = n.parentElement) {
+        if (n.hasAttribute('data-sheet-pull')) return null
         const o = getComputedStyle(n).overflowY
         if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n
       }

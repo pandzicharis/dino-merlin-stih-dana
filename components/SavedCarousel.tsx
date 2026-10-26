@@ -34,6 +34,8 @@ import { tapProps } from '@/lib/tap'
 /** ekran telefona u pikselima — karta je on, umanjen */
 const W = 390
 const H = 620
+/** mala karta je kraća od ekrana — dno (tamno pretapanje) odsječeno, atmosfera ostaje H */
+const SH = 590
 /** mjesto sa svake strane prednje karte — tu vire susjedne */
 const SIDE = 54
 /** zraka unutar karte, lijevo i desno (em od W) */
@@ -334,7 +336,7 @@ export function SavedCarousel({
       style={
         {
           containerType: 'inline-size',
-          '--cw': `min(calc(${size} * ${W / H}), calc(100cqw - ${SIDE * 2}px))`,
+          '--cw': `min(calc(${size} * ${W / SH}), calc(100cqw - ${SIDE * 2}px))`,
         } as CSSProperties
       }
     >
@@ -345,7 +347,7 @@ export function SavedCarousel({
         ref={strip}
         data-hscroll
         className="relative flex w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ height: `calc(var(--cw) * ${H / W})`, gap: STRIP_GAP, touchAction: 'pan-x' }}
+        style={{ height: `calc(var(--cw) * ${SH / W})`, gap: STRIP_GAP, touchAction: 'pan-x' }}
       >
         {/* razmak do prve/zadnje karte — da i one stanu na sredinu */}
         <div aria-hidden className="shrink-0" style={{ width: `calc((100% - var(--cw)) / 2 - ${STRIP_GAP}px)` }} />
@@ -542,7 +544,7 @@ function CardFaceView({
     if (!rr.width) return
     const em = rr.width / W
     const tall = rr.height / em
-    box.dataset.drop = String(Math.max(0, Math.round((tall - H) / 2)))
+    box.dataset.drop = String(Math.max(0, Math.round((tall - SH) / 2)))
     const g = row.current
     if (g) {
       // donja zona iPhonea (traka za početni ekran), u em karte
@@ -552,7 +554,7 @@ function CardFaceView({
       const safe = (parseFloat(getComputedStyle(probe).paddingBottom) || 0) / em
       probe.remove()
       // dno ploče iznad trake za početni ekran
-      const down = tall - H + 18 - 30 - safe
+      const down = tall - SH + 18 - 30 - safe
       g.dataset.grow = `translateY(${down.toFixed(1)}em)`
     }
   }, [actionsZoom])
@@ -588,7 +590,7 @@ function CardFaceView({
       <div
         className={`absolute inset-x-0 top-0 z-[1] flex flex-col justify-between ${actionsZoom ? '' : 'bottom-0'}`}
         // zraka od lijeve i desne ivice karte (isto za zaglavlje, stih i gramofon)
-        style={{ padding: `26em ${SIDE_PAD}em ${FADE * 0.75}em`, height: actionsZoom ? `${H}em` : undefined }}
+        style={{ padding: `26em ${SIDE_PAD}em ${FADE * 0.75}em`, height: actionsZoom ? `${SH}em` : undefined }}
       >
         {/* zaglavlje — potpis | Magaza, kao na ekranu stiha; desno raširi i srce */}
         <div className="flex items-center justify-between">
@@ -690,12 +692,13 @@ function CardFaceView({
       <div
         data-small
         className="pointer-events-none absolute z-[1] flex flex-col items-center text-center"
-        style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${H - FADE - 7}em`, gap: '7em' }}
+        // niže, tik iznad plejera koji prekrije dno karte
+        style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${SH - 104}em`, gap: '7em' }}
       >
-        <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '12.5em', letterSpacing: '0.2em', color: m.accent }}>
+        <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '15em', letterSpacing: '0.18em', color: m.accent }}>
           {verse.song}
         </p>
-        <p className="max-w-full truncate uppercase" style={{ fontSize: '9.5em', letterSpacing: '0.24em', color: 'rgba(255,255,255,0.55)' }}>
+        <p className="max-w-full truncate uppercase" style={{ fontSize: '12em', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.6)' }}>
           {albumLine(verse)}
         </p>
       </div>
@@ -704,7 +707,7 @@ function CardFaceView({
       <span
         data-small
         className={`pointer-events-none absolute inset-x-0 top-0 rounded-[26px] border ${front ? 'border-white/15' : 'border-white/30'}`}
-        style={{ ...layer, height: `${H}em` }}
+        style={{ ...layer, height: `${SH}em` }}
         aria-hidden
       />
       <span
@@ -719,7 +722,7 @@ function CardFaceView({
       <span
         data-small
         className="pointer-events-none absolute inset-x-[-1px]"
-        style={{ ...layer, top: `${H - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }}
+        style={{ ...layer, top: `${SH - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }}
         aria-hidden
       />
 

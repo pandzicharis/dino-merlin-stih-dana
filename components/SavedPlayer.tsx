@@ -13,6 +13,8 @@ import { audioFile } from '@/lib/audio-name'
 import { dragScroll } from '@/lib/drag-scroll'
 import { useIsLoved, useLoved } from '@/lib/client-store'
 import { useLiveFront } from './SavedCarousel'
+import { LyricsButton, LyricsIcon, LyricsPanel, primeLyrics, type LyricsClock } from './Lyrics'
+import { BRAND } from '@/lib/brand'
 import {
   SAVED_TRACK,
   currentSaved,
@@ -349,8 +351,6 @@ export function SavedPlayer({
   const p = {
     id: useSavedPlayerSelect((s) => s.id),
     playing: useSavedPlayerSelect((s) => s.playing),
-    shuffle: useSavedPlayerSelect((s) => s.shuffle),
-    repeat: useSavedPlayerSelect((s) => s.repeat),
   }
   const nowKey = nowKeyOf(p.id)
   const loaded = verses.find((v) => v.id === p.id) ?? (nowKey ? verses.find((v) => keyOf(v) === nowKey) : undefined) ?? null
@@ -362,19 +362,15 @@ export function SavedPlayer({
   // inače pjesma koja je u plejeru (pa prednja / prva)
   const cur = (view === 'cards' ? (inQueue ?? loaded) : (loaded ?? inQueue)) ?? verses[0] ?? null
   const isLoaded = Boolean(cur && nowKey && keyOf(cur) === nowKey)
-  const fill = useRef<HTMLSpanElement>(null)
-  const dot = useRef<HTMLSpanElement>(null)
-  const now = useRef<HTMLSpanElement>(null)
-  const left = useRef<HTMLSpanElement>(null)
-  const track = useRef<HTMLDivElement>(null)
-  useProgress(isLoaded && cur ? keyOf(cur) : null, fill, now, left, !isLoaded && cur && hasSong(cur) ? knownDuration(cur) : 0, dot)
   // pjesma koju plejer pokazuje — spušten bez puštanja, ostaje u mini plejeru
   useEffect(() => setShownSaved(cur && hasSong(cur) ? cur : null), [cur])
+  // tekst pjesme (components/Lyrics.tsx): one koja svira — pređe li plejer na sljedeću, i tekst pređe
+  const [lyrics, setLyrics] = useState(false)
+  const sung = loaded ?? cur
   if (!cur) return null
 
   const m = MOODS[cur.mood]
   const playing = isLoaded && p.playing
-  const song = hasSong(cur)
   const n = verses.length
   const i = Math.max(0, verses.findIndex((v) => v.id === cur.id))
 
@@ -384,12 +380,6 @@ export function SavedPlayer({
     // ništa ne svira u špilu — samo se špil pomjeri na susjednu kartu
     const v = verses[(((i + dir) % n) + n) % n]
     if (v) window.dispatchEvent(new CustomEvent(SAVED_TRACK, { detail: v.id }))
-  }
-  // premotavanje: dodir ili povlačenje po traci
-  const seekAt = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const r = track.current?.getBoundingClientRect()
-    if (!r || !isLoaded) return
-    seekSaved(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)))
   }
 
   return (
@@ -413,72 +403,15 @@ export function SavedPlayer({
             </div>
             <Credit verse={cur} />
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1 self-stretch">
+          <div className="flex shrink-0 flex-col items-end justify-between gap-1 self-stretch">
             <span className="tabular text-[10px] tracking-[0.18em] text-white/45">
               {i + 1} / {n}
             </span>
+            {sung && <LyricsButton song={sung.song} onOpen={() => setLyrics(true)} playing={Boolean(loaded && sung === loaded && p.playing)} size={30} />}
           </div>
         </div>
 
-        {/* traka napretka — dodir ili povlačenje premota */}
-        <div className="mt-4">
-          <div
-            ref={track}
-            data-nodrag
-            aria-hidden
-            className="relative flex h-5 cursor-pointer touch-none items-center"
-            onPointerDown={(e) => {
-              e.currentTarget.setPointerCapture(e.pointerId)
-              seekAt(e)
-            }}
-            onPointerMove={(e) => e.buttons && seekAt(e)}
-          >
-            <span className="relative block h-[4px] w-full overflow-hidden rounded-full bg-white/15">
-              <span ref={fill} className="block h-full w-full origin-left rounded-full" style={{ background: `linear-gradient(90deg, ${m.accent}, #fff)`, transform: 'scaleX(0)' }} />
-            </span>
-            {/* omot tačke širok kao traka — pomak u % od nje, bez mjerenja u svakom kadru */}
-            <span ref={dot} className="pointer-events-none absolute inset-x-0 top-[4px] block h-3">
-              <span
-                className="absolute -left-1.5 top-0 block h-3 w-3 rounded-full bg-white"
-                style={{ boxShadow: `0 0 0 3px ${m.accent}40, 0 2px 6px rgba(0,0,0,0.5)` }}
-              />
-            </span>
-          </div>
-          <div className="tabular flex justify-between text-[10px] text-white/50">
-            <span ref={now}>0:00</span>
-            <span ref={left}>{song ? `-${mmss(knownDuration(cur))}` : 'bez pjesme'}</span>
-          </div>
-        </div>
-
-        {/* kontrole — kao u Apple Musicu: krupni bijeli znakovi, sitni sa strane */}
-        <div className="mt-1 flex items-center justify-between px-1">
-          <Btn label="Nasumično" onPress={toggleShuffle} size={40} pressed={p.shuffle} color={p.shuffle ? m.accent : 'rgba(255,255,255,0.5)'}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
-            </svg>
-          </Btn>
-          <Btn label="Prethodna" onPress={() => skip(-1)} size={54}>
-            <svg width="31" height="31" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              {PREV}
-            </svg>
-          </Btn>
-          <Btn label={playing ? 'Pauza' : 'Pusti'} onPress={() => song && toggle(cur, playing)} size={64} color={song ? '#fff' : 'rgba(255,255,255,0.3)'}>
-            <PlayGlyph playing={playing} size={44} />
-          </Btn>
-          <Btn label="Sljedeća" onPress={() => skip(1)} size={54}>
-            <svg width="31" height="31" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              {NEXT}
-            </svg>
-          </Btn>
-          <Btn label="Ponovi pjesmu" onPress={toggleRepeat} size={40} pressed={p.repeat} color={p.repeat ? m.accent : 'rgba(255,255,255,0.5)'}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="m17 2 4 4-4 4" />
-              <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
-              <path d="m7 22-4-4 4-4" />
-              <path d="M21 13v1a4 4 0 0 1-4 4H3" />
-            </svg>
-          </Btn>
-        </div>
+        <Transport verse={cur} loaded={isLoaded} playing={playing} onSkip={skip} />
 
         {/* pogled iznad plejera: karte, lista pjesama (cijeli stih) ili albumi */}
         <div className="mt-4 flex justify-center">
@@ -510,7 +443,141 @@ export function SavedPlayer({
           </div>
         </div>
       </div>
+      {sung && <SavedLyrics open={lyrics} verse={sung} onClose={() => setLyrics(false)} />}
     </div>
+  )
+}
+
+/**
+ * Traka napretka i kontrole plejera sačuvanih — u plejeru na dnu panela i
+ * u panelu s tekstom (isti plejer: nasumično, prethodna, pusti, sljedeća, ponovi).
+ */
+function Transport({ verse, loaded, playing, onSkip }: { verse: Verse; loaded: boolean; playing: boolean; onSkip: (dir: 1 | -1) => void }) {
+  const shuffle = useSavedPlayerSelect((s) => s.shuffle)
+  const repeat = useSavedPlayerSelect((s) => s.repeat)
+  const m = MOODS[verse.mood]
+  const song = hasSong(verse)
+  const fill = useRef<HTMLSpanElement>(null)
+  const dot = useRef<HTMLSpanElement>(null)
+  const now = useRef<HTMLSpanElement>(null)
+  const left = useRef<HTMLSpanElement>(null)
+  const track = useRef<HTMLDivElement>(null)
+  useProgress(loaded ? keyOf(verse) : null, fill, now, left, !loaded && song ? knownDuration(verse) : 0, dot)
+  // premotavanje: dodir ili povlačenje po traci
+  const seekAt = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const r = track.current?.getBoundingClientRect()
+    if (!r || !loaded) return
+    seekSaved(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)))
+  }
+
+  return (
+    <>
+      {/* traka napretka — dodir ili povlačenje premota */}
+      <div className="mt-4">
+        <div
+          ref={track}
+          data-nodrag
+          aria-hidden
+          className="relative flex h-5 cursor-pointer touch-none items-center"
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            seekAt(e)
+          }}
+          onPointerMove={(e) => e.buttons && seekAt(e)}
+        >
+          <span className="relative block h-[4px] w-full overflow-hidden rounded-full bg-white/15">
+            <span ref={fill} className="block h-full w-full origin-left rounded-full" style={{ background: `linear-gradient(90deg, ${m.accent}, #fff)`, transform: 'scaleX(0)' }} />
+          </span>
+          {/* omot tačke širok kao traka — pomak u % od nje, bez mjerenja u svakom kadru */}
+          <span ref={dot} className="pointer-events-none absolute inset-x-0 top-[4px] block h-3">
+            <span
+              className="absolute -left-1.5 top-0 block h-3 w-3 rounded-full bg-white"
+              style={{ boxShadow: `0 0 0 3px ${m.accent}40, 0 2px 6px rgba(0,0,0,0.5)` }}
+            />
+          </span>
+        </div>
+        <div className="tabular flex justify-between text-[10px] text-white/50">
+          <span ref={now}>0:00</span>
+          <span ref={left}>{song ? `-${mmss(knownDuration(verse))}` : 'bez pjesme'}</span>
+        </div>
+      </div>
+
+      {/* kontrole — kao u Apple Musicu: krupni bijeli znakovi, sitni sa strane */}
+      <div className="mt-1 flex items-center justify-between px-1">
+        <Btn label="Nasumično" onPress={toggleShuffle} size={40} pressed={shuffle} color={shuffle ? m.accent : 'rgba(255,255,255,0.5)'}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+          </svg>
+        </Btn>
+        <Btn label="Prethodna" onPress={() => onSkip(-1)} size={54}>
+          <svg width="31" height="31" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            {PREV}
+          </svg>
+        </Btn>
+        <Btn label={playing ? 'Pauza' : 'Pusti'} onPress={() => song && toggle(verse, playing)} size={64} color={song ? '#fff' : 'rgba(255,255,255,0.3)'}>
+          <PlayGlyph playing={playing} size={44} />
+        </Btn>
+        <Btn label="Sljedeća" onPress={() => onSkip(1)} size={54}>
+          <svg width="31" height="31" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            {NEXT}
+          </svg>
+        </Btn>
+        <Btn label="Ponovi pjesmu" onPress={toggleRepeat} size={40} pressed={repeat} color={repeat ? m.accent : 'rgba(255,255,255,0.5)'}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="m17 2 4 4-4 4" />
+            <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+            <path d="m7 22-4-4 4-4" />
+            <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+          </svg>
+        </Btn>
+      </div>
+    </>
+  )
+}
+
+/**
+ * Tekst pjesme iz plejera sačuvanih: prati pjesmu koja je u plejeru (vrijeme
+ * iz zajedničkog zvuka); plejer u drawer-u je isti kao ispod stiha.
+ */
+function SavedLyrics({ open, verse, onClose }: { open: boolean; verse: Verse; onClose: () => void }) {
+  const id = useSavedPlayerSelect((s) => s.id)
+  const playing = useSavedPlayerSelect((s) => s.playing)
+  const shuffle = useSavedPlayerSelect((s) => s.shuffle)
+  const repeat = useSavedPlayerSelect((s) => s.repeat)
+  const on = keyOf(verse) === nowKeyOf(id) && playing
+  // zvuk ove pjesme — samo dok je ona u plejeru
+  const clock: LyricsClock = () => {
+    const v = savedVerse()
+    const a = v && keyOf(v) === keyOf(verse) ? currentSaved() : null
+    const d = a && Number.isFinite(a.duration) && a.duration > 0 ? a.duration : knownDuration(verse)
+    return { t: a?.currentTime ?? 0, d, playing: Boolean(a && !a.paused), loading: Boolean(a?.dataset.want && a.readyState < 3) }
+  }
+
+  return (
+    <LyricsPanel
+      open={open}
+      verse={verse}
+      clock={clock}
+      // dodir na red: pjesma odatle (i krene, ako je stajala)
+      onSeek={(t) => {
+        const d = clock().d
+        if (!on) playSaved(verse)
+        if (d) seekSaved(Math.min(1, t / d))
+      }}
+      // isti plejer kao u sačuvanima: nasumično, prethodna, pusti, sljedeća, ponovi
+      controls={{
+        toggle: () => toggle(verse, on),
+        seek: (f) => {
+          if (!on) playSaved(verse)
+          seekSaved(f)
+        },
+        prev: prevSaved,
+        next: nextSaved,
+        shuffle: { on: shuffle, toggle: toggleShuffle },
+        repeat: { on: repeat, toggle: toggleRepeat },
+      }}
+      onClose={onClose}
+    />
   )
 }
 
@@ -1056,9 +1123,12 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
   const start = useRef<number | null>(null)
   const swiped = useRef(false)
   useProgress(v ? keyOf(v) : null, fill)
+  // tekst pjesme koja svira — isti panel kao iz plejera
+  const [lyrics, setLyrics] = useState(false)
   if (!v) return null
   const m = MOODS[v.mood]
   return (
+    <>
     <motion.div
       role="button"
       tabIndex={0}
@@ -1115,7 +1185,27 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
         <Atmosphere verse={v} />
         {/* jedan red: omot · trenutno slušaš, pjesma i album · natrag, pusti/pauza, naprijed */}
         <div className="relative flex items-center gap-2 py-3 pl-3 pr-2">
-          <Cover verse={v} size={52} />
+          {/* omot je dugme za tekst pjesme — znak teksta u uglu (red je pun dugmadi) */}
+          <button
+            type="button"
+            onPointerDown={() => primeLyrics(v.song)}
+            onClick={() => {
+              haptic(6)
+              setLyrics(true)
+            }}
+            aria-label="Tekst pjesme"
+            data-lyrics-open
+            className="relative shrink-0 transition-transform active:scale-95"
+          >
+            <Cover verse={v} size={52} />
+            <span
+              className="absolute -bottom-1 -right-1 flex h-[22px] w-[22px] items-center justify-center rounded-full text-[#16110A]"
+              style={{ background: `linear-gradient(145deg, #F1E2BF, ${BRAND.gold})`, boxShadow: '0 2px 6px rgba(0,0,0,0.55), 0 0 0 1.5px rgba(0,0,0,0.35)' }}
+              aria-hidden
+            >
+              <LyricsIcon size={12} />
+            </span>
+          </button>
           <div className="min-w-0 flex-1">
             {/* trenutno slušaš — trake titraju dok svira */}
             <div className="mb-1.5 flex items-center gap-1.5">
@@ -1152,5 +1242,8 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
         </span>
       </div>
     </motion.div>
+    {/* pored mini plejera, ne u njemu — povlačenje u tekstu ne smije ugasiti muziku (povučen mini je gasi) */}
+    <SavedLyrics open={lyrics} verse={v} onClose={() => setLyrics(false)} />
+    </>
   )
 }
