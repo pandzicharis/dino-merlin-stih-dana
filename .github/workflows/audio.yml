@@ -16,8 +16,9 @@ on:
   repository_dispatch:
     # audio: preuzmi pjesme (i tekstove) koje fale; audio-rename: admin je preimenovao
     # pjesmu; lyrics-offset: admin je podesio pomak teksta; lyrics-sync: ponovo traži
-    # vremena redova za tekstove koji ne prate pjesmu (song: naziv ili *)
-    types: [audio, audio-rename, lyrics-offset, lyrics-sync]
+    # vremena redova za tekstove koji ne prate pjesmu (song: naziv ili *); sync: admin →
+    # Sinhronizacija, izabrane pjesme (songs: red po red) — zvuk koji fali i tekst iznova
+    types: [audio, audio-rename, lyrics-offset, lyrics-sync, sync]
   workflow_dispatch:
 
 concurrency:
@@ -84,6 +85,13 @@ jobs:
           STIH_AUDIO_FETCH: '1'
           LYRICS_RESYNC: ${{ github.event.client_payload.song }}
         run: npx -y tsx@4.23.13 scripts/audio-sync.ts --lyrics
+
+      - name: Sinhronizacija izabranih pjesama
+        if: github.event.action == 'sync'
+        env:
+          STIH_AUDIO_FETCH: '1'
+          SYNC_SONGS: ${{ github.event.client_payload.songs }}
+        run: npx -y tsx@4.23.13 scripts/audio-sync.ts
 
       - name: Preuzmi pjesme koje fale
         if: github.event.action == 'audio' || github.event_name == 'workflow_dispatch'

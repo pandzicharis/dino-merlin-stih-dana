@@ -31,6 +31,13 @@ const check = process.argv.includes('--check')
 const lyricsOnly = process.argv.includes('--lyrics')
 /** tekstovi koji ne prate pjesmu — LRCLIB iznova: `*` svi, ili naziv pjesme (admin → "Preuzmi tekst") */
 const resync = process.env.LYRICS_RESYNC?.trim() || ''
+/** admin → Sinhronizacija: samo ove pjesme (red po red) — zvuk koji fali i tekst iznova */
+const only = new Set(
+  (process.env.SYNC_SONGS ?? '')
+    .split('\n')
+    .map((x) => audioSlug(x.trim()))
+    .filter(Boolean),
+)
 
 async function verses(): Promise<V[]> {
   const sent: V[] = process.env.AUDIO_SONG ? [{ id: '(iz admina)', song: process.env.AUDIO_SONG, youtube: process.env.AUDIO_YOUTUBE || undefined }] : []
@@ -63,6 +70,9 @@ async function main() {
     songs.set(k, s)
   }
 
+  // Sinhronizacija iz admina — samo izabrane pjesme
+  if (only.size) for (const k of [...songs.keys()]) if (!only.has(k)) songs.delete(k)
+
   const durations = await readDurations()
   const todo: string[] = []
   for (const [k, s] of [...songs].sort()) {
@@ -92,17 +102,28 @@ async function main() {
   // uz LYRICS_RESYNC i oni bez vremena redova
   const [stored, alias, secs] = await Promise.all([readLyrics(), readAlias(), readDurations()])
   const again = (s: { song: string }) =>
-    Boolean(resync) && !stored[audioFile(s.song, alias)]?.synced && (resync === '*' || audioSlug(resync) === audioSlug(s.song))
+    !stored[audioFile(s.song, alias)]?.synced && (only.has(audioSlug(s.song)) || (Boolean(resync) && (resync === '*' || audioSlug(resync) === audioSlug(s.song))))
   const bare = [...songs.values()].filter((s) => audioFile(s.song, alias) in secs && (!(audioFile(s.song, alias) in stored) || again(s)))
   let lyricsLeft = bare.length
   if (bare.length && !check) {
     console.log(`Tekstovi: ${bare.length}…`)
-    for (const s of bare) {
-      const f = audioFile(s.song, alias)
-      const ok = await storeLyrics(f, s.song, secs[f], true).catch(() => false)
-      if (ok) lyricsLeft--
-      const l = ok ? (await readLyrics())[f] : null
-      console.log(`  ${ok ? '✓' : '✖'}  ${s.song.padEnd(26)} ${l ? `${l.lines.length} redova${l.synced ? ' · prati pjesmu' : ''}` : 'izvor nije odgovorio'}`)
+    let todoLyrics = bare
+    // LRCLIB zna biti pretrpan — što nije odgovorilo, još dva puta, malo kasnije
+    for (let round = 0; round < 3 && todoLyrics.length; round++) {
+      if (round) {
+        console.log(`  … ${todoLyrics.length} ponovo za ${round * 20} s`)
+        await new Promise((r) => setTimeout(r, round * 20_000))
+      }
+      const failed: typeof bare = []
+      for (const s of todoLyrics) {
+        const f = audioFile(s.song, alias)
+        const ok = await storeLyrics(f, s.song, secs[f], true).catch(() => false)
+        if (ok) lyricsLeft--
+        else failed.push(s)
+        const l = ok ? (await readLyrics())[f] : null
+        console.log(`  ${ok ? '✓' : '✖'}  ${s.song.padEnd(26)} ${l ? `${l.lines.length} redova${l.synced ? ' · prati pjesmu' : ''}` : 'izvor nije odgovorio'}`)
+      }
+      todoLyrics = failed
     }
   }
   const all = await readLyrics()

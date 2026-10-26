@@ -32,11 +32,16 @@ export async function readLyrics(): Promise<Record<string, StoredLyrics>> {
   }
 }
 
-/** Tekst iz oba izvora; null ako neki nije odgovorio. `duration`: trajanje našeg fajla; `fresh`: LRCLIB iznova. */
+/**
+ * Tekst iz oba izvora. `duration`: trajanje našeg fajla; `fresh`: LRCLIB iznova.
+ * null (pokuša se opet) kad LRCLIB ne odgovori — bez njega nema vremena redova;
+ * ne odgovori li sajt, redovi su s LRCLIB-a (ako ih ima).
+ */
 export async function fetchLyrics(song: string, duration: number, fresh = false): Promise<StoredLyrics | null> {
   const [site, lrc] = await Promise.allSettled([lyricsOf(song), lrcOf(song, duration, fresh)])
-  if (site.status === 'rejected' || lrc.status === 'rejected') return null
-  const page = site.value
+  if (lrc.status === 'rejected') return null
+  if (site.status === 'rejected' && !lrc.value.synced && !lrc.value.plain?.length) return null
+  const page = site.status === 'fulfilled' ? site.value : null
   const lines = page?.lines.length ? page.lines : (lrc.value.plain ?? [])
   return {
     title: page?.title ?? song,

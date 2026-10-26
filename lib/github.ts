@@ -22,7 +22,7 @@ export function gh(path: string, init?: RequestInit) {
 }
 
 /** Pokreni workflow za pjesme; null = poslano, inače poruka za admina. */
-export async function dispatchAudio(type: 'audio' | 'audio-rename' | 'lyrics-offset' | 'lyrics-sync', payload: Record<string, string>): Promise<string | null> {
+export async function dispatchAudio(type: 'audio' | 'audio-rename' | 'lyrics-offset' | 'lyrics-sync' | 'sync', payload: Record<string, string>): Promise<string | null> {
   if (!GITHUB_TOKEN) return 'Pjesme se na produkciji mijenjaju preko GitHuba — dodaj GITHUB_AUDIO_TOKEN u Vercel (DEPLOY.md).'
   const r = await gh('/dispatches', { method: 'POST', body: JSON.stringify({ event_type: type, client_payload: payload }) }).catch(() => null)
   return r?.ok ? null : `GitHub nije primio zahtjev (${r?.status ?? 'nema veze'}) — provjeri GITHUB_AUDIO_TOKEN.`

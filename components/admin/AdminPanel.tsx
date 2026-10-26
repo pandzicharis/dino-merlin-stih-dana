@@ -15,6 +15,7 @@ import { PrintSlips } from './PrintSlips'
 import { VerseDesigner } from './VerseDesigner'
 import { SongEdit, SongPicker, SongPlayer, type KnownSong } from './SongPicker'
 import { LyricsBadge, LyricsRow } from './LyricsPreview'
+import { SyncModule } from './SyncModule'
 import { audioFile } from '@/lib/audio-name'
 import { DrawerIcon } from '../DrawerIcon'
 import { Icon, TOAST_BAD, TOAST_OK, toast } from '../Toast'
@@ -43,6 +44,8 @@ type Op =
 /** stihova po stranici liste */
 const PAGE = 10
 /** printer — dugme u zaglavlju i znak modala za štampu */
+const SYNC_ICON = <path d="M20 11a8 8 0 0 0-14.9-3.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.9 3.9L20 16M20 20v-4h-4" />
+
 const PRINT_ICON = (
   <>
     <path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2" />
@@ -70,6 +73,8 @@ export function AdminPanel() {
   const [archiving, setArchiving] = useState<AdminVerse | null>(null)
   // papirići za štampu (modal)
   const [printing, setPrinting] = useState(false)
+  // Sinhronizacija — modal s pjesmama: zvuk i tekst koji fale, u jednom potezu
+  const [syncing, setSyncing] = useState(false)
   const [printCount, setPrintCount] = useState(0)
   // pregled u uređivanju se učita unaprijed, u pozadini — otvori se odmah
   useWarmPreview(data?.verses)
@@ -152,7 +157,19 @@ export function AdminPanel() {
       }
       right={
         <div className="flex items-center gap-2">
-        {/* sve iz baze: pjesme i tekstovi koji fale */}
+        {/* pjesme i tekstovi koji fale — izabrane, u jednom potezu */}
+        <button
+          type="button"
+          onClick={() => setSyncing(true)}
+          disabled={!data || !songs.mode || songs.mode === 'off'}
+          data-sync
+          className="flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white disabled:opacity-40"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            {SYNC_ICON}
+          </svg>
+          Sinhronizacija
+        </button>
         {/* papirići za pult — A4 za štampu na papir u boji */}
         <button
           type="button"
@@ -233,6 +250,13 @@ export function AdminPanel() {
                 }
               >
                 <PrintSlips verses={data.verses} onCount={setPrintCount} />
+              </Sheet>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {syncing && (
+              <Sheet key="sync" wide eyebrow="Pjesme i tekstovi" title="Sinhronizacija" icon={SYNC_ICON} onClose={() => setSyncing(false)}>
+                <SyncModule verses={data.verses} info={songs.of} onDone={songs.reload} flash={flash} />
               </Sheet>
             )}
           </AnimatePresence>
