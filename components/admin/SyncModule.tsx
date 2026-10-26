@@ -43,10 +43,8 @@ export function SyncModule({
   const [noSync, setNoSync] = useState(false)
   const hasAudio = (v: Verse) => info(v.song)?.state === 'ready'
   const synced = (v: Verse) => info(v.song)?.lyrics === 'synced'
-  const shown = songs.filter((v) => (!noAudio || !hasAudio(v)) && (!noSync || !synced(v)))
 
   const [sel, setSel] = useState<Set<string>>(() => new Set())
-  const allOn = shown.length > 0 && shown.every((v) => sel.has(audioSlug(v.song)))
   const toggle = (k: string) =>
     setSel((s) => {
       const n = new Set(s)
@@ -60,6 +58,11 @@ export function SyncModule({
   const [running, setRunning] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const result = new Map(items.map((i) => [audioSlug(i.song), i]))
+  // samo pjesme kojima nešto fali (muzika ili tekst koji prati) — i one iz zadnje
+  // akcije, da im se vidi rezultat i kad su sad potpune
+  const lacking = songs.filter((v) => !hasAudio(v) || !synced(v) || result.has(audioSlug(v.song)))
+  const shown = lacking.filter((v) => (!noAudio || !hasAudio(v)) && (!noSync || !synced(v)))
+  const allOn = shown.length > 0 && shown.every((v) => sel.has(audioSlug(v.song)))
 
   // lokalno: napredak dok posao ide
   const poll = useRef(0)
@@ -112,8 +115,8 @@ export function SyncModule({
     <div className="flex min-h-0 flex-col gap-4" data-sync-module>
       {/* filteri */}
       <div className="flex flex-wrap items-center gap-2">
-        <Pill on={noAudio} onClick={() => setNoAudio((x) => !x)} label="Bez muzike" count={songs.filter((v) => !hasAudio(v)).length} />
-        <Pill on={noSync} onClick={() => setNoSync((x) => !x)} label="Tekst ne prati" count={songs.filter((v) => !synced(v)).length} />
+        <Pill on={noAudio} onClick={() => setNoAudio((x) => !x)} label="Bez muzike" count={lacking.filter((v) => !hasAudio(v)).length} />
+        <Pill on={noSync} onClick={() => setNoSync((x) => !x)} label="Tekst ne prati" count={lacking.filter((v) => !synced(v)).length} />
         <button
           type="button"
           onClick={() =>
@@ -153,7 +156,9 @@ export function SyncModule({
 
       {/* pjesme */}
       <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/[0.08]">
-        {shown.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-white/45">Nema takvih pjesama</p>}
+        {shown.length === 0 && (
+          <p className="px-4 py-6 text-center text-[13px] text-white/45">{lacking.length ? 'Nema takvih pjesama' : 'Sve pjesme imaju muziku i tekst koji prati'}</p>
+        )}
         {shown.map((v) => {
           const k = audioSlug(v.song)
           const s = info(v.song)
