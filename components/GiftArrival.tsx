@@ -457,7 +457,7 @@ function GiftCard({
               aria-modal="true"
               aria-label={`Stih za tebe — ${verse.song}`}
               data-gift
-              className="os-sheet relative flex h-[96dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[26px] border border-b-0 border-white/15 shadow-[0_24px_60px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.1)] sm:h-[88dvh] sm:rounded-[26px] sm:border-b"
+              className="os-sheet relative flex h-[86dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[26px] border border-b-0 border-white/15 shadow-[0_24px_60px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.1)] sm:h-[80dvh] sm:rounded-[26px] sm:border-b"
               {...sheetDrag}
               style={{ ...sheetDrag.style, background: m.gradient[0], fontFamily: 'var(--font-sans), sans-serif' }}
             >

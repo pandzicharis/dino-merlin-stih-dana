@@ -116,14 +116,12 @@ export function QrScanner({ onCode, onClose }: { onCode: (text: string) => boole
       transition={{ duration: 0.25 }}
     >
       <video ref={video} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
-      {/* zatamnjeno oko okvira */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(circle at 50% 46%, transparent 34%, rgba(0,0,0,0.62) 35%)' }} aria-hidden />
 
       <button
         type="button"
         onClick={onClose}
         aria-label="Zatvori"
-        className="hdr-btn absolute right-5 w-[34px]"
+        className="hdr-btn absolute right-5 z-10 w-[34px]"
         style={{ top: 'max(1.25rem, calc(var(--sat, 0px) + 0.75rem))' }}
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -138,6 +136,8 @@ export function QrScanner({ onCode, onClose }: { onCode: (text: string) => boole
         transition={{ duration: wrong ? 0.4 : 2.4, repeat: wrong ? 0 : Infinity, ease: 'easeInOut' }}
         aria-hidden
       >
+        {/* zatamnjeno oko okvira — prozor tačno do zlatnih uglova (sjena oko zaobljenog kvadrata) */}
+        <span className="absolute inset-0 rounded-[18px]" style={{ boxShadow: '0 0 0 200vmax rgba(0,0,0,0.62)' }} />
         {(['left-0 top-0 rounded-tl-[18px] border-b-0 border-r-0', 'right-0 top-0 rounded-tr-[18px] border-b-0 border-l-0', 'bottom-0 left-0 rounded-bl-[18px] border-r-0 border-t-0', 'bottom-0 right-0 rounded-br-[18px] border-l-0 border-t-0'] as const).map((c) => (
           <span key={c} className={`${corner} ${c}`} style={{ borderColor: wrong ? '#D08C8C' : BRAND.gold }} />
         ))}

@@ -22,7 +22,7 @@ export function VerseDrawer({
   open,
   verse,
   label,
-  height = 'h-[96dvh] sm:h-[88dvh]',
+  height = 'h-[86dvh] sm:h-[80dvh]',
   above,
   header,
   children,
