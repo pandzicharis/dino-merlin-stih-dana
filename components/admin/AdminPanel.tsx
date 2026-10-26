@@ -70,6 +70,8 @@ export function AdminPanel() {
   const [data, setData] = useState<Snapshot | null>(null)
   const [busy, setBusy] = useState(false)
   const [editor, setEditor] = useState<{ verse?: AdminVerse } | null>(null)
+  // novi stih — lista iznova (bez filtera, prva strana: novi je na vrhu)
+  const [libKey, setLibKey] = useState(0)
   const [archiving, setArchiving] = useState<AdminVerse | null>(null)
   // papirići za štampu (modal)
   const [printing, setPrinting] = useState(false)
@@ -221,7 +223,7 @@ export function AdminPanel() {
             </button>
           </div>
 
-          <Library data={data} busy={busy} songs={songs} onEdit={(v) => setEditor({ verse: v })} onArchive={setArchiving} onRestore={(v) => send({ op: 'restore', id: v.id }, 'Stih je vraćen u izvlačenje')} />
+          <Library key={libKey} data={data} busy={busy} songs={songs} onEdit={(v) => setEditor({ verse: v })} onArchive={setArchiving} onRestore={(v) => send({ op: 'restore', id: v.id }, 'Stih je vraćen u izvlačenje')} />
 
           <AnimatePresence>
             {printing && (
@@ -285,6 +287,8 @@ export function AdminPanel() {
                     : await send({ op: 'add', verse: draft }, 'Stih je dodan · ulazi u izvlačenje od sutra')
                   if (!ok) return
                   setEditor(null)
+                  if (!editor.verse) setLibKey((k) => k + 1)
+                  songs.reload()
                   // pjesma se sprema odmah — dok stih uđe u izvlačenje, pušta se bez čekanja
                   if (draft.youtube.trim() && songs.of(draft.song)?.state !== 'ready') songs.fetch(draft.song, draft.youtube)
                 }}
@@ -513,6 +517,36 @@ function SongIssue({ info, mode, onRetry }: { info: SongInfo | null; mode: Songs
 }
 
 /** Mala oznaka uz naziv pjesme: spremna, preuzima se, ili fali (s dugmetom). */
+/** Pregled YouTube videa u formi stiha: sličica, dodir pusti video ovdje. */
+function YouTubePreview({ id }: { id: string }) {
+  const [play, setPlay] = useState(false)
+  return (
+    <div className="col-span-2 -mt-1 overflow-hidden rounded-xl border border-white/[0.08] bg-black/40" data-yt-preview>
+      <div className="relative aspect-video w-full">
+        {play ? (
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`}
+            title="YouTube video pjesme"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full border-0"
+          />
+        ) : (
+          <button type="button" onClick={() => setPlay(true)} aria-label="Pusti video" className="group absolute inset-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" draggable={false} className="h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100" />
+            <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform group-hover:scale-105">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="translate-x-px" aria-hidden>
+                <path d="M7 4.5v15l12-7.5z" />
+              </svg>
+            </span>
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** Prekidač filtera u listi: samo stihovi kojima nešto fali (broj desno). */
 function Switch({ data, label, on, count, onChange }: { data: string; label: string; on: boolean; count: number; onChange: (on: boolean) => void }) {
   return (
@@ -1213,6 +1247,33 @@ function Editor({
     const cur = latest.current
     if (audioSlug(cur.song) === audioSlug(song) && !cur.youtube.trim()) setD({ ...cur, youtube }, 'song')
   }
+  // pjesma bez linka (upisana, izabrana, ili stih koji se uređuje) — link sa njene
+  // stranice na dinomerlin.com (tamo gdje je i tekst), pa pregled videa ispod
+  const [linkLook, setLinkLook] = useState<'idle' | 'look' | 'none'>('idle')
+  const linkTo = useRef(setLink)
+  useEffect(() => {
+    linkTo.current = setLink
+  })
+  useEffect(() => {
+    const name = d.song.trim()
+    if (!name || youtubeId(d.youtube)) return
+    let on = true
+    const t = window.setTimeout(() => {
+      setLinkLook('look')
+      fetch(`/api/admin/songs?song=${encodeURIComponent(name)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((b: { youtube?: string | null } | null) => {
+          if (!on) return
+          if (b?.youtube) linkTo.current(name, `https://www.youtube.com/watch?v=${b.youtube}`)
+          setLinkLook(b?.youtube ? 'idle' : 'none')
+        })
+        .catch(() => on && setLinkLook('none'))
+    }, 450)
+    return () => {
+      on = false
+      clearTimeout(t)
+    }
+  }, [d.song, d.youtube])
   const song = d.song.trim() ? songOf(d.song) : null
   // uredi pjesmu iz liste: naziv i ime fajla
   const [editSong, setEditSong] = useState<KnownSong | null>(null)
@@ -1418,7 +1479,14 @@ function Editor({
               YouTube <span className="normal-case tracking-normal text-white/30">— pjesma</span>
             </span>
             <input name="youtube" value={d.youtube} onChange={set('youtube')} required placeholder="link pjesme" className={`mt-2 ${field}`} />
+            {d.song.trim() && !youtubeId(d.youtube) && linkLook !== 'idle' && (
+              <span className="mt-1.5 block text-[11px] text-white/45" data-link-look>
+                {linkLook === 'look' ? 'Tražim link na dinomerlin.com…' : 'Link nije nađen — upiši ga'}
+              </span>
+            )}
           </label>
+          {/* pregled videa — da se vidi da je link prava pjesma */}
+          {youtubeId(d.youtube) && <YouTubePreview key={youtubeId(d.youtube)!} id={youtubeId(d.youtube)!} />}
           {/* svaki stih ima pjesmu koja se pušta odmah — postojeća se može pustiti ovdje */}
           {song?.state === 'ready' ? (
             <SongPlayer key={audioSlug(d.song)} song={d.song} />

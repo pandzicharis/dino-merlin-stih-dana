@@ -5,7 +5,7 @@ import { CAN_FETCH, readAlias, readDurations, renameSong } from '@/lib/audio-fil
 import { audioFile } from '@/lib/audio-name'
 import { audioSlug } from '@/lib/text'
 import { dispatchAudio } from '@/lib/github'
-import { siteLyrics, siteSongs, sitePicks } from '@/lib/dino-site'
+import { findSiteSong, siteLyrics, siteSongs, sitePicks } from '@/lib/dino-site'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,16 +13,20 @@ export const dynamic = 'force-dynamic'
 /**
  * Pjesme s dinomerlin.com/tekstovi-pjesama — izbor pjesme u formi stiha
  * (nazivi usklađeni s katalogom i fajlovima — lib/dino-site.ts `sitePicks`).
- * `?page=<stranica>` vrati YouTube link te pjesme (za novu pjesmu).
+ * `?page=<stranica>` ili `?song=<naziv>` vrati YouTube link te pjesme sa
+ * njene stranice na sajtu (forma ga popuni sama).
  */
 export async function GET(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Niste prijavljeni.' }, { status: 401 })
-  const page = new URL(req.url).searchParams.get('page')
+  const params = new URL(req.url).searchParams
+  const song = params.get('song')?.trim().slice(0, 120)
   try {
+    const page = params.get('page') ?? (song ? findSiteSong(song, await siteSongs())?.page : null)
     if (page) {
       const { youtube } = await siteLyrics(page)
       return NextResponse.json({ youtube: youtube ?? null })
     }
+    if (song) return NextResponse.json({ youtube: null })
     const [list, cat, durations, alias] = await Promise.all([siteSongs(), readCatalog(), readDurations(), readAlias()])
     const songs = sitePicks(
       list,
