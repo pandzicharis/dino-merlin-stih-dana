@@ -29,6 +29,8 @@ type V = { id: string; song: string; youtube?: string; active?: boolean }
 const local = process.argv.includes('--local')
 const check = process.argv.includes('--check')
 const lyricsOnly = process.argv.includes('--lyrics')
+/** tekstovi koji ne prate pjesmu — LRCLIB iznova: `*` svi, ili naziv pjesme (admin → "Traži vremena") */
+const resync = process.env.LYRICS_RESYNC?.trim() || ''
 
 async function verses(): Promise<V[]> {
   const sent: V[] = process.env.AUDIO_SONG ? [{ id: '(iz admina)', song: process.env.AUDIO_SONG, youtube: process.env.AUDIO_YOUTUBE || undefined }] : []
@@ -86,21 +88,25 @@ async function main() {
   const left = (await Promise.all(todo.map((k) => songState(songs.get(k)!.song)))).filter((s) => s.state !== 'ready').length
   console.log(`\n${songs.size} pjesama za ${list.length} stihova · ${left ? `${left} bez zvuka` : 'sve spremne'}${noLink ? ` · ${noLink} bez linka` : ''}\n`)
 
-  // tekstovi: pjesma sa zvukom, a bez spremljenog teksta (trajanje treba za vrijeme redova)
+  // tekstovi: pjesma sa zvukom, a bez spremljenog teksta (trajanje treba za vrijeme redova);
+  // uz LYRICS_RESYNC i oni bez vremena redova
   const [stored, alias, secs] = await Promise.all([readLyrics(), readAlias(), readDurations()])
-  const bare = [...songs.values()].filter((s) => audioFile(s.song, alias) in secs && !(audioFile(s.song, alias) in stored))
+  const again = (s: { song: string }) =>
+    Boolean(resync) && !stored[audioFile(s.song, alias)]?.synced && (resync === '*' || audioSlug(resync) === audioSlug(s.song))
+  const bare = [...songs.values()].filter((s) => audioFile(s.song, alias) in secs && (!(audioFile(s.song, alias) in stored) || again(s)))
   let lyricsLeft = bare.length
   if (bare.length && !check) {
     console.log(`Tekstovi: ${bare.length}…`)
     for (const s of bare) {
       const f = audioFile(s.song, alias)
-      const ok = await storeLyrics(f, s.song, secs[f]).catch(() => false)
+      const ok = await storeLyrics(f, s.song, secs[f], true).catch(() => false)
       if (ok) lyricsLeft--
       const l = ok ? (await readLyrics())[f] : null
       console.log(`  ${ok ? '✓' : '✖'}  ${s.song.padEnd(26)} ${l ? `${l.lines.length} redova${l.synced ? ' · prati pjesmu' : ''}` : 'izvor nije odgovorio'}`)
     }
   }
-  console.log(`\nTekstovi: ${Object.keys(stored).length + bare.length - lyricsLeft} spremljeno${lyricsLeft ? ` · ${lyricsLeft} fali` : ''}\n`)
+  const all = await readLyrics()
+  console.log(`\nTekstovi: ${Object.keys(all).length} spremljeno · ${Object.values(all).filter((l) => l.synced).length} prati pjesmu${lyricsLeft ? ` · ${lyricsLeft} nije odgovorio` : ''}\n`)
 
   if (!check && ((todo.length && !left) || bare.length > lyricsLeft)) console.log('Sad: git add public/audio data/audio.json data/lyrics.json, commit i push.\n')
   // preuzimanje: greška samo kad pjesma fali (stih bez linka javi provjera); tekst nije obavezan

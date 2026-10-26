@@ -349,8 +349,10 @@ type Songs = {
   mode: SongsSnapshot['mode'] | null
   of: (song: string) => SongInfo | null
   fetch: (song: string, youtube?: string) => void
-  /** preuzmi tekst pjesme sada */
+  /** preuzmi tekst pjesme sada (i kad postoji, a ne prati pjesmu — LRCLIB iznova) */
   fetchLyrics: (song: string) => void
+  /** svi tekstovi koji ne prate pjesmu — LRCLIB iznova */
+  resyncLyrics: () => void
   reload: () => void
 }
 
@@ -379,7 +381,7 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
     (song: string): SongInfo | null => {
       const k = audioSlug(song)
       const s = snap?.songs[k] ?? null
-      const lyrics = pendingLyrics[k] && Date.now() - pendingLyrics[k] < 90_000 && s?.lyrics === 'missing' ? 'loading' : s?.lyrics
+      const lyrics = pendingLyrics[k] && Date.now() - pendingLyrics[k] < 90_000 && s?.lyrics !== 'synced' ? 'loading' : s?.lyrics
       if (s?.state === 'ready') return { ...s, lyrics }
       if (pending[k] && Date.now() - pending[k] < 90_000) return { state: 'loading', lyrics }
       return s && { ...s, lyrics }
@@ -397,7 +399,7 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
     if (!live || !busy) return
     const t = setTimeout(() => {
       setPending((p) => Object.fromEntries(Object.entries(p).filter(([k, at]) => Date.now() - at < 90_000 && snap?.songs[k]?.state !== 'ready')))
-      setPendingLyrics((p) => Object.fromEntries(Object.entries(p).filter(([k, at]) => Date.now() - at < 90_000 && snap?.songs[k]?.lyrics === 'missing')))
+      setPendingLyrics((p) => Object.fromEntries(Object.entries(p).filter(([k, at]) => Date.now() - at < 90_000 && snap?.songs[k]?.lyrics !== 'synced')))
       void load()
     }, snap?.mode === 'local' ? 2000 : 7000)
     return () => clearTimeout(t)
@@ -441,7 +443,27 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
     [live, load, flash],
   )
 
-  return { mode: snap?.mode ?? null, of, fetch: fetchSong, fetchLyrics, reload: () => void load() }
+  const resyncLyrics = useCallback(async () => {
+    if (!live) return
+    // na produkciji GitHubu treba par minuta — dotad "preuzima se"
+    const keys = Object.entries(snap?.songs ?? {})
+      .filter(([, s]) => s.state === 'ready' && s.lyrics !== 'synced')
+      .map(([k]) => k)
+    if (snap?.mode !== 'local') setPendingLyrics((p) => ({ ...p, ...Object.fromEntries(keys.map((k) => [k, Date.now()])) }))
+    const r = await fetch('/api/admin/lyrics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    }).catch(() => null)
+    const b = (await r?.json().catch(() => null)) as { error?: string; note?: string } | null
+    if (!r?.ok) {
+      setPendingLyrics((p) => Object.fromEntries(Object.entries(p).filter(([k]) => !keys.includes(k))))
+      flash(b?.error ?? 'Tekstovi se nisu mogli pokrenuti', true)
+    } else if (b?.note) flash(b.note)
+    void load()
+  }, [live, snap, load, flash])
+
+  return { mode: snap?.mode ?? null, of, fetch: fetchSong, fetchLyrics, resyncLyrics, reload: () => void load() }
 }
 
 type SyncSnap = {
@@ -595,7 +617,7 @@ function Switch({ data, label, on, count, onChange }: { data: string; label: str
       aria-checked={on}
       data-missing-filter={data}
       onClick={() => onChange(!on)}
-      className="flex items-center gap-2 text-[11px] transition-colors"
+      className="flex h-8 shrink-0 items-center gap-2 whitespace-nowrap px-1 text-[11px] transition-colors"
       style={{ color: on ? '#fff' : 'rgba(255,255,255,0.5)' }}
     >
       <span className="relative h-[18px] w-[30px] shrink-0 rounded-full border transition-colors" style={{ borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.15)', background: on ? `${BRAND.gold}33` : 'rgba(255,255,255,0.04)' }}>
@@ -768,7 +790,7 @@ function Library({
       />
 
       {/* raspoloženja u jednom redu — na uskom ekranu klize vodoravno */}
-      <div className="no-scrollbar -mx-5 mb-3 flex gap-2 overflow-x-auto px-5">
+      <div className="no-scrollbar -mx-5 mb-4 flex gap-2 overflow-x-auto px-5">
         {MOOD_KEYS.map((k) => (
           <button
             key={k}
@@ -789,31 +811,45 @@ function Library({
             {MOODS[k].label}
           </button>
         ))}
+        {/* bez pjesme / tekst bez vremena redova — tek kad je stanje pjesama stiglo */}
+        {songs.mode && (
+          <>
+            <span className="mx-1 w-px shrink-0 self-stretch bg-white/10" aria-hidden />
+            {(
+              [
+                ['song', 'Bez pjesme', noSong, setNoSong, hasSong],
+                ['sync', 'Tekst ne prati', noSync, setNoSync, synced],
+              ] as const
+            ).map(([k, label, on, set, has]) => (
+              <Switch
+                key={k}
+                data={k}
+                label={label}
+                on={on}
+                count={data.verses.filter((v) => v.active !== archived && !has(v)).length}
+                onChange={(next) => {
+                  set(next)
+                  setPage(0)
+                }}
+              />
+            ))}
+            {/* svi tekstovi koji ne prate pjesmu — LRCLIB iznova */}
+            {songs.mode !== 'off' && data.verses.some((v) => hasSong(v) && !synced(v)) && (
+              <button
+                type="button"
+                onClick={songs.resyncLyrics}
+                data-lyrics-resync
+                className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/10 px-3 text-[11px] text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+                </svg>
+                Traži vremena
+              </button>
+            )}
+          </>
+        )}
       </div>
-
-      {/* bez pjesme / tekst bez vremena redova — tek kad je stanje pjesama stiglo */}
-      {songs.mode && (
-        <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2">
-          {(
-            [
-              ['song', 'Bez pjesme', noSong, setNoSong, hasSong],
-              ['sync', 'Tekst ne prati', noSync, setNoSync, synced],
-            ] as const
-          ).map(([k, label, on, set, has]) => (
-            <Switch
-              key={k}
-              data={k}
-              label={label}
-              on={on}
-              count={data.verses.filter((v) => v.active !== archived && !has(v)).length}
-              onChange={(next) => {
-                set(next)
-                setPage(0)
-              }}
-            />
-          ))}
-        </div>
-      )}
 
       {/* lista ima svoju visinu i skrola se unutra — filteri i kartice ostaju na mjestu */}
       <div

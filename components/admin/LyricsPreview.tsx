@@ -130,6 +130,23 @@ export function LyricsRow({
             )}
           </AnimatePresence>
         </motion.div>
+        {/* bez vremena redova — LRCLIB iznova (zna biti pretrpan pa vrati manje) */}
+        {l === 'plain' && canFetch && (
+          <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-2 text-[11px] text-white/55" data-lyrics-plain>
+            <span className="min-w-0 flex-1">Tekst ne prati pjesmu</span>
+            <button
+              type="button"
+              onClick={onFetch}
+              data-lyrics-retry
+              className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-2.5 text-[11px] text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+              </svg>
+              Traži vremena
+            </button>
+          </div>
+        )}
         {/* pomak: kad tekst kasni ili žuri za pjesmom — + svijetli ranije */}
         {l === 'synced' && (
           <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-2 text-[11px] text-white/55" data-lyrics-offset>

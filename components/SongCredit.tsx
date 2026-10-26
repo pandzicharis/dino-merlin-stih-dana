@@ -745,7 +745,6 @@ function GramophoneRow({
   state,
   progress,
   time,
-  cover,
   onToggle,
   onPrime,
   onSeek,
@@ -759,7 +758,6 @@ function GramophoneRow({
   state: State
   progress: number
   time: string
-  cover?: string
   onToggle: () => void
   onPrime: () => void
   onSeek: (fraction: number) => void
@@ -777,7 +775,7 @@ function GramophoneRow({
     <div data-tip={tip ? 'song' : undefined} className="flex items-center gap-4 text-left" style={{ width: CARD_W }}>
       {/* ploča visoka koliko i tekst s trakom desno */}
       {/* sačuvani sviraju — samo ploča (rupa), dugmad su ispod; današnji ima pusti */}
-      <Vinyl size={72} state={state} progress={progress} song={verse.song} cover={cover} onClick={onToggle} onPrime={onPrime} deck={deck} arm hole={hole} />
+      <Vinyl size={72} state={state} progress={progress} song={verse.song} onClick={onToggle} onPrime={onPrime} deck={deck} arm hole={hole} />
       <div className="min-w-0 flex-1">
         {/* dodir na naziv radi isto što i ploča */}
         <div className="flex items-center gap-2.5">
@@ -868,7 +866,7 @@ function AudioRow({ fit, hole, vinyl, ...props }: Source & { fit: boolean; hole:
   const small = vinyl < 56
   return (
     <>
-      <Vinyl size={vinyl} state={state} progress={progress} song={verse.song} cover={albumOf(verse.album)?.cover} onClick={toggle} onPrime={prime} arm hole={hole} />
+      <Vinyl size={vinyl} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} arm hole={hole} />
       <div className="min-w-0 flex-1">
         <RowText verse={verse} onClick={toggle} fit={fit} small={small} />
         <div className={`flex items-center ${small ? 'gap-2' : 'gap-2.5'}`}>

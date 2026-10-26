@@ -7,6 +7,8 @@ import { BRAND } from '@/lib/brand'
 import { audioSlug, albumLine } from '@/lib/text'
 import { audioFile } from '@/lib/audio-name'
 import type { SitePick } from '@/lib/dino-site'
+import { LyricsIcon } from '../Lyrics'
+import type { PreviewAudio, PreviewLyrics } from '../PreviewScreen'
 
 export type KnownSong = {
   song: string
@@ -307,12 +309,22 @@ export function SongPicker({
 
 const time = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
-/** Pjesma koja je već u aplikaciji — pusti je u formi, da se čuje prije čuvanja. */
+/** pregledi ekrana u adminu (DevicePreview) — svi dobiju isto */
+function toPreviews(msg: PreviewLyrics) {
+  document.querySelectorAll<HTMLIFrameElement>('iframe[src^="/pregled"]').forEach((f) => f.contentWindow?.postMessage(msg, location.origin))
+}
+
+/**
+ * Pjesma koja je već u aplikaciji — pusti je u formi, da se čuje prije čuvanja.
+ * "Tekst u pregledu": na pregledu ekrana se otvori tekst pjesme i prati je (kao
+ * u aplikaciji); dugmad u njemu upravljaju ovom pjesmom.
+ */
 export function SongPlayer({ song }: { song: string }) {
   const audio = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [t, setT] = useState(0)
   const [dur, setDur] = useState(0)
+  const [lyrics, setLyrics] = useState(false)
   // druga pjesma = novi plejer (key u formi) — kreće ispočetka, ne svira sama
   const src = `/audio/${audioFile(song)}.m4a`
 
@@ -322,6 +334,31 @@ export function SongPlayer({ song }: { song: string }) {
     if (a.paused) void a.play().catch(() => setPlaying(false))
     else a.pause()
   }
+
+  // stanje pjesme pregledu — pri svakoj promjeni, i kad se pregled učita iznova
+  const state = useRef<PreviewLyrics>({ type: 'stihdana:preview-lyrics', on: false, t: 0, d: 0, playing: false })
+  useEffect(() => {
+    state.current = { type: 'stihdana:preview-lyrics', on: lyrics, t, d: dur, playing }
+    toPreviews(state.current)
+  }, [lyrics, t, dur, playing])
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== location.origin) return
+      if (e.data?.type === 'stihdana:preview-ready') return toPreviews(state.current)
+      const m = e.data as PreviewAudio
+      if (m?.type !== 'stihdana:preview-audio') return
+      const a = audio.current
+      if (m.cmd === 'close') setLyrics(false)
+      else if (m.cmd === 'toggle') toggle()
+      else if (a && m.cmd === 'seek' && typeof m.at === 'number') a.currentTime = Math.max(0, Math.min(a.duration || 0, m.at))
+    }
+    window.addEventListener('message', onMessage)
+    return () => {
+      window.removeEventListener('message', onMessage)
+      // forma zatvorena / druga pjesma — tekst sa pregleda nestane
+      toPreviews({ ...state.current, on: false, playing: false })
+    }
+  }, [])
 
   return (
     <div className="col-span-2 -mt-1 flex items-center gap-3 rounded-xl border border-white/[0.08] bg-black/30 px-2.5 py-2" data-song-player>
@@ -374,6 +411,20 @@ export function SongPlayer({ song }: { song: string }) {
           <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${dur ? (t / dur) * 100 : 0}%`, background: BRAND.gold }} />
         </div>
       </div>
+      {/* tekst pjesme na pregledu ekrana — prati pjesmu */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={lyrics}
+        onClick={() => setLyrics((on) => !on)}
+        title="Tekst pjesme na pregledu"
+        data-preview-lyrics
+        className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] transition-colors"
+        style={lyrics ? { borderColor: BRAND.gold, color: BRAND.gold, background: `${BRAND.gold}1f` } : { borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.55)' }}
+      >
+        <LyricsIcon size={13} />
+        {lyrics ? 'Tekst u pregledu' : 'Tekst'}
+      </button>
     </div>
   )
 }

@@ -32,9 +32,9 @@ export async function readLyrics(): Promise<Record<string, StoredLyrics>> {
   }
 }
 
-/** Tekst iz oba izvora; null ako neki nije odgovorio. `duration`: trajanje našeg fajla. */
-export async function fetchLyrics(song: string, duration: number): Promise<StoredLyrics | null> {
-  const [site, lrc] = await Promise.allSettled([lyricsOf(song), lrcOf(song, duration)])
+/** Tekst iz oba izvora; null ako neki nije odgovorio. `duration`: trajanje našeg fajla; `fresh`: LRCLIB iznova. */
+export async function fetchLyrics(song: string, duration: number, fresh = false): Promise<StoredLyrics | null> {
+  const [site, lrc] = await Promise.allSettled([lyricsOf(song), lrcOf(song, duration, fresh)])
   if (site.status === 'rejected' || lrc.status === 'rejected') return null
   const page = site.value
   const lines = page?.lines.length ? page.lines : (lrc.value.plain ?? [])
@@ -80,6 +80,15 @@ const g = globalThis as typeof globalThis & { __stihLyrics?: Set<string> }
 const pending = (g.__stihLyrics ??= new Set())
 export const lyricsLoading = (file: string) => pending.has(file)
 
+/**
+ * Ponovo traži vremena redova za tekstove koji ne prate pjesmu (admin → "Traži
+ * vremena"), jedan za drugim — LRCLIB ne voli navalu. Lokalno, u pozadini.
+ */
+export async function resyncLyrics(list: { file: string; song: string; duration: number }[]): Promise<void> {
+  list.forEach((s) => pending.add(s.file))
+  for (const s of list) await storeLyrics(s.file, s.song, s.duration, true).catch(() => false)
+}
+
 /** Stanje teksta pjesme za admina. */
 export type LyricsState = 'synced' | 'plain' | 'missing' | 'loading'
 export function lyricsState(file: string, stored: Record<string, StoredLyrics>): LyricsState {
@@ -88,13 +97,15 @@ export function lyricsState(file: string, stored: Record<string, StoredLyrics>):
   return !l ? 'missing' : l.synced ? 'synced' : 'plain'
 }
 
-/** Preuzmi i spremi tekst pjesme `file` (ime fajla). false = izvor nije odgovorio. */
-export async function storeLyrics(file: string, song: string, duration: number): Promise<boolean> {
+/** Preuzmi i spremi tekst pjesme `file` (ime fajla). false = izvor nije odgovorio. `fresh`: LRCLIB iznova. */
+export async function storeLyrics(file: string, song: string, duration: number, fresh = false): Promise<boolean> {
   pending.add(file)
   try {
-    const l = await fetchLyrics(song, duration)
+    const l = await fetchLyrics(song, duration, fresh)
     if (!l) return false
     await updateLyrics((d) => {
+      // tekst koji prati pjesmu ne zamijeni slabiji (LRCLIB zna vratiti manje kad je pretrpan)
+      if (d[file]?.synced && !l.synced) return
       // podešen pomak ostaje i kad se tekst preuzme iznova
       d[file] = d[file]?.offset ? { ...l, offset: d[file].offset } : l
     })

@@ -15,8 +15,9 @@ name: Stih dana — pjesme
 on:
   repository_dispatch:
     # audio: preuzmi pjesme (i tekstove) koje fale; audio-rename: admin je preimenovao
-    # pjesmu; lyrics-offset: admin je podesio pomak teksta
-    types: [audio, audio-rename, lyrics-offset]
+    # pjesmu; lyrics-offset: admin je podesio pomak teksta; lyrics-sync: ponovo traži
+    # vremena redova za tekstove koji ne prate pjesmu (song: naziv ili *)
+    types: [audio, audio-rename, lyrics-offset, lyrics-sync]
   workflow_dispatch:
 
 concurrency:
@@ -76,6 +77,13 @@ jobs:
           AUDIO_SONG: ${{ github.event.client_payload.song }}
           LYRICS_OFFSET: ${{ github.event.client_payload.offset }}
         run: npx -y tsx@4.23.13 scripts/lyrics-offset.ts
+
+      - name: Tekstovi koji ne prate pjesmu
+        if: github.event.action == 'lyrics-sync'
+        env:
+          STIH_AUDIO_FETCH: '1'
+          LYRICS_RESYNC: ${{ github.event.client_payload.song }}
+        run: npx -y tsx@4.23.13 scripts/audio-sync.ts --lyrics
 
       - name: Preuzmi pjesme koje fale
         if: github.event.action == 'audio' || github.event_name == 'workflow_dispatch'
