@@ -29,7 +29,7 @@ type V = { id: string; song: string; youtube?: string; active?: boolean }
 const local = process.argv.includes('--local')
 const check = process.argv.includes('--check')
 const lyricsOnly = process.argv.includes('--lyrics')
-/** tekstovi koji ne prate pjesmu — LRCLIB iznova: `*` svi, ili naziv pjesme (admin → "Traži vremena") */
+/** tekstovi koji ne prate pjesmu — LRCLIB iznova: `*` svi, ili naziv pjesme (admin → "Preuzmi tekst") */
 const resync = process.env.LYRICS_RESYNC?.trim() || ''
 
 async function verses(): Promise<V[]> {

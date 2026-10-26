@@ -80,15 +80,6 @@ const g = globalThis as typeof globalThis & { __stihLyrics?: Set<string> }
 const pending = (g.__stihLyrics ??= new Set())
 export const lyricsLoading = (file: string) => pending.has(file)
 
-/**
- * Ponovo traži vremena redova za tekstove koji ne prate pjesmu (admin → "Traži
- * vremena"), jedan za drugim — LRCLIB ne voli navalu. Lokalno, u pozadini.
- */
-export async function resyncLyrics(list: { file: string; song: string; duration: number }[]): Promise<void> {
-  list.forEach((s) => pending.add(s.file))
-  for (const s of list) await storeLyrics(s.file, s.song, s.duration, true).catch(() => false)
-}
-
 /** Stanje teksta pjesme za admina. */
 export type LyricsState = 'synced' | 'plain' | 'missing' | 'loading'
 export function lyricsState(file: string, stored: Record<string, StoredLyrics>): LyricsState {

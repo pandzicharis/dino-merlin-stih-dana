@@ -2,43 +2,23 @@ import { NextResponse } from 'next/server'
 import { isAdmin } from '@/lib/admin-auth'
 import { CAN_FETCH, readAlias, readDurations } from '@/lib/audio-files'
 import { audioFile } from '@/lib/audio-name'
-import { readLyrics, resyncLyrics, setLyricsOffset, storeLyrics } from '@/lib/lyrics-store'
-import { readCatalog } from '@/lib/catalog'
+import { setLyricsOffset, storeLyrics } from '@/lib/lyrics-store'
 import { GITHUB_TOKEN, dispatchAudio } from '@/lib/github'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * Preuzmi tekst pjesme sada (admin → "Preuzmi tekst" / "Traži vremena"), ili
+ * Preuzmi tekst pjesme sada (admin → "Preuzmi tekst"), ili
  * sačuvaj pomak teksta (`offset`, kad LRC kasni ili žuri za pjesmom). Tekst ide
  * uz pjesmu (vrijeme redova po trajanju fajla), pa pjesma mora biti preuzeta.
- * `all`: svi tekstovi koji ne prate pjesmu. Lokalno odmah, u pozadini (stanje u
- * /api/admin/audio); na produkciji GitHub (`npm run audio`, LYRICS_RESYNC).
+ * Lokalno odmah, u pozadini (stanje u /api/admin/audio); na produkciji GitHub
+ * (`npm run audio`, LYRICS_RESYNC).
  */
 export async function POST(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: 'Niste prijavljeni.' }, { status: 401 })
-  const body = (await req.json().catch(() => null)) as { song?: string; offset?: number; all?: boolean } | null
+  const body = (await req.json().catch(() => null)) as { song?: string; offset?: number } | null
   const song = String(body?.song ?? '').trim().slice(0, 120)
-
-  // svi tekstovi koji ne prate pjesmu — LRCLIB iznova
-  if (body?.all) {
-    if (CAN_FETCH) {
-      const [cat, alias, secs, stored] = await Promise.all([readCatalog(), readAlias(), readDurations(), readLyrics()])
-      const seen = new Set<string>()
-      const list = cat.verses.flatMap((v) => {
-        const file = audioFile(v.song, alias)
-        if (seen.has(file) || !(file in secs) || stored[file]?.synced) return []
-        seen.add(file)
-        return [{ file, song: v.song, duration: secs[file] }]
-      })
-      resyncLyrics(list).catch(() => {})
-      return NextResponse.json({ state: 'loading', count: list.length })
-    }
-    const fail = await dispatchAudio('lyrics-sync', { song: '*' })
-    if (fail) return NextResponse.json({ error: fail }, { status: GITHUB_TOKEN ? 502 : 409 })
-    return NextResponse.json({ state: 'loading', note: 'Tekstovi stižu uz sljedeću objavu (~3 min).' })
-  }
 
   if (!song) return NextResponse.json({ error: 'Nedostaje naziv pjesme.' }, { status: 400 })
 

@@ -15,6 +15,8 @@ import { GearIcon } from './Settings'
 import { QrCode } from './deck/QrCode'
 import APP_QR from '@/data/app-qr.json'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
+import { QrScanner, giftFromQr } from './QrScanner'
+import { openGift } from './GiftArrival'
 
 /** Verzija iz `public/sw.js` (`stihdana-v1.0`) — 1.0, 1.1… raste s izdanjima. */
 const versionOf = (name: string) => /^stihdana-v(\d+\.\d+)$/.exec(name)?.[1]
@@ -148,6 +150,7 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
                 {/* visoko, da se QR vidi čim se otvori */}
                 <Section title="Podijeli">
                   <ShareApp />
+                  <ScanGift onDone={onClose} />
                 </Section>
 
                 <Section title="Dino Merlin">
@@ -260,6 +263,51 @@ function Link({ href, tile, title, sub }: { href: string; tile: ReactNode; title
       <Text title={title} sub={sub} />
       <Chevron />
     </a>
+  )
+}
+
+/**
+ * "Skeniraj poklon" — QR kod stiha s drugog telefona, kamerom u aplikaciji
+ * (kamera telefona na iPhoneu link otvori u Safariju, ne ovdje). Pročitan —
+ * postavke se zatvore i poklon se otvori odmah (components/GiftArrival.tsx).
+ */
+function ScanGift({ onDone }: { onDone: () => void }) {
+  const [scan, setScan] = useState(false)
+  return (
+    <>
+      <Row
+        tile={
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M7 12h10" />
+          </svg>
+        }
+        title="Skeniraj poklon"
+        sub="QR kod stiha s drugog telefona"
+        right={<Chevron />}
+        onClick={() => {
+          haptic(6)
+          setScan(true)
+        }}
+        label="Skeniraj poklon"
+      />
+      <AnimatePresence>
+        {scan && (
+          <QrScanner
+            key="scan"
+            onClose={() => setScan(false)}
+            onCode={(text) => {
+              const id = giftFromQr(text)
+              if (!id) return false
+              haptic([10, 40, 16])
+              setScan(false)
+              onDone()
+              openGift(id)
+              return true
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 

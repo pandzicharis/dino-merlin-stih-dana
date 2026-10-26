@@ -104,6 +104,15 @@ function takeGift(): string | null {
   return arrived
 }
 
+const GIFT_EVENT = 'stihdana:gift'
+/** Otvori poklon odmah, bez učitavanja stranice (skener QR koda u aplikaciji); van početne — na nju. */
+export function openGift(id: string) {
+  const taken = !window.dispatchEvent(new CustomEvent(GIFT_EVENT, { detail: id, cancelable: true }))
+  // namjerno puno učitavanje: poklon se čita iz adrese jednom po učitavanju (takeGift)
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  if (!taken) window.location.assign(`/?poklon=${encodeURIComponent(id)}`)
+}
+
 /** `?poklon=<id>` u adresi (ili već pročitan) — samo čita, ništa ne mijenja */
 function peekGift(): string | null {
   if (arrived !== undefined) return arrived
@@ -135,85 +144,105 @@ export function GiftHost({ verses }: { verses: Verse[] }) {
   const verseBox = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const id = takeGift()
-    if (!id) return
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    let dead = false
-    const timers: number[] = []
-    const at = (ms: number, f: () => void) => timers.push(window.setTimeout(() => !dead && f(), ms))
-    let flown = false
-    let landed = false
-    let flight: Flight | null = null
-    // drawer stoji iza podloge: izmjeri stih i iscrtaj kopiju (nevidljivu) unaprijed
-    const prepare = (v: Verse, then?: () => void) =>
-      whenStill(verseBox.current, () => {
-        if (dead) return
-        flight ??= measureFlight(verseBox.current, v)
-        setFly(flight)
-        then?.()
-      })
-    // slova s papira na stih
-    const toVerse = (v: Verse) => {
-      if (flown) return
-      flown = true
-      timers.forEach(clearTimeout)
-      // papirić se otvori i kad je dodir preskočio otvaranje
-      setPhase((p) => (p === 'in' ? 'open' : p))
-      prepare(v, () => {
-        // dva kadra: kopija je iscrtana, tek onda krene
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            if (dead) return
-            setGo(true)
-            setBlank(true)
-            haptic([10, 40, 16])
-            at(40, () => setPhase('gone'))
-            // ako kraj leta ne javi (pozadinska kartica) — zamjena ipak
-            at((SPLASH_ARRIVE + 0.25) * 1000, () => land.current())
-          }),
-        )
-      })
-    }
-    // slova sletjela: stih i kopija se zamijene u istom kadru — bez preklapanja (sjaj
-    // bi se udvostručio) i bez praznog trenutka
-    land.current = () => {
-      if (landed || dead) return
-      landed = true
-      setHide(false)
-      setFly(null)
-    }
-    const start = (v: Verse) => {
-      setVerse(v)
-      skip.current = () => {
-        haptic(6)
-        toVerse(v)
+    // jedan poklon: papirić, let slova, drawer — vrati čišćenje
+    const play = (id: string) => {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      let dead = false
+      const timers: number[] = []
+      const at = (ms: number, f: () => void) => timers.push(window.setTimeout(() => !dead && f(), ms))
+      let flown = false
+      let landed = false
+      let flight: Flight | null = null
+      // drawer stoji iza podloge: izmjeri stih i iscrtaj kopiju (nevidljivu) unaprijed
+      const prepare = (v: Verse, then?: () => void) =>
+        whenStill(verseBox.current, () => {
+          if (dead) return
+          flight ??= measureFlight(verseBox.current, v)
+          setFly(flight)
+          then?.()
+        })
+      // slova s papira na stih
+      const toVerse = (v: Verse) => {
+        if (flown) return
+        flown = true
+        timers.forEach(clearTimeout)
+        // papirić se otvori i kad je dodir preskočio otvaranje
+        setPhase((p) => (p === 'in' ? 'open' : p))
+        prepare(v, () => {
+          // dva kadra: kopija je iscrtana, tek onda krene
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              if (dead) return
+              setGo(true)
+              setBlank(true)
+              haptic([10, 40, 16])
+              at(40, () => setPhase('gone'))
+              // ako kraj leta ne javi (pozadinska kartica) — zamjena ipak
+              at((SPLASH_ARRIVE + 0.25) * 1000, () => land.current())
+            }),
+          )
+        })
       }
-      if (reduced) return setDrawer(true)
-      // drawer se otvori odmah, iza podloge — dok se papirić otvara, on je na svom mjestu
-      setHide(true)
-      setDrawer(true)
-      // duži stih — duže stoji otvoren
-      const hold = Math.min(3600, 1600 + v.text.length * 25)
-      at(80, () => setPhase('in'))
-      at(1000, () => {
-        setPhase('open')
-        haptic(8)
-        prepare(v)
+      // slova sletjela: stih i kopija se zamijene u istom kadru — bez preklapanja (sjaj
+      // bi se udvostručio) i bez praznog trenutka
+      land.current = () => {
+        if (landed || dead) return
+        landed = true
+        setHide(false)
+        setFly(null)
+      }
+      const start = (v: Verse) => {
+        setVerse(v)
+        skip.current = () => {
+          haptic(6)
+          toVerse(v)
+        }
+        if (reduced) return setDrawer(true)
+        // drawer se otvori odmah, iza podloge — dok se papirić otvara, on je na svom mjestu
+        setHide(true)
+        setDrawer(true)
+        // duži stih — duže stoji otvoren
+        const hold = Math.min(3600, 1600 + v.text.length * 25)
+        at(80, () => setPhase('in'))
+        at(1000, () => {
+          setPhase('open')
+          haptic(8)
+          prepare(v)
+        })
+        at(1000 + 800 + hold, () => toVerse(v))
+      }
+      // kreće kad su fontovi tu — inače bi papirić zastao dok se stranica slaže
+      void Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 700))]).then(async () => {
+        const v =
+          list.current.find((x) => x.id === id) ??
+          ((await fetch(`/api/day?id=${encodeURIComponent(id)}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null)) as Verse | null)
+        if (v && !dead) start(v)
       })
-      at(1000 + 800 + hold, () => toVerse(v))
+      return () => {
+        dead = true
+        timers.forEach(clearTimeout)
+      }
     }
-    // kreće kad su fontovi tu — inače bi papirić zastao dok se stranica slaže
-    void Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 700))]).then(async () => {
-      const v =
-        list.current.find((x) => x.id === id) ??
-        ((await fetch(`/api/day?id=${encodeURIComponent(id)}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .catch(() => null)) as Verse | null)
-      if (v && !dead) start(v)
-    })
+    // poklon iz adrese (link, QR kamerom telefona) ili skeniran u aplikaciji (openGift)
+    let stop = () => {}
+    const first = takeGift()
+    if (first) stop = play(first)
+    const onGift = (e: Event) => {
+      // javi openGift da je poklon preuzet ovdje
+      e.preventDefault()
+      stop()
+      setGo(false)
+      setBlank(false)
+      setFly(null)
+      setPhase(null)
+      stop = play((e as CustomEvent<string>).detail)
+    }
+    window.addEventListener(GIFT_EVENT, onGift)
     return () => {
-      dead = true
-      timers.forEach(clearTimeout)
+      stop()
+      window.removeEventListener(GIFT_EVENT, onGift)
     }
   }, [])
 

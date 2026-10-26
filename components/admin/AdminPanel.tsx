@@ -153,7 +153,6 @@ export function AdminPanel() {
       right={
         <div className="flex items-center gap-2">
         {/* sve iz baze: pjesme i tekstovi koji fale */}
-        <SyncButton disabled={!data} flash={flash} onDone={songs.reload} />
         {/* papirići za pult — A4 za štampu na papir u boji */}
         <button
           type="button"
@@ -351,8 +350,6 @@ type Songs = {
   fetch: (song: string, youtube?: string) => void
   /** preuzmi tekst pjesme sada (i kad postoji, a ne prati pjesmu — LRCLIB iznova) */
   fetchLyrics: (song: string) => void
-  /** svi tekstovi koji ne prate pjesmu — LRCLIB iznova */
-  resyncLyrics: () => void
   reload: () => void
 }
 
@@ -443,123 +440,7 @@ function useSongs(ready: boolean, flash: (t: string, bad?: boolean) => void): So
     [live, load, flash],
   )
 
-  const resyncLyrics = useCallback(async () => {
-    if (!live) return
-    // na produkciji GitHubu treba par minuta — dotad "preuzima se"
-    const keys = Object.entries(snap?.songs ?? {})
-      .filter(([, s]) => s.state === 'ready' && s.lyrics !== 'synced')
-      .map(([k]) => k)
-    if (snap?.mode !== 'local') setPendingLyrics((p) => ({ ...p, ...Object.fromEntries(keys.map((k) => [k, Date.now()])) }))
-    const r = await fetch('/api/admin/lyrics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ all: true }),
-    }).catch(() => null)
-    const b = (await r?.json().catch(() => null)) as { error?: string; note?: string } | null
-    if (!r?.ok) {
-      setPendingLyrics((p) => Object.fromEntries(Object.entries(p).filter(([k]) => !keys.includes(k))))
-      flash(b?.error ?? 'Tekstovi se nisu mogli pokrenuti', true)
-    } else if (b?.note) flash(b.note)
-    void load()
-  }, [live, snap, load, flash])
-
-  return { mode: snap?.mode ?? null, of, fetch: fetchSong, fetchLyrics, resyncLyrics, reload: () => void load() }
-}
-
-type SyncSnap = {
-  mode: 'local' | 'github' | 'off'
-  songs: number
-  audio: number
-  lyrics: number
-  synced: number
-  running: boolean
-  done: number
-  total: number
-  current: string | null
-  failed: string[]
-}
-
-/**
- * Sinhronizuj: svaka pjesma iz baze dobije zvuk i tekst (lib/catalog-sync.ts).
- * Lokalno se vidi napredak (3/25); na produkciji posao preuzme GitHub.
- * Zlatna tačka: nekoj pjesmi fali zvuk ili tekst.
- */
-function SyncButton({ disabled, flash, onDone }: { disabled: boolean; flash: (t: string, bad?: boolean) => void; onDone: () => void }) {
-  const [s, setS] = useState<SyncSnap | null>(null)
-  // svako povećanje = stanje iznova sa servera
-  const [ask, setAsk] = useState(0)
-  useEffect(() => {
-    if (disabled) return
-    let on = true
-    fetch('/api/admin/sync', { cache: 'no-store' })
-      .then((r) => (r.ok ? (r.json() as Promise<SyncSnap>) : null))
-      .then((b) => on && b && setS(b))
-      .catch(() => {})
-    return () => {
-      on = false
-    }
-  }, [disabled, ask])
-  // dok radi — napredak svake sekunde i po; na kraju poruka (onDone je nov u svakom crtanju — preko refa)
-  const was = useRef(false)
-  const done = useRef(onDone)
-  useEffect(() => {
-    done.current = onDone
-  })
-  useEffect(() => {
-    if (!s) return
-    if (s.running) {
-      was.current = true
-      const t = setTimeout(() => setAsk((n) => n + 1), 1500)
-      return () => clearTimeout(t)
-    }
-    if (!was.current) return
-    was.current = false
-    flash(s.failed.length ? `Sinhronizovano · fali ${s.failed.length}` : 'Sve sinhronizovano', s.failed.length > 0)
-    done.current()
-  }, [s, flash])
-
-  const running = Boolean(s?.running)
-  const missing = s ? Math.max(s.songs - s.audio, s.songs - s.lyrics) : 0
-  const start = async () => {
-    if (running) return
-    if (inDeck()) return flash('U prezentaciji se pjesme ne mijenjaju.')
-    const r = await fetch('/api/admin/sync', { method: 'POST' }).catch(() => null)
-    const body = (await r?.json().catch(() => null)) as { state?: string; error?: string } | null
-    if (!r?.ok) return flash(body?.error ?? 'Sinhronizacija nije pokrenuta', true)
-    if (body?.state === 'github') flash('Pokrenuto — stiže za par minuta')
-    setAsk((n) => n + 1)
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={start}
-      disabled={disabled || s?.mode === 'off'}
-      aria-busy={running}
-      title={s ? `Pjesme ${s.audio}/${s.songs} · tekstovi ${s.lyrics}/${s.songs}` : undefined}
-      data-sync
-      className="relative flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white disabled:opacity-40"
-      style={running ? { color: BRAND.gold, borderColor: `${BRAND.gold}55` } : undefined}
-    >
-      <motion.svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        animate={{ rotate: running ? 360 : 0 }}
-        transition={running ? { duration: 1, repeat: Infinity, ease: 'linear' } : { duration: 0.3 }}
-        aria-hidden
-      >
-        <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
-      </motion.svg>
-      <span className="tabular">{running ? `${s!.done}/${s!.total}` : 'Sinhronizuj'}</span>
-      {!running && missing > 0 && <i className="absolute right-1.5 top-1.5 block h-1.5 w-1.5 rounded-full" style={{ background: BRAND.gold }} aria-label={`Fali ${missing}`} />}
-    </button>
-  )
+  return { mode: snap?.mode ?? null, of, fetch: fetchSong, fetchLyrics, reload: () => void load() }
 }
 
 /** Desno u boxu stiha: pjesma se preuzima, ili nije preuzeta (natpis + ponovi). */
@@ -833,20 +714,6 @@ function Library({
                 }}
               />
             ))}
-            {/* svi tekstovi koji ne prate pjesmu — LRCLIB iznova */}
-            {songs.mode !== 'off' && data.verses.some((v) => hasSong(v) && !synced(v)) && (
-              <button
-                type="button"
-                onClick={songs.resyncLyrics}
-                data-lyrics-resync
-                className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/10 px-3 text-[11px] text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
-                </svg>
-                Traži vremena
-              </button>
-            )}
           </>
         )}
       </div>
