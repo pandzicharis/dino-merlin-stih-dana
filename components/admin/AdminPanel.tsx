@@ -517,41 +517,42 @@ function SongIssue({ info, mode, onRetry }: { info: SongInfo | null; mode: Songs
 }
 
 /** Mala oznaka uz naziv pjesme: spremna, preuzima se, ili fali (s dugmetom). */
-/** Pregled YouTube videa u formi stiha: sličica, dodir pusti video ovdje. */
+/** Pregled YouTube videa u formi stiha — pravi plejer odmah (da se vidi da je link prava pjesma). */
 function YouTubePreview({ id }: { id: string }) {
-  const [play, setPlay] = useState(false)
-  // sličica se učitava — pulsira i vrti se dok ne stigne
+  // plejer se učitava — pulsira dok ne stigne
   const [loaded, setLoaded] = useState(false)
   return (
     <div className="col-span-2 -mt-1 overflow-hidden rounded-xl border border-white/[0.08] bg-black/40" data-yt-preview>
       <div className="relative aspect-video w-full">
-        {play ? (
-          <iframe
-            src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`}
-            title="YouTube video pjesme"
-            allow="autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-            className="absolute inset-0 h-full w-full border-0"
-          />
-        ) : (
-          <button type="button" onClick={() => setPlay(true)} aria-label="Pusti video" className="group absolute inset-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
-              alt=""
-              draggable={false}
-              onLoad={() => setLoaded(true)}
-              className={`h-full w-full object-cover transition-opacity duration-500 group-hover:opacity-100 ${loaded ? 'opacity-85' : 'opacity-0'}`}
-            />
-            {!loaded && <span className="absolute inset-0 animate-pulse bg-white/[0.04]" aria-hidden />}
-            <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform group-hover:scale-105">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="translate-x-px" aria-hidden>
-                <path d="M7 4.5v15l12-7.5z" />
-              </svg>
-            </span>
-          </button>
+        {!loaded && (
+          <span className="absolute inset-0 flex items-center justify-center bg-white/[0.04]" aria-hidden>
+            <span className="absolute inset-0 animate-pulse bg-white/[0.03]" />
+            <span className="block h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: BRAND.gold, borderTopColor: 'transparent' }} />
+          </span>
         )}
+        {/* YouTube traži referrer za ugrađen plejer */}
+        <iframe
+          src={`https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`}
+          title="YouTube video pjesme"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          onLoad={() => setLoaded(true)}
+          className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        />
       </div>
+      {/* neki video se ne da ugraditi (vlasnik ili zemlja) — tad bar link */}
+      <a
+        href={`https://www.youtube.com/watch?v=${id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-end gap-1 px-3 py-1.5 text-[11px] text-white/45 transition-colors hover:text-white"
+      >
+        Otvori na YouTubeu
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M7 17 17 7M9 7h8v8" />
+        </svg>
+      </a>
     </div>
   )
 }
