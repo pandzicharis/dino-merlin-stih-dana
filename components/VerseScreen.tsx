@@ -125,7 +125,7 @@ export function VerseScreen({
               }`
         }
       >
-        {/* zaglavlje — potpis | Magaza gore lijevo, isti znak kao u prezentaciji */}
+        {/* zaglavlje — potpis i Magaza gore lijevo (bez crte između) */}
         <header className="relative z-10 flex items-center justify-between">
           {compact ? (
             <p className="meta" style={{ color: m.accent }}>
@@ -140,7 +140,6 @@ export function VerseScreen({
               transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
             >
               <Signature height={36} wipe={false} className="opacity-90" />
-              <span className="h-6 w-px bg-white/20" aria-hidden />
               <a href="https://magaza.com.ba" target="_blank" rel="noopener noreferrer" aria-label="Magaza" className="opacity-90">
                 <MagazaLogo height={Math.round(36 * MAGAZA_BESIDE)} color="#FFFFFF" style={{ transform: MAGAZA_DROP_CSS }} />
               </a>
