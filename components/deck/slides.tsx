@@ -95,7 +95,14 @@ const STIH: FeatureDef[] = [
     body: () => <Slusanje />,
   },
   {
-    // sačuvani kao plejer na početnoj: svaka pjesma donese svoj stih
+    // dugme s redovima pored gramofona: tekst pjesme, red po red uz muziku
+    id: 'tekst',
+    title: 'Tekst koji prati pjesmu',
+    enter: '/',
+    body: () => <Tekst />,
+  },
+  {
+    // sačuvani kao plejer — poseban ekran: svaka pjesma donese svoj stih
     id: 'plejer',
     title: 'Player pjesama',
     enter: '/',
@@ -105,6 +112,13 @@ const STIH: FeatureDef[] = [
     id: 'dijeljenje',
     title: 'Podijeli kao sliku',
     body: () => <Dijeljenje />,
+  },
+  {
+    // "Link i QR": stih kao poklon — prijatelj ga otvori kao listić iz tombole
+    id: 'poklon',
+    title: 'Stih kao poklon',
+    enter: '/',
+    body: () => <Poklon />,
   },
   {
     // pregled mjeseca kao priča — prođe sam kroz sve kartice
@@ -1474,8 +1488,9 @@ function Sacuvano() {
       {/* scena po sistemu: kad iPhone završi, ista ide na Androidu (prekidač ide s njom) */}
       <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && both && setOs('android')} />
       <Text>
-        „Sačuvaj“ ispod stiha, a gore se pojavi ikonica plejera s brojem — dodir otvara Player pjesama: sačuvani
-        stihovi kao karte jedna do druge, svaka s danom kad je sačuvana, pjesmom i albumom. Prevuci za sljedeći —
+        „Sačuvaj“ ispod stiha, a gore se pojavi ikonica plejera s brojem, uz lijevu ivicu i džep iz kojeg viri
+        ploča — dodir (ili izvuci ploču) otvara Player pjesama kao poseban ekran: sačuvani stihovi kao karte jedna
+        do druge, svaka s danom kad je sačuvana, pjesmom i albumom. Prevuci za sljedeći —
         glatko kao listanje fotografija; raširi kartu i stih je preko cijelog ekrana — povuci je nadolje i vrati se
         među karte. Bez naloga i prijave: sve ostaje na telefonu.
       </Text>
@@ -1546,11 +1561,11 @@ function Plejer() {
     <>
       <PlejerScene key={os} onDone={() => os === 'ios' && !manual && both && setOs('android')} />
       <Text>
-        Sačuvani su plejer: ikonica gore otvara Player pjesama — stihovi kao karte, pjesme sa cijelim stihom,
-        albumi i omiljene (zvjezdica, redom koliko se slušaju), a lupa gore traži pjesmu po nazivu ili stihu. Plejer
-        je u boji stiha, kontrole kao u Apple Musicu,
-        a naprijed i natrag idu kroz album ili omiljene u kojima si. Spusti ga — na početnoj pluta mini plejer,
-        muzika ide dalje, a na zaključanom ekranu je omot albuma koji svira.
+        Player pjesama je svoj ekran: uđe sa strane, a pjesma krene sama. Stihovi kao karte, pjesme sa cijelim
+        stihom, albumi i omiljene (zvjezdica, redom koliko se slušaju), a lupa gore traži pjesmu po nazivu ili
+        stihu. Plejer je u boji stiha, kontrole kao u Apple Musicu, a naprijed i natrag idu kroz album ili omiljene
+        u kojima si. Papirići u džepu desno vraćaju na stih dana — muzika ide dalje u mini plejeru, a na
+        zaključanom ekranu je omot albuma koji svira.
       </Text>
     </>
   )
@@ -1584,9 +1599,8 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     await wait(500)
     if (alive()) await swipe(1)
     await wait(700)
-    // pusti pa sljedeća — karte klize za pjesmom
-    if (alive()) await press('[data-player] [aria-label="Pusti"]')
-    await wait(2600)
+    // pjesma je krenula sama (otvaranje plejera) — sljedeća, karte klize za pjesmom
+    await wait(1400)
     if (alive()) await press('[data-player] [aria-label="Sljedeća"]')
     await wait(2400)
     // pjesme (cijeli stih), zvjezdica — u omiljene, albumi
@@ -1615,14 +1629,117 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     }
     if (alive()) await press('[data-view="cards"]')
     await wait(1200)
-    // spusti — na početnoj pluta mini plejer, muzika ide dalje
-    if (alive()) await press('[aria-label="Spusti"]')
+    // nazad na stih dana — na početnoj pluta mini plejer, muzika ide dalje
+    if (alive()) await press('[aria-label="Na stih dana"]')
     await wait(2600)
     if (alive()) await press('[aria-label="Otvori plejer pjesama"] [aria-label="Sljedeća"]')
     await wait(2400)
     if (alive()) onDone()
   })
   return null
+}
+
+/** Muzika stane na odlasku s koraka (i sačuvani na početnoj) — odmah, ne tek kad nestane. */
+function useStopOnLeave() {
+  const { phone } = useDeck()
+  const present = useIsPresent()
+  useEffect(() => {
+    if (!present) return
+    return () => {
+      try {
+        const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
+        w?.dispatchEvent(new w.Event('stihdana:stop-audio'))
+      } catch {
+        /* tuđa adresa */
+      }
+    }
+  }, [phone, present])
+}
+
+/**
+ * Tekst pjesme: gramofon zasvira, dugme s redovima otvori tekst — red koji se
+ * pjeva svijetli i dođe na sredinu; dodir na red premota pjesmu tamo.
+ */
+function Tekst() {
+  useKeepSaved()
+  useStopOnLeave()
+  useScene(async ({ wait, find, press, home, alive }) => {
+    if (!(await home())) return
+    await wait(700)
+    if (alive()) await press('[data-deck="play"]')
+    await wait(1600)
+    if (!alive() || !(await press('[data-lyrics-open]'))) return
+    // uvod pjesme — pa dodir na drugi red: pjesma skoči tamo i redovi idu dalje s njom
+    await wait(2600)
+    const row = await find('[data-lyric-row="2"]', 6000)
+    if (row && alive()) await press(row)
+    await wait(11000)
+    if (alive()) await press('[data-drawer-close]')
+    await wait(800)
+  })
+  return (
+    <>
+      <Text>
+        Dugme s redovima pored gramofona otvori tekst pjesme: red koji Dino upravo pjeva svijetli i sam dođe na
+        sredinu, a dodir na bilo koji red premota pjesmu tamo. Ispod je isti plejer — pauza, premotavanje, sljedeća.
+      </Text>
+      <Bullets
+        items={[
+          <>Vremena redova su usklađena s našim snimkom — <b>tekst prati baš ovu verziju pjesme.</b></>,
+          <>Tekst je spremljen uz pjesmu: otvara se odmah, i bez interneta.</>,
+          <>Isto i u Playeru pjesama — pređe li plejer na sljedeću, pređe i tekst.</>,
+        ]}
+      />
+    </>
+  )
+}
+
+/**
+ * Stih kao poklon: Podijeli → "Link i QR"; pa prijatelj otvori link — podloga
+ * kao tombola, papirić iste boje se otvori i slova polete u ekran stiha.
+ */
+function Poklon() {
+  const { phone } = useDeck()
+  useKeepSaved()
+  useScene(async ({ wait, press, home, find, alive }) => {
+    if (!(await home())) return
+    await wait(500)
+    if (!(await press('[data-tip="share"]'))) return
+    await wait(1300)
+    if (alive()) await press('[data-share-mode="link"]')
+    // QR kod i link — kopira se ili pošalje
+    await wait(3600)
+    if (alive()) await press('[role="dialog"][aria-modal="true"] button[aria-label="Zatvori"]')
+    await wait(900)
+    // prijatelj otvori link (ili skenira QR) — stih mu stiže kao poklon
+    try {
+      phone()?.contentWindow?.location.assign(`/stih/${DECK_VERSE}?poklon`)
+    } catch {
+      return
+    }
+    await wait(1500)
+    // papirić, slova, pa drawer sa stihom
+    if (!(await find('[data-gift]', 15000)) || !alive()) return
+    await wait(9000)
+    // zatvori — ispod je njegov stih dana
+    if (alive()) await press('[data-gift-close]')
+    await wait(1600)
+  })
+  return (
+    <>
+      <Text>
+        „Podijeli“ → „Link i QR“: stih se šalje kao poklon. Ko otvori link ili skenira QR kod, dobije ga kao listić iz
+        tombole — papirić iste boje se otvori, a slova polete u ekran stiha. Zatvori ga, a ispod je njegov stih
+        dana.
+      </Text>
+      <Bullets
+        items={[
+          <><b>Svaki poklon je nova instalacija</b> — link vodi pravo u aplikaciju.</>,
+          <>Ko već ima aplikaciju, QR skenira iz nje: Postavke → Skeniraj poklon.</>,
+        ]}
+      />
+    </>
+  )
 }
 
 /** Dijeljenje: formati jedan za drugim, pa dugme za preuzimanje slike. */

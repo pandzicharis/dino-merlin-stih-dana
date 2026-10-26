@@ -293,6 +293,7 @@ export default function SharePanel({
                     }}
                     disabled={recording}
                     aria-pressed={on}
+                    data-share-mode={k ? 'link' : 'image'}
                     className="relative flex h-11 items-center justify-center gap-2 rounded-xl text-[13px] font-semibold tracking-wide transition-colors duration-300"
                     style={{ color: on ? '#14100A' : 'rgba(255,255,255,0.6)' }}
                   >

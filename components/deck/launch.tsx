@@ -1077,9 +1077,11 @@ export function Ostalo({ d }: { d: DeckData }) {
     'Atmosfera po raspoloženju, album u pozadini',
     'Pjesma uz stih, u pozadini',
     'Sačuvani kao karte, s pjesmom',
-    'Player pjesama: stihovi, pjesme, albumi, omiljene, pretraga',
+    'Player pjesama kao poseban ekran: stihovi, pjesme, albumi, omiljene, pretraga',
     'Mini plejer dok muzika svira',
+    'Tekst pjesme koji prati muziku, red po red',
     'Dijeljenje kao slika',
+    'Stih kao poklon — link i QR, skener u aplikaciji',
     'Link koji izgleda kao poster',
     'QR kod aplikacije u postavkama',
     'Nova verzija stiže sama',
@@ -1391,8 +1393,8 @@ export function Video() {
       </R>
       <R i={2}>
         <p className="dk-lead mt-[1.8vh] max-w-[40em]">
-          Obavijest u podne, dodir, tombola, stih, sačuvaj i Player pjesama — u pravoj aplikaciji, uz natpise. Oko 30
-          sekundi, sa zvukom obavijesti i pjesmom, spremno za objavu.
+          Obavijest u podne, dodir, tombola, stih, sačuvaj, Player pjesama i tekst koji prati pjesmu — u pravoj
+          aplikaciji, uz natpise. Oko 35 sekundi, sa zvukom obavijesti i pjesmom, spremno za objavu.
         </p>
       </R>
       <div className="mt-[4vh] flex items-start gap-[clamp(18px,3vw,56px)]">

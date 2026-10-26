@@ -15,7 +15,7 @@ import type { Simulation } from './types'
 export type VideoFormat = 'story' | 'objava'
 
 /** Koraci videa — svaki ima svoj natpis. */
-type Step = 'notify' | 'tombola' | 'verse' | 'save' | 'play' | 'month' | 'end'
+type Step = 'notify' | 'tombola' | 'verse' | 'save' | 'play' | 'lyrics' | 'month' | 'end'
 
 const CAPTIONS: Record<Step, { eyebrow: string; a: string; b: string }> = {
   notify: { eyebrow: 'Svaki dan u 12:00', a: 'Stigne obavijest.', b: 'Tvoj stih te čeka.' },
@@ -23,6 +23,7 @@ const CAPTIONS: Record<Step, { eyebrow: string; a: string; b: string }> = {
   verse: { eyebrow: 'Stih dana', a: 'Riječi koje', b: 'danas trebaš.' },
   save: { eyebrow: 'Sačuvaj', a: 'Da ti ostane', b: 'za kasnije.' },
   play: { eyebrow: 'Player pjesama', a: 'Sačuvani stihovi', b: 'su tvoj plejer.' },
+  lyrics: { eyebrow: 'Tekst pjesme', a: 'Riječi idu', b: 'uz muziku.' },
   month: { eyebrow: 'Moj mjesec', a: 'Svaki mjesec', b: 'kao priča.' },
   end: { eyebrow: 'Besplatno · iPhone · Android', a: 'Jedan stih.', b: 'Svaki dan.' },
 }
@@ -151,20 +152,26 @@ export function VideoScene({
     // srce se upali i iskoči ikonica s brojem — pa odmah u sačuvane
     await wait(1300)
 
-    // 4 — otvori Player pjesama (ikonica gore), pusti pjesmu prednje karte i
-    // spusti panel — pjesma svira dalje, na početnoj pluta mini plejer
+    // 4 — otvori Player pjesama (ikonica gore) — pjesma prednje karte krene
+    // sama; nazad na stih dana — pjesma svira dalje, na početnoj pluta mini plejer
     if (!alive()) return
     setStep('play')
     await press('[data-tip="saved"]', id)
-    const go = '[data-player] [aria-label="Pusti"]'
-    await until(() => Boolean(doc()?.querySelector(go)), 5000)
-    await wait(700)
-    await press(go, id)
     mark('play')
-    await wait(2000)
+    await until(() => Boolean(doc()?.querySelector('[data-player] [aria-label="Pauza"]')), 5000)
+    await wait(2400)
     if (!alive()) return
-    await press('[role="dialog"][aria-label="Player pjesama"] button[aria-label="Spusti"]', id)
-    await wait(3000)
+    await press('[role="dialog"][aria-label="Player pjesama"] button[aria-label="Na stih dana"]', id)
+    await wait(1800)
+
+    // 5 — tekst pjesme iz mini plejera: redovi svijetle uz muziku
+    if (!alive()) return
+    setStep('lyrics')
+    await press('[data-mini] button[aria-label="Tekst pjesme"]', id)
+    await wait(4200)
+    if (!alive()) return
+    await press('[role="dialog"][aria-label^="Tekst —"] [data-drawer-close]', id)
+    await wait(1200)
 
     // 5 — moj mjesec: probni podaci mjeseca (telefon dijeli localStorage s
     // ovom stranicom), ikonica kalendara gore — priča prođe sama, pa se zatvori

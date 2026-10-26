@@ -586,6 +586,7 @@ function SyncedRow({
     <motion.p
       ref={rowRef}
       onClick={onPick}
+      data-lyric-row={i}
       className={`origin-center py-[0.28em] text-[1.45rem] leading-[1.3] ${onPick ? 'cursor-pointer' : ''}`}
       style={{
         fontFamily: SERIF,
