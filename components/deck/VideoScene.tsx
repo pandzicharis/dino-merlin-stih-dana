@@ -168,6 +168,10 @@ export function VideoScene({
     if (!alive()) return
     setStep('lyrics')
     await press('[data-mini] button[aria-label="Tekst pjesme"]', id)
+    // dodir na red — pjesma skoči tamo, red svijetli i tekst ide dalje s njom
+    await until(() => Boolean(doc()?.querySelector('[data-lyric-row="2"]')), 4000)
+    await wait(700)
+    await press('[data-lyric-row="2"]', id)
     await wait(4200)
     if (!alive()) return
     await press('[role="dialog"][aria-label^="Tekst —"] [data-drawer-close]', id)

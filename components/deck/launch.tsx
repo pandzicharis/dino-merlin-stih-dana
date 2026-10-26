@@ -1394,7 +1394,7 @@ export function Video() {
       <R i={2}>
         <p className="dk-lead mt-[1.8vh] max-w-[40em]">
           Obavijest u podne, dodir, tombola, stih, sačuvaj, Player pjesama i tekst koji prati pjesmu — u pravoj
-          aplikaciji, uz natpise. Oko 35 sekundi, sa zvukom obavijesti i pjesmom, spremno za objavu.
+          aplikaciji, uz natpise. Oko 50 sekundi, sa zvukom obavijesti i pjesmom, spremno za objavu.
         </p>
       </R>
       <div className="mt-[4vh] flex items-start gap-[clamp(18px,3vw,56px)]">
