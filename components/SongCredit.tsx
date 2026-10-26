@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { albumLine, isFirstVerse, youtubeId } from '@/lib/text'
 import { albumOf, thumbOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { cancelFade, dropNeedle, fadeOut, isRouted, startCrackle, stopCrackle, unlockVinyl } from '@/lib/vinyl'
-import { AUTOPLAY, SHARED, SHARED_GONE, SOLO, createPlayer, playOn, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
+import { AUTOPLAY, SHARED, SHARED_GONE, SOLO, createPlayer, openSaved, playOn, pauseSaved, playSaved, playable, session, shared, sourceOf, type Player } from '@/lib/player'
 import { warmAudio } from '@/lib/sw-cache'
 import { bumpMonth } from '@/lib/storage'
 import { audioFile } from '@/lib/audio-name'
@@ -700,10 +700,34 @@ function AudioSong({ preview = false, share = false, ...props }: Source & { prev
   }
   const row = { verse, state, progress, time, cover, onToggle: toggle, onPrime: prime, onSeek: seek }
 
+  // gramofon na početnoj otvara plejer sačuvanih: povuci ga gore (ili dodirni
+  // naziv pjesme) — ploča u plejeru izleti s ove ploče (components/VinylDeck.tsx)
+  const home = !preview && !share
+  const wrap = useRef<HTMLDivElement>(null)
+  const drag = useDragControls()
+  const toPlayer = () => {
+    haptic(8)
+    openSaved(wrap.current?.querySelector<HTMLElement>('button[data-state]')?.getBoundingClientRect())
+  }
+
   return (
     <>
+      <motion.div
+        ref={wrap}
+        drag={home ? 'y' : false}
+        dragControls={drag}
+        dragListener={false}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0.35, bottom: 0 }}
+        dragSnapToOrigin
+        // traka (premotavanje) vuče svoje — ne gramofon
+        onPointerDown={(e) => home && !(e.target as Element).closest('[role="slider"]') && drag.start(e)}
+        onDragEnd={(_, i) => (i.offset.y < -36 || i.velocity.y < -400) && toPlayer()}
+        style={home ? { touchAction: 'none' } : undefined}
+      >
       <GramophoneRow
         {...row}
+        onTitle={home ? toPlayer : undefined}
         tip
         deck
         hole={share}
@@ -717,6 +741,7 @@ function AudioSong({ preview = false, share = false, ...props }: Source & { prev
           )
         }
       />
+      </motion.div>
       {!preview && (
         <LyricsPanel
           open={lyrics}
@@ -746,6 +771,7 @@ function GramophoneRow({
   progress,
   time,
   onToggle,
+  onTitle,
   onPrime,
   onSeek,
   tip = false,
@@ -759,6 +785,8 @@ function GramophoneRow({
   progress: number
   time: string
   onToggle: () => void
+  /** dodir na naziv pjesme (inače isto što i ploča) — na početnoj otvara plejer */
+  onTitle?: () => void
   onPrime: () => void
   onSeek: (fraction: number) => void
   /** savjet (Tips) se kači na ovaj red — samo ispod stiha */
@@ -782,8 +810,8 @@ function GramophoneRow({
           <p
             className="min-w-0 flex-1 cursor-pointer truncate font-semibold uppercase leading-none tracking-[0.18em]"
             style={{ color: BRAND.gold, fontSize: cardSongSize(verse.song, icon) }}
-            onClick={onToggle}
-            onPointerDown={onPrime}
+            onClick={onTitle ?? onToggle}
+            onPointerDown={onTitle ? undefined : onPrime}
           >
             {verse.song}
           </p>

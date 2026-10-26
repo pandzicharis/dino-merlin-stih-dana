@@ -281,10 +281,23 @@ export function autoplaySaved() {
   if (!playSaved(v)) nextSaved()
 }
 
-/** Otvori sačuvane (SavedLink sluša). */
-export function openSaved() {
+/**
+ * Otvori sačuvane (SavedLink sluša). `from`: gdje je ploča gramofona koja
+ * otvara plejer — ploča u plejeru izleti odatle (components/VinylDeck.tsx).
+ */
+export function openSaved(from?: DOMRect) {
+  flyFrom = from ?? null
   window.dispatchEvent(new Event(OPEN_SAVED))
 }
+let flyFrom: DOMRect | null = null
+/** odakle ploča u plejeru izleti — jednom, pa se zaboravi */
+export function takeFlyFrom(): DOMRect | null {
+  const r = flyFrom
+  flyFrom = null
+  return r
+}
+/** krak ploče u plejeru otvara tekst pjesme (SavedPlayer sluša) */
+export const OPEN_LYRICS = 'stihdana:saved-lyrics'
 
 const subscribe = (f: () => void) => {
   subs.add(f)
