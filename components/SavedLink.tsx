@@ -1,17 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { EqBars } from './EqBars'
-import { OPEN_SAVED, autoplaySaved, savedVerse, useSavedPlayerSelect } from '@/lib/player'
-import { albumOf, thumbOf } from '@/data/albums'
+import { OPEN_SAVED, autoplaySaved, useSavedPlayerSelect } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
-import { useMounted } from '@/lib/client-store'
-import { Pocket } from './Pocket'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
 const load = () => import('./SavedPanel')
@@ -19,8 +15,8 @@ const SavedPanel = dynamic(load, { ssr: false })
 
 /**
  * Plejer pjesama (sačuvani stihovi) — tiha ikonica u zaglavlju s malim
- * brojačem u tonu ikonice (ne crvena "obavijest"), i džep uz lijevu ivicu.
- * Oboje otvaraju plejer kao poseban ekran (SavedPanel); kad se vrati na
+ * brojačem u tonu ikonice (ne crvena "obavijest"). Otvara plejer kao novu
+ * stranicu (SavedPanel); kad se vrati na
  * stih, a muzika svira, na dnu početne viri mini plejer. Pojavi se tek kad
  * postoji bar jedan sačuvan stih.
  */
@@ -35,13 +31,9 @@ export function SavedLink() {
   const [used, setUsed] = useState(false)
   // samo svira li — otvaranje i spuštanje panela ne crtaju zaglavlje iznova
   const playing = useSavedPlayerSelect((s) => s.playing)
-  // pjesma u plejeru — njen omot je etiketa ploče u džepu
-  const nowId = useSavedPlayerSelect((s) => s.id)
-  const nowCover = albumOf(nowId ? savedVerse()?.album : undefined)?.cover
   // stalni (useCallback) — panel i sadržaj (memo) se ne crtaju iznova zbog njih
   const onOpen = useCallback(() => setOpen(true), [])
   const onClose = useCallback(() => setOpen(false), [])
-  const mounted = useMounted()
   // panel se preuzme i SLOŽI u tišini kad se ekran smiri (sklonjen ispod
   // ekrana) — prvi dodir ga samo podigne, bez čekanja i treptaja. "Smiri":
   // bar 3 s, bez tombole i uvoda i bez prsta na ekranu (lib/calm.ts) — slaganje
@@ -103,29 +95,6 @@ export function SavedLink() {
           </motion.span>
         )}
       </AnimatePresence>
-      {/* džep uz lijevu ivicu — plejer kao poseban ekran izađe odatle */}
-      {mounted &&
-        createPortal(
-          <AnimatePresence>
-            {count > 0 && !open && (
-              <Pocket
-                key="pocket"
-                side="left"
-                kind="vinyl"
-                label="Player pjesama"
-                spinning={playing}
-                cover={nowCover ? (thumbOf(nowCover) ?? nowCover) : undefined}
-                onOpen={() => {
-                  void load()
-                  setUsed(true)
-                  setOpen(true)
-                  autoplaySaved()
-                }}
-              />
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
       {/* jednom otvoren ostaje montiran — spušten viri kao mini plejer */}
       {used && <SavedPanel open={open} onOpen={onOpen} onClose={onClose} />}
     </>

@@ -1488,9 +1488,8 @@ function Sacuvano() {
       {/* scena po sistemu: kad iPhone završi, ista ide na Androidu (prekidač ide s njom) */}
       <SacuvanoScene key={os} onDone={() => os === 'ios' && !manual && both && setOs('android')} />
       <Text>
-        „Sačuvaj“ ispod stiha, a gore se pojavi ikonica plejera s brojem, uz lijevu ivicu i džep iz kojeg viri
-        ploča — dodir (ili izvuci ploču) otvara Player pjesama kao poseban ekran: sačuvani stihovi kao karte jedna
-        do druge, svaka s danom kad je sačuvana, pjesmom i albumom. Prevuci za sljedeći —
+        „Sačuvaj“ ispod stiha, a gore se pojavi ikonica plejera s brojem — dodir otvara Player pjesama kao novu
+        stranicu: sačuvani stihovi kao karte jedna do druge, svaka s danom kad je sačuvana, pjesmom i albumom. Prevuci za sljedeći —
         glatko kao listanje fotografija; raširi kartu i stih je preko cijelog ekrana — povuci je nadolje i vrati se
         među karte. Bez naloga i prijave: sve ostaje na telefonu.
       </Text>
@@ -1561,11 +1560,10 @@ function Plejer() {
     <>
       <PlejerScene key={os} onDone={() => os === 'ios' && !manual && both && setOs('android')} />
       <Text>
-        Player pjesama je nova stranica: izađe odozdo preko cijelog ekrana, s istim zaglavljem kao naslovna, a
-        pjesma krene sama. Stihovi kao karte, pjesme sa cijelim stihom, albumi i omiljene (zvjezdica, redom koliko
+        Player pjesama je nova stranica: izađe odozdo preko cijelog ekrana, a pjesma krene sama. Stihovi kao karte, pjesme sa cijelim stihom, albumi i omiljene (zvjezdica, redom koliko
         se slušaju), a lupa traži pjesmu po nazivu ili stihu. Plejer je u boji stiha, kontrole kao u Apple Musicu.
-        Povuci ga nadolje (ili dodirni dugme plejera) i stih dana se vrati — muzika ide dalje u mini plejeru, a
-        na zaključanom ekranu je omot albuma koji svira.
+        Povuci ga nadolje (ili „Spusti“) i stih dana se vrati — muzika ide dalje u mini plejeru, a na
+        zaključanom ekranu je omot albuma koji svira; × ga zatvori do kraja.
       </Text>
     </>
   )
@@ -1629,8 +1627,8 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     }
     if (alive()) await press('[data-view="cards"]')
     await wait(1200)
-    // nazad na stih dana — na početnoj pluta mini plejer, muzika ide dalje
-    if (alive()) await press('[aria-label="Na stih dana"]')
+    // spusti — na početnoj pluta mini plejer, muzika ide dalje
+    if (alive()) await press('[aria-label="Spusti"]')
     await wait(2600)
     if (alive()) await press('[aria-label="Otvori plejer pjesama"] [aria-label="Sljedeća"]')
     await wait(2400)

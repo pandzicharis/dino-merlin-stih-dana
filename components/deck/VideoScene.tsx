@@ -161,7 +161,7 @@ export function VideoScene({
     await until(() => Boolean(doc()?.querySelector('[data-player] [aria-label="Pauza"]')), 5000)
     await wait(2400)
     if (!alive()) return
-    await press('[role="dialog"][aria-label="Player pjesama"] button[aria-label="Na stih dana"]', id)
+    await press('[role="dialog"][aria-label="Player pjesama"] button[aria-label="Spusti"]', id)
     await wait(1800)
 
     // 5 — tekst pjesme iz mini plejera: redovi svijetle uz muziku
