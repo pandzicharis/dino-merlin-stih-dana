@@ -16,7 +16,6 @@ import { useLiveFront } from './SavedCarousel'
 import { LyricsButton, LyricsIcon, LyricsPanel, primeLyrics, type LyricsClock } from './Lyrics'
 import { BRAND } from '@/lib/brand'
 import {
-  OPEN_LYRICS,
   SAVED_TRACK,
   currentSaved,
   knownDuration,
@@ -367,12 +366,6 @@ export function SavedPlayer({
   useEffect(() => setShownSaved(cur && hasSong(cur) ? cur : null), [cur])
   // tekst pjesme (components/Lyrics.tsx): one koja svira — pređe li plejer na sljedeću, i tekst pređe
   const [lyrics, setLyrics] = useState(false)
-  // ručica ploče (components/VinylDeck.tsx) otvara tekst
-  useEffect(() => {
-    const open = () => setLyrics(true)
-    window.addEventListener(OPEN_LYRICS, open)
-    return () => window.removeEventListener(OPEN_LYRICS, open)
-  }, [])
   const sung = loaded ?? cur
   if (!cur) return null
 

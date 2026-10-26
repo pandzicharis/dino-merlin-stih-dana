@@ -5,7 +5,8 @@ import { Activity, memo, startTransition, useCallback, useEffect, useMemo, useRe
 import type { Verse } from '@/data/verses'
 import { useFavorites, useLovedIds, useMounted } from '@/lib/client-store'
 import { BRAND } from '@/lib/brand'
-import { VinylDeck } from './VinylDeck'
+import { useSavedFull } from './SavedFull'
+import { SavedCarousel } from './SavedCarousel'
 import { SAVED_TRACK, closeSaved, setSavedPlaylist } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
 import { loose } from '@/lib/text'
@@ -126,6 +127,8 @@ export const SavedVerses = memo(function SavedVerses({
   // pretraga ne mijenja red — plejer i dalje pokazuje pjesmu koja svira
   const order = albums ?? (view === 'cards' ? list : songs)
   useEffect(() => setSavedPlaylist(order), [order])
+  // "Raširi" na karti: ista karta, uvećana; ostale vire iza (components/SavedFull.tsx)
+  const full = useSavedFull(list)
   // prednja karta (ili pjesma na koju je plejer prešao) — plejer je pokazuje
   const [frontId, setFrontId] = useState<string | null>(null)
   const onFront = useCallback((v: Verse) => setFrontId(v.id), [])
@@ -203,7 +206,7 @@ export const SavedVerses = memo(function SavedVerses({
                   ) : v === 'loved' ? (
                     <SavedLoved verses={songs} front={front} onQueue={setQueue} active={on} />
                   ) : (
-                    <VinylDeck verses={list} onFront={onFront} />
+                    <SavedCarousel verses={list} size={onClose ? FIT : 'min(56dvh, 560px)'} onOpen={full.open} onFront={onFront} dots={false} />
                   )}
                 </Activity>
               </div>
@@ -217,6 +220,7 @@ export const SavedVerses = memo(function SavedVerses({
         <div className="relative z-10 -mt-20 shrink-0">
           <SavedPlayer verses={order} front={front} view={view} onView={setView} />
         </div>
+        {full.view}
       </div>
     )
 

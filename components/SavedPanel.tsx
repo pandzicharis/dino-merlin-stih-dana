@@ -16,6 +16,7 @@ import { pruneFavorites } from '@/lib/storage'
 import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { AfterOpen, useSheetOpen } from './Sheet'
+import { Pocket } from './Pocket'
 
 /**
  * Zatvaranje: prvo samo kretnja, a sve ostalo (stanje plejera, gašenje
@@ -138,9 +139,12 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   // dok se sluša)
   const idle = !hasId
   const [shown, setShown] = useState(open)
+  // otvoren iz mini plejera — panel se podiže sporije, kao da izraste iz njega
+  const [rise, setRise] = useState(false)
   if (shown !== open) {
     setShown(open)
     if (open && idle) setView('cards')
+    setRise(open && mini && hasId)
   }
 
   const peek = !open && mini && hasId
@@ -196,8 +200,7 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
           {/* mini plejer je ispod ekrana plejera — pri otvaranju ga prirodno prekrije */}
           <AnimatePresence custom={open ? 'open' : 'stop'}>{peek && <MiniPlayer key="mini" onOpen={onOpen} />}</AnimatePresence>
 
-          {/* ekran plejera — pojavi se preko stiha (ploča gramofona izleti na svoje
-              mjesto, components/VinylDeck.tsx) i nestane; zatvoren se ne crta */}
+          {/* ekran plejera — izađe s lijeva, ode na lijevo; zatvoren se ne crta */}
           <motion.div
             role="dialog"
             aria-modal={open}
@@ -209,11 +212,11 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
               borderRadius: 0,
               paddingTop: 'max(0.75rem, var(--sat, 0px))',
               background: '#0a0909',
-              willChange: 'opacity',
+              willChange: 'transform',
             }}
             initial={false}
-            animate={open ? { opacity: 1, visibility: 'visible' } : { opacity: 0, transitionEnd: { visibility: 'hidden' } }}
-            transition={{ duration: open ? 0.3 : 0.35, ease: 'easeOut' }}
+            animate={open ? { x: '0%', visibility: 'visible' } : { x: '-100%', transitionEnd: { visibility: 'hidden' } }}
+            transition={{ duration: rise ? 0.6 : 0.55, ease: [0.32, 0.72, 0, 1] }}
           >
             <span
               className="pointer-events-none absolute inset-x-10 top-0 h-px"
@@ -347,6 +350,10 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
               )}
             </div>
 
+            {/* džep uz desnu ivicu — nazad na stih dana */}
+            {open && (
+              <Pocket side="right" kind="paper" label="Stih dana" onOpen={dismiss} />
+            )}
           </motion.div>
     </div>,
     document.body,
