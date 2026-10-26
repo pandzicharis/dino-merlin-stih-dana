@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import type { Verse } from '@/data/verses'
-import { BRAND } from '@/lib/brand'
+import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { MOODS } from '@/data/moods'
 import { albumOf, softOf } from '@/data/albums'
 import { SavedVerses, type SavedView } from './SavedVerses'
 import { closeSaved, dismissSaved, expandSaved, stopSaved, useSavedPlayerSelect } from '@/lib/player'
-import { MiniPlayer, PlayerIconPaths } from './SavedPlayer'
-import { DrawerIcon } from './DrawerIcon'
+import { EqBars, MiniPlayer, SEARCH_SAVED } from './SavedPlayer'
+import { Signature } from './Signature'
+import { MagazaLogo } from './MagazaLogo'
+import { MonthButton } from './RecapHost'
+import { SettingsButton } from './Settings'
 import { loadVerses } from '@/lib/verses-client'
 import { pruneFavorites } from '@/lib/storage'
 import { useFavorites } from '@/lib/client-store'
@@ -37,6 +40,9 @@ const VIEW = 'stihdana:savedView'
  * muzika ide dalje, a iznad dna početne pluta mini plejer (MiniPlayer).
  * Dodir ga vrati; povlačenje dolje gasi muziku.
  */
+/** zatvori plejer do kraja, muzika stane (prezentacija) */
+export const CLOSE_PLAYER = 'stihdana:close-player'
+
 export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
   const [verses, setVerses] = useState<Verse[] | null>(null)
 
@@ -84,6 +90,10 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   const before = useRef<SavedView>('cards')
   const favs = useFavorites()
   const hasSaved = favs.length > 0
+  const hasSavedRef = useRef(hasSaved)
+  useEffect(() => {
+    hasSavedRef.current = hasSaved
+  })
   // pozadina ekrana — pjesma koja svira, inače prvi sačuvani stih
   const nowId = useSavedPlayerSelect((s) => s.id)
   const backdrop = verses ? (verses.find((v) => v.id === nowId) ?? verses.find((v) => favs.includes(v.id)) ?? null) : null
@@ -169,7 +179,29 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
       closeSaved()
     }, LAG)
   }, [onClose])
-  // ekran stiha klizne udesno dok je plejer otvoren (globals.css)
+  // do kraja zatvoren (muzika stane) — prezentacija između koraka (components/deck/slides.tsx)
+  useEffect(() => {
+    const shut = () => {
+      onClose()
+      window.setTimeout(() => !openNow.current && stopSaved(), LAG)
+    }
+    window.addEventListener(CLOSE_PLAYER, shut)
+    return () => window.removeEventListener(CLOSE_PLAYER, shut)
+  }, [onClose])
+  // lupa ispod plejera (SavedPlayer) — pretraga u zaglavlju; iz istog dodira (tastatura)
+  const searchFrom = useRef(startSearch)
+  useEffect(() => {
+    searchFrom.current = startSearch
+  })
+  useEffect(() => {
+    const go = () => hasSavedRef.current && searchFrom.current()
+    window.addEventListener(SEARCH_SAVED, go)
+    return () => window.removeEventListener(SEARCH_SAVED, go)
+  }, [])
+  // povuci zaglavlje nadolje — plejer se spusti (lista i karte skrolaju svoje)
+  const drag = useDragControls()
+  const playing = useSavedPlayerSelect((s) => s.playing)
+  // stih dana se povuče u dubinu dok je plejer otvoren (globals.css)
   useEffect(() => {
     const d = document.documentElement
     if (open) d.dataset.page = 'player'
@@ -200,7 +232,8 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
           {/* mini plejer je ispod ekrana plejera — pri otvaranju ga prirodno prekrije */}
           <AnimatePresence custom={open ? 'open' : 'stop'}>{peek && <MiniPlayer key="mini" onOpen={onOpen} />}</AnimatePresence>
 
-          {/* ekran plejera — izađe s lijeva, ode na lijevo; zatvoren se ne crta */}
+          {/* ekran plejera — izađe odozdo preko cijelog ekrana, kao nova stranica (stih
+              dana se iza povuče u dubinu); spusti se nadolje; zatvoren se ne crta */}
           <motion.div
             role="dialog"
             aria-modal={open}
@@ -215,8 +248,15 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
               willChange: 'transform',
             }}
             initial={false}
-            animate={open ? { x: '0%', visibility: 'visible' } : { x: '-100%', transitionEnd: { visibility: 'hidden' } }}
+            animate={open ? { y: '0%', visibility: 'visible' } : { y: '100%', transitionEnd: { visibility: 'hidden' } }}
             transition={{ duration: rise ? 0.6 : 0.55, ease: [0.32, 0.72, 0, 1] }}
+            drag="y"
+            dragControls={drag}
+            dragListener={false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 1 }}
+            dragSnapToOrigin
+            onDragEnd={(_, i) => (i.offset.y > 110 || i.velocity.y > 600) && dismiss()}
           >
             <span
               className="pointer-events-none absolute inset-x-10 top-0 h-px"
@@ -227,8 +267,11 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
             {/* pozadina ekrana: atmosfera pjesme (boja stiha, zamućen omot) — pretopi se s pjesmom */}
             <Backdrop verse={backdrop} />
 
-            {/* zaglavlje — kao na ekranu stiha; lista ispod normalno skrola */}
-            <div className="relative z-[1] shrink-0 px-5 pb-1 pt-3">
+            {/* zaglavlje — isto kao na naslovnoj (potpis | Magaza, ista dugmad); povuci ga
+                nadolje i plejer se spusti */}
+            <div className="relative z-[1] shrink-0 touch-none px-5 pb-1 pt-3" onPointerDown={(e) => !(e.target as Element).closest('button, input, a') && drag.start(e)}>
+              {/* hvataljka — povuci nadolje */}
+              <span className="mx-auto -mt-1 mb-2 block h-1 w-9 rounded-full bg-white/20" aria-hidden />
               <div className="relative mb-3 flex items-center justify-between">
                 {/* pretraga — preko naslova i dugmadi, pretopi se */}
                 <div
@@ -279,61 +322,34 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                     </button>
                   </label>
                 </div>
-                <div className={`flex items-center gap-3 transition-opacity duration-200 ${searching ? 'pointer-events-none opacity-0' : ''}`}>
-                  {/* ista ikona kao dugme u zaglavlju: plejer pjesama */}
-                  <DrawerIcon>
-                    <PlayerIconPaths />
-                  </DrawerIcon>
-                  <div>
-                    <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
-                      Sačuvani stihovi
-                    </p>
-                    <p className="text-[1.1rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                      Player pjesama
-                    </p>
-                  </div>
+                <div className={`flex items-center gap-3.5 transition-opacity duration-200 ${searching ? 'pointer-events-none opacity-0' : ''}`}>
+                  <Signature height={36} wipe={false} className="opacity-90" />
+                  <span className="h-6 w-px bg-white/20" aria-hidden />
+                  <MagazaLogo height={Math.round(36 * MAGAZA_BESIDE)} color="#FFFFFF" style={{ transform: MAGAZA_DROP_CSS, opacity: 0.9 }} />
                 </div>
                 <div className={`flex items-center gap-2 transition-opacity duration-200 ${searching ? 'pointer-events-none opacity-0' : ''}`}>
-                  {/* traži pjesmu među sačuvanima */}
-                  {hasSaved && (
-                    <button
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={startSearch}
-                      aria-label="Traži pjesmu"
-                      className="hdr-btn w-[34px]"
-                    >
-                      <SearchGlyph />
-                    </button>
-                  )}
-                  {/* na stih dana — muzika ide dalje, na dnu početne viri mini plejer */}
+                  {/* dugme plejera kao na naslovnoj — ovdje upaljeno; dodir vraća na stih
+                      dana (muzika ide dalje, na dnu početne viri mini plejer) */}
                   <button
-                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={dismiss}
                     aria-label="Na stih dana"
-                    className="hdr-btn w-[34px]"
+                    title="Na stih dana"
+                    className="hdr-btn gap-1.5 pl-2.5 pr-3"
+                    style={{ color: '#14100A', background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})`, borderColor: 'transparent' }}
                   >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m9 6 6 6-6 6" />
-                    </svg>
+                    {playing ? (
+                      <EqBars accent="currentColor" on h={12} />
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M3.5 6h11M3.5 10.5h11M3.5 15h6.5" />
+                        <path d="M18 16.5V5.2l3 1.1" />
+                        <circle cx="15.7" cy="16.8" r="2.3" fill="currentColor" stroke="none" />
+                      </svg>
+                    )}
+                    <span className="tabular text-[12px] font-semibold leading-none">{favs.length}</span>
                   </button>
-                  {/* zatvori — muzika stane, plejer ode do kraja (bez mini plejera) */}
-                  <motion.button
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => {
-                      onClose()
-                      // muzika stane čim panel krene (LAG) — prvi kadar zatvaranja ostaje lak
-                      window.setTimeout(() => !openNow.current && stopSaved(), LAG)
-                    }}
-                    aria-label="Zatvori plejer"
-                    className="hdr-btn w-[34px]"
-                    whileHover={{ scale: 1.15 }}
-                    whileTap={{ scale: 0.88 }}
-                    transition={{ type: 'spring', stiffness: 460, damping: 24 }}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M6 6l12 12M18 6 6 18" />
-                    </svg>
-                  </motion.button>
+                  <MonthButton />
+                  <SettingsButton />
                 </div>
               </div>
             </div>

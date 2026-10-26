@@ -860,8 +860,8 @@ function useScene(run: (s: Scene) => Promise<void>, always = false) {
       try {
         const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
         if (q('[data-full]')) w?.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }))
-        const x = q('[aria-label="Zatvori plejer"]')
-        if (x) x.click()
+        // plejer do kraja zatvoren, muzika stane (components/SavedPanel.tsx)
+        if (q('[data-player-page][aria-hidden="false"]')) w?.dispatchEvent(new w.Event('stihdana:close-player'))
         // ostali otvoreni prozori (dijeljenje, postavke, pregled mjeseca…) — i kad je plejer
         // u stranici, inače bi dijeljenje ostalo otvoreno ispod sljedećeg koraka
         for (const dlg of w?.document.querySelectorAll('[role="dialog"][aria-modal="true"]') ?? []) {
@@ -1561,11 +1561,11 @@ function Plejer() {
     <>
       <PlejerScene key={os} onDone={() => os === 'ios' && !manual && both && setOs('android')} />
       <Text>
-        Player pjesama je svoj ekran: uđe sa strane, a pjesma krene sama. Stihovi kao karte, pjesme sa cijelim
-        stihom, albumi i omiljene (zvjezdica, redom koliko se slušaju), a lupa gore traži pjesmu po nazivu ili
-        stihu. Plejer je u boji stiha, kontrole kao u Apple Musicu, a naprijed i natrag idu kroz album ili omiljene
-        u kojima si. Papirići u džepu desno vraćaju na stih dana — muzika ide dalje u mini plejeru, a na
-        zaključanom ekranu je omot albuma koji svira.
+        Player pjesama je nova stranica: izađe odozdo preko cijelog ekrana, s istim zaglavljem kao naslovna, a
+        pjesma krene sama. Stihovi kao karte, pjesme sa cijelim stihom, albumi i omiljene (zvjezdica, redom koliko
+        se slušaju), a lupa traži pjesmu po nazivu ili stihu. Plejer je u boji stiha, kontrole kao u Apple Musicu.
+        Povuci ga nadolje (ili dodirni dugme plejera) i stih dana se vrati — muzika ide dalje u mini plejeru, a
+        na zaključanom ekranu je omot albuma koji svira.
       </Text>
     </>
   )

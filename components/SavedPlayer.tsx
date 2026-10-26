@@ -280,6 +280,9 @@ function PlayGlyph({ playing, size }: { playing: boolean; size: number }) {
 
 export { EqBars } from './EqBars'
 
+/** lupa ispod plejera otvara pretragu u zaglavlju (SavedPanel sluša) */
+export const SEARCH_SAVED = 'stihdana:saved-search'
+
 /** Šta pusti/pauza radi za pjesmu `cur` (ona u plejeru ili prednja karta). */
 let lastToggle = 0
 function toggle(cur: Verse, playing: boolean) {
@@ -441,6 +444,22 @@ export function SavedPlayer({
               </button>
             ))}
           </div>
+          {/* traži pjesmu — polje se otvori gore, u zaglavlju plejera (SavedPanel) */}
+          <button
+            type="button"
+            onClick={() => {
+              haptic(5)
+              // odmah, u istom dodiru — iPhone inače ne otvori tastaturu
+              window.dispatchEvent(new Event(SEARCH_SAVED))
+            }}
+            aria-label="Traži pjesmu"
+            className="ml-2 flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full bg-black/25 text-white/65 transition-colors hover:text-white"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <path d="m20 20-4.6-4.6" />
+            </svg>
+          </button>
         </div>
       </div>
       {sung && <SavedLyrics open={lyrics} verse={sung} onClose={() => setLyrics(false)} />}
