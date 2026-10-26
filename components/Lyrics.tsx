@@ -153,10 +153,9 @@ export function LyricsPanel({
       open={open}
       verse={verse}
       label={`Tekst — ${verse.song}`}
-      // zaglavlje kao na ostalim panelima: znak, natpis i naslov, zatvori — malo niže
-      // od hvataljke (tekst ispod ide s njim, razmaci ostaju)
+      // zaglavlje kao na ostalim panelima: znak, natpis i naslov, zatvori
       header={
-        <div className="mt-[1cm] flex items-center gap-3">
+        <div className="flex items-center gap-3">
           <span
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
             style={{ borderColor: `${BRAND.gold}55`, background: `radial-gradient(circle, ${BRAND.gold}24, transparent 70%)`, color: BRAND.gold }}
