@@ -520,6 +520,8 @@ function SongIssue({ info, mode, onRetry }: { info: SongInfo | null; mode: Songs
 /** Pregled YouTube videa u formi stiha: sličica, dodir pusti video ovdje. */
 function YouTubePreview({ id }: { id: string }) {
   const [play, setPlay] = useState(false)
+  // sličica se učitava — pulsira i vrti se dok ne stigne
+  const [loaded, setLoaded] = useState(false)
   return (
     <div className="col-span-2 -mt-1 overflow-hidden rounded-xl border border-white/[0.08] bg-black/40" data-yt-preview>
       <div className="relative aspect-video w-full">
@@ -534,7 +536,14 @@ function YouTubePreview({ id }: { id: string }) {
         ) : (
           <button type="button" onClick={() => setPlay(true)} aria-label="Pusti video" className="group absolute inset-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" draggable={false} className="h-full w-full object-cover opacity-85 transition-opacity group-hover:opacity-100" />
+            <img
+              src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
+              alt=""
+              draggable={false}
+              onLoad={() => setLoaded(true)}
+              className={`h-full w-full object-cover transition-opacity duration-500 group-hover:opacity-100 ${loaded ? 'opacity-85' : 'opacity-0'}`}
+            />
+            {!loaded && <span className="absolute inset-0 animate-pulse bg-white/[0.04]" aria-hidden />}
             <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform group-hover:scale-105">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="translate-x-px" aria-hidden>
                 <path d="M7 4.5v15l12-7.5z" />
@@ -1249,7 +1258,7 @@ function Editor({
   }
   // pjesma bez linka (upisana, izabrana, ili stih koji se uređuje) — link sa njene
   // stranice na dinomerlin.com (tamo gdje je i tekst), pa pregled videa ispod
-  const [linkLook, setLinkLook] = useState<'idle' | 'look' | 'none'>('idle')
+  const [linkLook, setLinkLook] = useState<'idle' | 'look' | 'found' | 'none'>('idle')
   const linkTo = useRef(setLink)
   useEffect(() => {
     linkTo.current = setLink
@@ -1265,7 +1274,7 @@ function Editor({
         .then((b: { youtube?: string | null } | null) => {
           if (!on) return
           if (b?.youtube) linkTo.current(name, `https://www.youtube.com/watch?v=${b.youtube}`)
-          setLinkLook(b?.youtube ? 'idle' : 'none')
+          setLinkLook(b?.youtube ? 'found' : 'none')
         })
         .catch(() => on && setLinkLook('none'))
     }, 450)
@@ -1274,6 +1283,12 @@ function Editor({
       clearTimeout(t)
     }
   }, [d.song, d.youtube])
+  // "nađen" kratko ostane uz polje
+  useEffect(() => {
+    if (linkLook !== 'found') return
+    const t = window.setTimeout(() => setLinkLook('idle'), 3500)
+    return () => clearTimeout(t)
+  }, [linkLook])
   const song = d.song.trim() ? songOf(d.song) : null
   // uredi pjesmu iz liste: naziv i ime fajla
   const [editSong, setEditSong] = useState<KnownSong | null>(null)
@@ -1478,10 +1493,26 @@ function Editor({
             <span className={labelCls}>
               YouTube <span className="normal-case tracking-normal text-white/30">— pjesma</span>
             </span>
-            <input name="youtube" value={d.youtube} onChange={set('youtube')} required placeholder="link pjesme" className={`mt-2 ${field}`} />
-            {d.song.trim() && !youtubeId(d.youtube) && linkLook !== 'idle' && (
-              <span className="mt-1.5 block text-[11px] text-white/45" data-link-look>
+            <span className="relative mt-2 block">
+              <input name="youtube" value={d.youtube} onChange={set('youtube')} required placeholder={linkLook === 'look' ? 'tražim link…' : 'link pjesme'} className={`${field} pr-10`} />
+              {/* traži se link — vrti se u polju; nađen — kvačica */}
+              {linkLook === 'look' && !youtubeId(d.youtube) && (
+                <span className="absolute right-3.5 top-1/2 block h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: `${BRAND.gold}`, borderTopColor: 'transparent' }} aria-hidden />
+              )}
+              {linkLook === 'found' && youtubeId(d.youtube) && (
+                <svg className="absolute right-3.5 top-1/2 -translate-y-1/2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9BCB8E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m5 12.5 4.5 4.5L19 7.5" />
+                </svg>
+              )}
+            </span>
+            {d.song.trim() && (linkLook === 'look' || linkLook === 'none') && !youtubeId(d.youtube) && (
+              <span className="mt-1.5 flex items-center gap-1.5 text-[11px] text-white/50" data-link-look>
                 {linkLook === 'look' ? 'Tražim link na dinomerlin.com…' : 'Link nije nađen — upiši ga'}
+              </span>
+            )}
+            {linkLook === 'found' && youtubeId(d.youtube) && (
+              <span className="mt-1.5 block text-[11px]" style={{ color: '#9BCB8E' }} data-link-look>
+                Link nađen na dinomerlin.com
               </span>
             )}
           </label>
