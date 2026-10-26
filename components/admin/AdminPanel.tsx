@@ -586,6 +586,27 @@ function SongIssue({ info, mode, onRetry }: { info: SongInfo | null; mode: Songs
 }
 
 /** Mala oznaka uz naziv pjesme: spremna, preuzima se, ili fali (s dugmetom). */
+/** Prekidač filtera u listi: samo stihovi kojima nešto fali (broj desno). */
+function Switch({ data, label, on, count, onChange }: { data: string; label: string; on: boolean; count: number; onChange: (on: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      data-missing-filter={data}
+      onClick={() => onChange(!on)}
+      className="flex items-center gap-2 text-[11px] transition-colors"
+      style={{ color: on ? '#fff' : 'rgba(255,255,255,0.5)' }}
+    >
+      <span className="relative h-[18px] w-[30px] shrink-0 rounded-full border transition-colors" style={{ borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.15)', background: on ? `${BRAND.gold}33` : 'rgba(255,255,255,0.04)' }}>
+        <span className="absolute top-[2px] h-3 w-3 rounded-full transition-all" style={{ left: on ? 14 : 2, background: on ? BRAND.gold : 'rgba(255,255,255,0.45)' }} />
+      </span>
+      {label}
+      <span className="tabular opacity-60">{count}</span>
+    </button>
+  )
+}
+
 function SongBadge({ info, mode, onFetch }: { info: SongInfo | null; mode: Songs['mode']; onFetch: () => void }) {
   if (!info) return null
   if (info.state === 'ready') {
@@ -645,9 +666,11 @@ function Library({
 }) {
   const [q, setQ] = useState('')
   const [mood, setMood] = useState<Mood | null>(null)
-  // filter po pjesmi: ima li stih pjesmu u aplikaciji (♪) ili ne
-  const [withSong, setWithSong] = useState<boolean | null>(null)
+  // samo stihovi kojima fali pjesma u aplikaciji, ili tekst koji prati pjesmu (vremena redova)
+  const [noSong, setNoSong] = useState(false)
+  const [noSync, setNoSync] = useState(false)
   const hasSong = (v: AdminVerse) => songs.of(v.song)?.state === 'ready'
+  const synced = (v: AdminVerse) => songs.of(v.song)?.lyrics === 'synced'
   const [archived, setArchived] = useState(false)
   const [page, setPage] = useState(0)
   const writable = Boolean(data.writable)
@@ -657,7 +680,8 @@ function Library({
       (v) =>
         v.active !== archived &&
         (!mood || v.mood === mood) &&
-        (withSong == null || hasSong(v) === withSong) &&
+        (!noSong || !hasSong(v)) &&
+        (!noSync || !synced(v)) &&
         (!q || `${v.text} ${v.song} ${v.album}`.toLowerCase().includes(q.toLowerCase())),
     )
     // najnoviji prvi — to je ono što urednik najčešće traži
@@ -744,7 +768,7 @@ function Library({
       />
 
       {/* raspoloženja u jednom redu — na uskom ekranu klize vodoravno */}
-      <div className="no-scrollbar -mx-5 mb-4 flex gap-2 overflow-x-auto px-5">
+      <div className="no-scrollbar -mx-5 mb-3 flex gap-2 overflow-x-auto px-5">
         {MOOD_KEYS.map((k) => (
           <button
             key={k}
@@ -765,45 +789,31 @@ function Library({
             {MOODS[k].label}
           </button>
         ))}
-        {/* pjesma: s njom / bez nje — tek kad je stanje pjesama stiglo */}
-        {songs.mode && (
-          <>
-            <span className="mx-1 w-px shrink-0 self-stretch bg-white/10" aria-hidden />
-            {(
-              [
-                [true, 'S pjesmom'],
-                [false, 'Bez pjesme'],
-              ] as const
-            ).map(([k, label]) => {
-              const on = withSong === k
-              const n = data.verses.filter((v) => v.active !== archived && hasSong(v) === k).length
-              return (
-                <button
-                  key={label}
-                  data-song-filter={k ? 'with' : 'without'}
-                  aria-pressed={on}
-                  onClick={() => {
-                    setWithSong(on ? null : k)
-                    setPage(0)
-                  }}
-                  className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[11px] transition-colors"
-                  style={{
-                    borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.08)',
-                    color: on ? '#fff' : 'rgba(255,255,255,0.5)',
-                    background: on ? `${BRAND.gold}14` : 'transparent',
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill={k ? BRAND.gold : 'none'} stroke={k ? 'none' : 'currentColor'} strokeWidth="2" aria-hidden>
-                    <path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2v12.5a3 3 0 1 1-2-2.83V7.3L9 8.6z" />
-                  </svg>
-                  {label}
-                  <span className="tabular opacity-60">{n}</span>
-                </button>
-              )
-            })}
-          </>
-        )}
       </div>
+
+      {/* bez pjesme / tekst bez vremena redova — tek kad je stanje pjesama stiglo */}
+      {songs.mode && (
+        <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2">
+          {(
+            [
+              ['song', 'Bez pjesme', noSong, setNoSong, hasSong],
+              ['sync', 'Tekst ne prati', noSync, setNoSync, synced],
+            ] as const
+          ).map(([k, label, on, set, has]) => (
+            <Switch
+              key={k}
+              data={k}
+              label={label}
+              on={on}
+              count={data.verses.filter((v) => v.active !== archived && !has(v)).length}
+              onChange={(next) => {
+                set(next)
+                setPage(0)
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* lista ima svoju visinu i skrola se unutra — filteri i kartice ostaju na mjestu */}
       <div
