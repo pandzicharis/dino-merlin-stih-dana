@@ -23,7 +23,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ song: string }
   } catch {}
   song = song.slice(0, 120)
   const stored = (STORED as Record<string, StoredLyrics>)[audioFile(song)]
-  if (stored) return NextResponse.json(stored, { headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=2592000' } })
+  // telefon kratko (ispravka iz admina stigne brzo), CDN sedmicu — nova objava ga ionako očisti
+  if (stored) return NextResponse.json(stored, { headers: { 'Cache-Control': 'public, max-age=300, s-maxage=604800, stale-while-revalidate=2592000' } })
   const duration = (DURATIONS as Record<string, number>)[audioFile(song)] ?? 0
   // LRCLIB zna kasniti — tekst ne čeka duže od 5 s (posao ide dalje i zapamti se za sljedeći put)
   const late = new Promise<never>((_, no) => setTimeout(() => no(new Error('lrclib kasni')), 5000))

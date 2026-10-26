@@ -47,19 +47,19 @@ export type LyricsControls = {
   repeat?: { on: boolean; toggle: () => void }
 }
 
-/* jednom po pjesmi; greška se ne pamti */
-const cache = new Map<string, Promise<Lyrics | null>>()
+/* po pjesmi, 10 minuta — aplikacija zna danima stajati otvorena, a ispravljen
+   tekst (pomak, vremena redova) mora stići; greška se ne pamti */
+const cache = new Map<string, { at: number; p: Promise<Lyrics | null> }>()
 function load(song: string): Promise<Lyrics | null> {
-  let p = cache.get(song)
-  if (!p) {
-    p = fetch(`/api/lyrics/${encodeURIComponent(song)}`).then(async (r) => {
-      if (r.status === 404) return null
-      if (!r.ok) throw new Error(String(r.status))
-      return (await r.json()) as Lyrics
-    })
-    cache.set(song, p)
-    p.catch(() => cache.delete(song))
-  }
+  const hit = cache.get(song)
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.p
+  const p = fetch(`/api/lyrics/${encodeURIComponent(song)}`).then(async (r) => {
+    if (r.status === 404) return null
+    if (!r.ok) throw new Error(String(r.status))
+    return (await r.json()) as Lyrics
+  })
+  cache.set(song, { at: Date.now(), p })
+  p.catch(() => cache.delete(song))
   return p
 }
 
