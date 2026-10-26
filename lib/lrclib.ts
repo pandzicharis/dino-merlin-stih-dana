@@ -17,8 +17,6 @@ const API = 'https://lrclib.net/api'
 const ARTIST = 'Dino Merlin'
 /** koliko trajanje LRC zapisa smije odstupati od našeg fajla (s) */
 const SLACK = 3
-/** nema li takvog — najbliži do ovoliko (drugo izdanje pjesme; razliku podesi pomak teksta u adminu) */
-const LOOSE = 10
 
 export type SyncedLine = { t: number; l: string }
 
@@ -106,10 +104,8 @@ export function lrcOf(song: string, duration: number, fresh = false): Promise<Lr
       // naziv s dodacima ("Bosnom (svuda)…") — opšta pretraga
       if (!list.length) list = (await get(`${API}/search?${new URLSearchParams({ q: `${ARTIST} ${song}` })}`)).filter((r) => songKey(clean(r.trackName)) === k)
     }
-    const near = (r: Entry) => Math.abs(r.duration - duration)
-    let close = duration ? list.filter(fits).sort((a, b) => near(a) - near(b)) : []
-    // nema verzije našeg trajanja — najbliža do LOOSE s (drugo izdanje; admin podesi pomak teksta)
-    if (duration && !close.length) close = list.filter((r) => Boolean(r.syncedLyrics) && !r.instrumental && near(r) <= LOOSE).sort((a, b) => near(a) - near(b))
+    // samo verzija našeg trajanja — drugo izdanje (duži uvod, drugi kraj) ima druga vremena redova
+    const close = duration ? list.filter(fits).sort((a, b) => Math.abs(a.duration - duration) - Math.abs(b.duration - duration)) : []
     const synced = close.length ? parseLrc(close[0].syncedLyrics!) : null
     const plain = list.find((r) => r.plainLyrics)?.plainLyrics
     return {

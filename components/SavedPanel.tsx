@@ -396,6 +396,9 @@ function Backdrop({ verse }: { verse: Verse | null }) {
         </motion.div>
       </AnimatePresence>
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.82))' }} />
+      {/* ispod statusne trake tamno, kao na ekranu stiha: iOS 26 tu sam zamuti ono što je
+          ispod (rub ekrana) — svijetla boja i omot bi se vidjeli kao magla */}
+      <div className="absolute inset-x-0 top-0" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 72px)', background: 'linear-gradient(180deg, rgba(0,0,0,0.78), rgba(0,0,0,0.35) 55%, transparent)' }} />
     </div>
   )
 }
