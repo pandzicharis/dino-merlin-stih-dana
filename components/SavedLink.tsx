@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { EqBars } from './EqBars'
-import { OPEN_SAVED, savedVerse, useSavedPlayerSelect } from '@/lib/player'
+import { OPEN_SAVED, autoplaySaved, savedVerse, useSavedPlayerSelect } from '@/lib/player'
 import { albumOf, thumbOf } from '@/data/albums'
 import { whenCalm } from '@/lib/calm'
 import { useMounted } from '@/lib/client-store'
@@ -53,6 +53,7 @@ export function SavedLink() {
     const show = () => {
       setUsed(true)
       setOpen(true)
+      autoplaySaved()
     }
     window.addEventListener(OPEN_SAVED, show)
     return () => window.removeEventListener(OPEN_SAVED, show)
@@ -77,6 +78,8 @@ export function SavedLink() {
                 haptic(8)
                 setUsed(true)
                 setOpen(true)
+                // otvoren plejer svira — iz ovog dodira (iPhone)
+                autoplaySaved()
               }}
               aria-label={`Player pjesama (${count})`}
               title="Player pjesama"
@@ -116,6 +119,7 @@ export function SavedLink() {
                   void load()
                   setUsed(true)
                   setOpen(true)
+                  autoplaySaved()
                 }}
               />
             )}

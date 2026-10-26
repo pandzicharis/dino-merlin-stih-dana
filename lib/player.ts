@@ -225,7 +225,14 @@ export function minimizeSaved() {
 let shown: Verse | null = null
 export function setShownSaved(v: Verse | null) {
   shown = v
+  // plejer otvoren prije nego je složen — pjesma krene čim je karta tu
+  if (autoWait && v) {
+    autoWait = false
+    if (!state.playing && !playSaved(v)) nextSaved()
+  }
 }
+/** otvoren, a karte još nisu složene (autoplaySaved) */
+let autoWait = false
 
 /**
  * Pjesma u plejeru, a ne svira — mini plejer je pokazuje, "pusti" je pokrene.
@@ -254,6 +261,7 @@ export function expandSaved() {
 }
 /** Panel zatvoren: sačuvani na početnoj sviraju dalje; inače sve stane. */
 export function closeSaved() {
+  autoWait = false
   if (!state.mini) stopSaved()
 }
 
@@ -261,6 +269,18 @@ export function closeSaved() {
 export function savedIndex(): { i: number; n: number } {
   return { i: Math.max(0, playlist.findIndex((v) => v.id === state.id)), n: playlist.length }
 }
+/**
+ * Plejer otvoren — ako sačuvani ne sviraju, krene pjesma koju plejer
+ * pokazuje (pauzirana, prednja karta, ili prva). Zove se iz dodira kojim se
+ * plejer otvara, pa iPhone dozvoli zvuk.
+ */
+export function autoplaySaved() {
+  if (state.playing && savedSounding()) return
+  const v = (state.id ? savedVerse() : null) ?? shown ?? playlist[0]
+  if (!v) return void (autoWait = true)
+  if (!playSaved(v)) nextSaved()
+}
+
 /** Otvori sačuvane (SavedLink sluša). */
 export function openSaved() {
   window.dispatchEvent(new Event(OPEN_SAVED))

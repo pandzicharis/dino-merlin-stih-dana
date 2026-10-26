@@ -378,6 +378,21 @@ function Backdrop({ verse }: { verse: Verse | null }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full scale-125 object-cover opacity-40" style={softOf(cover) ? undefined : { filter: 'blur(48px)' }} />
           )}
+          {/* gore oštar omot koji se pretapa u tamu (kao drawer teksta) — vrh ekrana nije
+              samo zamućen; ispod statusne trake se vidi slika, ne magla */}
+          {cover && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={cover}
+              alt=""
+              draggable={false}
+              className="absolute inset-x-0 top-0 h-[60%] w-full object-cover opacity-30"
+              style={{
+                maskImage: 'linear-gradient(180deg, #000 0%, rgba(0,0,0,0.5) 45%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(180deg, #000 0%, rgba(0,0,0,0.5) 45%, transparent 100%)',
+              }}
+            />
+          )}
         </motion.div>
       </AnimatePresence>
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.82))' }} />
