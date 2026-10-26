@@ -138,6 +138,8 @@ export function GiftHost({ verses }: { verses: Verse[] }) {
   const [hide, setHide] = useState(false)
   // tekst papira se skloni u istom trenutku kad kopija krene (bez dvostrukih slova)
   const [blank, setBlank] = useState(false)
+  // skeniran u aplikaciji — papirić bez čekanja (nema učitavanja stranice da ga sakrije)
+  const [quick, setQuick] = useState(false)
   const list = useRef(verses)
   const skip = useRef<() => void>(() => {})
   const land = useRef<() => void>(() => {})
@@ -145,7 +147,8 @@ export function GiftHost({ verses }: { verses: Verse[] }) {
 
   useEffect(() => {
     // jedan poklon: papirić, let slova, drawer — vrati čišćenje
-    const play = (id: string) => {
+    // `quick`: skeniran u aplikaciji — stranica je već tu, papirić kreće odmah
+    const play = (id: string, quick = false) => {
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       let dead = false
       const timers: number[] = []
@@ -203,13 +206,13 @@ export function GiftHost({ verses }: { verses: Verse[] }) {
         setDrawer(true)
         // duži stih — duže stoji otvoren
         const hold = Math.min(3600, 1600 + v.text.length * 25)
-        at(80, () => setPhase('in'))
-        at(1000, () => {
+        at(quick ? 0 : 80, () => setPhase('in'))
+        at(quick ? 650 : 1000, () => {
           setPhase('open')
           haptic(8)
           prepare(v)
         })
-        at(1000 + 800 + hold, () => toVerse(v))
+        at((quick ? 650 : 1000) + 800 + hold, () => toVerse(v))
       }
       // kreće kad su fontovi tu — inače bi papirić zastao dok se stranica slaže
       void Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 700))]).then(async () => {
@@ -237,7 +240,8 @@ export function GiftHost({ verses }: { verses: Verse[] }) {
       setBlank(false)
       setFly(null)
       setPhase(null)
-      stop = play((e as CustomEvent<string>).detail)
+      setQuick(true)
+      stop = play((e as CustomEvent<string>).detail, true)
     }
     window.addEventListener(GIFT_EVENT, onGift)
     return () => {
@@ -272,7 +276,7 @@ export function GiftHost({ verses }: { verses: Verse[] }) {
         <AnimatePresence>
           {phase && phase !== 'gone' && (
             <motion.div key="paper" className="pointer-events-none fixed inset-0 z-[118]" exit={{ transition: { duration: 0.6 } }}>
-              <Paper verse={verse} opened={phase === 'open'} blank={blank} />
+              <Paper verse={verse} opened={phase === 'open'} blank={blank} quick={quick} />
             </motion.div>
           )}
         </AnimatePresence>,
@@ -566,7 +570,7 @@ function Stage({ verse, onSkip }: { verse: Verse; onSkip: () => void }) {
  * sleti na sredinu, otvori se s pola na cijeli, a stih izroni iz pregiba.
  * Kad slova odlete (`blank`), papirić bez njih padne i nestane.
  */
-function Paper({ verse, opened, blank }: { verse: Verse; opened: boolean; blank: boolean }) {
+function Paper({ verse, opened, blank, quick = false }: { verse: Verse; opened: boolean; blank: boolean; quick?: boolean }) {
   // otvoren do kraja — od tad ravan (bez naličja i 3D-a); ništa se na papiru ne mijenja kad slova polete
   const [flat, setFlat] = useState(false)
   const W = Math.min(window.innerWidth * 0.8, 330)
@@ -593,7 +597,7 @@ function Paper({ verse, opened, blank }: { verse: Verse; opened: boolean; blank:
       animate={opened ? { x: 0, y: 0, rotate: 0, scale: 1, opacity: 1 } : { x: -half, y: 0, scale: 1, opacity: 1, rotate: -2 }}
       // slova su odletjela — papirić padne i nestane (kao listić iz tombole)
       exit={{ y: 70, rotate: 8, opacity: 0, transition: { duration: 0.6, ease: [0.55, 0, 0.75, 0.4] } }}
-      transition={opened ? { duration: 0.7, ease: EASE } : { duration: 0.7, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      transition={opened ? { duration: 0.7, ease: EASE } : { duration: 0.7, delay: quick ? 0.05 : 0.35, ease: [0.22, 1, 0.36, 1] }}
     >
       {/* otvoren papir je ravan — bez naličja i 3D-a, pa ga Safari pri letu slova i
           odlasku (prozirnost) ne može "spljoštiti" i bljesnuti naličjem */}

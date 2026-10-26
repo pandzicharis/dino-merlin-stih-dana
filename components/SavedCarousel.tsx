@@ -693,7 +693,7 @@ function CardFaceView({
         data-small
         className="pointer-events-none absolute z-[1] flex flex-col items-center text-center"
         // niže, tik iznad plejera koji prekrije dno karte
-        style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${SH - 104}em`, gap: '7em' }}
+        style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${SH - 120}em`, gap: '7em' }}
       >
         <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '15em', letterSpacing: '0.18em', color: m.accent }}>
           {verse.song}
