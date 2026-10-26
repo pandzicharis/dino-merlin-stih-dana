@@ -600,33 +600,39 @@ function CardFaceView({
             <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
             <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
           </div>
-          <div data-shrink className="flex items-center gap-2" style={{ ...layer, transformOrigin: 'right center' }}>
+          {/* svako dugme se na raširenoj vrati na svoju veličinu oko svoje sredine
+              (data-shrink) — ostaje na svom mjestu na karti, ne klizne prema uglu */}
+          <div className="flex items-center gap-2">
             {/* raširi kartu preko cijelog ekrana / skupi je nazad */}
             {(onOpen || onCollapse) && (
-              <button
-                data-nodrag
-                {...tapProps(() => (onCollapse ? onCollapse() : onOpen?.(verse)))}
-                aria-label={onCollapse ? 'Skupi' : 'Raširi'}
-                title={onCollapse ? 'Skupi' : 'Raširi'}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80 transition-transform active:scale-90"
-              >
-                {/* strelice se okrenu dok karta raste i skuplja se (SavedFull `data-flip`) */}
-                <ExpandMorph layer={layer} />
-              </button>
+              <span data-shrink className="flex" style={layer}>
+                <button
+                  data-nodrag
+                  {...tapProps(() => (onCollapse ? onCollapse() : onOpen?.(verse)))}
+                  aria-label={onCollapse ? 'Skupi' : 'Raširi'}
+                  title={onCollapse ? 'Skupi' : 'Raširi'}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80 transition-transform active:scale-90"
+                >
+                  {/* strelice se okrenu dok karta raste i skuplja se (SavedFull `data-flip`) */}
+                  <ExpandMorph layer={layer} />
+                </button>
+              </span>
             )}
             {/* srce — i na raširenoj karti */}
-            <button
-              data-nodrag
-              onClick={() => toggleFavorite(verse.id)}
-              aria-label="Ukloni iz sačuvanih"
-              title="Ukloni iz sačuvanih"
-              className="flex h-8 w-8 items-center justify-center rounded-full border transition-transform active:scale-90"
-              style={{ borderColor: `${m.accent}55`, background: `${m.accent}1a`, color: m.accent }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                <path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z" />
-              </svg>
-            </button>
+            <span data-shrink className="flex" style={layer}>
+              <button
+                data-nodrag
+                onClick={() => toggleFavorite(verse.id)}
+                aria-label="Ukloni iz sačuvanih"
+                title="Ukloni iz sačuvanih"
+                className="flex h-8 w-8 items-center justify-center rounded-full border transition-transform active:scale-90"
+                style={{ borderColor: `${m.accent}55`, background: `${m.accent}1a`, color: m.accent }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z" />
+                </svg>
+              </button>
+            </span>
           </div>
         </div>
 
