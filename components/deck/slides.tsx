@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
-import { motion, useIsPresent } from 'motion/react'
+import { createPortal } from 'react-dom'
+import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP_CSS, MAGAZA_RATIO } from '@/lib/brand'
+import { AnimatePresence, motion, useIsPresent } from 'motion/react'
 import { MOODS } from '@/data/moods'
 import { albumOf, ALBUMS, blurOf, glowOf, thumbOf } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
@@ -14,6 +15,7 @@ import { useDeck } from './context'
 import { TIPS_ON } from '../Tips'
 import { Grafike, LANSIRANJE, LaunchPlan, Ostalo, PwaNative, Video } from './launch'
 import { QrCode } from './QrCode'
+import { deviceOuter, Galaxy, GALAXY, IPhone, IPHONE, type DeviceKind } from './Devices'
 import {
   Dot,
   ActionChip,
@@ -1698,6 +1700,8 @@ function Tekst() {
  */
 function Poklon() {
   const { phone } = useDeck()
+  // drugi telefon (prijatelja) koji skenira QR s ekrana — kao kod izloga
+  const [scan, setScan] = useState<{ step: ScanStep; qr: string | null } | null>(null)
   useKeepSaved()
   useScene(async ({ wait, press, home, find, alive }) => {
     if (!(await home())) return
@@ -1706,18 +1710,30 @@ function Poklon() {
     await wait(1300)
     if (alive()) await press('[data-share-mode="link"]')
     // QR kod i link — kopira se ili pošalje
-    await wait(3600)
-    if (alive()) await press('[role="dialog"][aria-modal="true"] button[aria-label="Zatvori"]')
-    await wait(900)
-    // prijatelj otvori link (ili skenira QR) — stih mu stiže kao poklon
+    await wait(1600)
+    if (!alive()) return
+    let qr: string | null = null
+    try {
+      qr = phone()?.contentDocument?.querySelector('[role="dialog"][aria-modal="true"] .aspect-square svg')?.outerHTML ?? null
+    } catch {
+      /* drugi izvor */
+    }
+    // prijatelj prinese telefon, skenira, pa njegov telefon dođe naprijed
+    for (const [step, ms] of [['in', 900], ['scan', 1800], ['lock', 650], ['cover', 750]] as const) {
+      if (!alive()) return
+      setScan({ step, qr })
+      await wait(ms)
+    }
+    // ispod njegovog telefona: stih mu stiže kao poklon
     try {
       phone()?.contentWindow?.location.assign(`/stih/${DECK_VERSE}?poklon`)
     } catch {
       return
     }
-    await wait(1500)
     // papirić, slova, pa drawer sa stihom
-    if (!(await find('[data-gift]', 15000)) || !alive()) return
+    const gift = await find('[data-gift]', 15000)
+    setScan(null)
+    if (!gift || !alive()) return
     await wait(9000)
     // zatvori — ispod je njegov stih dana
     if (alive()) await press('[data-gift-close]')
@@ -1730,6 +1746,7 @@ function Poklon() {
         tombole — papirić iste boje se otvori, a slova polete u ekran stiha. Zatvori ga, a ispod je njegov stih
         dana.
       </Text>
+      <AnimatePresence>{scan && <GiftScan key="scan" step={scan.step} qr={scan.qr} />}</AnimatePresence>
       <Bullets
         items={[
           <><b>Svaki poklon je nova instalacija</b> — link vodi pravo u aplikaciju.</>,
@@ -1737,6 +1754,90 @@ function Poklon() {
         ]}
       />
     </>
+  )
+}
+
+type ScanStep = 'in' | 'scan' | 'lock' | 'cover'
+
+/**
+ * Telefon prijatelja preko živog telefona: dođe sa strane, kamera uhvati QR
+ * (isti kod s ekrana), linija skenira, okvir zasvijetli, pa telefon dođe
+ * tačno preko živog — tad se ispod otvori poklon i ovaj nestane.
+ */
+function GiftScan({ step, qr }: { step: ScanStep; qr: string | null }) {
+  const { phone, frame } = useDeck()
+  const [box, setBox] = useState<{ l: number; t: number; w: number; kind: DeviceKind } | null>(null)
+  useEffect(() => {
+    // okvir živog telefona, izmjeren s ekrana aplikacije (iframe je umanjen)
+    const measure = () => {
+      const r = phone()?.getBoundingClientRect()
+      if (!r?.width) return
+      const D = frame === 'iphone' ? IPHONE : GALAXY
+      const k = r.width / D.w
+      const inset = (D.rim + D.bezel) * k
+      setBox({ l: r.left - inset, t: r.top - inset, w: deviceOuter(frame).w * k, kind: frame })
+    }
+    measure()
+    addEventListener('resize', measure)
+    return () => removeEventListener('resize', measure)
+  }, [phone, frame])
+  if (!box) return null
+  const { w } = box
+  const h = (w * deviceOuter(box.kind).h) / deviceOuter(box.kind).w
+  const Frame = box.kind === 'iphone' ? IPhone : Galaxy
+  const locked = step === 'lock' || step === 'cover'
+  return createPortal(
+    <motion.div
+      className="pointer-events-none fixed z-30"
+      style={{ left: box.l, top: box.t, width: w, height: h }}
+      initial={{ x: -w * 0.8, y: h * 0.7, rotate: 12, scale: 0.5, opacity: 0 }}
+      animate={
+        step === 'cover'
+          ? { x: 0, y: 0, rotate: 0, scale: 1, opacity: 1 }
+          : { x: -w * 0.3, y: h * 0.26, rotate: -7, scale: 0.54, opacity: 1 }
+      }
+      exit={{ opacity: 0, transition: { duration: 0.35 } }}
+      transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+      aria-hidden
+    >
+      <Frame width={`${w}px`} time="12:00">
+        <motion.div className="absolute inset-0 bg-black" animate={{ opacity: step === 'cover' ? 0 : 1 }} transition={{ duration: 0.35 }}>
+          {/* kamera: QR s drugog ekrana, okvir koda i linija skeniranja */}
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 50% 45%, #2a2622, #0b0a09 70%)' }} />
+          <div className="absolute left-1/2 top-[44%] h-[230em] w-[230em] -translate-x-1/2 -translate-y-1/2">
+            {qr && (
+              <motion.div
+                className="absolute inset-[24em] rounded-[10em] p-[10em]"
+                style={{ background: '#F6F1E7', rotate: 8 }}
+                initial={false}
+                animate={{ filter: locked ? 'blur(0px)' : 'blur(3px)', scale: locked ? 1 : 0.94 }}
+                transition={{ duration: 0.4 }}
+              >
+                <div className="h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: qr }} />
+              </motion.div>
+            )}
+            {['left-0 top-0 border-l-[6em] border-t-[6em]', 'right-0 top-0 border-r-[6em] border-t-[6em]', 'left-0 bottom-0 border-l-[6em] border-b-[6em]', 'right-0 bottom-0 border-r-[6em] border-b-[6em]'].map((c) => (
+              <span
+                key={c}
+                className={`absolute h-[46em] w-[46em] rounded-[8em] transition-colors duration-300 ${c}`}
+                style={{ borderColor: locked ? BRAND.gold : '#F4E5C2' }}
+              />
+            ))}
+            {step === 'scan' && (
+              <motion.span
+                className="absolute left-[8%] right-[8%] h-[3em] rounded-full"
+                style={{ background: BRAND.gold, boxShadow: `0 0 20em ${BRAND.gold}` }}
+                initial={{ top: '10%' }}
+                animate={{ top: ['10%', '88%', '10%'] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            )}
+          </div>
+          <p className="absolute bottom-[90em] left-0 right-0 text-center text-[15em] text-white/70">Stih dana</p>
+        </motion.div>
+      </Frame>
+    </motion.div>,
+    document.body,
   )
 }
 
