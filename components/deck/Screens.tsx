@@ -278,11 +278,10 @@ export function VerseMock({
       >
         {/* zaglavlje */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* potpis | Magaza — kao VerseScreen */}
+          {/* potpis i Magaza (bez crte između) — kao VerseScreen */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14em' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/signature.webp?v=2" alt="" style={{ height: '36em', width: 'auto', opacity: 0.9 }} />
-            <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
             <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
           </div>
           {/* sačuvani, moj mjesec i postavke — kao VerseScreen (obavijesti su u postavkama) */}
