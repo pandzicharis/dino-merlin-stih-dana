@@ -246,7 +246,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
             className={`os-sheet ${open ? 'pointer-events-auto' : ''} absolute inset-0 mx-auto flex max-w-[520px] flex-col sm:border-x sm:border-white/10`}
             style={{
               borderRadius: 0,
-              paddingTop: 'max(0.75rem, var(--sat, 0px))',
               background: '#0a0909',
               willChange: 'transform',
             }}
@@ -272,8 +271,13 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
 
             {/* zaglavlje — potpis | Magaza kao na naslovnoj, desno samo zatvori;
                 povuci ga nadolje i plejer se spusti (muzika ide dalje u mini plejeru) */}
-            <div className="relative z-[1] shrink-0 touch-none px-5 pb-1 pt-3" onPointerDown={(e) => !(e.target as Element).closest('button, input, a') && drag.start(e)}>
-              <div className="relative mb-3 flex items-center justify-between">
+            {/* logotipi i × tačno gdje su na početnoj (VerseScreen: px-6, isti razmak od vrha) —
+                otvaranje plejera je samo zamjena ekrana, zaglavlje ne skače */}
+            <div
+              className="relative z-[1] shrink-0 touch-none px-6 pt-[max(3rem,calc(var(--sat)+1.75rem))]"
+              onPointerDown={(e) => !(e.target as Element).closest('button, input, a') && drag.start(e)}
+            >
+              <div className="relative flex items-center justify-between">
                 {/* pretraga — preko naslova i dugmadi, pretopi se */}
                 <div
                   className={`absolute inset-0 z-[1] flex items-center gap-3 transition-opacity duration-200 ${searching ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
@@ -325,8 +329,10 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                 </div>
                 <div className={`flex items-center gap-3.5 transition-opacity duration-200 ${searching ? 'pointer-events-none opacity-0' : ''}`}>
                   <Signature height={36} wipe={false} className="opacity-90" />
-                  <span className="h-6 w-px bg-white/20" aria-hidden />
-                  <MagazaLogo height={Math.round(36 * MAGAZA_BESIDE)} color="#FFFFFF" style={{ transform: MAGAZA_DROP_CSS, opacity: 0.9 }} />
+                  {/* omotan kao link na početnoj — znak sjedne na isti red, piksel u piksel */}
+                  <span className="opacity-90">
+                    <MagazaLogo height={Math.round(36 * MAGAZA_BESIDE)} color="#FFFFFF" style={{ transform: MAGAZA_DROP_CSS }} />
+                  </span>
                 </div>
                 <div className={`flex items-center gap-2 transition-opacity duration-200 ${searching ? 'pointer-events-none opacity-0' : ''}`}>
                   {/* zatvori — muzika stane, plejer ode do kraja (bez mini plejera) */}
