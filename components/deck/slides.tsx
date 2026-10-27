@@ -1564,8 +1564,8 @@ function Plejer() {
       <Text>
         Player pjesama je nova stranica: izađe odozdo preko cijelog ekrana, a pjesma krene sama. Stihovi kao karte, pjesme sa cijelim stihom, albumi i omiljene (zvjezdica, redom koliko
         se slušaju), a lupa traži pjesmu po nazivu ili stihu. Plejer je u boji stiha, kontrole kao u Apple Musicu.
-        Povuci ga nadolje (ili „Spusti“) i stih dana se vrati — muzika ide dalje u mini plejeru, a na
-        zaključanom ekranu je omot albuma koji svira; × ga zatvori do kraja.
+        Povuci ga nadolje i stih dana se vrati — muzika ide dalje u mini plejeru, a na zaključanom ekranu je
+        omot albuma koji svira; × ga zatvori do kraja.
       </Text>
     </>
   )
@@ -1629,8 +1629,11 @@ function PlejerScene({ onDone }: { onDone: () => void }) {
     }
     if (alive()) await press('[data-view="cards"]')
     await wait(1200)
-    // spusti — na početnoj pluta mini plejer, muzika ide dalje
-    if (alive()) await press('[aria-label="Spusti"]')
+    // spusti (kao povlačenje nadolje) — na početnoj pluta mini plejer, muzika ide dalje
+    if (alive()) {
+      const w = phone()?.contentWindow as (Window & typeof globalThis) | null | undefined
+      w?.dispatchEvent(new w.Event('stihdana:minimize-player'))
+    }
     await wait(2600)
     if (alive()) await press('[aria-label="Otvori plejer pjesama"] [aria-label="Sljedeća"]')
     await wait(2400)

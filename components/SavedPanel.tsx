@@ -17,6 +17,7 @@ import { pruneFavorites } from '@/lib/storage'
 import { useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { AfterOpen, useSheetOpen } from './Sheet'
+import { lockScroll } from '@/lib/scroll-lock'
 
 /**
  * Zatvaranje: prvo samo kretnja, a sve ostalo (stanje plejera, gašenje
@@ -39,6 +40,8 @@ const VIEW = 'stihdana:savedView'
  */
 /** zatvori plejer do kraja, muzika stane (prezentacija) */
 export const CLOSE_PLAYER = 'stihdana:close-player'
+/** spusti plejer (mini plejer, muzika ide dalje) — prezentacija, umjesto povlačenja */
+export const MINIMIZE_PLAYER = 'stihdana:minimize-player'
 
 export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; onOpen: () => void; onClose: () => void }) {
   const [verses, setVerses] = useState<Verse[] | null>(null)
@@ -185,6 +188,11 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
     window.addEventListener(CLOSE_PLAYER, shut)
     return () => window.removeEventListener(CLOSE_PLAYER, shut)
   }, [onClose])
+  // spušten (mini plejer, muzika ide dalje) — prezentacija, umjesto povlačenja prstom
+  useEffect(() => {
+    window.addEventListener(MINIMIZE_PLAYER, dismiss)
+    return () => window.removeEventListener(MINIMIZE_PLAYER, dismiss)
+  }, [dismiss])
   // lupa ispod plejera (SavedPlayer) — pretraga u zaglavlju; iz istog dodira (tastatura)
   const searchFrom = useRef(startSearch)
   useEffect(() => {
@@ -209,12 +217,11 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && dismiss()
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     window.addEventListener('keydown', onKey)
     return () => {
       // stranica se vrati kad panel ode — ne u prvom kadru zatvaranja (cijela stranica bi se iznova rasporedila)
-      window.setTimeout(() => !openNow.current && (document.body.style.overflow = prev), 460)
+      window.setTimeout(unlock, 460)
       window.removeEventListener('keydown', onKey)
     }
   }, [open, dismiss])
@@ -263,11 +270,9 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
             {/* pozadina ekrana: atmosfera pjesme (boja stiha, zamućen omot) — pretopi se s pjesmom */}
             <Backdrop verse={backdrop} />
 
-            {/* zaglavlje — potpis | Magaza kao na naslovnoj, desno samo spusti i zatvori;
-                povuci ga nadolje i plejer se spusti */}
+            {/* zaglavlje — potpis | Magaza kao na naslovnoj, desno samo zatvori;
+                povuci ga nadolje i plejer se spusti (muzika ide dalje u mini plejeru) */}
             <div className="relative z-[1] shrink-0 touch-none px-5 pb-1 pt-3" onPointerDown={(e) => !(e.target as Element).closest('button, input, a') && drag.start(e)}>
-              {/* hvataljka — povuci nadolje */}
-              <span className="mx-auto -mt-1 mb-2 block h-1 w-9 rounded-full bg-white/20" aria-hidden />
               <div className="relative mb-3 flex items-center justify-between">
                 {/* pretraga — preko naslova i dugmadi, pretopi se */}
                 <div
@@ -324,12 +329,6 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                   <MagazaLogo height={Math.round(36 * MAGAZA_BESIDE)} color="#FFFFFF" style={{ transform: MAGAZA_DROP_CSS, opacity: 0.9 }} />
                 </div>
                 <div className={`flex items-center gap-2 transition-opacity duration-200 ${searching ? 'pointer-events-none opacity-0' : ''}`}>
-                  {/* spusti — muzika ide dalje, na dnu početne viri mini plejer */}
-                  <button onClick={dismiss} aria-label="Spusti" title="Spusti" className="hdr-btn w-[34px]">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </button>
                   {/* zatvori — muzika stane, plejer ode do kraja (bez mini plejera) */}
                   <button
                     onClick={() => {
@@ -385,16 +384,17 @@ function Backdrop({ verse }: { verse: Verse | null }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={img} alt="" draggable={false} className="absolute inset-0 h-full w-full scale-125 object-cover opacity-40" style={softOf(cover) ? undefined : { filter: 'blur(48px)' }} />
           )}
-          {/* gore oštar omot koji se pretapa u tamu (kao drawer teksta) — vrh ekrana nije
-              samo zamućen; ispod statusne trake se vidi slika, ne magla */}
+          {/* gore omot koji se pretapa u tamu (kao drawer teksta), malo zamućen — slika
+              se nazire iza karata, ne odvlači pažnju; uvećan da zamućen rub ne svijetli */}
           {cover && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={cover}
               alt=""
               draggable={false}
-              className="absolute inset-x-0 top-0 h-[60%] w-full object-cover opacity-30"
+              className="absolute inset-x-0 top-0 h-[60%] w-full scale-110 object-cover opacity-30"
               style={{
+                filter: 'blur(14px)',
                 maskImage: 'linear-gradient(180deg, #000 0%, rgba(0,0,0,0.5) 45%, transparent 100%)',
                 WebkitMaskImage: 'linear-gradient(180deg, #000 0%, rgba(0,0,0,0.5) 45%, transparent 100%)',
               }}

@@ -104,6 +104,10 @@ export function SavedCarousel({
   const movedAt = useRef(0)
   // traka ide za plejerom (sam prešao na sljedeću) — usput se ništa ne pušta
   const following = useRef(false)
+  // pjesma koju je pustila sama traka (prevučena karta) — plejer javi prelazak
+  // (SAVED_TRACK), a traka ne smije kliziti za tim: karta je već tu, a prst
+  // ili zaustavljanje sistema još vode skrol (inače zastane i vrati se)
+  const mine = useRef<string | null>(null)
   const versesRef = useRef(verses)
   const nearRef = useRef(near)
   useEffect(() => {
@@ -248,7 +252,10 @@ export function SavedCarousel({
       const vs = live.current.verses
       const v = vs[cur]
       if (!live.current.playing || !v) return
-      if (v.id !== savedVerse()?.id) playSaved(v)
+      if (v.id !== savedVerse()?.id) {
+        mine.current = v.id
+        playSaved(v)
+      }
       warmSaved([vs[cur + 1], vs[cur - 1]])
     }, 160)
     return () => clearTimeout(t)
@@ -263,7 +270,10 @@ export function SavedCarousel({
       if (still < DWELL) return void (t = window.setTimeout(check, DWELL - still))
       const vs = live.current.verses
       const v = vs[restN]
-      if (live.current.playing && v && v.id !== savedVerse()?.id) playSaved(v)
+      if (live.current.playing && v && v.id !== savedVerse()?.id) {
+        mine.current = v.id
+        playSaved(v)
+      }
       // dok svira, susjedne su spremne — sljedeće prevlačenje svira odmah
       if (live.current.playing) warmSaved([vs[restN + 1], vs[restN - 1]])
     }
@@ -279,9 +289,13 @@ export function SavedCarousel({
   }, [])
   useEffect(() => {
     const onTrack = (e: Event) => {
-      const i = verses.findIndex((v) => v.id === (e as CustomEvent).detail)
-      if (i < 0) return
-      if (i !== curRef.current) following.current = true
+      const id = (e as CustomEvent).detail
+      if (id === mine.current) return void (mine.current = null)
+      mine.current = null
+      const i = verses.findIndex((v) => v.id === id)
+      // već na sredini, ili se traka upravo lista — ne otima se skrol prstu
+      if (i < 0 || i === curRef.current || performance.now() - movedAt.current < 300) return
+      following.current = true
       go(i)
     }
     window.addEventListener(SAVED_TRACK, onTrack)
@@ -600,41 +614,37 @@ function CardFaceView({
             <span style={{ width: '1em', height: '24em', background: 'rgba(255,255,255,0.2)' }} />
             <MagazaMark height={36 * MAGAZA_BESIDE} style={{ opacity: 0.9, transform: MAGAZA_DROP_CSS }} />
           </div>
-          {/* svako dugme se na raširenoj vrati na svoju veličinu oko svoje sredine
-              (data-shrink) — ostaje na svom mjestu na karti, ne klizne prema uglu */}
+          {/* dugmad rastu i skupljaju se s kartom — kao sve ostalo na njoj; ništa
+              ne klizne ni prema uglu ni jedno prema drugom */}
           <div className="flex items-center gap-2">
             {/* raširi kartu preko cijelog ekrana / skupi je nazad */}
             {(onOpen || onCollapse) && (
-              <span data-shrink className="flex" style={layer}>
-                <button
-                  data-nodrag
-                  {...tapProps(() => (onCollapse ? onCollapse() : onOpen?.(verse)))}
-                  aria-label={onCollapse ? 'Skupi' : 'Raširi'}
-                  title={onCollapse ? 'Skupi' : 'Raširi'}
-                  // bez pritiska (scale): karta se širi/skuplja odmah na dodir — kopija i karta
-                  // ispod se pretapaju, pa bi dugme usred pritiska na tren bilo dvostruko
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80"
-                >
-                  {/* strelice se okrenu dok karta raste i skuplja se (SavedFull `data-flip`) */}
-                  <ExpandMorph layer={layer} />
-                </button>
-              </span>
-            )}
-            {/* srce — i na raširenoj karti */}
-            <span data-shrink className="flex" style={layer}>
               <button
                 data-nodrag
-                onClick={() => toggleFavorite(verse.id)}
-                aria-label="Ukloni iz sačuvanih"
-                title="Ukloni iz sačuvanih"
-                className="flex h-8 w-8 items-center justify-center rounded-full border transition-transform active:scale-90"
-                style={{ borderColor: `${m.accent}55`, background: `${m.accent}1a`, color: m.accent }}
+                {...tapProps(() => (onCollapse ? onCollapse() : onOpen?.(verse)))}
+                aria-label={onCollapse ? 'Skupi' : 'Raširi'}
+                title={onCollapse ? 'Skupi' : 'Raširi'}
+                // bez pritiska (scale): karta se širi/skuplja odmah na dodir — kopija i karta
+                // ispod se pretapaju, pa bi dugme usred pritiska na tren bilo dvostruko
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/20 text-white/80"
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                  <path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z" />
-                </svg>
+                {/* strelice se okrenu dok karta raste i skuplja se (SavedFull `data-flip`) */}
+                <ExpandMorph layer={layer} />
               </button>
-            </span>
+            )}
+            {/* srce — i na raširenoj karti */}
+            <button
+              data-nodrag
+              onClick={() => toggleFavorite(verse.id)}
+              aria-label="Ukloni iz sačuvanih"
+              title="Ukloni iz sačuvanih"
+              className="flex h-8 w-8 items-center justify-center rounded-full border transition-transform active:scale-90"
+              style={{ borderColor: `${m.accent}55`, background: `${m.accent}1a`, color: m.accent }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z" />
+              </svg>
+            </button>
           </div>
         </div>
 

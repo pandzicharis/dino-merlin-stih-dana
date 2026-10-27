@@ -8,6 +8,7 @@ import { MOODS } from '@/data/moods'
 import { albumOf, softOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
+import { lockScroll } from '@/lib/scroll-lock'
 
 /** Okrugla ikonica u zaglavlju — kao na ostalim panelima. */
 export const ROUND = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/70 transition-colors hover:text-white active:scale-95'
@@ -51,11 +52,10 @@ export function VerseDrawer({
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = prev
+      unlock()
       window.removeEventListener('keydown', onKey)
     }
   }, [open, onClose])

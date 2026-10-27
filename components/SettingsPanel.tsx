@@ -17,6 +17,7 @@ import APP_QR from '@/data/app-qr.json'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 import { QrScanner, giftFromQr } from './QrScanner'
 import { openGift } from './GiftArrival'
+import { lockScroll } from '@/lib/scroll-lock'
 
 /** Verzija iz `public/sw.js` (`stihdana-v1.0`) — 1.0, 1.1… raste s izdanjima. */
 const versionOf = (name: string) => /^stihdana-v(\d+\.\d+)$/.exec(name)?.[1]
@@ -42,11 +43,10 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = prev
+      unlock()
       window.removeEventListener('keydown', onKey)
     }
   }, [open, onClose])

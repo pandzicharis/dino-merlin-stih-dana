@@ -23,6 +23,7 @@ import { Signature } from './Signature'
 import { MagazaLogo } from './MagazaLogo'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 import { BackLink } from './BackLink'
+import { lockScroll } from '@/lib/scroll-lock'
 
 const EASE: Easing = [0.3, 0, 0.2, 1]
 /** sjena je na polovinama (ne animira se) — pokret ostaje samo pomak i prozirnost */
@@ -440,11 +441,10 @@ function GiftCard({
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = prev
+      unlock()
       window.removeEventListener('keydown', onKey)
     }
   }, [open, onClose])

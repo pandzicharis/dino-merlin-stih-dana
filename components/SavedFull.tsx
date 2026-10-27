@@ -7,6 +7,7 @@ import { MOODS } from '@/data/moods'
 import { haptic } from '@/lib/haptic'
 import { swallowClick } from '@/lib/tap'
 import { CardFace } from './SavedCarousel'
+import { lockScroll } from '@/lib/scroll-lock'
 
 /*
  * Raširena sačuvana karta — ista karta iz špila, samo uvećana: isti
@@ -95,7 +96,7 @@ function moving(el: HTMLElement, ms: number) {
  * kretnje — prvi kadar velike je tačno mala karta, a zadnji kadar pri
  * vraćanju opet tačno mala karta. Ništa ne iskoči ni ne nestane naglo.
  */
-function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 0, curve?: string) {
+function swap(el: HTMLElement, toBig: boolean, total: number, lead = 0, curve?: string) {
   const ease = curve ?? (toBig ? OPEN : CLOSE).easing
   const fade = (n: HTMLElement, show: boolean, delay: number, duration: number) => {
     n.style.visibility = ''
@@ -118,19 +119,6 @@ function swap(el: HTMLElement, toBig: boolean, total: number, k: number, lead = 
       easing: 'ease-in-out',
       fill: 'both',
     })
-  })
-  // dugmad u uglu: na maloj karti krupna za prst — raširena ih vrati na
-  // pravu veličinu, kao na ekranu stiha
-  // Tačno suprotno od karte u svakom kadru: karta se smanjuje linearno po
-  // razmjeri, pa obrnuta razmjera nije prava linija — u više tačaka, inače
-  // dugmad usput narastu (~6 %) i "plešu"
-  const frames = Array.from({ length: 9 }, (_, i) => {
-    const p = i / 8
-    const card = toBig ? 1 / k + (1 - 1 / k) * p : 1 + (1 / k - 1) * p
-    return { transform: `scale(${1 / (k * card)})` }
-  })
-  el.querySelectorAll<HTMLElement>('[data-shrink]').forEach((n) => {
-    n.animate(frames, { duration: total, delay: lead, easing: ease, fill: 'both' })
   })
   // stih: raširena karta je viša — klizne na njenu sredinu, i nazad
   // gramofon: ista ploča (bez uvećavanja — slova ostaju oštra) klizne na dno, i nazad
@@ -243,7 +231,6 @@ function SavedFull({
       el.querySelectorAll<HTMLElement>('[data-flip]').forEach((n) => (n.style.transform = 'rotate(180deg)'))
       el.querySelectorAll<HTMLElement>('[data-drop]').forEach((n) => (n.style.transform = `translateY(${n.dataset.drop}em)`))
       el.querySelectorAll<HTMLElement>('[data-grow]').forEach((n) => (n.style.transform = n.dataset.grow!))
-      el.querySelectorAll<HTMLElement>('[data-shrink]').forEach((n) => (n.style.transform = `scale(${1 / k})`))
       return
     }
     // sve što se pojavljuje — nevidljivo od prvog kadra (bez bljeska zatamnjenja)
@@ -267,7 +254,7 @@ function SavedFull({
         el.animate([{ transform: small }, { transform: 'none' }], { ...OPEN, delay: lead, fill: 'backwards' })
         cl?.animate([{ transform: cut }, { transform: 'none' }], { ...OPEN, delay: lead, fill: 'backwards' })
         sh?.animate([{ transform: back }, { transform: 'none' }], { ...OPEN, delay: lead, fill: 'backwards' })
-        swap(el, true, OPEN.duration, k, lead)
+        swap(el, true, OPEN.duration, lead)
         moving(el, lead + OPEN.duration)
         shade.current?.animate([{ opacity: 0 }, { opacity: 1 }], { ...OPEN, delay: lead, fill: 'backwards' })
         for (const n of [extras.current, grab.current])
@@ -279,7 +266,7 @@ function SavedFull({
       cancelAnimationFrame(a)
       cancelAnimationFrame(b)
     }
-  }, [small, k, cut, back])
+  }, [small, cut, back])
 
   /** smanji nazad tačno na malu kartu (i iz povučenog položaja), pa zatvori */
   const close = useCallback(
@@ -304,7 +291,7 @@ function SavedFull({
       moved.finished
         .then(() => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SETTLE, easing: 'ease-in-out', fill: 'forwards' }).finished)
         .then(onClosed, onClosed)
-      swap(el, false, curve.duration, k, 0, curve.easing)
+      swap(el, false, curve.duration, 0, curve.easing)
       moving(el, curve.duration + SETTLE)
       shade.current?.animate([{ opacity: Number(shade.current.style.opacity || 1) }, { opacity: 0 }], { ...curve, fill: 'forwards' })
     },
@@ -367,11 +354,10 @@ function SavedFull({
   // Escape zatvara; stranica ispod ne skrola
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && collapse()
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = prev
+      unlock()
       window.removeEventListener('keydown', onKey)
     }
   }, [collapse])

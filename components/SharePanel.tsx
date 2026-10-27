@@ -20,6 +20,7 @@ import { bumpMonth } from '@/lib/storage'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 import { QrCode } from './deck/QrCode'
 import type { QrMatrix } from '@/lib/qr'
+import { lockScroll } from '@/lib/scroll-lock'
 
 type Target = 'share' | 'save'
 
@@ -91,11 +92,10 @@ export default function SharePanel({
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     window.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = prev
+      unlock()
       window.removeEventListener('keydown', onKey)
     }
   }, [open, onClose])
