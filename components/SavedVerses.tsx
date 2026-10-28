@@ -22,9 +22,11 @@ export type SavedView = View
 /**
  * Visina karte na ekranu plejera (SavedPanel): cijeli ekran bez zaglavlja i
  * plejera — plejer malo prekrije dno karte, koja se u njega pretapa. Širinu
- * karta i dalje uzme koliko ima (SavedCarousel).
+ * karta i dalje uzme koliko ima (SavedCarousel). Zaglavlje kao na početnoj
+ * (max(3rem, sat + 1.75rem) + 36), plejer i mjesto ispod karte 267, i 12 px
+ * razmaka više — karta ne dodiruje logotipe.
  */
-const FIT = 'calc(100dvh - 300px - var(--sat, 0px) - env(safe-area-inset-bottom, 0px))'
+const FIT = 'calc(100dvh - max(3rem, var(--sat, 0px) + 1.75rem) - 315px - env(safe-area-inset-bottom, 0px))'
 /** visina reda pjesme (omot 46 + razmak) — liste su visoke koliko pjesama ima */
 const ROW = 70
 /** najviše ovoliko redova se vidi odjednom — ostalo se skrola (pola reda viri) */

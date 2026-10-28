@@ -789,7 +789,12 @@ function GramophoneRow({
           </p>
           {extra}
         </div>
-        <p className="mt-2 truncate text-[10.5px] uppercase leading-none tracking-[0.22em] text-white/60">{albumLine(verse)}</p>
+        {/* dug album (Nešto lijepo treba da se desi · 1989) — slova se smanje, stane cio */}
+        <p className="mt-2 overflow-hidden whitespace-nowrap text-[10.5px] uppercase leading-none tracking-[0.22em] text-white/60">
+          <FitLines cacheKey={albumLine(verse)}>
+            <span>{albumLine(verse)}</span>
+          </FitLines>
+        </p>
         <div className="mt-1 flex items-center gap-2.5">
           <Seek value={progress} onSeek={onSeek} loading={loading} />
           <Time loading={loading} text={time} className="w-9 text-[10.5px]" />
