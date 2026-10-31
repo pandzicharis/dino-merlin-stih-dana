@@ -18,6 +18,10 @@ import { playable } from './player'
  *   špil      nasumično, ali bez ponavljanja: dok ne prođeš kroz sve aktivne
  *             stihove, nijedan se ne vrati. Onda novi krug, a zadnjih
  *             nekoliko iz starog ne mogu odmah opet.
+ *   pjesma    ni ista pjesma (drugi stih iz nje) ne dolazi skoro opet:
+ *             pjesma iz zadnjih SONG_GAP dana čeka, i preko granice kruga
+ *             (ostanu li u krugu samo takve, odmah kreće novi), a drugi stih
+ *             iste pjesme tek kad u krugu prođu sve ostale.
  *   dan       izvučen stih se zapamti za taj datum — isti dan je uvijek isti
  *             stih, i izmjena u adminu ga ne dira.
  *   obavijest ne nosi stih nego poziv "Izvuci svoj stih" (lib/notify.ts) —
@@ -47,6 +51,8 @@ const EVENT = 'stihdana:draw'
 const KEEP = 500
 /** Zadnjih ovoliko iz starog kruga ne može odmah u novi. */
 const GAP = 7
+/** Pjesma koja je izvučena u zadnjih ovoliko dana čeka (najviše pola pjesama). */
+const SONG_GAP = 14
 
 /* ── stanje ─────────────────────────────────────────────────── */
 
@@ -110,19 +116,36 @@ function rand(n: number): number {
 }
 
 /** Sljedeći stih poslije dana `past` (sortirani datumi, svi raniji). */
-function next(days: State['days'], past: string[], pool: string[], avoid?: string): Entry {
+function next(days: State['days'], past: string[], pool: string[], byId: Map<string, Verse>, avoid?: string): Entry {
+  const song = (id: string) => byId.get(id)?.song.trim().toLowerCase() ?? id
+  // pjesme iz zadnjih SONG_GAP dana (najviše pola svih pjesama) čekaju
+  const gap = Math.min(SONG_GAP, Math.floor(new Set(pool.map(song)).size / 2))
+  const lately = new Set(gap ? past.slice(-gap).map((d) => song(days[d].id)) : [])
   const last = past.length ? days[past[past.length - 1]] : undefined
   let r = last?.r ?? 0
-  // ovaj krug: od zadnjeg dana unazad, dok je krug isti
+  // ovaj krug: od zadnjeg dana unazad, dok je krug isti; i prošli prije njega
   const round = new Set<string>()
-  for (let i = past.length - 1; i >= 0 && days[past[i]].r === r; i--) round.add(days[past[i]].id)
-  let cand = pool.filter((id) => !round.has(id))
-  if (!cand.length) {
-    // špil je prošao — novi krug, bez zadnjih nekoliko iz starog
+  const prev = new Set<string>()
+  let i = past.length - 1
+  for (; i >= 0 && days[past[i]].r === r; i--) round.add(days[past[i]].id)
+  for (; i >= 0 && days[past[i]].r === r - 1; i--) prev.add(days[past[i]].id)
+  let cand = pool.filter((id) => !round.has(id) && !lately.has(song(id)))
+  if (cand.length) {
+    // drugi stih pjesme iz ovog kruga tek kad ostalih pjesama nestane, a
+    // preskočeni u prošlom krugu (pjesma im je bila nedavno) su prvi na redu
+    const played = new Set([...round].map(song))
+    for (const keep of [(id: string) => !played.has(song(id)), (id: string) => !prev.has(id)]) {
+      const pick = cand.filter(keep)
+      if (pick.length) cand = pick
+    }
+  } else {
+    // špil je prošao (ili su ostale samo nedavne pjesme — čekaju u novom) —
+    // novi krug, bez zadnjih nekoliko stihova i nedavnih pjesama iz starog
     r += 1
     const recent = new Set(past.slice(-Math.min(GAP, Math.floor(pool.length / 2))).map((d) => days[d].id))
-    cand = pool.filter((id) => !recent.has(id))
-    if (!cand.length) cand = pool
+    const rest = pool.filter((id) => !recent.has(id))
+    cand = rest.filter((id) => !lately.has(song(id)))
+    if (!cand.length) cand = rest.length ? rest : pool
   }
   // pravi stih poslije probnog — ne isti ponovo
   if (avoid && cand.length > 1) cand = cand.filter((id) => id !== avoid)
@@ -133,13 +156,13 @@ function next(days: State['days'], past: string[], pool: string[], avoid?: strin
  * Sredi stanje za `today`: današnji stih ostaje kakav je, a ako ga nema —
  * izvuče se. Istorija starija od KEEP dana se zaboravi.
  */
-function settle(s: State, today: string, pool: string[], known: Set<string>, avoid?: string, first?: string): State {
+function settle(s: State, today: string, pool: string[], byId: Map<string, Verse>, avoid?: string, first?: string): State {
   const days: State['days'] = {}
   const oldest = addDays(today, -KEEP)
   for (const [d, e] of Object.entries(s.days)) {
     // budućnost se ne čuva (dev pomjeranje datuma), a stih kojeg više nema
     // nigdje (druga baza, stari test) — dan se izvuče ponovo
-    if (d < oldest || d > today || !known.has(e.id)) continue
+    if (d < oldest || d > today || !byId.has(e.id)) continue
     days[d] = e
   }
   if (!days[today]) {
@@ -147,7 +170,7 @@ function settle(s: State, today: string, pool: string[], known: Set<string>, avo
     // ljudima" (ako ga ima u katalogu). Zamjena probnog (`avoid`) je pravi
     // stih — inače bi ga obavijest mijenjala u krug.
     const firstEver = !Object.keys(s.days).length && !avoid
-    const e = firstEver && first ? { id: first, r: 0 } : next(days, Object.keys(days).sort(), pool, avoid)
+    const e = firstEver && first ? { id: first, r: 0 } : next(days, Object.keys(days).sort(), pool, byId, avoid)
     days[today] = firstEver ? { ...e, pre: 1 } : e
   }
   return { days }
@@ -189,7 +212,7 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
   // novi dan (i "izvuci ponovo" u dev traci): izvuci današnji
   useEffect(() => {
     if (!on || !missing) return
-    save(settle(parse(snapshot()), date, pool, new Set(byId.keys()), avoid, first))
+    save(settle(parse(snapshot()), date, pool, byId, avoid, first))
   }, [on, missing, date, pool, byId, first])
 
   if (!on || !verse || !entry) return null
@@ -225,7 +248,7 @@ export function unseat(date: string, verses: ListVerse[]): boolean {
   delete s.days[date]
   avoid = e.id
   // pravi stih odmah, u istom potezu — ekran ni na frejm ne ostane bez stiha
-  save(settle(s, date, poolOf(verses), new Set(verses.map((v) => v.id)), avoid))
+  save(settle(s, date, poolOf(verses), new Map(verses.map((v) => [v.id, v])), avoid))
   return true
 }
 
