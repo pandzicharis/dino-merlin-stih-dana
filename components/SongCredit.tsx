@@ -693,11 +693,7 @@ function AudioSong({ preview = false, share = false, ...props }: Source & { prev
   }, [fallback, preview])
 
   // tekst prati ovaj zvuk (components/Lyrics.tsx) — vrijeme se čita u svakom kadru
-  const clock: LyricsClock = () => {
-    const a = audio.current
-    const on = Boolean(a && !a.dataset.unlock)
-    return { t: on ? a!.currentTime : 0, d: a && Number.isFinite(a.duration) && a.duration > 0 ? a.duration : dur, playing: on && !a!.paused, loading: state === 'loading' }
-  }
+  const clock = songClock(audio, dur, state)
   const row = { verse, state, progress, time, cover, onToggle: toggle, onPrime: prime, onSeek: seek }
 
   return (
@@ -734,6 +730,15 @@ function AudioSong({ preview = false, share = false, ...props }: Source & { prev
       )}
     </>
   )
+}
+
+/** Vrijeme pjesme za tekst (components/Lyrics.tsx) — čita se u svakom kadru. */
+function songClock(audio: React.RefObject<Player | null>, dur: number, state: State): LyricsClock {
+  return () => {
+    const a = audio.current
+    const on = Boolean(a && !a.dataset.unlock)
+    return { t: on ? a!.currentTime : 0, d: a && Number.isFinite(a.duration) && a.duration > 0 ? a.duration : dur, playing: on && !a!.paused, loading: state === 'loading' }
+  }
 }
 
 /**
@@ -864,35 +869,84 @@ export function SongRow({
 
 function AudioRow({ fit, hole, vinyl, ...props }: Source & { fit: boolean; hole: boolean; vinyl: number }) {
   // plejer na karti sačuvanih — zajednički zvuk, ne staje kad se karta skupi ili prevuče
-  const { state, progress, time, toggle, seek, prime } = useSong({ ...props, preload: false, share: true })
+  const { state, progress, dur, time, toggle, seek, prime, audio } = useSong({ ...props, preload: false, share: true })
   const { verse } = props
   const loading = state === 'loading'
   // mala ploča (karta u špilu) — i slova sitnija
   const small = vinyl < 56
+  // tekst pjesme — kao ispod stiha na početnoj (mala ploča: karta je uvećana, dugme ispadne iste veličine);
+  // pjesma svira → tekst se pripremi
+  const [lyrics, setLyrics] = useState(false)
+  useEffect(() => {
+    if (state === 'playing') primeLyrics(verse.song)
+  }, [state, verse.song])
+  const clock = songClock(audio, dur, state)
   return (
     <>
       <Vinyl size={vinyl} state={state} progress={progress} song={verse.song} onClick={toggle} onPrime={prime} arm hole={hole} />
       <div className="min-w-0 flex-1">
-        <RowText verse={verse} onClick={toggle} fit={fit} small={small} />
+        <RowText
+          verse={verse}
+          onClick={toggle}
+          fit={fit}
+          small={small}
+          extra={<LyricsButton song={verse.song} onOpen={() => setLyrics(true)} playing={state === 'playing'} size={small ? 23 : 32} />}
+        />
         <div className={`flex items-center ${small ? 'gap-2' : 'gap-2.5'}`}>
           <Seek value={progress} onSeek={seek} loading={loading} />
           <Time loading={loading} text={time} className={small ? 'w-7 text-[8.5px]' : 'w-9 text-[10px]'} />
         </div>
       </div>
+      <LyricsPanel
+        open={lyrics}
+        verse={verse}
+        clock={clock}
+        // dodir na red: pjesma odatle (i krene, ako je stajala)
+        onSeek={(t) => {
+          const d = clock().d
+          if (d) seek(Math.min(1, t / d))
+          if (state !== 'playing' && state !== 'loading') toggle()
+        }}
+        controls={{ toggle, seek }}
+        onClose={() => setLyrics(false)}
+      />
     </>
   )
 }
 
-function RowText({ verse, onClick, fit = false, small = false }: { verse: Verse; onClick?: () => void; fit?: boolean; small?: boolean }) {
+function RowText({
+  verse,
+  onClick,
+  fit = false,
+  small = false,
+  extra,
+}: {
+  verse: Verse
+  onClick?: () => void
+  fit?: boolean
+  small?: boolean
+  /** desno u redu s nazivom (dugme za tekst) — ne mijenja visinu reda */
+  extra?: React.ReactNode
+}) {
   // jedan red: skraćen (lista) ili cio, sa smanjenim slovima (karte) — nikad
   // preko ivice: duga pjesma se smanji, ne gura razmak
   const line = (t: React.ReactNode) => (fit ? <FitLines><span>{t}</span></FitLines> : t)
   const cut = fit ? 'overflow-hidden' : 'truncate'
+  const name = (
+    <p className={`${cut} ${small ? 'text-[9px] tracking-[0.16em]' : 'text-[11px] tracking-[0.18em]'} ${extra ? 'min-w-0 flex-1' : ''} font-semibold uppercase`} style={{ color: BRAND.gold }}>
+      {line(verse.song)}
+    </p>
+  )
   return (
     <div className={`min-w-0 ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
-      <p className={`${cut} ${small ? 'text-[9px] tracking-[0.16em]' : 'text-[11px] tracking-[0.18em]'} font-semibold uppercase`} style={{ color: BRAND.gold }}>
-        {line(verse.song)}
-      </p>
+      {extra ? (
+        <div className="flex items-center gap-2">
+          {name}
+          <span className="-my-3">{extra}</span>
+        </div>
+      ) : (
+        name
+      )}
       <p className={`mt-1 ${cut} ${small ? 'text-[8.5px] tracking-[0.14em]' : 'text-[10px] tracking-[0.16em]'} uppercase text-white/55`}>
         {line(albumLine(verse))}
       </p>

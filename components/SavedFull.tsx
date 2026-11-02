@@ -304,6 +304,8 @@ function SavedFull({
   // prst, a dovoljno nisko se skupi; dodir bez povlačenja ne radi ništa
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
     if (closing.current) return
+    // tekst pjesme je portal — njegovi dodiri stižu i ovdje (React), a ne vuku kartu
+    if (!e.currentTarget.contains(e.target as Node)) return
     if ((e.target as Element).closest('button, a, input, [role="slider"], [data-nodrag]')) return
     drag.current = { x0: e.clientX, y0: e.clientY, dy: 0, id: e.pointerId, on: false, last: [[e.clientY, e.timeStamp]] }
   }
@@ -351,9 +353,13 @@ function SavedFull({
     if (shade.current) shade.current.style.opacity = ''
   }
 
-  // Escape zatvara; stranica ispod ne skrola
+  // Escape zatvara (otvoren tekst pjesme zatvori prvo sebe); stranica ispod ne skrola
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && collapse()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const top = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].at(-1)
+      if (!top || top.hasAttribute('data-full')) collapse()
+    }
     const unlock = lockScroll()
     window.addEventListener('keydown', onKey)
     return () => {
