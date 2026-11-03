@@ -14,7 +14,7 @@ import {
 } from '@/lib/share-image'
 import { recordStory, videoSupported } from '@/lib/share-video'
 import { haptic } from '@/lib/haptic'
-import { DrawerIcon } from './DrawerIcon'
+import { DrawerHeader } from './DrawerIcon'
 import { Icon, TOAST_BAD, TOAST_OK, toast } from './Toast'
 import { bumpMonth } from '@/lib/storage'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
@@ -240,38 +240,20 @@ export default function SharePanel({
               background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
             }}
           >
-            {/* zlatna nit po vrhu panela */}
-            <span
-              className="pointer-events-none absolute inset-x-10 top-0 h-px"
-              style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)` }}
-              aria-hidden
-            />
-            <span className="os-grabber mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
-
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                {/* ista ikona kao dugme za dijeljenje */}
-                <DrawerIcon>
+            {/* zaglavlje preko cijele širine (panel ima unutrašnji razmak) */}
+            <DrawerHeader
+              className="-mx-5 -mt-3 mb-4"
+              // ista ikona kao dugme za dijeljenje
+              icon={
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 3v13M12 3 8 7M12 3l4 4" />
                   <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
-                </DrawerIcon>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
-                    Podijeli stih
-                  </p>
-                  <p className="truncate text-[1.1rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                    {verse.song}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                aria-label="Zatvori"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:text-white"
-              >
-                <CloseIcon />
-              </button>
-            </div>
+                </svg>
+              }
+              eyebrow="Podijeli stih"
+              title={verse.song}
+              onClose={onClose}
+            />
 
             {/* dva načina: slika (Story, objava…) ili link s QR kodom */}
             <div className="relative mb-4 grid grid-cols-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-1">
@@ -490,14 +472,6 @@ function DownloadIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M12 4v11M12 15l-4-4M12 15l4-4" />
       <path d="M5 19h14" />
-    </svg>
-  )
-}
-
-function CloseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M6 6l12 12M18 6 6 18" />
     </svg>
   )
 }

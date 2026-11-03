@@ -10,7 +10,12 @@ import { isFirstVerse } from '@/lib/text'
 import { saveAllFavorites, seedMonth } from '@/lib/storage'
 import { loadVerses } from '@/lib/verses-client'
 import { Icon, TOAST_BAD, TOAST_OK, dismissToast, toast, type Toast } from './Toast'
-import { openRecap, recapDate } from './RecapHost'
+import { openRecap } from './RecapHost'
+
+/** Mjesec za "20+ sačuvanih": prvih 7 dana prošli (tekući još nema dovoljno dana), poslije tekući. */
+function recapDate(today: string): string {
+  return Number(today.slice(8, 10)) <= 7 ? addDays(`${today.slice(0, 7)}-01`, -1) : today
+}
 
 /** Sve poruke aplikacije redom — svaki klik na "poruke" pokaže sljedeću. */
 const SAMPLES: Toast[] = [

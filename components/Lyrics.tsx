@@ -9,7 +9,8 @@ import { albumLine, loose } from '@/lib/text'
 import { albumOf, thumbOf } from '@/data/albums'
 import { EqBars } from './EqBars'
 import { haptic } from '@/lib/haptic'
-import { ROUND, VerseDrawer } from './VerseDrawer'
+import { VerseDrawer } from './VerseDrawer'
+import { DrawerHeader } from './DrawerIcon'
 
 /*
  * Tekst pjesme — uz plejer ispod stiha (components/SongCredit.tsx) i u
@@ -154,30 +155,7 @@ export function LyricsPanel({
       verse={verse}
       label={`Tekst — ${verse.song}`}
       // zaglavlje kao na ostalim panelima: znak, natpis i naslov, zatvori
-      header={
-        <div className="flex items-center gap-3">
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-            style={{ borderColor: `${BRAND.gold}55`, background: `radial-gradient(circle, ${BRAND.gold}24, transparent 70%)`, color: BRAND.gold }}
-            aria-hidden
-          >
-            <LyricsIcon size={18} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
-              Dino Merlin
-            </p>
-            <p className="text-[1.1rem] text-white/90" style={{ fontFamily: SERIF }}>
-              Tekst pjesme
-            </p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Zatvori" data-drawer-close className={ROUND}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </div>
-      }
+      header={<DrawerHeader icon={<LyricsIcon size={17} />} eyebrow="Dino Merlin" title="Tekst pjesme" onClose={onClose} />}
       onClose={onClose}
       data-lyrics
     >

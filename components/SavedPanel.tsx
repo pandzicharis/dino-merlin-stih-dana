@@ -283,11 +283,12 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                   className={`absolute inset-0 z-[1] flex items-center gap-3 transition-opacity duration-200 ${searching ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
+                  {/* staklo kao plejer ispod: svjetlije, mutno, s odsjajem po vrhu; dok se kuca, zlatni rub i lupa */}
                   <label
-                    className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border bg-white/[0.04] pl-3.5 pr-1.5 transition-colors"
-                    style={{ borderColor: query ? `${BRAND.gold}55` : 'rgba(255,255,255,0.1)' }}
+                    className="group flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full border bg-white/[0.07] pl-4 pr-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-colors focus-within:bg-white/[0.1]"
+                    style={{ borderColor: query ? `${BRAND.gold}66` : 'rgba(255,255,255,0.12)', '--gold': BRAND.gold } as React.CSSProperties}
                   >
-                    <SearchGlyph className="shrink-0 text-white/40" />
+                    <SearchGlyph className={`shrink-0 transition-colors group-focus-within:text-[var(--gold)] ${query ? 'text-[var(--gold)]' : 'text-white/45'}`} />
                     <input
                       ref={input}
                       type="search"
@@ -319,7 +320,7 @@ export default function SavedPanel({ open, onOpen, onClose }: { open: boolean; o
                         endSearch()
                       }}
                       aria-label="Zatvori pretragu"
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:text-white active:scale-90"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.12] text-white/75 transition-colors hover:text-white active:scale-90"
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden>
                         <path d="M6 6l12 12M18 6 6 18" />

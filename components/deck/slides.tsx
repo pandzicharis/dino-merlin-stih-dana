@@ -9,7 +9,6 @@ import { albumOf, ALBUMS, blurOf, glowOf, thumbOf } from '@/data/albums'
 import { SEND_TIME } from '@/lib/date'
 import { playable } from '@/lib/player'
 import { seedMonth } from '@/lib/storage'
-import { recapDate } from '../RecapHost'
 import { DECK_VERSE } from '@/lib/deck'
 import { useDeck } from './context'
 import { TIPS_ON } from '../Tips'
@@ -1898,11 +1897,8 @@ function Mjesec({ d }: { d: DeckData }) {
   useKeepSaved()
   // telefon dijeli localStorage s prezentacijom; pregled čita podatke kad se otvori
   useEffect(() => {
-    const day = Number(d.today.slice(8, 10))
-    const prev = recapDate(d.today)
-    // prvih dana u mjesecu — cio prošli mjesec, inače ovaj do jučer
-    if (day <= 7) seedMonth(d.verses, prev.slice(0, 7), Number(prev.slice(8, 10)))
-    else seedMonth(d.verses, d.today.slice(0, 7), day - 1)
+    // "Moj mjesec" otvara tekući mjesec — popuni ga do danas
+    seedMonth(d.verses, d.today.slice(0, 7), Number(d.today.slice(8, 10)))
   }, [d.today, d.verses])
   useScene(async ({ wait, find, press, home, alive }) => {
     if (!(await home())) return

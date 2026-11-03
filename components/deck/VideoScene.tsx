@@ -6,7 +6,6 @@ import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { audioFile } from '@/lib/audio-name'
 import { seedMonth } from '@/lib/storage'
-import { recapDate } from '../RecapHost'
 import { LivePhone } from './Stages'
 import { MagazaMark } from './Screens'
 import { Backdrop, Sheet } from './Poster'
@@ -183,10 +182,8 @@ export function VideoScene({
     // ovom stranicom), ikonica kalendara gore — priča prođe sama, pa se zatvori
     if (!alive()) return
     setStep('month')
-    const day = Number(date.slice(8, 10))
-    const prev = recapDate(date)
-    if (day <= 7) seedMonth(verses, prev.slice(0, 7), Number(prev.slice(8, 10)))
-    else seedMonth(verses, date.slice(0, 7), day - 1)
+    // "Moj mjesec" otvara tekući mjesec — popuni ga do danas
+    seedMonth(verses, date.slice(0, 7), Number(date.slice(8, 10)))
     await wait(900)
     await press('button[aria-label="Moj mjesec"]', id)
     await until(() => Boolean(doc()?.querySelector('[data-recap-end]')), 40000)

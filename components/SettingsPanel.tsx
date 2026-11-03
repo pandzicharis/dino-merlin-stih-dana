@@ -12,6 +12,7 @@ import { Icon, TOAST_OK, toast } from './Toast'
 import { MagazaLogo } from './MagazaLogo'
 import { ARTIST_LINKS } from './ArtistLinks'
 import { GearIcon } from './Settings'
+import { DrawerHeader } from './DrawerIcon'
 import { QrCode } from './deck/QrCode'
 import APP_QR from '@/data/app-qr.json'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
@@ -96,46 +97,10 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
                 background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0a0909 100%)`,
               }}
             >
-              <span
-                className="pointer-events-none absolute inset-x-10 top-0 h-px"
-                style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)` }}
-                aria-hidden
-              />
-
               {/* zaglavlje kao na ostalim panelima */}
-              <div className="shrink-0 px-5 pt-3">
-                <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-                      style={{ borderColor: `${BRAND.gold}55`, background: `radial-gradient(circle, ${BRAND.gold}24, transparent 70%)`, color: BRAND.gold }}
-                      aria-hidden
-                    >
-                      <GearIcon />
-                    </span>
-                    <div>
-                      <p className="text-[10px] font-medium uppercase tracking-[0.28em]" style={{ color: BRAND.gold }}>
-                        Stih dana
-                      </p>
-                      <p className="text-[1.1rem] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                        Postavke
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={onClose}
-                    aria-label="Zatvori"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50 transition-colors hover:text-white"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                      <path d="M6 6l12 12M18 6 6 18" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <DrawerHeader icon={<GearIcon size={17} />} eyebrow="Stih dana" title="Postavke" onClose={onClose} />
 
-              <div className="overflow-y-auto overscroll-contain px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+              <div className="overflow-y-auto overscroll-contain px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
                 <Section title="Obavijesti">
                   <Row
                     tile={<Bell />}

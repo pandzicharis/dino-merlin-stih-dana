@@ -13,8 +13,7 @@ import { dismissToast, toast } from './Toast'
  * Mjesečni pregled ("Tvoj oktobar") — otvara se:
  *   · sam se ponudi jednom, prvih 7 dana novog mjeseca (poruka "Pogledaj"),
  *     kad stih sleti — pregled prošlog mjeseca
- *   · iz postavki ("Tvoj …") i dugmetom "Moj mjesec" u zaglavlju početne —
- *     do 7. prošli mjesec, poslije tekući
+ *   · dugmetom "Moj mjesec" u zaglavlju početne — uvijek tekući mjesec
  * Kod pregleda se učita tek kad se otvori.
  */
 
@@ -23,11 +22,6 @@ const MonthRecap = lazy(() => import('./MonthRecap'))
 const EVENT = 'stihdana:pregled'
 /** mjesec čiji je pregled već ponuđen ("2026-10") */
 const OFFERED = 'stihdana:pregled-ponuden'
-
-/** Koji mjesec pregled pokazuje na dan `today`: prvih 7 dana prošli, poslije tekući. */
-export function recapDate(today: string): string {
-  return Number(today.slice(8, 10)) <= 7 ? addDays(`${today.slice(0, 7)}-01`, -1) : today
-}
 
 /** Otvori pregled mjeseca u kojem je `date`. */
 export function openRecap(date: string) {
@@ -60,7 +54,7 @@ export function MonthButton() {
     <button
       onClick={() => {
         haptic(8)
-        openRecap(recapDate(shownDay(getActiveDate())))
+        openRecap(shownDay(getActiveDate()))
       }}
       aria-label="Moj mjesec"
       title="Moj mjesec"

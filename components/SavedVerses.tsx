@@ -33,6 +33,8 @@ const ROW = 70
 const MAX_ROWS = 5.5
 /** plejer prekriva dno prikaza za ovoliko (-mt-20) */
 const UNDER = 80
+/** liste i albumi počinju ovoliko ispod zaglavlja (logotipi, pretraga) — ne lijepe se za njih */
+const TOP = 20
 
 /**
  * Visina prikaza iznad plejera: špil koliko je karta visoka, liste koliko
@@ -45,10 +47,10 @@ function paneHeight(view: SavedView, songs: number, loved: number, page: boolean
     // + mjesto ispod karte: plejer (-mt-20) joj prekrije samo tamno dno
     return `calc(76px + min(${page ? 'min(56dvh, 560px)' : FIT}, (min(100vw, 440px) - 108px) * ${(590 / 390).toFixed(4)}))`
   }
-  if (view === 'albums') return `calc(${ALBUM_H} + ${44 + UNDER + 8}px)`
+  if (view === 'albums') return `calc(${ALBUM_H} + ${44 + UNDER + 8 + TOP}px)`
   const n = view === 'loved' ? loved : songs
-  if (!n) return `${200 + UNDER}px`
-  return `${Math.round(Math.min(n, MAX_ROWS) * ROW + 12 + UNDER)}px`
+  if (!n) return `${200 + UNDER + TOP}px`
+  return `${Math.round(Math.min(n, MAX_ROWS) * ROW + 12 + UNDER + TOP)}px`
 }
 
 /**
@@ -189,7 +191,7 @@ export const SavedVerses = memo(function SavedVerses({
                 key={v}
                 data-pane={v}
                 aria-hidden={!on}
-                className={`absolute inset-0 px-5 ${v === 'cards' ? 'overflow-hidden pt-3' : 'overflow-y-auto overscroll-none pb-20'} ${
+                className={`absolute inset-0 px-5 ${v === 'cards' ? 'overflow-hidden pt-3' : 'overflow-y-auto overscroll-none pb-20 pt-5'} ${
                   on ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'
                 }`}
                 style={{ transition: on ? 'opacity 0.26s ease' : 'opacity 0.16s ease, visibility 0s linear 0.16s' }}
