@@ -137,7 +137,7 @@ export function NowPlaying({
               }}
               aria-expanded={open}
               // traka je uvijek u tonu (i otvorena) — pod prstom još malo jača
-              className="flex h-12 shrink-0 items-center gap-3 bg-white/[0.08] px-5 text-left transition-colors hover:bg-white/[0.1] active:bg-white/[0.11]"
+              className="flex h-14 shrink-0 items-center gap-3 bg-white/[0.08] px-5 text-left transition-colors hover:bg-white/[0.1] active:bg-white/[0.11]"
             >
               {/* znak muzike — titra dok pjesma svira */}
               <EqBars accent={m.accent} on={playing} h={14} />

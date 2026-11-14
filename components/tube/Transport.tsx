@@ -94,18 +94,18 @@ export function Transport() {
   return (
     <div className="flex shrink-0 items-center">
       {tube.list && (
-        <Btn label="Prethodna" onPress={prevTube} size={38}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+        <Btn label="Prethodna" onPress={prevTube} size={41}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
             {PREV}
           </svg>
         </Btn>
       )}
-      <Btn label={on ? 'Pauza' : 'Pusti'} onPress={toggleTube} size={44}>
-        <PlayGlyph playing={on} size={28} />
+      <Btn label={on ? 'Pauza' : 'Pusti'} onPress={toggleTube} size={47}>
+        <PlayGlyph playing={on} size={31} />
       </Btn>
       {tube.list && (
-        <Btn label="Sljedeća" onPress={nextTube} size={38} disabled={!tube.next}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+        <Btn label="Sljedeća" onPress={nextTube} size={41} disabled={!tube.next}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
             {NEXT}
           </svg>
         </Btn>
