@@ -7,19 +7,18 @@ import { BRAND } from '@/lib/brand'
  * Donja traka na telefonu (components/VerseScreen.tsx): Moji stihovi (s
  * brojem), Moj kalendar i Postavke — na širem ekranu su to dugmad gore u
  * zaglavlju. Staklena traka preko cijele širine, uz dno ekrana: pozadina iza
- * nje zamućena, s blagim sjajem — bez linije, gornja ivica se pretapa.
+ * nje zamućena, ravna (bez sjene i tamnjenja), gornja ivica se kratko pretopi.
  */
 export function NavBar({ children }: { children: ReactNode }) {
   return (
     <nav aria-label="Meni" className="relative z-10 -mx-6 mt-5 flex items-stretch px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3">
-      {/* staklo (zamućeno, blag sjaj) iza stavki — gore se mekano pretopi, bez ivice */}
+      {/* staklo iza stavki — ravno, bez sjene; gore se kratko pretopi, bez ivice */}
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-2xl backdrop-saturate-150"
+        className="pointer-events-none absolute inset-0 -z-10 bg-white/[0.045] backdrop-blur-xl"
         style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 50%, rgba(0,0,0,0.2) 100%)',
-          maskImage: 'linear-gradient(180deg, transparent 0, #000 24px)',
-          WebkitMaskImage: 'linear-gradient(180deg, transparent 0, #000 24px)',
+          maskImage: 'linear-gradient(180deg, transparent 0, #000 10px)',
+          WebkitMaskImage: 'linear-gradient(180deg, transparent 0, #000 10px)',
         }}
       />
       {children}

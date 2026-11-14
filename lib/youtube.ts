@@ -33,6 +33,7 @@ type YTPlayer = {
   getPlaybackRate?(): number
   getVideoUrl?(): string
   mute?(): void
+  unMute?(): void
   isMuted?(): boolean
 }
 type YTApi = { Player: new (el: HTMLElement, o: Record<string, unknown>) => YTPlayer }
@@ -210,24 +211,35 @@ export function openTube(v: Verse, scope: string, list?: Verse[]): boolean {
     if (mine !== ask) return
     loadedId = id
     started = false
+    // zvuk uvijek uključen prije pjesme — YouTube pamti utišano (i od prošlog
+    // otvaranja, i od tihog pokretanja na iPhoneu), pa bi i ova svirala bez zvuka
+    p.unMute?.()
     p.loadVideoById({ videoId: id })
     // nije krenuo sam — iPhone ne pušta zvuk bez dodira u samom videu (YouTube u
     // okviru): krene bez zvuka (to smije), YouTube u videu pokaže "uključi zvuk",
-    // a jedan dodir u videu pusti zvuk — i svakoj sljedećoj pjesmi
+    // a jedan dodir u videu pusti zvuk — i svakoj sljedećoj pjesmi. Drugdje (računar,
+    // Android) se ništa ne utišava: spor video samo pričeka, ili YouTubeov "pusti"
     window.setTimeout(() => {
       if (mine !== ask || started || (ytState !== UNSTARTED && ytState !== CUED)) return
-      p.mute?.()
-      p.playVideo()
-      // ni bez zvuka nije krenuo (rijetko) — pokaže se YouTubeov "pusti"
+      if (IOS) {
+        p.mute?.()
+        p.playVideo()
+      }
+      // ni tako nije krenuo — pokaže se YouTubeov "pusti"
       window.setTimeout(() => {
         if (mine !== ask || started) return
         started = true
         if (ytState !== BUFFERING) set({ status: 'paused' })
-      }, 1500)
+      }, IOS ? 1500 : 500)
     }, 1000)
   })
   return true
 }
+
+/** iPhone i iPad (i iPad koji se predstavlja kao Mac) — zvuk tek poslije dodira u videu */
+const IOS =
+  typeof navigator !== 'undefined' &&
+  (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
 
 /** svira bez zvuka — dok se zvuk ne uključi (dodir u videu), pita plejer */
 let sound = 0

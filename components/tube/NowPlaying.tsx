@@ -6,7 +6,7 @@ import { albumOf, softOf, thumbOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { haptic } from '@/lib/haptic'
-import { albumLine } from '@/lib/text'
+import { albumLine, asWritten } from '@/lib/text'
 import { tubeNext, useTube, videoOf } from '@/lib/youtube'
 import { primeLyrics } from '../Lyrics'
 import { DrawerHeader } from '../DrawerIcon'
@@ -21,7 +21,7 @@ import { LyricsView, useTubeLyrics } from './TubeLyrics'
  * i u sačuvanima (components/tube/TubePanel.tsx): zatvori zatvara samo pjesmu.
  * Jedna pjesma — pusti, pauza i traka su u YouTube videu.
  *
- *   zaglavlje  kao na ostalim ladicama — "Pjesma · <naziv pjesme>", zatvori
+ *   zaglavlje  kao na ostalim ladicama — "Stih · <stih u jednom redu>", zatvori
  *   video      YouTube plejer
  *   pjesma     red kao u plejeru sačuvanih na developu: omot, "Trenutno" sa
  *              znakom muzike, pjesma u boji stiha, album — poravnat s videom;
@@ -87,7 +87,7 @@ export function NowPlaying({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div ref={inner} className={`flex flex-col ${wide ? 'min-h-0 flex-1' : ''}`}>
-        <DrawerHeader icon={<NoteIcon />} eyebrow="Pjesma" title={verse.song} onClose={onClose} minimize={minimize} />
+        <DrawerHeader icon={<NoteIcon />} eyebrow="Stih" title={asWritten(verse.text).replace(/\s*\n\s*/g, ' ')} onClose={onClose} minimize={minimize} />
 
         <div className="shrink-0 px-[10px] pt-3">
           <div className="rounded-[18px] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
@@ -141,7 +141,7 @@ export function NowPlaying({
             >
               {/* znak muzike — titra dok pjesma svira */}
               <EqBars accent={m.accent} on={playing} h={14} />
-              <span className="flex-1 text-[12px] font-semibold uppercase leading-none tracking-[0.2em] text-white/85">Tekst pjesme</span>
+              <span className="flex-1 text-[12px] font-bold uppercase leading-none tracking-[0.2em] text-white/90">Tekst pjesme</span>
               <svg
                 width="18"
                 height="18"
