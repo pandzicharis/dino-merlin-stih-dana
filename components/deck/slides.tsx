@@ -1752,7 +1752,7 @@ function Poklon() {
       <Bullets
         items={[
           <><b>Svaki poklon je nova instalacija</b> — link vodi pravo u aplikaciju.</>,
-          <>Ko već ima aplikaciju, QR skenira iz nje: Postavke → Skeniraj poklon.</>,
+          <>Ko već ima aplikaciju, QR skenira iz nje: Postavke → Skeniraj stih.</>,
         ]}
       />
     </>

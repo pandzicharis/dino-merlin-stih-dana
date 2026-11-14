@@ -232,7 +232,7 @@ function Link({ href, tile, title, sub }: { href: string; tile: ReactNode; title
 }
 
 /**
- * "Skeniraj poklon" — QR kod stiha s drugog telefona, kamerom u aplikaciji
+ * "Skeniraj stih" — QR kod stiha s drugog telefona, kamerom u aplikaciji
  * (kamera telefona na iPhoneu link otvori u Safariju, ne ovdje). Pročitan —
  * postavke se zatvore i poklon se otvori odmah (components/GiftArrival.tsx).
  */
@@ -246,14 +246,14 @@ function ScanGift({ onDone }: { onDone: () => void }) {
             <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M7 12h10" />
           </svg>
         }
-        title="Skeniraj poklon"
+        title="Skeniraj stih"
         sub="QR kod stiha s drugog telefona"
         right={<Chevron />}
         onClick={() => {
           haptic(6)
           setScan(true)
         }}
-        label="Skeniraj poklon"
+        label="Skeniraj stih"
       />
       <AnimatePresence>
         {scan && (

@@ -107,7 +107,7 @@ export function QrScanner({ onCode, onClose }: { onCode: (text: string) => boole
     <motion.div
       role="dialog"
       aria-modal="true"
-      aria-label="Skeniraj poklon"
+      aria-label="Skeniraj stih"
       data-qr-scanner
       className="fixed inset-0 z-[130] flex flex-col items-center justify-center bg-black"
       initial={{ opacity: 0 }}
@@ -144,7 +144,7 @@ export function QrScanner({ onCode, onClose }: { onCode: (text: string) => boole
       </motion.div>
 
       <p className="relative mt-8 px-8 text-center text-[13px] font-medium uppercase tracking-[0.2em]" style={{ color: error || wrong ? '#E6A4A4' : BRAND.gold }}>
-        {error ?? (wrong ? 'To nije poklon' : 'Skeniraj poklon')}
+        {error ?? (wrong ? 'To nije poklon' : 'Skeniraj stih')}
       </p>
       {error && <p className="relative mt-2 px-10 text-center text-[13px] text-white/55">Dozvoli kameru u postavkama telefona, pa probaj ponovo.</p>}
     </motion.div>,
