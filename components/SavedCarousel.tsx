@@ -452,6 +452,20 @@ function decodeOnce(src: string) {
   img.src = src
   img.decode().catch(() => decoded.delete(src))
 }
+
+/**
+ * Pozadina karte stiha unaprijed — učitana i dekodirana (papirići:
+ * components/tube/TubeViews.tsx — raširen stih se otvori odmah s pozadinom,
+ * ne čeka mrežu). Ispečena atmosfera, ili omot ako je nema.
+ */
+export function primeCard(v: Verse) {
+  const still = cardStillOf(v.album, v.mood)
+  if (still) return decodeOnce(still)
+  const cover = albumOf(v.album)?.cover
+  const art = cardArtOf(cover)
+  if (art) decodeOnce(art)
+  if (cover) decodeOnce(cover)
+}
 /** atmosfere karata oko mjesta gdje se lista — dekodirane i držane dok su blizu */
 const stills = new Map<string, HTMLImageElement>()
 function keepDecoded(src: string) {

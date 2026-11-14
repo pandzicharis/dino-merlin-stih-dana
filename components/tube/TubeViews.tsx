@@ -10,7 +10,9 @@ import { dragScroll } from '@/lib/drag-scroll'
 import { haptic } from '@/lib/haptic'
 import { asWritten, loose, paperText } from '@/lib/text'
 import { videoOf } from '@/lib/youtube'
+import { whenCalm } from '@/lib/calm'
 import { primeLyrics } from '../Lyrics'
+import { primeCard } from '../SavedCarousel'
 
 /*
  * Prikazi sačuvanih stihova u ladici (components/tube/TubePanel.tsx) — kao u
@@ -126,6 +128,8 @@ const slipFont = (text: string) => `${Math.min(8.2, 560 / Math.max(text.length, 
  * papirić po `data-stih`, raste iz njega i vrati se na njega).
  */
 export function Slips({ verses, onPick }: { verses: Verse[]; onPick: (v: Verse) => void }) {
+  // pozadine stihova se pripreme čim se papirići pokažu — dodir otvori stih s pozadinom odmah
+  useEffect(() => whenCalm(() => verses.forEach(primeCard), 300), [verses])
   return (
     <div className="grid grid-cols-2 gap-2 pb-8 pt-1">
       {verses.map((v, i) => (
@@ -141,6 +145,8 @@ const Slip = memo(function Slip({ v, n, onPick }: { v: Verse; n: number; onPick:
     <motion.button
       type="button"
       data-stih={v.id}
+      // prst dotakne — pozadina stiha se krene učitavati odmah (ako već nije)
+      onPointerDown={() => primeCard(v)}
       onClick={() => onPick(v)}
       aria-label={`${text} — ${v.song}`}
       className="relative flex w-full items-center justify-center overflow-hidden rounded-[2px] text-center shadow-[0_3px_10px_rgba(0,0,0,0.35)]"

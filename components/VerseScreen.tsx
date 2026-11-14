@@ -250,12 +250,15 @@ export function VerseScreen({
               <>
                 {OWN_AUDIO ? <SongCredit verse={verse} preview={preview} /> : <TubeSong verse={verse} />}
                 {/* crtica ispod gramofona — uvijek na mjestu (ne mijenja raspored),
-                    samo se pretopi: dok pluta mini plejer, nje nema */}
-                <span
-                  className="h-px w-16 shrink-0 transition-opacity duration-500"
-                  style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`, opacity: peek ? 0 : 1 }}
-                  aria-hidden
-                />
+                    samo se pretopi: dok pluta mini plejer, nje nema. Preko YouTubea je nema
+                    (ispod kartice pjesme je donja traka) */}
+                {OWN_AUDIO && (
+                  <span
+                    className="h-px w-16 shrink-0 transition-opacity duration-500"
+                    style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)`, opacity: peek ? 0 : 1 }}
+                    aria-hidden
+                  />
+                )}
               </>
             )}
           </motion.footer>
