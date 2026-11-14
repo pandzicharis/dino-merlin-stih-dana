@@ -11,6 +11,7 @@ import { haptic } from '@/lib/haptic'
 import { favoriteDate, getFavorites, monthCount, openedIn } from '@/lib/storage'
 import { albumLine } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
+import { OWN_AUDIO } from '@/lib/flags'
 import { pauseSaved, playSaved, playable, savedVerse, useSavedPlayerSelect } from '@/lib/player'
 import { BrandLockup } from './BrandLockup'
 import { EqBars } from './EqBars'
@@ -591,7 +592,8 @@ const keep = { onClick: (e: SyntheticEvent) => e.stopPropagation() }
 
 /* ── puštanje pjesme dodirom ──────────────────────────────────── */
 
-const canPlay = (v?: Verse): v is Verse => Boolean(v?.youtube && playable(v))
+// samo uz vlastite pjesme (lib/flags.ts) — YouTube pjesma svira na početnoj i u plejeru, gdje se video vidi
+const canPlay = (v?: Verse): v is Verse => Boolean(OWN_AUDIO && v?.youtube && playable(v))
 
 /** svira li (ili je u plejeru) pjesma stiha `v` */
 function useNow(v?: Verse) {

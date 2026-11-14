@@ -46,3 +46,6 @@ next-env.d.ts
 # cloudflare (pjesme) — složeno iz public/audio
 /cloudflare/audio/dist
 .wrangler
+
+# pjesme (m4a) se ne objavljuju — puštaju se preko YouTubea (lib/youtube.ts)
+/public/audio/

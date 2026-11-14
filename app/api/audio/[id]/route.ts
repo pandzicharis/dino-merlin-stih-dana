@@ -1,3 +1,4 @@
+import { OWN_AUDIO } from '@/lib/flags'
 import { createReadStream } from 'node:fs'
 import { mkdir, readdir, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -27,6 +28,8 @@ const links = new Map<string, Promise<{ url: string; exp: number }>>()
 const expires = new Map<string, number>()
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  // preuzimanje pjesama samo uz vlastite pjesme (lib/flags.ts)
+  if (!OWN_AUDIO) return new Response('Not found', { status: 404 })
   const { id } = await ctx.params
   if (!/^[\w-]{11}$/.test(id)) return new Response('Bad id', { status: 400 })
   const q = new URL(req.url).searchParams

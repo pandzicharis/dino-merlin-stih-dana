@@ -1,12 +1,11 @@
 /**
- * Lokalno stanje — samo zadnji viđeni dan. Bez logina, bez baze.
+ * Lokalno stanje na uređaju. Bez logina, bez baze.
  * Svaki pristup je u try/catch: private mode i blokirani storage ne smiju srušiti ekran.
  */
 
-import { addDays, getActiveDate, shownDay } from './date'
+import { getActiveDate, shownDay } from './date'
 import { audioFile } from './audio-name'
 
-const SEEN = 'stihdana:lastSeen'
 const NOTIFY = 'stihdana:notify'
 
 function read<T>(key: string, fallback: T): T {
@@ -42,35 +41,6 @@ export function getNotifyIntent(): boolean {
 export function setNotifyIntent(on: boolean) {
   write(NOTIFY, on)
   window.dispatchEvent(new Event('notifychange'))
-}
-
-export function getLastSeen(): string | null {
-  return read<string | null>(SEEN, null)
-}
-
-export function setLastSeen(iso: string) {
-  write(SEEN, iso)
-}
-
-/* ── niz: dana zaredom s otvorenim stihom ─────────────────────── */
-
-const STREAK = 'stihdana:niz'
-
-/**
- * Koliki je niz na dan `iso` — samo čita. Raste ako je stih otvoren i jučer,
- * inače kreće ispočetka. Ko je aplikaciju koristio i prije niza, a otvorio
- * je jučer (`lastSeen`), kreće od dva.
- */
-export function peekStreak(iso: string): number {
-  const s = read<{ last: string; n: number } | null>(STREAK, null)
-  if (s?.last === iso) return s.n
-  const yesterday = addDays(iso, -1)
-  return s ? (s.last === yesterday ? s.n + 1 : 1) : getLastSeen() === yesterday ? 2 : 1
-}
-
-/** Stih otvoren na dan `iso` — zapamti niz. Zove se PRIJE `setLastSeen`. */
-export function bumpStreak(iso: string) {
-  write(STREAK, { last: iso, n: peekStreak(iso) })
 }
 
 /* ── dijeljenje: zadnji izabrani format ───────────────────────── */

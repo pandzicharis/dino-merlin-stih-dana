@@ -29,7 +29,8 @@ import { DrawerHeader } from './DrawerIcon'
  * teksta diše sjaj.
  */
 
-type Lyrics = { title: string; lines: string[]; url?: string; synced?: { t: number; l: string }[]; offset?: number }
+/** `duration`: trajanje snimka za koji vrijede vremena redova; `open`: trajanje se ne zna — pitaj opet s trajanjem videa */
+type Lyrics = { title: string; lines: string[]; url?: string; synced?: { t: number; l: string }[]; offset?: number; duration?: number; open?: boolean }
 
 /** Zvuk pjesme — čita se u svakom kadru. `loading`: traži da svira, a zvuk još nije stigao. */
 export type LyricsClock = () => { t: number; d: number; playing: boolean; loading?: boolean }
@@ -51,18 +52,28 @@ export type LyricsControls = {
 /* po pjesmi, 10 minuta — aplikacija zna danima stajati otvorena, a ispravljen
    tekst (pomak, vremena redova) mora stići; greška se ne pamti */
 const cache = new Map<string, { at: number; p: Promise<Lyrics | null> }>()
-function load(song: string): Promise<Lyrics | null> {
-  const hit = cache.get(song)
+/** tekst koji je već stigao — prikaz ga ima odmah, bez praznog kadra (promjena pjesme) */
+const done = new Map<string, Lyrics | null>()
+/** `d`: trajanje videa (s) — za pjesmu čije trajanje server ne zna (YouTube, lib/youtube.ts) */
+function load(song: string, d = 0): Promise<Lyrics | null> {
+  const key = d ? `${song}|${d}` : song
+  const hit = cache.get(key)
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.p
-  const p = fetch(`/api/lyrics/${encodeURIComponent(song)}`).then(async (r) => {
+  const p = fetch(`/api/lyrics/${encodeURIComponent(song)}${d ? `?d=${d}` : ''}`).then(async (r) => {
     if (r.status === 404) return null
     if (!r.ok) throw new Error(String(r.status))
     return (await r.json()) as Lyrics
   })
-  cache.set(song, { at: Date.now(), p })
-  p.catch(() => cache.delete(song))
+  cache.set(key, { at: Date.now(), p })
+  p.then(
+    (v) => void done.set(key, v),
+    () => cache.delete(key),
+  )
   return p
 }
+
+/** Tekst pjesme ako je već stigao (pripremljen), inače `undefined`. */
+export const lyricsNow = (song: string): Lyrics | null | undefined => done.get(song)
 
 /** Pripremi tekst unaprijed (prst na dugmetu, pjesma krenula) — panel se otvori pun. */
 export const primeLyrics = (song: string) => void load(song).catch(() => {})
@@ -440,12 +451,8 @@ function Body({ verse, clock, onSeek }: { verse: Verse; clock: LyricsClock; onSe
   const { active, playing } = useFollow(scroller, lyrics ? (synced ? 'synced' : 'plain') : null, synced, clock, rows, intro, lyrics?.offset ?? 0)
   const accent = MOODS[verse.mood].accent
 
-  // redovi današnjeg stiha — u tekstu zlatni ("nekog" u stihu, "nekoga" u pjesmi)
-  const own = verse.text.split('\n').map(loose).filter((l) => l.length >= 8)
-  const mine = (l: string) => {
-    const k = loose(l)
-    return k.length >= 8 && own.some((v) => k.includes(v) || v.includes(k))
-  }
+  // redovi današnjeg stiha — u tekstu zlatni
+  const mine = verseMatcher(verse.text)
 
   const fade = 'linear-gradient(180deg, transparent 0, #000 6%, #000 78%, transparent 100%)'
   return (
@@ -730,3 +737,24 @@ function useFollow(
 
   return { active, playing }
 }
+
+/**
+ * Koji redovi teksta pjesme su stih `text`: isti red ("nekog" u stihu,
+ * "nekoga" u pjesmi) ili iste riječi drugim redom ("ja tebe imam" u stihu,
+ * "ja imam tebe" u pjesmi).
+ */
+export function verseMatcher(text: string): (line: string) => boolean {
+  const own = text.split('\n').map(loose).filter((l) => l.length >= 8)
+  const sets = own.map((l) => new Set(l.split(' ')))
+  return (line) => {
+    const k = loose(line)
+    if (k.length < 8) return false
+    if (own.some((v) => k.includes(v) || v.includes(k))) return true
+    const words = k.split(' ')
+    return words.length >= 3 && sets.some((s) => words.filter((w) => s.has(w)).length >= Math.max(3, Math.ceil(words.length * 0.8)))
+  }
+}
+
+/* YouTube ladica (components/tube) čita isti tekst i ima isti red pjesme */
+export { load as loadLyrics }
+export type { Lyrics as LyricsData }

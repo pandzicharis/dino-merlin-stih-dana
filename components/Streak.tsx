@@ -24,7 +24,7 @@ function Flame({ size }: { size: number }) {
 }
 
 /**
- * Niz dana zaredom (lib/storage.ts) — tiha pilula iznad datuma, tek od
+ * Niz dana zaredom (lib/draw.ts) — tiha pilula iznad datuma, tek od
  * drugog dana: vatrica i "7. stih dana".
  */
 export function StreakLine({ n }: { n: number; accent?: string }) {

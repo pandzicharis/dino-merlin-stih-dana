@@ -20,6 +20,8 @@ import { SavedLink } from './SavedLink'
 import { MonthButton } from './RecapHost'
 import { MagazaLogo } from './MagazaLogo'
 import { StreakLine } from './Streak'
+import { OWN_AUDIO } from '@/lib/flags'
+import { TubeSong } from './tube/TubeSong'
 import { useSavedPlayerSelect } from '@/lib/player'
 
 /**
@@ -50,7 +52,7 @@ export function VerseScreen({
   instant?: boolean
   /** pregled (admin, prezentacija): gramofon i za pjesmu koja još nije preuzeta */
   preview?: boolean
-  /** dana zaredom (lib/storage.ts) — tiho iznad datuma, tek od drugog dana */
+  /** dana zaredom (lib/draw.ts) — tiho iznad datuma, tek od drugog dana */
   streak?: number
   /** dugme "Moj mjesec" u zaglavlju — samo na početnoj (tamo je pregled mjeseca) */
   month?: boolean
@@ -235,7 +237,7 @@ export function VerseScreen({
               </div>
             ) : (
               <>
-                <SongCredit verse={verse} preview={preview} />
+                {OWN_AUDIO ? <SongCredit verse={verse} preview={preview} /> : <TubeSong verse={verse} />}
                 {/* crtica ispod gramofona — uvijek na mjestu (ne mijenja raspored),
                     samo se pretopi: dok pluta mini plejer, nje nema */}
                 <span

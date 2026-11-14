@@ -2,9 +2,13 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { Verse } from '@/data/verses'
-import { addDays } from './date'
-import { isFirstVerse } from './text'
+import { addDays, shownDay } from './date'
+import { isFirstVerse, youtubeId } from './text'
 import { playable } from './player'
+import { OWN_AUDIO } from './flags'
+
+/** Ima li stih pjesmu: vlastiti fajl (lib/flags.ts), inače video na YouTubeu. */
+const hasSong = (v: Verse) => (OWN_AUDIO ? playable(v) : Boolean(youtubeId(v.youtube)))
 
 /**
  * SVAKOM SVOJ STIH — izvlačenje na uređaju.
@@ -26,6 +30,8 @@ import { playable } from './player'
  *             stih, i izmjena u adminu ga ne dira.
  *   obavijest ne nosi stih nego poziv "Izvuci svoj stih" (lib/notify.ts) —
  *             stih se otkriva tek kad se izvuče, pa nema šta da se razilazi.
+ *   niz       dani zaredom ("7. stih dana") — broji se iz same istorije: dan
+ *             s izvučenim stihom, ili dan otvoren samo ujutro (`am`).
  *
  * Gdje se čuva: localStorage — čita se sinhrono, bez treptanja.
  */
@@ -39,6 +45,9 @@ type Entry = {
   /** zavrćen u tomboli (papirić sletio). Do tad se stih ne pokazuje —
    *  svako otvaranje je tombola, i poslije ubijene aplikacije. */
   seen?: 1
+  /** na ekranu i sutradan prije podneva (dan stiha se mijenja u podne, pa
+   *  je tad još ovaj, s današnjim datumom) — taj dan ne prekida niz */
+  am?: 1
   /** probni: prvi stih ikad (uvod poslije instalacije) — ne broji se za taj
    *  dan; obavijest istog dana ga zamijeni pravim izvlačenjem (`unseat`) */
   pre?: 1
@@ -160,9 +169,11 @@ function settle(s: State, today: string, pool: string[], byId: Map<string, Verse
   const days: State['days'] = {}
   const oldest = addDays(today, -KEEP)
   for (const [d, e] of Object.entries(s.days)) {
-    // budućnost se ne čuva (dev pomjeranje datuma), a stih kojeg više nema
-    // nigdje (druga baza, stari test) — dan se izvuče ponovo
-    if (d < oldest || d > today || !byId.has(e.id)) continue
+    // budućnost se ne čuva (dev pomjeranje datuma), a današnji stih kojeg više
+    // nema nigdje (druga baza, stari test) — dan se izvuče ponovo. Prošli dani
+    // ostaju i bez svog stiha na listi (baza padne → kraća lista iz
+    // data/verses.ts): to je istorija — niz, pregled mjeseca
+    if (d < oldest || d > today || (d === today && !byId.has(e.id))) continue
     days[d] = e
   }
   if (!days[today]) {
@@ -185,7 +196,7 @@ function settle(s: State, today: string, pool: string[], byId: Map<string, Verse
 function poolOf(verses: ListVerse[]): string[] {
   const a = verses.filter((v) => v.active !== false)
   const base = a.length ? a : verses
-  const ready = base.filter(playable)
+  const ready = base.filter(hasSong)
   return (ready.length ? ready : base).map((v) => v.id)
 }
 
@@ -202,7 +213,7 @@ export function useDraw(date: string, verses: ListVerse[], on = true): { verse: 
   const pool = useMemo(() => poolOf(verses), [verses])
 
   // prvi stih svakom novom korisniku (lib/text.ts) — i kad je arhiviran; samo s pjesmom
-  const first = useMemo(() => verses.find((v) => isFirstVerse(v.text) && playable(v))?.id, [verses])
+  const first = useMemo(() => verses.find((v) => isFirstVerse(v.text) && hasSong(v))?.id, [verses])
 
   const entry = raw == null ? undefined : parse(raw).days[date]
   const verse = entry ? byId.get(entry.id) : undefined
@@ -232,6 +243,20 @@ export function markSeen(date: string) {
   save(s)
 }
 
+/**
+ * Stih za `date` je na ekranu (izvučen). Prije podneva je to još jučerašnji
+ * stih, s današnjim datumom — zapamti se da je i taj dan aplikacija otvorena
+ * (`am`), pa niz ne pukne i kad se novi stih tog dana ne izvuče.
+ */
+export function markOpen(date: string) {
+  if (shownDay(date) === date) return
+  const s = parse(snapshot())
+  const e = s.days[date]
+  if (!e?.seen || e.am) return
+  s.days[date] = { ...e, am: 1 }
+  save(s)
+}
+
 /** Stih za `date` je probni (uvod poslije instalacije) — ne broji se kao današnji. */
 export function isProbe(date: string): boolean {
   return Boolean(parse(snapshot()).days[date]?.pre)
@@ -257,4 +282,22 @@ export function redraw(date: string) {
   const s = parse(snapshot())
   for (const d of Object.keys(s.days)) if (d >= date) delete s.days[d]
   save(s)
+}
+
+/**
+ * Niz: koliko dana zaredom, do `date` (dok današnji stih nije izvučen, do
+ * jučer). Dan se broji kad je njegov stih izvučen — ili kad je aplikacija tog
+ * dana otvorena samo ujutro (`am` na danu prije: na ekranu je još jučerašnji
+ * stih, pa se novi ni ne izvuče). Na serveru i u prvom frejmu 0 — nikad iz
+ * keširanog datuma.
+ */
+export function useStreak(date: string): number {
+  const raw = useSyncExternalStore(subscribe, snapshot, () => null)
+  if (!raw) return 0
+  const { days } = parse(raw)
+  const kept = (d: string) => days[d]?.seen || days[addDays(d, -1)]?.am
+  let d = days[date]?.seen ? date : addDays(date, -1)
+  let n = 0
+  for (; kept(d); d = addDays(d, -1)) n++
+  return n
 }

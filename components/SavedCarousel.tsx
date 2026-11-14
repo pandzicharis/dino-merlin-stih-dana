@@ -10,12 +10,16 @@ import { albumOf, cardArtOf, cardStillOf, softOf, thumbOf } from '@/data/albums'
 import { lookCss, lookScale, parseFont, preloadFonts } from '@/lib/fonts'
 import { albumLine, asWritten } from '@/lib/text'
 import { savedDay, toggleFavorite } from '@/lib/storage'
+import { useFavorites } from '@/lib/client-store'
 import { formatFullDateBs } from '@/lib/date'
 import { MAGAZA_BESIDE, MAGAZA_DROP_CSS } from '@/lib/brand'
 import { FontedLines, MagazaMark } from './deck/Screens'
 import { CardAtmosphere } from './CardAtmosphere'
 import { FitLines } from './deck/FitLines'
 import { SongRow } from './SongCredit'
+import { OWN_AUDIO } from '@/lib/flags'
+import { openTube } from '@/lib/youtube'
+import { TubeCapsule } from './tube/TubeSong'
 import { SAVED_TRACK, playSaved, savedVerse, setSavedPlaylist, useSavedPlayerSelect, warmSaved } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
 import { dragScroll } from '@/lib/drag-scroll'
@@ -36,6 +40,8 @@ const W = 390
 const H = 620
 /** mala karta je kraća od ekrana — dno (tamno pretapanje) odsječeno, atmosfera ostaje H */
 const SH = 590
+/** visina karte u špilu prema širini (raširena karta iz papirića — components/SavedFull.tsx) */
+export const CARD_RATIO = SH / W
 /** mjesto sa svake strane prednje karte — tu vire susjedne */
 const SIDE = 54
 /** zraka unutar karte, lijevo i desno (em od W) */
@@ -78,9 +84,24 @@ export function SavedCarousel({
   onOpen,
   onFront,
   dots = true,
+  count = false,
+  even = false,
+  expand = true,
+  side = SIDE,
+  lead = false,
 }: {
   verses: Verse[]
   size: string
+  /** koliko vire susjedne karte sa svake strane (px) */
+  side?: number
+  /** ispod špila uvijek "2 / 22" (i kad je karata malo) */
+  count?: boolean
+  /** "2 / 22" s istim razmakom iznad i ispod (12 px) — u sačuvanima tačno između karte i dugmadi */
+  even?: boolean
+  /** prva karta od lijeve ivice (kao sadržaj ladice), ne na sredini — ostale na sredini */
+  lead?: boolean
+  /** dugme "Raširi" na prednjoj karti — bez njega dodir na kartu i dalje zove `onOpen` (sačuvani preko YouTubea: otvori pjesmu) */
+  expand?: boolean
   /** dodir na prednju kartu — stih preko cijelog ekrana (components/SavedFull.tsx) */
   onOpen?: (verse: Verse) => void
   /** prednja karta se promijenila — plejer ispod pokazuje njenu pjesmu */
@@ -350,7 +371,7 @@ export function SavedCarousel({
       style={
         {
           containerType: 'inline-size',
-          '--cw': `min(calc(${size} * ${W / SH}), calc(100cqw - ${SIDE * 2}px))`,
+          '--cw': `min(calc(${size} * ${W / SH}), calc(100cqw - ${side * 2}px))`,
         } as CSSProperties
       }
     >
@@ -363,8 +384,8 @@ export function SavedCarousel({
         className="relative flex w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ height: `calc(var(--cw) * ${SH / W})`, gap: STRIP_GAP, touchAction: 'pan-x' }}
       >
-        {/* razmak do prve/zadnje karte — da i one stanu na sredinu */}
-        <div aria-hidden className="shrink-0" style={{ width: `calc((100% - var(--cw)) / 2 - ${STRIP_GAP}px)` }} />
+        {/* razmak do prve/zadnje karte — da i one stanu na sredinu (`lead`: prva uz lijevu ivicu) */}
+        <div aria-hidden className="shrink-0" style={{ width: lead ? 20 - STRIP_GAP : `calc((100% - var(--cw)) / 2 - ${STRIP_GAP}px)` }} />
         {verses.map((v, i) => (
           <Card
             key={v.id}
@@ -374,6 +395,7 @@ export function SavedCarousel({
             full={Math.abs(i - near) <= 3}
             onOpen={open}
             onPick={go}
+            expand={expand}
           />
         ))}
         <div aria-hidden className="shrink-0" style={{ width: `calc((100% - var(--cw)) / 2 - ${STRIP_GAP}px)` }} />
@@ -381,7 +403,7 @@ export function SavedCarousel({
 
       {dots &&
         verses.length > 1 &&
-        (verses.length <= 8 ? (
+        (verses.length <= 8 && !count ? (
           <div className="mt-3 flex items-center gap-1.5">
             {verses.map((v, i) => (
               <button
@@ -399,7 +421,8 @@ export function SavedCarousel({
             ))}
           </div>
         ) : (
-          <p className="tabular mt-3 h-6 text-[11px] tracking-[0.2em] text-white/50">
+          // `even`: isti razmak iznad i ispod (u sačuvanima — tačno između karte i dugmadi)
+          <p className={`tabular text-[11px] tracking-[0.2em] text-white/50 ${even ? 'my-3 flex h-4 shrink-0 items-center' : 'mt-3 h-6'}`}>
             {cur + 1} / {verses.length}
           </p>
         ))}
@@ -446,6 +469,7 @@ const Card = memo(function Card({
   full,
   onOpen,
   onPick,
+  expand,
 }: {
   verse: Verse
   index: number
@@ -453,6 +477,7 @@ const Card = memo(function Card({
   full: boolean
   onOpen?: (verse: Verse) => void
   onPick: (i: number) => void
+  expand: boolean
 }) {
   // daleko od sredine: samo mjesto za zaustavljanje, u boji karte — bez sloja i sadržaja
   if (!full) {
@@ -491,7 +516,7 @@ const Card = memo(function Card({
           style={front ? undefined : { pointerEvents: 'none' }}
           {...tap}
         >
-          <CardFace verse={verse} o={0} onOpen={onOpen} />
+          <CardFace verse={verse} o={0} onOpen={expand ? onOpen : undefined} />
         </div>
       </div>
     </div>
@@ -509,9 +534,12 @@ function CardFaceView({
   onOpen,
   onCollapse,
   actionsZoom,
+  toggle = true,
 }: {
   verse: Verse
   o?: number
+  /** dugme raširi/skupi (raširen papirić ga nema — components/SavedFull.tsx) */
+  toggle?: boolean
   /** "Raširi" — samo prednja karta u špilu */
   onOpen?: (verse: Verse) => void
   /** "Skupi" — raširena karta */
@@ -534,6 +562,8 @@ function CardFaceView({
   const front = o === 0
 
   useEffect(() => preloadFonts(verse.font), [verse.font])
+  // je li stih (još) sačuvan — srce gore prati dugme "Sačuvano" na raširenoj karti
+  const kept = useFavorites().includes(verse.id)
   // karte postoje samo na klijentu (poslije hidratacije) — smije se čitati odmah
   const [saved] = useState(() => savedDay(verse.id))
   // isti elementi iz rendera u render: FitLines mjeri samo kad se stih stvarno
@@ -604,7 +634,8 @@ function CardFaceView({
       <div
         className={`absolute inset-x-0 top-0 z-[1] flex flex-col justify-between ${actionsZoom ? '' : 'bottom-0'}`}
         // zraka od lijeve i desne ivice karte (isto za zaglavlje, stih i gramofon)
-        style={{ padding: `26em ${SIDE_PAD}em ${FADE * 0.75}em`, height: actionsZoom ? `${SH}em` : undefined }}
+        // donji razmak manji — stih sjedne na sredinu karte (iznad naziva pjesme)
+        style={{ padding: `26em ${SIDE_PAD}em 60em`, height: actionsZoom ? `${SH}em` : undefined }}
       >
         {/* zaglavlje — potpis | Magaza, kao na ekranu stiha; desno raširi i srce */}
         <div className="flex items-center justify-between">
@@ -618,7 +649,7 @@ function CardFaceView({
               ne klizne ni prema uglu ni jedno prema drugom */}
           <div className="flex items-center gap-2">
             {/* raširi kartu preko cijelog ekrana / skupi je nazad */}
-            {(onOpen || onCollapse) && (
+            {toggle && (onOpen || onCollapse) && (
               <button
                 data-nodrag
                 {...tapProps(() => (onCollapse ? onCollapse() : onOpen?.(verse)))}
@@ -632,16 +663,17 @@ function CardFaceView({
                 <ExpandMorph layer={layer} />
               </button>
             )}
-            {/* srce — i na raširenoj karti */}
+            {/* srce — i na raširenoj karti; prati "Sačuvano" ispod stiha (odznačeno — prazno) */}
             <button
               data-nodrag
               onClick={() => toggleFavorite(verse.id)}
-              aria-label="Ukloni iz sačuvanih"
-              title="Ukloni iz sačuvanih"
-              className="flex h-8 w-8 items-center justify-center rounded-full border transition-transform active:scale-90"
-              style={{ borderColor: `${m.accent}55`, background: `${m.accent}1a`, color: m.accent }}
+              aria-label={kept ? 'Ukloni iz sačuvanih' : 'Sačuvaj'}
+              aria-pressed={kept}
+              title={kept ? 'Ukloni iz sačuvanih' : 'Sačuvaj'}
+              className="flex h-8 w-8 items-center justify-center rounded-full border transition-[transform,background] active:scale-90"
+              style={{ borderColor: `${m.accent}55`, background: kept ? `${m.accent}1a` : 'rgba(0,0,0,0.2)', color: m.accent }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill={kept ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={kept ? 0 : 1.8} strokeLinejoin="round" aria-hidden>
                 <path d="M12 20.5s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7.5 2.6c0 5.7-7.5 10.3-7.5 10.3z" />
               </svg>
             </button>
@@ -699,7 +731,21 @@ function CardFaceView({
             className="absolute flex items-center gap-2.5"
             style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, bottom: '18em', opacity: 0, transformOrigin: 'center bottom' }}
           >
-            <SongRow verse={verse} accent={m.accent} fit vinyl={54} />
+            {/* pjesma preko YouTubea: kartica s YouTube dugmetom */}
+            {OWN_AUDIO ? (
+              <SongRow verse={verse} accent={m.accent} fit vinyl={54} />
+            ) : (
+              // karta je uvećana (CSS zoom) — kartica pjesme se vrati na pravu veličinu, preko cijele širine
+              <div className="min-w-0 flex-1" style={actionsZoom ? { zoom: actionsZoom } : undefined}>
+                <TubeCapsule
+                  verse={verse}
+                  wide
+                  // pjesma izađe kao ladica preko raširenog stiha (components/tube/TubePanel.tsx) —
+                  // stih ostaje, "nazad" se vrati na njega
+                  onPlay={() => openTube(verse, 'card')}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -710,8 +756,9 @@ function CardFaceView({
       <div
         data-small
         className="pointer-events-none absolute z-[1] flex flex-col items-center text-center"
-        // niže, tik iznad plejera koji prekrije dno karte
-        style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${SH - 120}em`, gap: '7em' }}
+        // niže, tik iznad plejera koji prekrije dno karte; preko YouTubea plejera ispod karte
+        // nema — malo više, dalje od dna koje se pretapa
+        style={{ ...layer, left: `${SIDE_PAD}em`, right: `${SIDE_PAD}em`, top: `${SH - (OWN_AUDIO ? 120 : 148)}em`, gap: '7em' }}
       >
         <p className="max-w-full truncate font-semibold uppercase" style={{ fontSize: '15em', letterSpacing: '0.18em', color: m.accent }}>
           {verse.song}
@@ -760,5 +807,6 @@ export const CardFace = memo(
     ((a.o ?? 0) === 0) === ((b.o ?? 0) === 0) &&
     a.onOpen === b.onOpen &&
     a.onCollapse === b.onCollapse &&
-    a.actionsZoom === b.actionsZoom,
+    a.actionsZoom === b.actionsZoom &&
+    a.toggle === b.toggle,
 )

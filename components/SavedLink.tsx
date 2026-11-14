@@ -8,9 +8,12 @@ import { haptic } from '@/lib/haptic'
 import { EqBars } from './EqBars'
 import { OPEN_SAVED, autoplaySaved, useSavedPlayerSelect } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
+import { OWN_AUDIO } from '@/lib/flags'
+import { useTube } from '@/lib/youtube'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
-const load = () => import('./SavedPanel')
+// YouTube (lib/flags.ts): novi plejer s videom; stari (špil, mini plejer) samo uz vlastite pjesme
+const load = () => (OWN_AUDIO ? import('./SavedPanel') : import('./tube/TubePanel'))
 const SavedPanel = dynamic(load, { ssr: false })
 
 /**
@@ -30,7 +33,9 @@ export function SavedLink() {
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
   // samo svira li — otvaranje i spuštanje panela ne crtaju zaglavlje iznova
-  const playing = useSavedPlayerSelect((s) => s.playing)
+  const own = useSavedPlayerSelect((s) => s.playing)
+  const tube = useTube().status === 'playing'
+  const playing = OWN_AUDIO ? own : tube
   // stalni (useCallback) — panel i sadržaj (memo) se ne crtaju iznova zbog njih
   const onOpen = useCallback(() => setOpen(true), [])
   const onClose = useCallback(() => setOpen(false), [])
@@ -45,7 +50,7 @@ export function SavedLink() {
     const show = () => {
       setUsed(true)
       setOpen(true)
-      autoplaySaved()
+      if (OWN_AUDIO) autoplaySaved()
     }
     window.addEventListener(OPEN_SAVED, show)
     return () => window.removeEventListener(OPEN_SAVED, show)
@@ -70,8 +75,8 @@ export function SavedLink() {
                 haptic(8)
                 setUsed(true)
                 setOpen(true)
-                // otvoren plejer svira — iz ovog dodira (iPhone)
-                autoplaySaved()
+                // otvoren plejer svira — iz ovog dodira (iPhone); YouTube plejer to radi sam
+                if (OWN_AUDIO) autoplaySaved()
               }}
               aria-label={`Player pjesama (${count})`}
               title="Player pjesama"

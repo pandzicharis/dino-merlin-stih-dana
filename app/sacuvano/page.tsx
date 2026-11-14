@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+import { OWN_AUDIO } from '@/lib/flags'
 import { PageShell } from '@/components/PageShell'
 import { SavedVerses } from '@/components/SavedVerses'
 import { allVerses } from '@/lib/catalog'
@@ -13,6 +15,8 @@ export const metadata: Metadata = { title: 'Sačuvani stihovi' }
 export const revalidate = 3600
 
 export default async function SacuvanoPage() {
+  // stari plejer (špil) samo uz vlastite pjesme — inače je plejer na početnoj
+  if (!OWN_AUDIO) redirect('/')
   const verses = await allVerses()
   return (
     <PageShell eyebrow="Sačuvani stihovi" title="Player pjesama">

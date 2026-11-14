@@ -48,12 +48,15 @@ export function DrawerHeader({
   eyebrow,
   title,
   onClose,
+  minimize = false,
   className = '',
 }: {
   icon: ReactNode
   eyebrow: string
   title: string
   onClose: () => void
+  /** spusti umjesto zatvori — strelica nadolje (pjesma u sačuvanima čeka spuštena) */
+  minimize?: boolean
   className?: string
 }) {
   return (
@@ -72,10 +75,16 @@ export function DrawerHeader({
             {title}
           </p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Zatvori" data-drawer-close className={ROUND}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-            <path d="M6 6l12 12M18 6 6 18" />
-          </svg>
+        <button type="button" onClick={onClose} aria-label={minimize ? 'Spusti' : 'Zatvori'} data-drawer-close className={ROUND}>
+          {minimize ? (
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          ) : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          )}
         </button>
       </div>
     </div>

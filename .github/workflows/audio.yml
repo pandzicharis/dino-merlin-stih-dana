@@ -93,8 +93,10 @@ jobs:
           SYNC_SONGS: ${{ github.event.client_payload.songs }}
         run: npx -y tsx@4.23.13 scripts/audio-sync.ts
 
+      # Pjesme idu preko YouTube plejera (lib/youtube.ts) — vlastiti fajlovi
+      # samo uz licencu: repo varijabla FF_OWN_AUDIO=1 ih vraća (lib/flags.ts)
       - name: Preuzmi pjesme koje fale
-        if: github.event.action == 'audio' || github.event_name == 'workflow_dispatch'
+        if: vars.FF_OWN_AUDIO == '1' && (github.event.action == 'audio' || github.event_name == 'workflow_dispatch')
         # naziv i link idu kroz env, ne u skriptu — bez ubacivanja u shell
         env:
           STIH_AUDIO_FETCH: '1'
@@ -106,7 +108,7 @@ jobs:
       # Ne uspije li, aplikacija je pušta s Vercela (rezerva u lib/player.ts),
       # a commit ide svejedno. Tajne: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
       - name: Pjesme na Cloudflare
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && vars.FF_OWN_AUDIO == '1' }}
         continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -122,7 +124,8 @@ jobs:
         # i kad neka pjesma ne prođe — one koje jesu idu gore
         if: ${{ !cancelled() }}
         run: |
-          git add -A public/audio data/audio.json data/audio-alias.json data/lyrics.json
+          # public/audio nije u repou (.gitignore) — pjesme se ne objavljuju
+          git add -A data/audio.json data/audio-alias.json data/lyrics.json
           if git diff --cached --quiet; then
             echo "Nema novih pjesama."
             exit 0

@@ -19,6 +19,8 @@ import { CardAtmosphere } from './CardAtmosphere'
 import { FavoriteButton } from './FavoriteButton'
 import { ShareButton } from './ShareSheet'
 import { SongCredit } from './SongCredit'
+import { OWN_AUDIO } from '@/lib/flags'
+import { TubeSong } from './tube/TubeSong'
 import { Signature } from './Signature'
 import { MagazaLogo } from './MagazaLogo'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
@@ -502,7 +504,7 @@ function GiftCard({
 
                 {/* gramofon — kao ispod stiha, s crticom */}
                 <div className="flex flex-col items-center gap-6 text-center">
-                  <SongCredit verse={verse} />
+                  {OWN_AUDIO ? <SongCredit verse={verse} /> : <TubeSong verse={verse} scope="gift" z={119} />}
                   <span className="h-px w-16 shrink-0" style={{ background: `linear-gradient(to right, transparent, ${m.accent}59, transparent)` }} aria-hidden />
                 </div>
               </div>

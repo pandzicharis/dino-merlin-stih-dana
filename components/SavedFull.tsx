@@ -6,7 +6,7 @@ import type { Verse } from '@/data/verses'
 import { MOODS } from '@/data/moods'
 import { haptic } from '@/lib/haptic'
 import { swallowClick } from '@/lib/tap'
-import { CardFace } from './SavedCarousel'
+import { CARD_RATIO, CardFace } from './SavedCarousel'
 import { lockScroll } from '@/lib/scroll-lock'
 
 /*
@@ -142,7 +142,8 @@ function swap(el: HTMLElement, toBig: boolean, total: number, lead = 0, curve?: 
   })
 }
 
-type Opened = { verse: Verse; from: Rect; n: number }
+/** `rise`: otvoren s papirića — izađe odozdo kao ladica (ne raste iz papirića), bez dugmeta raširi/skupi */
+type Opened = { verse: Verse; from: Rect; n: number; rise?: boolean }
 /** otvaranje ide pravo u sloj raširene karte — špil i plejer se ne crtaju iznova */
 let show: ((o: Opened | null) => void) | null = null
 let opened = 0
@@ -154,6 +155,14 @@ export function useSavedFull(saved: Verse[] = []): { open: (verse: Verse) => voi
     if (!card) return
     haptic(6)
     const r = card.getBoundingClientRect()
+    // papirić (sačuvani preko YouTubea — components/tube/TubeViews.tsx) je širok i nizak:
+    // stih izađe odozdo kao ladica, iste veličine kao karta iz špila (ne raste iz papirića)
+    if (r.width > r.height) {
+      const w = Math.min(innerWidth - 148, 320)
+      const h = w * CARD_RATIO
+      show?.({ verse, from: { left: (innerWidth - w) / 2, top: innerHeight - h, width: w, height: h, visible: h }, n: ++opened, rise: true })
+      return
+    }
     // plejer ispod špila prekriva dno karte — kopija počinje (i sleti) iznad njega
     const player = document.querySelector('[data-player]')?.getBoundingClientRect()
     const visible = player && player.top > r.top ? Math.min(r.height, player.top - r.top) : r.height
@@ -181,18 +190,20 @@ function SavedFullLayer({ saved }: { saved: Verse[] }) {
     behind = behind.filter((v, d) => behind.findIndex((x) => x.id === v.id) === d)
   }
 
-  return full && <SavedFull key={full.n} verse={full.verse} from={full.from} behind={behind} onClosed={done} />
+  return full && <SavedFull key={full.n} verse={full.verse} from={full.from} behind={behind} rise={full.rise} onClosed={done} />
 }
 
 function SavedFull({
   verse,
   from,
   behind,
+  rise = false,
   onClosed,
 }: {
   verse: Verse
   from: Rect
   behind: Verse[]
+  rise?: boolean
   onClosed: () => void
 }) {
   const box = useRef<HTMLDivElement>(null)
@@ -233,6 +244,26 @@ function SavedFull({
       el.querySelectorAll<HTMLElement>('[data-grow]').forEach((n) => (n.style.transform = n.dataset.grow!))
       return
     }
+    // s papirića: karta izađe odozdo kao ladica (velika od početka), stvari velike se pretope
+    if (rise) {
+      const down = `translateY(${innerHeight - top}px)`
+      el.style.transform = down
+      el.querySelectorAll<HTMLElement>('[data-small]').forEach((n) => (n.style.visibility = 'hidden'))
+      const go = requestAnimationFrame(() => {
+        el.style.transform = ''
+        el.animate([{ transform: down }, { transform: 'none' }], { duration: 520, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'backwards' })
+        el.querySelectorAll<HTMLElement>('[data-big]').forEach((n) => {
+          n.style.visibility = ''
+          n.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 260, fill: 'both' })
+        })
+        el.querySelectorAll<HTMLElement>('[data-drop]').forEach((n) => (n.style.transform = `translateY(${n.dataset.drop}em)`))
+        el.querySelectorAll<HTMLElement>('[data-grow]').forEach((n) => (n.style.transform = n.dataset.grow!))
+        moving(el, 520)
+        shade.current?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, fill: 'backwards' })
+        for (const n of [extras.current, grab.current]) n?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, delay: 360, fill: 'backwards' })
+      })
+      return () => cancelAnimationFrame(go)
+    }
     // sve što se pojavljuje — nevidljivo od prvog kadra (bez bljeska zatamnjenja)
     const fading = [shade.current, extras.current, grab.current]
     el.style.transform = small
@@ -266,7 +297,7 @@ function SavedFull({
       cancelAnimationFrame(a)
       cancelAnimationFrame(b)
     }
-  }, [small, cut, back])
+  }, [small, cut, back, rise, top])
 
   /** smanji nazad tačno na malu kartu (i iz povučenog položaja), pa zatvori */
   const close = useCallback(
@@ -278,6 +309,13 @@ function SavedFull({
       if (!el || still()) return onClosed()
       // spuštena prstom: nastavi kretnju odmah, bez sporog početka
       const curve = fromTransform === 'none' ? CLOSE : FLING
+      // s papirića: ode nadolje kao ladica
+      if (rise) {
+        for (const n of [extras.current, grab.current]) n?.animate([{ opacity: Number(n.style.opacity || 1) }, { opacity: 0 }], { duration: 200, fill: 'forwards' })
+        shade.current?.animate([{ opacity: Number(shade.current.style.opacity || 1) }, { opacity: 0 }], { ...curve, fill: 'forwards' })
+        el.animate([{ transform: fromTransform }, { transform: `translateY(${innerHeight - top}px)` }], { ...curve, fill: 'forwards' }).finished.then(onClosed, onClosed)
+        return
+      }
       for (const n of [extras.current, grab.current])
         n?.animate([{ opacity: Number(n.style.opacity || 1) }, { opacity: 0 }], { duration: curve.duration * 0.4, easing: 'ease-out', fill: 'forwards' })
       // sleti tačno na malu kartu, pa se kratko pretopi u nju — bez treptaja.
@@ -295,7 +333,7 @@ function SavedFull({
       moving(el, curve.duration + SETTLE)
       shade.current?.animate([{ opacity: Number(shade.current.style.opacity || 1) }, { opacity: 0 }], { ...curve, fill: 'forwards' })
     },
-    [small, k, cut, back, onClosed, verse.id, from.width, left, top],
+    [small, k, cut, back, onClosed, verse.id, from.width, left, top, rise],
   )
   const collapse = useCallback(() => close(), [close])
 
@@ -415,7 +453,7 @@ function SavedFull({
                 smanjivanje i odsijecanje dna tokom kretnje je onda samo posao
                 GPU-a, bez ponovnog crtanja pozadine, slova i sjenki */}
             <div style={{ width: from.width, height: H / k, zoom: k, '--cw': `${from.width}px` } as CSSProperties}>
-              <CardFace verse={verse} onCollapse={collapse} actionsZoom={1 / k} />
+              <CardFace verse={verse} onCollapse={collapse} actionsZoom={1 / k} toggle={!rise} />
             </div>
           </div>
         </div>

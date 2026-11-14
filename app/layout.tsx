@@ -23,6 +23,8 @@ import {
 } from 'next/font/google'
 import { SITE_URL } from '@/lib/site'
 import { Toaster } from '@/components/Toast'
+import { TubeStage } from '@/components/tube/TubeStage'
+import { OWN_AUDIO } from '@/lib/flags'
 import './globals.css'
 import { HOME_IMAGE, OG_BASE } from '@/lib/og'
 
@@ -148,6 +150,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         {/* poruke (nova verzija, obavijesti, dijeljenje) — components/Toast.tsx */}
         <Toaster />
+        {/* YouTube plejer — jedan za cijelu aplikaciju (lib/youtube.ts) */}
+        {!OWN_AUDIO && <TubeStage />}
       </body>
     </html>
   )

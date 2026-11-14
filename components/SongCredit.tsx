@@ -385,7 +385,8 @@ function useSong({
  * Gramofonska ploča sa zlatnom etiketom (play/pauza) i prstenom napretka —
  * vrti se dok pjesma svira i stane tačno gdje je pauzirana.
  */
-function Vinyl({
+/* i ispod stiha kad pjesma ide preko YouTubea (components/tube/TubeSong.tsx) */
+export function Vinyl({
   size,
   state,
   progress,

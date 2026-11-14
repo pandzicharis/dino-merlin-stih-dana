@@ -21,6 +21,7 @@ import { audioSlug, youtubeId } from './text'
 import BUNDLED from '../data/audio.json'
 import BUNDLED_ALIAS from '../data/audio-alias.json'
 import { audioFile } from './audio-name'
+import { OWN_AUDIO } from './flags'
 import { storeLyrics, updateLyrics } from './lyrics-store'
 
 const ROOT = process.cwd()
@@ -81,6 +82,8 @@ export async function songState(song: string, durations?: Record<string, number>
  * Pjesma bez YouTube linka se traži kao "Dino Merlin <naziv>".
  */
 export function prepareSong(song: string, youtube?: string): Promise<void> {
+  // preuzimanje pjesama samo uz vlastite pjesme (lib/flags.ts)
+  if (!OWN_AUDIO) return Promise.reject(new Error('Pjesme idu preko YouTubea — preuzimanje je isključeno (FF_OWN_AUDIO).'))
   if (!audioSlug(song)) return Promise.reject(new Error('Pjesma nema naziv.'))
   return readAlias().then((alias) => prepareFile(audioFile(song, alias), song, youtube))
 }

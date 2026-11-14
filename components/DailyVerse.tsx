@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useReducedMotion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { useDevParams } from '@/lib/client-store'
-import { isProbe, markSeen, unseat, useDraw, type ListVerse } from '@/lib/draw'
-import { bumpStreak, noteOpen, peekStreak, setLastSeen } from '@/lib/storage'
+import { isProbe, markOpen, markSeen, unseat, useDraw, useStreak, type ListVerse } from '@/lib/draw'
+import { noteOpen } from '@/lib/storage'
 import { primeVerses } from '@/lib/verses-client'
 import { AUTOPLAY } from '@/lib/player'
 import { isFirstVerse } from '@/lib/text'
@@ -28,8 +28,6 @@ import { INTRO_DONE, IntroHost, playDraw } from './IntroSplash'
  * stih za danas i zapamti ga. Prvo otvaranje u danu ide uz animaciju
  * izvlačenja. Prezentacija i dev `?verse=` i dalje pokazuju tačno zadani stih.
  */
-const noop = () => () => {}
-
 export function DailyVerse({
   serverDate,
   verses,
@@ -121,6 +119,18 @@ export function DailyVerse({
     playDraw()
   }, [fresh, drawnId, date, reduced])
 
+  // stih na ekranu — ujutro je to još jučerašnji, s današnjim datumom: i taj
+  // dan se računa u niz (lib/draw.ts `markOpen`), i kad se samo vrati iz pozadine
+  useEffect(() => {
+    if (verseId || !drawnId || fresh) return
+    const open = () => {
+      if (document.visibilityState === 'visible') markOpen(date)
+    }
+    open()
+    document.addEventListener('visibilitychange', open)
+    return () => document.removeEventListener('visibilitychange', open)
+  }, [verseId, drawnId, fresh, date])
+
   // PRAVILO: dok ima nepročitana obavijest (oznaka iz service workera,
   // tačka na ikonici), svako otvaranje je tombola — i kad je stih danas već
   // viđen. Briše se tek kad papirić sleti (`land`). Na dan instalacije stih
@@ -194,13 +204,8 @@ export function DailyVerse({
   // roditeljevih, pa bi footer s plejerom čekao poseban fetch i kasnio
   if (typeof window !== 'undefined') primeVerses(verses)
 
-  // niz dana zaredom (na serveru 0) — zapiše se prije `setLastSeen`, da
-  // prvi put zna je li stih otvoren i jučer
-  const streak = useSyncExternalStore(noop, () => peekStreak(date), () => 0)
-  useEffect(() => {
-    bumpStreak(date)
-    setLastSeen(date)
-  }, [date])
+  // niz dana zaredom — iz istorije izvučenih, raste kad papirić sleti
+  const streak = useStreak(date)
 
   const tone = mood ?? verse?.mood ?? 'nostalgija'
   // ostali aktivni stihovi — papirići u gomili na prvom otvaranju

@@ -202,10 +202,10 @@ export function useSheetDrag(onClose: () => void, open: boolean, { passive = fal
  * Sloj preko ekrana. Čim se panel zatvara, dodiri prolaze do ekrana ispod —
  * ne čekaju da se kretnja smiri do kraja.
  */
-export function SheetLayer({ children, className }: { children: ReactNode; className: string }) {
+export function SheetLayer({ children, className, z }: { children: ReactNode; className: string; z?: number }) {
   const present = useIsPresent()
   return (
-    <div className={className} style={{ pointerEvents: present ? undefined : 'none' }}>
+    <div className={className} style={{ pointerEvents: present ? undefined : 'none', zIndex: z }}>
       {children}
     </div>
   )
@@ -270,11 +270,14 @@ export function SheetSlide({
   children,
   away = false,
   rise = false,
+  edge = false,
   onShown,
 }: {
   children: ReactNode
   away?: boolean
   rise?: boolean
+  /** na telefonu od ivice do ivice (bez 440 px) — ladice pjesme i sačuvanih */
+  edge?: boolean
   /** panel je sjeo (otvaranje gotovo) */
   onShown?: () => void
 }) {
@@ -313,7 +316,7 @@ export function SheetSlide({
   const resume = { ...shown, opacity: 1, visibility: 'visible' as const, transition: rise ? RISE : OPEN }
   return (
     <motion.div
-      className="relative flex w-full max-w-[440px] justify-center"
+      className={`relative flex w-full justify-center ${edge ? 'sm:max-w-[440px]' : 'max-w-[440px]'}`}
       style={{ willChange: 'transform' }}
       // `away`: panel stalno montiran, sklonjen ispod ekrana — kad sjedne
       // dolje, ne crta se (visibility), a otvara se bez ikakvog slaganja
