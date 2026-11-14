@@ -103,7 +103,7 @@ export function SavedCarousel({
   side?: number
   /** ispod špila uvijek "2 / 22" (i kad je karata malo) */
   count?: boolean
-  /** zauzme visinu svog mjesta: karta gore, "2 / 22" na sredini prostora ispod nje (u sačuvanima — između karte i dugmadi) */
+  /** zauzme visinu svog mjesta: karta gore, "2 / 22" malo iznad sredine prostora ispod nje (u sačuvanima — između karte i dugmadi) */
   even?: boolean
   /** mala karta je visoka ovoliko (em od W, do SH): prazno dno se odsiječe — kraj karte odmah ispod albuma; veličina i raspored ostaju */
   cut?: number
@@ -376,11 +376,13 @@ export function SavedCarousel({
   return (
     <div
       // do ruba ekrana — karta što šira, a susjedne vire sa strane
-      className={`-mx-5 flex flex-col items-center ${even ? 'min-h-0 flex-1' : ''}`}
+      // `even`: broj na sredini prostora ispod karte, podignut (24 px dole ne računa)
+      className={`-mx-5 flex flex-col items-center ${even ? 'min-h-0 flex-1 pb-6' : ''}`}
       style={
         {
           containerType: 'inline-size',
-          '--cw': `min(calc(${size} * ${W / SH}), calc(100cqw - ${side * 2}px))`,
+          // `size` je visina karte koja se vidi (odsječena — `cut`) — širina iz nje
+          '--cw': `min(calc(${size} * ${W / cut}), calc(100cqw - ${side * 2}px))`,
         } as CSSProperties
       }
     >
@@ -432,7 +434,7 @@ export function SavedCarousel({
           </div>
         ) : (
           // `even`: na sredini prostora ispod karte (u sačuvanima — tačno između kraja karte i dugmadi)
-          <p className={`tabular text-[11px] tracking-[0.2em] text-white/50 ${even ? 'my-auto flex h-4 shrink-0 items-center' : 'mt-3 h-6'}`}>
+          <p className={`tabular tracking-[0.2em] text-white/50 ${even ? 'my-auto flex h-5 shrink-0 items-center text-[14px]' : 'mt-3 h-6 text-[11px]'}`}>
             {cur + 1} / {verses.length}
           </p>
         ))}
@@ -784,11 +786,24 @@ function CardFaceView({
         </p>
       </div>
 
-      {/* rub male karte (i na raširenoj u prvom kadru) — pretopi se u rub velike */}
+      {/* rub male karte (i na raširenoj u prvom kadru) — pretopi se u rub velike;
+          odsječena karta (preko YouTubea): lijevi i desni rub jači i iznad pretapanja,
+          skoro do dna — tek pri dnu se pretope, donja linija se ne vidi */}
       <span
         data-small
-        className={`pointer-events-none absolute inset-x-0 top-0 rounded-[26px] border ${front ? 'border-white/15' : 'border-white/30'}`}
-        style={{ ...layer, height: `${cut}em` }}
+        className={`pointer-events-none absolute inset-x-0 top-0 rounded-[26px] border ${
+          cut < SH ? `z-[2] ${front ? 'border-white/25' : 'border-white/35'}` : front ? 'border-white/15' : 'border-white/30'
+        }`}
+        style={{
+          ...layer,
+          height: `${cut}em`,
+          ...(cut < SH
+            ? {
+                maskImage: 'linear-gradient(180deg, #000 0, #000 calc(100% - 150em), transparent calc(100% - 2em))',
+                WebkitMaskImage: 'linear-gradient(180deg, #000 0, #000 calc(100% - 150em), transparent calc(100% - 2em))',
+              }
+            : {}),
+        }}
         aria-hidden
       />
       <span
@@ -803,7 +818,18 @@ function CardFaceView({
       <span
         data-small
         className="pointer-events-none absolute inset-x-[-1px]"
-        style={{ ...layer, top: `${cut - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }}
+        // odsječena karta (preko YouTubea — ispod nje nema plejera): pretapanje kao gradijent —
+        // sve crnje prema dnu (do 85 %), bez pune crne
+        style={
+          cut < SH
+            ? {
+                ...layer,
+                top: `${cut - 170}em`,
+                height: '171em',
+                background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.3) 40%, rgba(12,11,11,0.6) 75%, rgba(12,11,11,0.85) 100%)',
+              }
+            : { ...layer, top: `${cut - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }
+        }
         aria-hidden
       />
 

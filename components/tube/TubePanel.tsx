@@ -65,13 +65,14 @@ function sheetSizes(): { low: number; full: number } {
 /** zapamćen prikaz */
 const VIEW = 'stihdana:tubeView'
 /**
- * karta u špilu (cijela, prije nego joj se odsiječe prazno dno — `CARD_CUT`):
- * visina prikaza (`cqh` — prikaz je kontejner; bez 20 px iznad karte, a do
- * samih dugmadi) bez 56 px. Karta završi odmah ispod albuma, a broj "x / x"
- * je na sredini između kraja karte i dugmadi. Spuštena pjesma (traka iznad
- * dugmadi) prikaz smanji — karta se smanji s njim.
+ * karta u špilu — ista kao u plejeru iza prekidača (raspored, stih, razmaci), samo
+ * odsječena ispod albuma (`CARD_CUT`): visoka koliko se vidi u prikazu (`cqh` —
+ * prikaz je kontejner: bez 20 px iznad karte, a do samih dugmadi), a ispod nje
+ * 72 px — broj "x / x" (20 px) je malo iznad sredine između kraja karte i
+ * dugmadi. Susjedne vire 38 px (ne 54) — karta je šira, pa i viša. Spuštena
+ * pjesma (traka iznad dugmadi) prikaz smanji — karta se smanji s njim.
  */
-const CARD = 'calc(100cqh - 56px)'
+const CARD = 'calc(100cqh - 72px)'
 
 /**
  * Sačuvani stihovi (YouTube — lib/youtube.ts): ladica kao postavke i
@@ -296,7 +297,7 @@ export default function TubePanel({ open, onClose }: { open: boolean; onOpen: ()
                       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     >
                       {view === 'cards' ? (
-                        <SavedCarousel verses={list} size={CARD} cut={CARD_CUT} onOpen={full.open} count even lead />
+                        <SavedCarousel verses={list} size={CARD} cut={CARD_CUT} side={38} onOpen={full.open} count even lead />
                       ) : view === 'slips' ? (
                         <Slips verses={list} onPick={full.open} />
                       ) : view === 'list' ? (
