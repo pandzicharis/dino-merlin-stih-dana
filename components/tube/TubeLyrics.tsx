@@ -217,7 +217,8 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
     )
 
   // gore kratko pretapanje i malo mjesta — tekst počinje odmah ispod trake "Tekst pjesme"
-  const fade = 'linear-gradient(180deg, transparent 0, #000 5%, #000 78%, transparent 100%)'
+  // dole kraće pretapanje i manje praznog — kraj teksta usklađen s početkom
+  const fade = 'linear-gradient(180deg, transparent 0, #000 5%, #000 87%, transparent 100%)'
   return (
     <div
       ref={scroller}
@@ -225,7 +226,7 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
       className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 text-center [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ maskImage: fade, WebkitMaskImage: fade }}
     >
-      <div className="pb-[60%] pt-5">
+      <div className="pb-20 pt-5">
         {items.map(({ i }, j) => {
           const text = i < 0 ? '' : lines[i]
           // pauza (početak, između strofa): znak muzike, s razmakom oko sebe. S vremenom

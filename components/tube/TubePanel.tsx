@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useIsPresent } from 'motion/react'
 import { albumOf } from '@/data/albums'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
@@ -12,7 +12,7 @@ import { lockScroll } from '@/lib/scroll-lock'
 import { pruneFavorites } from '@/lib/storage'
 import { loadVerses } from '@/lib/verses-client'
 import { closeTube, minimizeTube, openTube, tubeSnap, tubeVerse, useTube } from '@/lib/youtube'
-import { SavedCarousel } from '../SavedCarousel'
+import { CARD_CUT, SavedCarousel } from '../SavedCarousel'
 import { useSavedFull } from '../SavedFull'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from '../Sheet'
 import { DrawerHeader } from '../DrawerIcon'
@@ -23,6 +23,27 @@ import { NowPlaying, SongBackdrop } from './NowPlaying'
 import { Albums, Slips, SongList, VIEWS, searchSongs, uniqueSongs, type TubeView } from './TubeViews'
 
 const SCOPE = 'saved'
+
+/**
+ * Pjesma u istoj ladici kao sačuvani — nije druga ladica preko njih: sadržaj
+ * se pretopi (i nazad) dok ladica glatko mijenja visinu. Dok odlazi, `inert` —
+ * video (TubeStage) se skloni odmah, a slika pjesme ispod njega izblijedi sa slojem.
+ */
+function SongLayer({ children }: { children: ReactNode }) {
+  const present = useIsPresent()
+  return (
+    <motion.div
+      className="absolute inset-0 z-20 flex flex-col overflow-hidden bg-[#0c0b0b]"
+      inert={!present}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+    >
+      {children}
+    </motion.div>
+  )
+}
 
 /** visina izreza na vrhu ekrana (safe area) */
 function safeTop(): number {
@@ -44,12 +65,13 @@ function sheetSizes(): { low: number; full: number } {
 /** zapamćen prikaz */
 const VIEW = 'stihdana:tubeView'
 /**
- * karta u špilu: visina prikaza (`cqh` — prikaz je kontejner; bez 20 px iznad
- * karte, a do samih dugmadi) bez 40 px za broj ispod nje (12 + 16 + 12).
- * Uska karta (vire susjedne) je niža — spusti se, broj ostaje na sredini do dugmadi.
- * Spuštena pjesma (traka iznad dugmadi) prikaz smanji — karta se smanji s njim.
+ * karta u špilu (cijela, prije nego joj se odsiječe prazno dno — `CARD_CUT`):
+ * visina prikaza (`cqh` — prikaz je kontejner; bez 20 px iznad karte, a do
+ * samih dugmadi) bez 56 px. Karta završi odmah ispod albuma, a broj "x / x"
+ * je na sredini između kraja karte i dugmadi. Spuštena pjesma (traka iznad
+ * dugmadi) prikaz smanji — karta se smanji s njim.
  */
-const CARD = 'calc(100cqh - 40px)'
+const CARD = 'calc(100cqh - 56px)'
 
 /**
  * Sačuvani stihovi (YouTube — lib/youtube.ts): ladica kao postavke i
@@ -266,15 +288,15 @@ export default function TubePanel({ open, onClose }: { open: boolean; onOpen: ()
                       data-pane={view}
                       // u svakom prikazu prvo je 20 px ispod zaglavlja (i ispod pretrage): karta,
                       // album, papirić, omot prve pjesme (red ima svojih 10 px iznad omota).
-                      // Karte: prikaz seže do samih dugmadi (-mb-3 preko njihovog razmaka), karta je
-                      // dolje, a broj "x / x" na sredini između karte i dugmadi (12 px gore i dolje)
-                      className={`min-h-0 flex-1 px-5 ${view === 'cards' ? '-mb-3 flex flex-col justify-end overflow-hidden pt-5 [container-type:size]' : view === 'albums' ? 'overflow-hidden pt-4' : `overflow-y-auto overflow-x-hidden overscroll-none ${view === 'list' ? 'pt-1.5' : 'pt-4'}`}`}
+                      // Karte: prikaz seže do samih dugmadi (-mb-3 preko njihovog razmaka), karta
+                      // gore, a broj "x / x" na sredini između kraja karte i dugmadi
+                      className={`min-h-0 flex-1 px-5 ${view === 'cards' ? '-mb-3 flex flex-col overflow-hidden pt-5 [container-type:size]' : view === 'albums' ? 'overflow-hidden pt-4' : `overflow-y-auto overflow-x-hidden overscroll-none ${view === 'list' ? 'pt-1.5' : 'pt-4'}`}`}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     >
                       {view === 'cards' ? (
-                        <SavedCarousel verses={list} size={CARD} onOpen={full.open} count even lead />
+                        <SavedCarousel verses={list} size={CARD} cut={CARD_CUT} onOpen={full.open} count even lead />
                       ) : view === 'slips' ? (
                         <Slips verses={list} onPick={full.open} />
                       ) : view === 'list' ? (
@@ -347,20 +369,14 @@ export default function TubePanel({ open, onClose }: { open: boolean; onOpen: ()
                 <p className="flex flex-1 items-center justify-center px-10 text-center text-[13px] text-white/45">{verses ? 'Još nema sačuvanih stihova' : ''}</p>
               )}
 
-              {/* pjesma — druga ladica iste veličine izađe preko ove; strelica je spusti u traku */}
+              {/* pjesma — ista ladica, drugi sadržaj: pretopi se preko sačuvanih dok ladica
+                  mijenja visinu (i nazad); strelica je spusti u traku */}
               <AnimatePresence>
                 {song && tube.videoId && (
-                  <motion.div
-                    key="song"
-                    className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-t-[30px] border-t border-white/10 bg-[#0c0b0b] sm:rounded-[30px]"
-                    initial={{ y: '100%' }}
-                    animate={{ y: 0 }}
-                    exit={{ y: '100%' }}
-                    transition={{ type: 'spring', stiffness: 320, damping: 36 }}
-                  >
+                  <SongLayer key="song">
                     <SongBackdrop verse={song} />
                     <NowPlaying verse={song} id={tube.videoId} onClose={minimizeTube} onHeight={setSongH} minimize />
-                  </motion.div>
+                  </SongLayer>
                 )}
               </AnimatePresence>
             </motion.div>

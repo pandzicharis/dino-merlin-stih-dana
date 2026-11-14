@@ -42,6 +42,12 @@ const H = 620
 const SH = 590
 /** visina karte u špilu prema širini (raširena karta iz papirića — components/SavedFull.tsx) */
 export const CARD_RATIO = SH / W
+/**
+ * Mala karta koja završi odmah ispod albuma (`cut` — sačuvani preko YouTubea,
+ * components/tube/TubePanel.tsx): naziv i album su ~442–490 em od vrha, karta
+ * ~26 em ispod njih. Prazno dno (pod plejerom u starom plejeru) se odsiječe.
+ */
+export const CARD_CUT = SH - 74
 /** mjesto sa svake strane prednje karte — tu vire susjedne */
 const SIDE = 54
 /** zraka unutar karte, lijevo i desno (em od W) */
@@ -86,6 +92,7 @@ export function SavedCarousel({
   dots = true,
   count = false,
   even = false,
+  cut = SH,
   expand = true,
   side = SIDE,
   lead = false,
@@ -96,8 +103,10 @@ export function SavedCarousel({
   side?: number
   /** ispod špila uvijek "2 / 22" (i kad je karata malo) */
   count?: boolean
-  /** "2 / 22" s istim razmakom iznad i ispod (12 px) — u sačuvanima tačno između karte i dugmadi */
+  /** zauzme visinu svog mjesta: karta gore, "2 / 22" na sredini prostora ispod nje (u sačuvanima — između karte i dugmadi) */
   even?: boolean
+  /** mala karta je visoka ovoliko (em od W, do SH): prazno dno se odsiječe — kraj karte odmah ispod albuma; veličina i raspored ostaju */
+  cut?: number
   /** prva karta od lijeve ivice (kao sadržaj ladice), ne na sredini — ostale na sredini */
   lead?: boolean
   /** dugme "Raširi" na prednjoj karti — bez njega dodir na kartu i dalje zove `onOpen` (sačuvani preko YouTubea: otvori pjesmu) */
@@ -367,7 +376,7 @@ export function SavedCarousel({
   return (
     <div
       // do ruba ekrana — karta što šira, a susjedne vire sa strane
-      className="-mx-5 flex flex-col items-center"
+      className={`-mx-5 flex flex-col items-center ${even ? 'min-h-0 flex-1' : ''}`}
       style={
         {
           containerType: 'inline-size',
@@ -382,7 +391,7 @@ export function SavedCarousel({
         ref={strip}
         data-hscroll
         className="relative flex w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ height: `calc(var(--cw) * ${SH / W})`, gap: STRIP_GAP, touchAction: 'pan-x' }}
+        style={{ height: `calc(var(--cw) * ${cut / W})`, gap: STRIP_GAP, touchAction: 'pan-x' }}
       >
         {/* razmak do prve/zadnje karte — da i one stanu na sredinu (`lead`: prva uz lijevu ivicu) */}
         <div aria-hidden className="shrink-0" style={{ width: lead ? 20 - STRIP_GAP : `calc((100% - var(--cw)) / 2 - ${STRIP_GAP}px)` }} />
@@ -396,6 +405,7 @@ export function SavedCarousel({
             onOpen={open}
             onPick={go}
             expand={expand}
+            cut={cut}
           />
         ))}
         <div aria-hidden className="shrink-0" style={{ width: `calc((100% - var(--cw)) / 2 - ${STRIP_GAP}px)` }} />
@@ -421,8 +431,8 @@ export function SavedCarousel({
             ))}
           </div>
         ) : (
-          // `even`: isti razmak iznad i ispod (u sačuvanima — tačno između karte i dugmadi)
-          <p className={`tabular text-[11px] tracking-[0.2em] text-white/50 ${even ? 'my-3 flex h-4 shrink-0 items-center' : 'mt-3 h-6'}`}>
+          // `even`: na sredini prostora ispod karte (u sačuvanima — tačno između kraja karte i dugmadi)
+          <p className={`tabular text-[11px] tracking-[0.2em] text-white/50 ${even ? 'my-auto flex h-4 shrink-0 items-center' : 'mt-3 h-6'}`}>
             {cur + 1} / {verses.length}
           </p>
         ))}
@@ -470,6 +480,7 @@ const Card = memo(function Card({
   onOpen,
   onPick,
   expand,
+  cut,
 }: {
   verse: Verse
   index: number
@@ -478,6 +489,7 @@ const Card = memo(function Card({
   onOpen?: (verse: Verse) => void
   onPick: (i: number) => void
   expand: boolean
+  cut: number
 }) {
   // daleko od sredine: samo mjesto za zaustavljanje, u boji karte — bez sloja i sadržaja
   if (!full) {
@@ -516,7 +528,7 @@ const Card = memo(function Card({
           style={front ? undefined : { pointerEvents: 'none' }}
           {...tap}
         >
-          <CardFace verse={verse} o={0} onOpen={expand ? onOpen : undefined} />
+          <CardFace verse={verse} o={0} onOpen={expand ? onOpen : undefined} cut={cut} />
         </div>
       </div>
     </div>
@@ -535,9 +547,12 @@ function CardFaceView({
   onCollapse,
   actionsZoom,
   toggle = true,
+  cut = SH,
 }: {
   verse: Verse
   o?: number
+  /** mala karta visoka ovoliko em (do SH) — raspored isti, prazno dno odsječeno */
+  cut?: number
   /** dugme raširi/skupi (raširen papirić ga nema — components/SavedFull.tsx) */
   toggle?: boolean
   /** "Raširi" — samo prednja karta u špilu */
@@ -632,10 +647,11 @@ function CardFaceView({
       )}
 
       <div
-        className={`absolute inset-x-0 top-0 z-[1] flex flex-col justify-between ${actionsZoom ? '' : 'bottom-0'}`}
+        className={`absolute inset-x-0 top-0 z-[1] flex flex-col justify-between ${actionsZoom || cut < SH ? '' : 'bottom-0'}`}
         // zraka od lijeve i desne ivice karte (isto za zaglavlje, stih i gramofon)
-        // donji razmak manji — stih sjedne na sredinu karte (iznad naziva pjesme)
-        style={{ padding: `26em ${SIDE_PAD}em 60em`, height: actionsZoom ? `${SH}em` : undefined }}
+        // donji razmak manji — stih sjedne na sredinu karte (iznad naziva pjesme);
+        // odsječena karta (`cut`) ima isti raspored — stih ostaje gdje je bio
+        style={{ padding: `26em ${SIDE_PAD}em 60em`, height: actionsZoom || cut < SH ? `${SH}em` : undefined }}
       >
         {/* zaglavlje — potpis | Magaza, kao na ekranu stiha; desno raširi i srce */}
         <div className="flex items-center justify-between">
@@ -772,7 +788,7 @@ function CardFaceView({
       <span
         data-small
         className={`pointer-events-none absolute inset-x-0 top-0 rounded-[26px] border ${front ? 'border-white/15' : 'border-white/30'}`}
-        style={{ ...layer, height: `${SH}em` }}
+        style={{ ...layer, height: `${cut}em` }}
         aria-hidden
       />
       <span
@@ -787,7 +803,7 @@ function CardFaceView({
       <span
         data-small
         className="pointer-events-none absolute inset-x-[-1px]"
-        style={{ ...layer, top: `${SH - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }}
+        style={{ ...layer, top: `${cut - FADE}em`, height: `${FADE + 1}em`, background: 'linear-gradient(180deg, rgba(12,11,11,0) 0%, rgba(12,11,11,0.75) 40%, #0c0b0b 68%)' }}
         aria-hidden
       />
 
@@ -808,5 +824,6 @@ export const CardFace = memo(
     a.onOpen === b.onOpen &&
     a.onCollapse === b.onCollapse &&
     a.actionsZoom === b.actionsZoom &&
-    a.toggle === b.toggle,
+    a.toggle === b.toggle &&
+    a.cut === b.cut,
 )

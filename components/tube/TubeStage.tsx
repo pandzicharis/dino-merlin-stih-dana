@@ -32,8 +32,8 @@ export function TubeStage() {
     let spot: HTMLElement | null = null
     let z = 20
     let radius = '0px'
-    // zadnje upisano — DOM se dira samo kad se nešto promijeni
-    let was = ''
+    // zadnje upisano — DOM se dira samo kad se nešto promijeni (na početku sklonjen)
+    let was = 'off'
     const frame = (now: number) => {
       // mjesto se bira rjeđe (pokrivenost), položaj prati svaki kadar
       if (now - last > 200) {
@@ -48,11 +48,12 @@ export function TubeStage() {
         else if (now - lost > 900) pauseTube()
       }
       const r = spot?.getBoundingClientRect()
-      const on = Boolean(r) && tubeShown()
+      // mjesto se upravo pojavilo (pjesma se vratila) — okvir se pretopi, ne iskoči
+      const on = Boolean(r) && tubeShown() && was !== 'off'
       const next = r ? `${Math.round(r.left)}|${Math.round(r.top)}|${Math.round(r.width)}|${Math.round(r.height)}|${z}|${on}|${radius}` : 'off'
       if (next !== was) {
         was = next
-        if (!r) b.style.visibility = 'hidden'
+        if (!r) Object.assign(b.style, { visibility: 'hidden', opacity: '0' })
         else
           Object.assign(b.style, {
             visibility: 'visible',
