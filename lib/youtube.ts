@@ -32,6 +32,8 @@ type YTPlayer = {
   getDuration(): number
   getPlaybackRate?(): number
   getVideoUrl?(): string
+  mute?(): void
+  isMuted?(): boolean
 }
 type YTApi = { Player: new (el: HTMLElement, o: Record<string, unknown>) => YTPlayer }
 
@@ -42,10 +44,12 @@ declare global {
   }
 }
 
+const UNSTARTED = -1
 const ENDED = 0
 const PLAYING = 1
 const PAUSED = 2
 const BUFFERING = 3
+const CUED = 5
 
 /* ── plejer: jedan iframe ── */
 
@@ -121,10 +125,11 @@ export type TubeStatus = 'idle' | 'loading' | 'playing' | 'paused'
  * `verseId`/`videoId`: stih i video u plejeru; `scope`: gdje je ladica otvorena;
  * `min`: ladica spuštena — pjesma čeka (stoji: bez videa na ekranu nema zvuka);
  * `list`: pjesma je iz liste (ima red — nazad, pusti, sljedeća);
- * `next`: stih sljedeće pjesme u redu, ili null
+ * `next`: stih sljedeće pjesme u redu, ili null;
+ * `muted`: svira bez zvuka — iPhone ne pušta zvuk dok se jednom ne dodirne video
  */
-export type TubeSnap = { verseId: string | null; videoId: string | null; scope: string | null; status: TubeStatus; min: boolean; list: boolean; next: string | null }
-const IDLE: TubeSnap = { verseId: null, videoId: null, scope: null, status: 'idle', min: false, list: false, next: null }
+export type TubeSnap = { verseId: string | null; videoId: string | null; scope: string | null; status: TubeStatus; min: boolean; list: boolean; next: string | null; muted: boolean }
+const IDLE: TubeSnap = { verseId: null, videoId: null, scope: null, status: 'idle', min: false, list: false, next: null, muted: false }
 let snap = IDLE
 let current: Verse | null = null
 /** red pjesama — lista iz koje je pjesma puštena (sačuvani), samo one s videom */
@@ -132,7 +137,7 @@ let queue: Verse[] = []
 const subs = new Set<() => void>()
 function set(next: Partial<TubeSnap>) {
   const s = { ...snap, ...next }
-  if (s.verseId === snap.verseId && s.videoId === snap.videoId && s.scope === snap.scope && s.status === snap.status && s.min === snap.min && s.list === snap.list && s.next === snap.next) return
+  if (s.verseId === snap.verseId && s.videoId === snap.videoId && s.scope === snap.scope && s.status === snap.status && s.min === snap.min && s.list === snap.list && s.next === snap.next && s.muted === snap.muted) return
   snap = s
   subs.forEach((f) => f())
 }
@@ -206,14 +211,34 @@ export function openTube(v: Verse, scope: string, list?: Verse[]): boolean {
     loadedId = id
     started = false
     p.loadVideoById({ videoId: id })
-    // nije krenuo sam (telefon traži dodir u okviru) — pokaže se YouTubeov "pusti"
+    // nije krenuo sam — iPhone ne pušta zvuk bez dodira u samom videu (YouTube u
+    // okviru): krene bez zvuka (to smije), YouTube u videu pokaže "uključi zvuk",
+    // a jedan dodir u videu pusti zvuk — i svakoj sljedećoj pjesmi
     window.setTimeout(() => {
-      if (mine !== ask || started) return
-      started = true
-      if (ytState !== BUFFERING) set({ status: 'paused' })
-    }, 1500)
+      if (mine !== ask || started || (ytState !== UNSTARTED && ytState !== CUED)) return
+      p.mute?.()
+      p.playVideo()
+      // ni bez zvuka nije krenuo (rijetko) — pokaže se YouTubeov "pusti"
+      window.setTimeout(() => {
+        if (mine !== ask || started) return
+        started = true
+        if (ytState !== BUFFERING) set({ status: 'paused' })
+      }, 1500)
+    }, 1000)
   })
   return true
+}
+
+/** svira bez zvuka — dok se zvuk ne uključi (dodir u videu), pita plejer */
+let sound = 0
+function watchSound() {
+  window.clearInterval(sound)
+  sound = window.setInterval(() => {
+    if (!yt || !snap.videoId || !yt.isMuted?.()) {
+      window.clearInterval(sound)
+      set({ muted: false })
+    }
+  }, 600)
 }
 
 /** zadnje vrijeme koje je plejer javio i kad (sat stranice) */
@@ -317,7 +342,10 @@ function changed(s: number) {
   if (!snap.videoId || loadedId !== snap.videoId) return
   if (s === PLAYING) {
     started = true
-    set({ status: 'playing' })
+    // svira bez zvuka (iPhone prije prvog dodira u videu) — natpis uz pjesmu dok se ne uključi
+    const muted = Boolean(yt?.isMuted?.())
+    set({ status: 'playing', muted })
+    if (muted) watchSound()
   } else if (s === ENDED) {
     // red (sačuvani): sljedeća krene sama — dok se video vidi (spuštena ionako stoji)
     if (snap.min || !nextTube()) set({ status: 'paused' })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
@@ -237,7 +238,8 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
               // na samom početku niža (iznad nje nema ničega), između strofa s razmakom oko sebe
               <div key={j} ref={(el) => void (rows.current[j] = el)} className={`flex items-center justify-center ${j === 0 ? 'h-9' : 'h-14'}`} aria-hidden>
                 <span className="transition-opacity duration-500" style={{ opacity: now ? 1 : 0.4 }}>
-                  <EqBars accent="rgba(255,255,255,0.85)" on={playing && (now || !synced)} h={13} />
+                  {/* isti znak kao uz "Tekst pjesme" — boja stiha, iste veličine */}
+                  <EqBars accent={MOODS[verse.mood].accent} on={playing && (now || !synced)} h={14} />
                 </span>
               </div>
             )

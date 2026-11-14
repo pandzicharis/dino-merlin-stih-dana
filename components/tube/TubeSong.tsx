@@ -57,8 +57,8 @@ export function TubeSong({ verse, scope = 'home', z = 90 }: { verse: Verse; scop
 /**
  * Kartica pjesme — na početnoj i na raširenoj sačuvanoj karti
  * (components/SavedCarousel.tsx): u pozadini zamućen omot albuma, lijevo omot
- * iz kojeg viri ploča (vrti se dok pjesma svira), naziv i album, desno YouTube
- * dugme. Dodir bilo gdje pusti pjesmu.
+ * (dok pjesma svira, na njemu trake), naziv i album, desno YouTube dugme. Dodir
+ * bilo gdje pusti pjesmu.
  */
 export function TubeCapsule({
   verse,
@@ -106,33 +106,17 @@ export function TubeCapsule({
       {/* blag odsjaj pređe preko kartice */}
       <span className="tube-sheen pointer-events-none absolute inset-0 -z-10" aria-hidden />
 
-      {/* omot i ploča koja viri iz njega — dok pjesma svira, izađe više i vrti se */}
-      <span className="relative block h-[58px] w-[80px] shrink-0" aria-hidden>
-        <span
-          className={`absolute top-[3px] block h-[52px] w-[52px] transition-transform duration-500 ease-out ${playing ? 'translate-x-[30px]' : 'translate-x-[24px] group-hover:translate-x-[29px]'}`}
-        >
-          <span
-            className="vinyl-disc relative block h-full w-full rounded-full"
-            style={{
-              // brazde, odsjaj i zlatni rub — ploča se vidi i na tamnoj kartici (kao gramofon)
-              background:
-                'radial-gradient(circle at 32% 28%, rgba(255,255,255,0.16), transparent 42%), repeating-radial-gradient(circle at center, #1c1a18 0 1.6px, #2e2a27 1.6px 3.2px)',
-              boxShadow: `0 4px 14px rgba(0,0,0,0.6), inset 0 0 0 1.2px ${BRAND.gold}a6`,
-              animation: 'vinyl-spin 3.6s linear infinite',
-              animationPlayState: playing ? 'running' : 'paused',
-            }}
-          >
-            <span className="absolute inset-[31%] rounded-full bg-cover bg-center ring-1 ring-black/40" style={{ backgroundImage: `url(${thumb})` }} />
-            <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0c0a08]" />
+      {/* omot albuma — dok pjesma svira, na njemu trake */}
+      <span
+        className="relative block h-[58px] w-[58px] shrink-0 rounded-[11px] bg-cover bg-center shadow-[0_4px_14px_rgba(0,0,0,0.5)] ring-1 ring-white/10"
+        style={{ backgroundImage: `url(${thumb})` }}
+        aria-hidden
+      >
+        {playing && (
+          <span className="absolute inset-0 flex items-center justify-center rounded-[11px] bg-black/45">
+            <EqBars accent="#fff" on h={14} />
           </span>
-        </span>
-        <span className="absolute left-0 top-0 block h-[58px] w-[58px] rounded-[11px] bg-cover bg-center shadow-[4px_0_14px_rgba(0,0,0,0.55)] ring-1 ring-white/10" style={{ backgroundImage: `url(${thumb})` }}>
-          {playing && (
-            <span className="absolute inset-0 flex items-center justify-center rounded-[11px] bg-black/45">
-              <EqBars accent="#fff" on h={14} />
-            </span>
-          )}
-        </span>
+        )}
       </span>
 
       <span className="block min-w-0 flex-1">

@@ -95,8 +95,8 @@ export function NowPlaying({
           </div>
         </div>
 
-        {/* pjesma — kao u plejeru sačuvanih, poravnata s videom; video, pjesma i tekst po 20 px razmaka */}
-        <div className="flex shrink-0 items-center gap-2.5 px-[10px] pt-5">
+        {/* pjesma — kao u plejeru sačuvanih, poravnata s videom; video, pjesma i tekst po 28 px razmaka */}
+        <div className="flex shrink-0 items-center gap-2.5 px-[10px] pt-7">
           <span
             className="block h-[58px] w-[58px] shrink-0 rounded-[10px] bg-cover bg-center"
             style={{
@@ -110,8 +110,9 @@ export function NowPlaying({
             {/* trenutno slušaš — trake titraju dok svira (stoje kad je pauza) */}
             <div className="mb-1.5 flex items-center gap-1.5">
               <EqBars accent={m.accent} on={playing} h={9} />
-              <span className="text-[8.5px] font-medium uppercase tracking-[0.26em]" style={{ color: m.accent }}>
-                {tube.status === 'paused' ? 'Pauzirano' : 'Trenutno'}
+              {/* svira bez zvuka (iPhone prije prvog dodira u videu) — kaže kako se pušta zvuk */}
+              <span className="whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.26em]" style={{ color: m.accent }}>
+                {tube.muted ? 'Dodirni video za zvuk' : tube.status === 'paused' ? 'Pauzirano' : 'Trenutno'}
               </span>
             </div>
             <p className="truncate text-[12.5px] font-semibold uppercase leading-tight tracking-[0.18em]" style={{ color: m.accent }}>
@@ -123,12 +124,11 @@ export function NowPlaying({
           {tube.list && <Transport />}
         </div>
 
-        {/* tekst pjesme — harmonika: meka podloga bez linija (kao staklo); otvorena je
-            ista podloga i oko teksta, pa traka i tekst čine jednu cjelinu */}
+        {/* tekst pjesme — harmonika preko cijele širine ladice: "Tekst pjesme" je tamnija
+            traka od ivice do ivice, a otvoren tekst teče ispod nje preko atmosfere pjesme —
+            bez okvira, pa ništa ne sužava prostor */}
         {has && (
-          <div
-            className={`mx-[10px] mt-5 flex flex-col overflow-hidden rounded-[14px] bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${wide ? 'min-h-0 flex-1' : 'shrink-0'}`}
-          >
+          <div className={`mt-7 flex flex-col ${wide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
             <button
               type="button"
               onClick={() => {
@@ -136,8 +136,8 @@ export function NowPlaying({
                 setOpen((o) => !o)
               }}
               aria-expanded={open}
-              // traka je uvijek u tonu kao pod mišem (i otvorena) — pod prstom još malo jača
-              className="flex h-12 shrink-0 items-center gap-3 bg-white/[0.03] px-3.5 text-left transition-colors hover:bg-white/[0.05] active:bg-white/[0.06]"
+              // traka je uvijek u tonu (i otvorena) — pod prstom još malo jača
+              className="flex h-12 shrink-0 items-center gap-3 bg-white/[0.08] px-5 text-left transition-colors hover:bg-white/[0.1] active:bg-white/[0.11]"
             >
               {/* znak muzike — titra dok pjesma svira */}
               <EqBars accent={m.accent} on={playing} h={14} />
@@ -167,8 +167,8 @@ export function NowPlaying({
           </div>
         )}
 
-        {/* podnožje: "Slušaj na" i platforme — bez linija */}
-        <div className={`relative mx-[10px] shrink-0 pb-[max(0.6rem,env(safe-area-inset-bottom))] ${wide ? 'pt-3' : 'pt-5'}`}>
+        {/* podnožje: "Slušaj na" i platforme — bez linija, malo niže (više mjesta iznad) */}
+        <div className={`relative mx-[10px] shrink-0 pb-[max(0.6rem,env(safe-area-inset-bottom))] ${wide ? 'pt-5' : 'pt-8'}`}>
           <ListenFooter verse={verse} videoId={id} />
         </div>
       </div>
