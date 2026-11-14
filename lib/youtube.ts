@@ -9,8 +9,8 @@
  * 200×200 px), nema pozadine ni samo zvuka.
  *
  * JEDAN plejer (iframe) za cijelu aplikaciju, s YouTubeovim kontrolama (pusti,
- * pauza, traka). Pjesma puštena iz liste u sačuvanima ima red (ta lista):
- * "sljedeća" i, kad završi, sljedeća krene sama. Inače jedna pjesma — kad završi, stane.
+ * pauza, traka). Svaka pjesma ima red — kad završi, sljedeća krene sama: lista
+ * iz koje je puštena (sačuvani), inače sačuvane pjesme ili sve pjesme (`defaultLine`).
  * Pluta iznad svog mjesta na ekranu (TubeStage); uz video ide tekst koji
  * prati pjesmu (vrijeme se čita iz plejera). `scope`: odakle je
  * pjesma puštena — na početnoj i poklonu se otvori mala ladica
@@ -20,7 +20,9 @@
 
 import { useSyncExternalStore } from 'react'
 import type { Verse } from '@/data/verses'
+import { getFavorites } from './storage'
 import { youtubeId } from './text'
+import { knownVerses } from './verses-client'
 
 type YTPlayer = {
   loadVideoById(o: { videoId: string; startSeconds?: number }): void
@@ -181,15 +183,42 @@ export function warmTube(v?: Verse) {
   })
 }
 
-/** Pjesma poslije `v` u redu, ili null. */
+/** Pjesma poslije `v` u redu (poslije zadnje — opet prva), ili null. */
 function after(v: Verse | null): Verse | null {
   const i = v ? queue.findIndex((x) => x.id === v.id) : -1
-  return i < 0 ? null : (queue[i + 1] ?? null)
+  if (i < 0 || queue.length < 2) return null
+  return queue[(i + 1) % queue.length]
+}
+
+/** ista pjesma (drugi stih iste pjesme je ista pjesma) */
+const songKey = (v: Verse) => v.song.trim().toLowerCase()
+
+/**
+ * Red za pjesmu puštenu van liste (početna, poklon, raširena karta) — kad
+ * završi, svira sljedeća, kao u plejeru: sačuvane pjesme ako je ova među
+ * njima, inače sve pjesme (aktivni stihovi s videom). Svaka pjesma jednom, a
+ * ova je baš ovaj stih.
+ */
+function defaultLine(v: Verse): Verse[] {
+  const all = knownVerses().filter((x) => (x as { active?: boolean }).active !== false && videoOf(x))
+  const byId = new Map(all.map((x) => [x.id, x]))
+  const saved = getFavorites().flatMap((id) => byId.get(id) ?? [])
+  const pool = saved.some((x) => songKey(x) === songKey(v)) ? saved : all
+  const seen = new Set<string>()
+  const out: Verse[] = []
+  for (const x of pool) {
+    const k = songKey(x)
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(k === songKey(v) ? v : x)
+  }
+  if (!seen.has(songKey(v))) out.unshift(v)
+  return out
 }
 
 /**
  * Otvori pjesmu stiha `v` (ladica u `scope`) i pusti je — iz dodira. `list`:
- * lista iz koje je puštena (red za "sljedeća"); bez nje druga pjesma nema red.
+ * lista iz koje je puštena (red za "sljedeća"); bez nje red su sačuvane ili sve pjesme.
  * `false`: stih nema video.
  */
 export function openTube(v: Verse, scope: string, list?: Verse[]): boolean {
@@ -198,7 +227,7 @@ export function openTube(v: Verse, scope: string, list?: Verse[]): boolean {
   const same = snap.videoId === id
   const was = snap.min
   if (list) queue = list.filter((x) => videoOf(x))
-  else if (!same) queue = []
+  else if (!same) queue = defaultLine(v)
   current = v
   set({ verseId: v.id, videoId: id, scope, min: false, list: queue.length > 0, next: after(v)?.id ?? null, status: same ? snap.status : 'loading' })
   if (same && loadedId === id) {

@@ -60,14 +60,30 @@ export function useTubeLyrics(verse: Verse): LyricsData | null | 'loading' {
   }, [vid])
   const dur = video && video.id === vid ? video.d : 0
 
+  // trajanje se ne sazna (video ne krene, greška) — tekst se pokaže i bez njega
+  const [late, setLate] = useState<string | null>(null)
+  useEffect(() => {
+    if (!vid) return
+    const t = window.setTimeout(() => setLate(vid), 2500)
+    return () => clearTimeout(t)
+  }, [vid])
+  const gaveUp = late === vid
+
   // server ne zna trajanje pjesme: s trajanjem videa se možda nađu vremena redova
   const open = Boolean(data?.open && !data.synced?.length)
+  /** odgovor na pitanje s trajanjem stigao (s vremenima ili bez) — `pjesma|trajanje` */
+  const [asked, setAsked] = useState<string | null>(null)
   useEffect(() => {
     if (!open || !dur) return
     let on = true
+    const key = `${song}|${dur}`
     loadLyrics(song, dur).then(
-      (d) => on && d?.synced?.length && setGot({ song, data: d }),
-      () => {},
+      (d) => {
+        if (!on) return
+        if (d?.synced?.length) setGot({ song, data: d })
+        setAsked(key)
+      },
+      () => on && setAsked(key),
     )
     return () => {
       on = false
@@ -77,11 +93,15 @@ export function useTubeLyrics(verse: Verse): LyricsData | null | 'loading' {
   return useMemo(() => {
     if (data === undefined) return 'loading'
     if (!data) return null
+    // vremena redova zavise od trajanja videa: dok se ono ne zna (i dok ne stigne odgovor s
+    // njim), tekst čeka — pokaže se jednom, u konačnom obliku, ne preslaže se pred očima
+    const needs = open || Boolean(data.synced?.length && data.duration)
+    if (needs && !gaveUp && (!dur || (open && asked !== `${song}|${dur}`))) return 'loading'
     const fits = !data.duration || !dur || Math.abs(dur - data.duration) <= SLACK
     if (fits || !data.synced?.length) return data
     // vremena ne vrijede za ovaj video: isti tekst, ali stoji
     return { ...data, synced: undefined, lines: data.lines.length ? data.lines : data.synced.map((s) => s.l) }
-  }, [data, dur])
+  }, [data, dur, open, gaveUp, asked, song])
 }
 
 /* ── tekst ispod videa ── */
