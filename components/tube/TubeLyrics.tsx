@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'motion/react'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
@@ -163,6 +164,8 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
     let hold = 0
     let pos = -1
     let last = -2
+    // prvi put tekst odmah stoji na redu koji traje (dok se pretapa) — ne klizi od vrha
+    let placed = false
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
       const t = tubeTime().t
@@ -176,6 +179,12 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
       const max = el.scrollHeight - el.clientHeight
       if (now < hold || max <= 0) return void (pos = -1)
       const target = row ? Math.max(0, Math.min(max, row.offsetTop + row.offsetHeight / 2 - el.clientHeight * at.current)) : 0
+      if (!placed) {
+        placed = true
+        pos = target
+        el.scrollTop = target
+        return
+      }
       if (pos < 0) pos = el.scrollTop
       const gap = target - pos
       pos += gap * (Math.abs(gap) > 80 ? 0.08 : 0.16)
@@ -221,11 +230,15 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
   // dole kraće pretapanje i manje praznog — kraj teksta usklađen s početkom
   const fade = 'linear-gradient(180deg, transparent 0, #000 5%, #000 93%, transparent 100%)'
   return (
-    <div
+    // tekst se pretopi kad stigne (i kad stigne kasnije, dok je harmonika već otvorena) — ne iskoči
+    <motion.div
       ref={scroller}
       data-lyrics-scroll
       className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 text-center [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ maskImage: fade, WebkitMaskImage: fade }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
     >
       <div className="pb-8 pt-5">
         {items.map(({ i }, j) => {
@@ -274,6 +287,6 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
           )
         })}
       </div>
-    </div>
+    </motion.div>
   )
 }

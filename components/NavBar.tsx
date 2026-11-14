@@ -11,7 +11,9 @@ import { BRAND } from '@/lib/brand'
  */
 export function NavBar({ children }: { children: ReactNode }) {
   return (
-    <nav aria-label="Meni" className="relative z-10 -mx-6 mt-5 flex items-stretch px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-3">
+    // stavke na sredini trake koja se vidi: na iPhoneu traka ide do dna (traka za
+    // početni ekran), pa je razmak gore veći, a dole 12 px manji od tog dijela ekrana
+    <nav aria-label="Meni" className="relative z-10 -mx-6 mt-5 flex items-stretch px-3 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.75rem))] pt-6">
       {/* staklo iza stavki — ravno, bez sjene; gore se kratko pretopi, bez ivice */}
       <span
         aria-hidden

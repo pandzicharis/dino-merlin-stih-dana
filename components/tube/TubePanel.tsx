@@ -62,8 +62,6 @@ function sheetSizes(): { low: number; full: number } {
   if (window.matchMedia('(min-width: 640px)').matches) return { low: Math.round(h * 0.82), full: Math.round(h * 0.82) }
   return { low: Math.round(h * 0.76), full: h - Math.max(safeTop(), 12) }
 }
-/** zapamćen prikaz */
-const VIEW = 'stihdana:tubeView'
 /**
  * karta u špilu — ista kao u plejeru iza prekidača (raspored, stih, razmaci), samo
  * odsječena ispod albuma (`CARD_CUT`): visoka koliko se vidi u prikazu (`cqh` —
@@ -79,7 +77,7 @@ const CARD = 'calc(100cqh - 72px)'
  * dijeljenje (zaglavlje, povlačenje nadolje, Escape).
  *
  *   prikazi   dugmad na dnu (kao u starom plejeru): Stihovi (špil karata, ispod "2 / 22"),
- *             Papirići (kao u Magazi), Pjesme (lista) i Albumi; lupa traži
+ *             Papirići (kao u Magazi — otvara se na njima), Pjesme (lista) i Albumi; lupa traži
  *             pjesmu. Ladica je niža dok se lista. Dodir na kartu ili papirić raširi stih
  *             (components/SavedFull.tsx); na raširenom je pjesma
  *   pjesma    izađe preko ove (ladica uzme visinu pjesme — pjesma i
@@ -113,19 +111,21 @@ export default function TubePanel({ open, onClose }: { open: boolean; onOpen: ()
   // pjesme — svaka jednom (dva sačuvana stiha iste pjesme su jedna pjesma)
   const songs = useMemo(() => uniqueSongs(list), [list])
 
-  const [view, setView] = useState<TubeView>(() => {
-    try {
-      const v = localStorage.getItem(VIEW)
-      return v === 'slips' || v === 'list' || v === 'albums' ? v : 'cards'
-    } catch {
-      return 'cards'
-    }
-  })
+  // sačuvani se uvijek otvore na papirićima (panel ostaje montiran — svako otvaranje ispočetka)
+  const [view, setView] = useState<TubeView>('slips')
   // pretraga pjesama: polje ispod zaglavlja, pogoci u "Pjesme"; `null` — zatvorena
   const [query, setQuery] = useState<string | null>(null)
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) {
+      setView('slips')
+      setQuery(null)
+    }
+  }
   const input = useRef<HTMLInputElement>(null)
   /** prikaz prije pretrage — × ga vrati */
-  const before = useRef<TubeView>('cards')
+  const before = useRef<TubeView>('slips')
   const searching = query !== null
   const found = useMemo(() => (query?.trim() ? searchSongs(songs, query) : songs), [songs, query])
   const endSearch = (to?: TubeView) => {
@@ -138,11 +138,6 @@ export default function TubePanel({ open, onClose }: { open: boolean; onOpen: ()
     haptic(5)
     endSearch(v)
     setView(v)
-    try {
-      localStorage.setItem(VIEW, v)
-    } catch {
-      /* privatni prozor */
-    }
   }
 
   // pjesma otvorena iz ove ladice — druga ladica preko nje; spuštena čeka u traci
