@@ -7,6 +7,7 @@ import { BRAND } from '@/lib/brand'
 import { whenCalm } from '@/lib/calm'
 import { addDays, getActiveDate, monthBs, shownDay } from '@/lib/date'
 import { haptic } from '@/lib/haptic'
+import { NavItem } from './NavBar'
 import { dismissToast, toast } from './Toast'
 
 /*
@@ -48,18 +49,18 @@ export function CalendarIcon({ size = 18 }: { size?: number }) {
   )
 }
 
-/** "Moj mjesec" — dugme u zaglavlju početne, desno od plejera. */
-export function MonthButton() {
+/**
+ * "Moj mjesec" — dugme u zaglavlju početne, desno od plejera. `nav`: stavka
+ * "Moj kalendar" u donjoj traci na telefonu (components/NavBar.tsx).
+ */
+export function MonthButton({ nav = false }: { nav?: boolean }) {
+  const press = () => {
+    haptic(8)
+    openRecap(shownDay(getActiveDate()))
+  }
+  if (nav) return <NavItem icon={<CalendarIcon size={20} />} label="Moj kalendar" onClick={press} aria-label="Moj kalendar" />
   return (
-    <button
-      onClick={() => {
-        haptic(8)
-        openRecap(shownDay(getActiveDate()))
-      }}
-      aria-label="Moj mjesec"
-      title="Moj mjesec"
-      className="hdr-btn w-[34px]"
-    >
+    <button onClick={press} aria-label="Moj mjesec" title="Moj mjesec" className="hdr-btn w-[34px]">
       <CalendarIcon size={16} />
     </button>
   )

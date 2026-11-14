@@ -116,6 +116,20 @@ export function useMounted(): boolean {
   )
 }
 
+const WIDE = '(min-width: 640px)'
+function subscribeWide(cb: () => void) {
+  const mq = window.matchMedia(WIDE)
+  mq.addEventListener('change', cb)
+  return () => mq.removeEventListener('change', cb)
+}
+/**
+ * Širi ekran (od 640 px): dugmad su gore u zaglavlju; na telefonu su u donjoj
+ * traci (components/NavBar.tsx). Na serveru i u prvom kadru — telefon.
+ */
+export function useWide(): boolean {
+  return useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false)
+}
+
 /* ── favoriti i niz dana ────────────────────────────────────── */
 
 const subscribeFavorites = subscribeTo(['favchange', 'storage'])

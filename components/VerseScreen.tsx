@@ -18,6 +18,8 @@ import { Signature } from './Signature'
 import { FavoriteButton } from './FavoriteButton'
 import { SavedLink } from './SavedLink'
 import { MonthButton } from './RecapHost'
+import { NavBar } from './NavBar'
+import { useWide } from '@/lib/client-store'
 import { MagazaLogo } from './MagazaLogo'
 import { StreakLine } from './Streak'
 import { OWN_AUDIO } from '@/lib/flags'
@@ -58,6 +60,8 @@ export function VerseScreen({
   month?: boolean
 }) {
   const m = MOODS[mood ?? verse.mood]
+  // širi ekran: Moji stihovi, kalendar i postavke gore u zaglavlju; telefon: donja traka (NavBar)
+  const wide = useWide()
   // mini plejer pjesama pluta na dnu — sadržaj se podigne iznad njega. Mjesto
   // stoji dok god je pjesma u plejeru (i dok je panel otvoren), pa se početna
   // ne preslaže usred otvaranja i zatvaranja panela. Sluša se samo to (ima li
@@ -123,7 +127,8 @@ export function VerseScreen({
           compact
             ? 'flex min-h-[260px] flex-col justify-between p-5'
             : `relative flex min-h-[100dvh] flex-col justify-between px-6 pt-[max(3rem,calc(var(--sat)+1.75rem))] ${
-                OVERRIDE_ON ? 'dev-pad pb-12' : 'pb-[max(2.5rem,calc(env(safe-area-inset-bottom)+0.5rem))]'
+                // telefon: dno nosi donja traka (s razmakom za početni ekran iPhonea)
+                OVERRIDE_ON ? 'dev-pad pb-12' : wide ? 'pb-[max(2.5rem,calc(env(safe-area-inset-bottom)+0.5rem))]' : 'pb-0'
               }`
         }
       >
@@ -156,9 +161,14 @@ export function VerseScreen({
             >
               {/* obavijesti rade u pozadini; prekidač je u postavkama */}
               <NotifySync />
-              <SavedLink />
-              {month && <MonthButton />}
-              <SettingsButton />
+              {/* na telefonu su ova dugmad u donjoj traci */}
+              {wide && (
+                <>
+                  <SavedLink />
+                  {month && <MonthButton />}
+                  <SettingsButton />
+                </>
+              )}
             </motion.div>
           )}
         </header>
@@ -169,8 +179,9 @@ export function VerseScreen({
           className={
             compact
               ? 'flex flex-col items-center gap-3 py-4'
-              : // malo iznad sredine — više zraka ispod stiha, prema gramofonu
-                'flex flex-1 flex-col items-center justify-center gap-8 pb-[min(10vh,80px)] pt-4'
+              : // malo iznad sredine — više zraka ispod stiha, prema gramofonu; na telefonu
+                // (donja traka) niže, dalje od logotipa
+                `flex flex-1 flex-col items-center justify-center gap-8 ${wide ? 'pb-[min(10vh,80px)] pt-4' : 'pb-[min(4vh,32px)] pt-8'}`
           }
         >
           {!compact && (
@@ -252,6 +263,14 @@ export function VerseScreen({
         {/* mjesto za spušten plejer na dnu — gramofon ostane odvojen od njega */}
         {/* mini plejer ode — gramofon se mekano spusti (klizne), ne skoči */}
         {!compact && <div ref={slotRef} aria-hidden className={`peek-slot shrink-0 ${peek ? 'peek-space' : 'h-0'}`} />}
+        {/* telefon: donja traka — Moji stihovi (s brojem), Moj kalendar, Postavke */}
+        {!compact && !wide && (
+          <NavBar>
+            <SavedLink nav />
+            {month && <MonthButton nav />}
+            <SettingsButton nav />
+          </NavBar>
+        )}
       </main>
     </div>
   )

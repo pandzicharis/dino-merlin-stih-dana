@@ -10,6 +10,7 @@ import { OPEN_SAVED, autoplaySaved, useSavedPlayerSelect } from '@/lib/player'
 import { whenCalm } from '@/lib/calm'
 import { OWN_AUDIO } from '@/lib/flags'
 import { useTube } from '@/lib/youtube'
+import { HeartIcon, NavItem } from './NavBar'
 
 /** Panel se učita tek kad prst dotakne ikonicu — kao i panel za dijeljenje. */
 // YouTube (lib/flags.ts): novi plejer s videom; stari (špil, mini plejer) samo uz vlastite pjesme
@@ -21,9 +22,10 @@ const SavedPanel = dynamic(load, { ssr: false })
  * brojačem u tonu ikonice (ne crvena "obavijest"). Otvara plejer kao novu
  * stranicu (SavedPanel); kad se vrati na
  * stih, a muzika svira, na dnu početne viri mini plejer. Pojavi se tek kad
- * postoji bar jedan sačuvan stih.
+ * postoji bar jedan sačuvan stih. `nav`: stavka "Moji stihovi" u donjoj traci
+ * na telefonu (components/NavBar.tsx) — uvijek tu, broj u zlatnoj znački.
  */
-export function SavedLink() {
+export function SavedLink({ nav = false }: { nav?: boolean }) {
   const ids = useFavorites()
   // Broj se ne provjerava listom stihova pri svakom otvaranju (jedan zahtjev
   // manje po korisniku): nevažeći zapisi (obrisan stih) se očiste kad se
@@ -56,6 +58,33 @@ export function SavedLink() {
     return () => window.removeEventListener(OPEN_SAVED, show)
   }, [])
 
+  const press = () => {
+    haptic(8)
+    setUsed(true)
+    setOpen(true)
+    // otvoren plejer svira — iz ovog dodira (iPhone); YouTube plejer to radi sam
+    if (OWN_AUDIO) autoplaySaved()
+  }
+
+  // donja traka na telefonu: "Moji stihovi" — srce (dok pjesma svira, trake) i broj
+  if (nav)
+    return (
+      <>
+        <NavItem
+          icon={playing ? <EqBars accent="currentColor" on h={16} /> : <HeartIcon />}
+          label="Moji stihovi"
+          badge={count}
+          onPointerEnter={load}
+          onTouchStart={load}
+          onClick={press}
+          aria-label={`Moji stihovi (${count})`}
+          data-tip="saved"
+          data-live={playing ? '' : undefined}
+        />
+        {used && <SavedPanel open={open} onOpen={onOpen} onClose={onClose} />}
+      </>
+    )
+
   return (
     <>
       <AnimatePresence initial={false}>
@@ -71,13 +100,7 @@ export function SavedLink() {
             <button
               onPointerEnter={load}
               onTouchStart={load}
-              onClick={() => {
-                haptic(8)
-                setUsed(true)
-                setOpen(true)
-                // otvoren plejer svira — iz ovog dodira (iPhone); YouTube plejer to radi sam
-                if (OWN_AUDIO) autoplaySaved()
-              }}
+              onClick={press}
               aria-label={`Player pjesama (${count})`}
               title="Player pjesama"
               data-tip="saved"

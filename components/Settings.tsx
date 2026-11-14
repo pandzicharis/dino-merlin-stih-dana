@@ -3,13 +3,17 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { haptic } from '@/lib/haptic'
+import { NavItem } from './NavBar'
 
 /** Panel se učita tek kad prst dotakne zupčanik — kao i ostali paneli. */
 const load = () => import('./SettingsPanel')
 const SettingsPanel = dynamic(load, { ssr: false })
 
-/** Postavke — zupčanik u zaglavlju, pored sačuvanih. Otvara donji panel. */
-export function SettingsButton() {
+/**
+ * Postavke — zupčanik u zaglavlju, pored sačuvanih. Otvara donji panel.
+ * `nav`: stavka "Postavke" u donjoj traci na telefonu (components/NavBar.tsx).
+ */
+export function SettingsButton({ nav = false }: { nav?: boolean }) {
   const [open, setOpen] = useState(false)
   // jednom otvoren panel ostaje montiran, da zatvaranje ima svoju animaciju
   const [used, setUsed] = useState(false)
@@ -19,24 +23,30 @@ export function SettingsButton() {
     return () => clearTimeout(t)
   }, [])
 
+  const press = () => {
+    haptic(8)
+    setUsed(true)
+    setOpen(true)
+  }
   return (
     <>
-      <button
-        onPointerEnter={load}
-        onTouchStart={load}
-        onClick={() => {
-          haptic(8)
-          setUsed(true)
-          setOpen(true)
-        }}
-        aria-label="Postavke"
-        title="Postavke"
+      {nav ? (
         // stari savjet za obavijesti (i prezentacija) traži ovaj znak — prekidač je sad ovdje
-        data-tip="notify"
-        className="hdr-btn w-[34px]"
-      >
-        <GearIcon size={16} />
-      </button>
+        <NavItem icon={<GearIcon size={20} />} label="Postavke" onPointerEnter={load} onTouchStart={load} onClick={press} aria-label="Postavke" data-tip="notify" />
+      ) : (
+        <button
+          onPointerEnter={load}
+          onTouchStart={load}
+          onClick={press}
+          aria-label="Postavke"
+          title="Postavke"
+          // stari savjet za obavijesti (i prezentacija) traži ovaj znak — prekidač je sad ovdje
+          data-tip="notify"
+          className="hdr-btn w-[34px]"
+        >
+          <GearIcon size={16} />
+        </button>
+      )}
       {used && <SettingsPanel open={open} onClose={() => setOpen(false)} />}
     </>
   )
