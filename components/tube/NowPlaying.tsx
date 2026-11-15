@@ -8,9 +8,11 @@ import type { Verse } from '@/data/verses'
 import { WIDE_MEDIA } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { albumLine, asWritten } from '@/lib/text'
-import { tubeNext, useTube, videoOf } from '@/lib/youtube'
+import { pauseTube, resumeTube, tubeNext, useTube, videoOf } from '@/lib/youtube'
 import { primeLyrics } from '../Lyrics'
 import { DrawerHeader } from '../DrawerIcon'
+import { GiftCardWide, useGiftLink } from '../GiftLink'
+import { QrToggle } from '../VerseQr'
 import { EqBars } from '../EqBars'
 import { ListenFooter } from './Listen'
 import { Slot } from './Slot'
@@ -82,6 +84,25 @@ export function NowPlaying({
   const playing = tube.status === 'playing'
   const m = MOODS[verse.mood]
   const cover = albumOf(verse.album)?.cover
+  // QR kod stiha (GiftLink.tsx) — dugme u zaglavlju ga stavi na mjesto videa. Pjesma
+  // za to vrijeme stoji, a kad se video vrati, nastavi (ako je svirala)
+  const [qrOn, setQrOn] = useState(false)
+  const gift = useGiftLink(verse, qrOn)
+  const resumeAfterQr = useRef(false)
+  const toggleQr = () => {
+    haptic(6)
+    if (!qrOn) {
+      resumeAfterQr.current = tube.status === 'playing' || tube.status === 'loading'
+      pauseTube()
+    } else if (resumeAfterQr.current) resumeTube()
+    setQrOn(!qrOn)
+  }
+  // druga pjesma (sljedeća iz reda) — opet video
+  const [qrFor, setQrFor] = useState(id)
+  if (qrFor !== id) {
+    setQrFor(id)
+    setQrOn(false)
+  }
 
   // koliko ladica treba: zatvoren tekst — koliko je sadržaj, otvoren — do vrha, a dok se
   // zatvara — mjera bez teksta (zapamćena), da se spušta ravno na nju
@@ -122,11 +143,33 @@ export function NowPlaying({
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div ref={inner} className={`flex flex-col ${wide ? 'min-h-0 flex-1' : ''}`}>
-        <DrawerHeader icon={<NoteIcon />} eyebrow="Stih" title={asWritten(verse.text).replace(/\s*\n\s*/g, ' ')} onClose={onClose} minimize={minimize} />
+        <DrawerHeader
+          icon={<NoteIcon />}
+          eyebrow="Stih"
+          title={asWritten(verse.text).replace(/\s*\n\s*/g, ' ')}
+          onClose={onClose}
+          minimize={minimize}
+          action={<QrToggle on={qrOn} onClick={toggleQr} />}
+        />
 
         <div className="shrink-0 px-[10px] pt-3">
-          <div className="rounded-[18px] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-            <Slot id={id} />
+          <div className="relative rounded-[18px] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+            {/* video se skloni (mjesto ostaje), a na njegovo mjesto, iste mjere, QR kod
+                stiha — ladica ne skače; pjesma za to vrijeme stoji (YouTube ne svira skriven) */}
+            <Slot id={id} away={qrOn} />
+            <AnimatePresence>
+              {qrOn && (
+                <motion.div
+                  key="qr"
+                  className="absolute inset-0"
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 380, damping: 30, delay: 0.08 } }}
+                  exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.18 } }}
+                >
+                  <GiftCardWide verse={verse} qr={gift.qr} />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 

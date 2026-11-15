@@ -107,6 +107,9 @@ function takeGift(): string | null {
   return arrived
 }
 
+/** Link poklona — otvoren (ili skeniran kao QR) donese ladicu samo s ovim stihom. */
+export const giftUrl = (id: string) => `${location.origin}/stih/${encodeURIComponent(id)}?poklon`
+
 const GIFT_EVENT = 'stihdana:gift'
 /** Otvori poklon odmah, bez učitavanja stranice (skener QR koda u aplikaciji); van početne — na nju. */
 export function openGift(id: string) {

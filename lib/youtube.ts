@@ -412,6 +412,8 @@ export function addSlot(s: Slot): () => void {
 export function slotsOf(id: string): HTMLElement[] {
   return [...slots].filter((s) => s.id === id).map((s) => s.el)
 }
+/** Mjesto se upravo sakrilo ili vratilo (QR kod u plejeru) — TubeStage bira odmah, ne za 200 ms. */
+export const SLOT_EVENT = 'stihdana:tube-slot'
 
 if (typeof document !== 'undefined') {
   // aplikacija ode u pozadinu — pjesma stane (YouTube ne dozvoljava pozadinu)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { pauseTube, setTubeHost, slotsOf, tubeShown, tubeSnap, useTube } from '@/lib/youtube'
+import { SLOT_EVENT, pauseTube, setTubeHost, slotsOf, tubeShown, tubeSnap, useTube } from '@/lib/youtube'
 
 /**
  * YouTube plejer (lib/youtube.ts) — jedan iframe, pluta iznad mjesta gdje je
@@ -69,7 +69,13 @@ export function TubeStage() {
       raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
-    return () => cancelAnimationFrame(raf)
+    // mjesto se sakrilo ili vratilo (Slot `away`) — bira se već u sljedećem kadru
+    const now = () => void (last = 0)
+    window.addEventListener(SLOT_EVENT, now)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener(SLOT_EVENT, now)
+    }
   }, [videoId])
 
   return (

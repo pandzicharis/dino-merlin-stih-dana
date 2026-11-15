@@ -49,6 +49,7 @@ export function DrawerHeader({
   title,
   onClose,
   minimize = false,
+  action,
   className = '',
 }: {
   icon: ReactNode
@@ -57,6 +58,8 @@ export function DrawerHeader({
   onClose: () => void
   /** spusti umjesto zatvori — strelica nadolje (pjesma u sačuvanima čeka spuštena) */
   minimize?: boolean
+  /** okruglo dugme lijevo od zatvori (QR kod stiha u ladici s pjesmom) */
+  action?: ReactNode
   className?: string
 }) {
   return (
@@ -75,6 +78,7 @@ export function DrawerHeader({
             {title}
           </p>
         </div>
+        {action && <div className="-mr-1 flex shrink-0">{action}</div>}
         <button type="button" onClick={onClose} aria-label={minimize ? 'Spusti' : 'Zatvori'} data-drawer-close className={ROUND}>
           {minimize ? (
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { oneLine, asWritten, paperText } from '@/lib/text'
+import { oneLine, asWritten } from '@/lib/text'
 import {
   SHARE_FORMATS,
   canvasToBlob,
@@ -18,8 +18,7 @@ import { DrawerHeader } from './DrawerIcon'
 import { Icon, TOAST_BAD, TOAST_OK, toast } from './Toast'
 import { bumpMonth } from '@/lib/storage'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
-import { QrCode } from './deck/QrCode'
-import type { QrMatrix } from '@/lib/qr'
+import { CopyIcon, GiftCard, ShareIcon, useGiftLink } from './GiftLink'
 import { lockScroll } from '@/lib/scroll-lock'
 
 type Target = 'share' | 'save'
@@ -47,32 +46,10 @@ export default function SharePanel({
   const [vidState, setVid] = useState<{ key: string; p: number; file?: File } | null>(null)
   const vid = vidState?.key === vidKey ? vidState : null
   const recording = Boolean(vid && !vid.file)
-  // link i QR: ko ga otvori, stih mu doleti u sačuvane (components/GiftArrival.tsx)
-  const [link, setLink] = useState(false)
-  const [qr, setQr] = useState<QrMatrix | null>(null)
-  const url = `${location.origin}/stih/${verse.id}?poklon`
-
+  // link i QR: ko ga otvori, stih mu doleti u sačuvane (components/GiftLink.tsx);
   // biblioteka za QR ide tek kad se link otvori
-  useEffect(() => {
-    if (link && !qr) import('@/lib/qr').then((m) => setQr(m.qrMatrix(url)))
-  }, [link, qr, url])
-
-  const copyLink = async () => {
-    haptic(6)
-    try {
-      await navigator.clipboard.writeText(url)
-      toast({ id: 'share', title: 'Link kopiran', color: TOAST_OK, icon: <Icon.ok /> })
-    } catch {}
-  }
-
-  const sendLink = async () => {
-    haptic(8)
-    if (!navigator.share) return copyLink()
-    try {
-      await navigator.share({ url, title: `${verse.song} — Dino Merlin` })
-      bumpMonth('shared')
-    } catch {}
-  }
+  const [link, setLink] = useState(false)
+  const { url, qr, copy: copyLink, send: sendLink } = useGiftLink(verse, link)
 
   useEffect(() => {
     if (!open || !canvasRef.current) return
@@ -293,26 +270,15 @@ export default function SharePanel({
                 className="rounded-[14px] shadow-[0_24px_60px_rgba(0,0,0,0.65)] ring-1 ring-white/10 transition-opacity duration-300"
                 style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100%', opacity: ready && !link ? 1 : 0 }}
               />
-              {/* QR kartica — na papiru, da je čitaju i stariji telefoni */}
+              {/* QR kartica — ista kao u ladici s QR kodom i u plejeru (GiftLink.tsx) */}
               {link && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                  className="absolute inset-y-0 flex flex-col items-center justify-center rounded-[22px] px-6 shadow-[0_24px_60px_rgba(0,0,0,0.65)]"
-                  style={{ background: '#F6F1E7' }}
+                  className="absolute inset-y-0 flex"
                 >
-                  <div className="aspect-square h-[min(25dvh,240px)]">{qr && <QrCode qr={qr} className="h-full w-full" />}</div>
-                  <p
-                    className="mt-2 max-w-[15rem] truncate text-[15px] text-[#1a1614]"
-                    style={{ fontFamily: 'var(--font-serif), serif' }}
-                  >
-                    {/* kao na papiriću: malim slovima, prvo veliko (i imena) */}
-                    {paperText(verse.text)}
-                  </p>
-                  <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#8C7449' }}>
-                    {verse.song}
-                  </p>
+                  <GiftCard verse={verse} qr={qr} />
                 </motion.div>
               )}
             </div>
@@ -419,15 +385,6 @@ export default function SharePanel({
 }
 
 
-function ShareIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 3v13M12 3 8 7M12 3l4 4" />
-      <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
-    </svg>
-  )
-}
-
 function QrIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -445,15 +402,6 @@ function ImageIcon() {
       <rect x="3" y="3" width="18" height="18" rx="3" />
       <circle cx="9" cy="9" r="1.8" />
       <path d="m21 15-4.5-4.5L6 21" />
-    </svg>
-  )
-}
-
-function CopyIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="9" y="9" width="12" height="12" rx="2.5" />
-      <path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5" />
     </svg>
   )
 }

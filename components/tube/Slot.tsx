@@ -1,26 +1,37 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { addSlot } from '@/lib/youtube'
+import { SLOT_EVENT, addSlot } from '@/lib/youtube'
 
 /**
  * Mjesto YouTube plejera (TubeStage ga drži iznad): dok video ne krene,
  * oštra slika pjesme (najveća koju YouTube ima — mala se razvuče i mutna je)
  * i krug koji se vrti.
+ * `away`: na mjestu je nešto drugo (QR kod stiha u plejeru) — video se skloni
+ * odmah, a mjesto ostaje (vrati se bez ponovnog učitavanja).
  */
-export function Slot({ id }: { id: string }) {
+export function Slot({ id, away = false }: { id: string; away?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = ref.current
     if (!el) return
     return addSlot({ el, id })
   }, [id])
+  // sklonjeno / vraćeno (i novo mjesto) — TubeStage to vidi već u sljedećem kadru
+  useEffect(() => {
+    window.dispatchEvent(new Event(SLOT_EVENT))
+  }, [away])
   // maxresdefault ima samo HD video — bez nje YouTube vrati sivu sličicu 120×90
   const [small, setSmall] = useState<string | null>(null)
   const src = small === id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
   return (
     // zaobljenje preuzme i plejer koji pluta iznad (TubeStage)
-    <div ref={ref} data-tube-slot className="relative flex aspect-video min-h-[200px] w-full items-center justify-center overflow-hidden rounded-[18px] bg-black">
+    <div
+      ref={ref}
+      data-tube-slot
+      aria-hidden={away || undefined}
+      className={`relative flex aspect-video min-h-[200px] w-full items-center justify-center overflow-hidden rounded-[18px] bg-black transition-opacity duration-200 ${away ? 'opacity-0' : ''}`}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={src}

@@ -17,6 +17,7 @@ import { ShareButton } from './ShareSheet'
 import { Signature } from './Signature'
 import { FavoriteButton } from './FavoriteButton'
 import { SavedLink } from './SavedLink'
+import { QrButton } from './VerseQr'
 import { MonthButton } from './RecapHost'
 import { NavBar } from './NavBar'
 import { useWide } from '@/lib/client-store'
@@ -161,6 +162,8 @@ export function VerseScreen({
             >
               {/* obavijesti rade u pozadini; prekidač je u postavkama */}
               <NotifySync />
+              {/* QR kod stiha — tiho gore desno, i na telefonu */}
+              <QrButton verse={verse} />
               {/* na telefonu su ova dugmad u donjoj traci */}
               {wide && (
                 <>
