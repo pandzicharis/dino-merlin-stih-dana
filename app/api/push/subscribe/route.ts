@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { SEND_HOUR, TZ } from '@/lib/date'
 import { isPushEndpoint } from '@/lib/push-endpoint'
+import { hasCronSecret, ownOrigins, parseProbaEndpoint, probaOn } from '@/lib/proba'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -46,8 +47,13 @@ export async function POST(req: Request) {
   const db = supabase()
   if (!db) return NextResponse.json({ error: 'push nije konfigurisan' }, { status: 503 })
 
+  // Proba opterećenja (scripts/proba-5000.mjs): samo uz tajnu za cron.
+  // Lažni korisnici idu istim putem kao pravi, a brana po IP-u bi ih —
+  // hiljade s jedne adrese — inače sve odbila.
+  const proba = probaOn() && hasCronSecret(req)
+
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'nepoznat'
-  if (rateLimited(ip)) {
+  if (!proba && rateLimited(ip)) {
     return NextResponse.json({ error: 'previše zahtjeva' }, { status: 429 })
   }
 
@@ -66,7 +72,9 @@ export async function POST(req: Request) {
   if (!endpoint || !keys?.p256dh || !keys?.auth) {
     return NextResponse.json({ error: 'nepotpun subscription' }, { status: 400 })
   }
-  if (!isPushEndpoint(endpoint) || !isKey(keys.p256dh) || !isKey(keys.auth)) {
+  const validEndpoint =
+    isPushEndpoint(endpoint) || (proba && parseProbaEndpoint(endpoint, ownOrigins(req)) !== null)
+  if (!validEndpoint || !isKey(keys.p256dh) || !isKey(keys.auth)) {
     return NextResponse.json({ error: 'neispravan subscription' }, { status: 400 })
   }
 

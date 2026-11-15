@@ -35,19 +35,19 @@ with provjere as (
   union all
   -- Imena parametara se provjeravaju namjerno: supabase-js šalje argumente
   -- po imenu, pa preimenovan parametar obara RPC iako funkcija postoji.
-  select 5, 'funkcija claim_due_subscriptions(p_run, p_today, p_limit, p_force)',
+  select 5, 'funkcija claim_due_subscriptions(p_run, p_today, p_limit, p_force, p_proba)',
          count(*) = 1
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'claim_due_subscriptions'
      and pg_get_function_identity_arguments(p.oid)
-         = 'p_run uuid, p_today date, p_limit integer, p_force boolean'
+         = 'p_run uuid, p_today date, p_limit integer, p_force boolean, p_proba text'
 
   union all
-  select 6, 'funkcija count_due_subscriptions(p_run, p_today, p_force)',
+  select 6, 'funkcija count_due_subscriptions(p_run, p_today, p_force, p_proba)',
          count(*) = 1
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'count_due_subscriptions'
-     and pg_get_function_identity_arguments(p.oid) = 'p_run uuid, p_today date, p_force boolean'
+     and pg_get_function_identity_arguments(p.oid) = 'p_run uuid, p_today date, p_force boolean, p_proba text'
 
   union all
   -- `p_today` je ono po čemu se novi potpis razlikuje: bez njega se dan
@@ -105,11 +105,12 @@ with provjere as (
    where n.nspname = 'public' and c.relname = 'push_subscriptions'
 
   union all
-  select 14, 'service_role smije zvati sve tri rutine',
-         count(*) = 3
+  select 14, 'service_role smije zvati svih pet rutina',
+         count(*) = 5
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
-     and p.proname in ('claim_due_subscriptions','count_due_subscriptions','finish_push_batch')
+     and p.proname in ('claim_due_subscriptions','count_due_subscriptions','finish_push_batch',
+                       'take_push_lock','release_push_lock')
      and has_function_privilege('service_role', p.oid, 'execute')
 
   union all
@@ -121,7 +122,25 @@ with provjere as (
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and p.proname in ('claim_due_subscriptions', 'count_due_subscriptions')
-     and pg_get_function_identity_arguments(p.oid) not like '%p_today date%'
+     and pg_get_function_identity_arguments(p.oid) not like '%p_proba text%'
+
+  union all
+  -- Bez brave se proba i pravo slanje mogu preklopiti (ruta u produkciji
+  -- tad šalje i bez nje, ali proba odbije da krene).
+  select 16, 'tabela push_lock (brava) s uključenim RLS',
+         count(*) = 1 and bool_and(c.relrowsecurity)
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relname = 'push_lock'
+
+  union all
+  select 17, 'funkcije take_push_lock(p_name, p_holder, p_seconds) i release_push_lock(p_name, p_holder)',
+         count(*) = 2
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and (   (p.proname = 'take_push_lock'
+              and pg_get_function_identity_arguments(p.oid) = 'p_name text, p_holder uuid, p_seconds integer')
+          or (p.proname = 'release_push_lock'
+              and pg_get_function_identity_arguments(p.oid) = 'p_name text, p_holder uuid'))
 )
 select rb as "#",
        case when ok then '✔ PROLAZ' else '✘ PAD' end as ishod,

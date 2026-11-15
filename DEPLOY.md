@@ -191,10 +191,18 @@ Raspored je u UTC: `0 10` je 12:00 u Sarajevu ljeti, 11:00 zimi. Vercel šalje
 ### Koliko dugo traje
 
 Ruta iznad ~400 pretplatnika na redu sama sebe podigne u više paralelnih
-workera (do 8). Desetak hiljada obavijesti tako stane u nekoliko sekundi.
-Ako i to ne stigne prije isteka funkcije, odgovor nosi `"truncated": true` —
-pozovi rutu ponovo i ona nastavi tamo gdje je stala, bez `?force=1`. Oni koji
-su već dobili preskaču se sami.
+workera (do 6, svaki drži 100 obavijesti u zraku). Svaki pokušaj ima rok od
+8 s, prolazna greška (mreža, 429, 5xx) se ponovi do 3 puta, a ko ni tad ne
+prođe dobije drugi krug na kraju poziva. 5000 pretplatnika tako stane u
+~20 s — najduže čeka uređaj koji ne odgovara (2 × 8 s). Ako ni to ne stigne
+prije isteka funkcije, odgovor nosi `"truncated": true` — pozovi rutu ponovo
+i ona nastavi tamo gdje je stala, bez `?force=1`. Oni koji su već dobili
+preskaču se sami.
+
+Dva slanja ne idu istovremeno (brava u bazi, `take_push_lock`). Drugi poziv
+čeka do 10 s, pa odgovori `"busy": true` i ne radi ništa — to nije greška.
+Ako brava u bazi ne postoji (shema još nije pokrenuta), slanje ide bez nje i
+to napiše u `"brava"`.
 
 ## 5. Testiranje
 
@@ -218,8 +226,8 @@ svima, ili u bazi nema nijedne pretplate. To je dvoje se lako pomiješa.
 Odgovor pravog slanja izgleda ovako:
 
 ```json
-{ "due": 9840, "workers": 7, "sent": 9812, "removed": 26, "retry": 2,
-  "failed": 0, "batches": 44, "ms": 6431 }
+{ "due": 9840, "workers": 5, "sent": 9812, "removed": 26, "retry": 2,
+  "failed": 0, "timeouts": 1, "attempts": 9871, "batches": 40, "ms": 9431 }
 ```
 
 | polje | znači |
@@ -227,9 +235,12 @@ Odgovor pravog slanja izgleda ovako:
 | `due` | koliko ih je bilo na redu |
 | `sent` | koliko je stvarno otišlo |
 | `removed` | uređaji koji više ne postoje (404/410) — obrisani iz baze |
-| `retry` | prolazna greška kod push servisa; vraćeni u red za sljedeći poziv |
+| `retry` | prolazna greška (mreža, 429, 5xx, bez odgovora) i poslije ponovnih pokušaja; vraćeni u red za sljedeći poziv |
+| `timeouts` | od `retry`: uređaji koji nisu odgovorili za 8 s |
 | `failed` | **naša** greška, npr. pogrešan VAPID ključ — vidi `last_error` u bazi |
+| `attempts` | ukupno HTTP pokušaja, s ponovnim |
 | `truncated` | posao nije stao u jedan prolaz; pozovi rutu ponovo |
+| `busy` | drugo slanje je bilo u toku — ovaj poziv nije radio ništa |
 
 `failed` veći od nule je jedini broj koji traži da odmah pogledaš — zato i
 obara GitHub Actions u crveno. Takvima dan ostaje otvoren, pa ih sljedeći
@@ -273,6 +284,46 @@ bio kriv devet puta od deset.
    pretplate treba obrisati i ponovo uključiti zvono.
 4. **Tek onda telefon.** Ugašene obavijesti u sistemskim postavkama, Focus
    režim, ili PWA obrisan s početnog ekrana.
+
+### Proba opterećenja (5000 lažnih korisnika)
+
+Slanje kao u produkciji, na produkciji, bez ijednog telefona: skripta
+prijavi 5000 lažnih korisnika kroz pravi `/api/push/subscribe` (pravi P-256
+ključevi), pozove slanje tri puta kao cron za izmišljen dan `2099-…`,
+ispiše po tipu uređaja kome je stiglo, a kome nije, i na kraju ih obriše.
+Lažni push servis (`/api/proba-push`) glumi FCM/Apple: `ok`, `sporo`
+(2–4 s), `prolazno` (503), `gust` (429), `mrtva` (410), `visi` (ne odgovara).
+
+Pravi korisnici ne dobiju ništa: baza drži probu i pravo slanje potpuno
+odvojeno, a dan probe je izmišljen, pa ne dira ni oznaku dana. Sve dijelove
+probe otvara samo `CRON_SECRET` (prijemnik i potpis našeg VAPID ključa).
+
+Jednom, prije prve probe:
+
+1. **Supabase → SQL Editor:** pokreni `supabase/schema.sql`, pa
+   `supabase/verify.sql` (sve PROLAZ). Bezbjedno: i stari i novi kod rade
+   s novom shemom.
+2. Kod mora biti na produkciji (push na `trunk`).
+
+Pokretanje — van 11:45–15:05 po Sarajevu (tad ide pravo slanje, skripta to
+sama odbije):
+
+```bash
+read -rs 'CRON_SECRET?CRON_SECRET: ' && export CRON_SECRET && node scripts/proba-5000.mjs 5000; unset CRON_SECRET
+```
+
+Traje ~2 minute. Na kraju piše `proba prošla` (izlaz 0) ili šta nije. Uz
+`--zadrzi` lažne pretplate ostaju u bazi (pravo slanje ih ionako ne dira).
+Ako skripta pukne na pola, briše ih
+`node scripts/proba-5000.mjs --ocisti` (uz isti `CRON_SECRET`).
+
+Druga adresa ide kao argument, npr. preview grane:
+`node scripts/proba-5000.mjs 5000 https://…-git-test-….vercel.app`. Ako je
+preview iza Vercelove prijave, treba i *Protection Bypass for Automation*
+(Settings → Deployment Protection) i tajna upisana kao `VERCEL_BYPASS`.
+
+Vercel formalno dozvoljava probe opterećenja tek na Enterprise planu; jedna
+proba je ~10 000 zahtjeva u par minuta — pokreni je kad treba, ne u petlji.
 
 ---
 

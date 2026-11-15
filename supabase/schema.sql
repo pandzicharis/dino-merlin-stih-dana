@@ -133,6 +133,23 @@ drop function if exists claim_due_subscriptions(uuid, int, boolean);
 drop function if exists count_due_subscriptions(uuid, boolean);
 drop function if exists push_subscription_is_due(text, smallint, date);
 drop function if exists finish_push_batch(text[], text[], text[], text);
+-- potpisi bez `p_proba` (do novembra 2026)
+drop function if exists claim_due_subscriptions(uuid, date, int, boolean);
+drop function if exists count_due_subscriptions(uuid, date, boolean);
+
+
+-- ─────────────────────────────────────────────────────────────────────
+--  Lažne pretplate (proba opterećenja, scripts/proba-5000.mjs)
+--
+--  Adresa im je `https://<test-deploy>/api/proba-push?id=…&tip=…&p=<oznaka>`
+--  i primaju ih samo preview deployi. `p_proba` dijeli posao na dva
+--  odvojena svijeta:
+--
+--    null      pravo slanje — lažne se NIKAD ne diraju, čak i da ostanu u
+--              bazi nakon prekinute probe
+--    <oznaka>  proba — samo lažne s tom oznakom; pravi korisnici ne mogu
+--              dobiti probnu obavijest ni kad test i produkcija dijele bazu
+-- ─────────────────────────────────────────────────────────────────────
 
 
 -- ─────────────────────────────────────────────────────────────────────
@@ -153,7 +170,8 @@ create or replace function claim_due_subscriptions(
   p_run   uuid,
   p_today date,
   p_limit int default 500,
-  p_force boolean default false
+  p_force boolean default false,
+  p_proba text default null
 )
 returns table (endpoint text, p256dh text, auth text)
 language sql
@@ -164,6 +182,11 @@ as $$
      where s.last_run is distinct from p_run
        and (p_force or s.last_sent_on is distinct from p_today)
        and (p_force or s.claimed_at is null or s.claimed_at < now() - interval '2 minutes')
+       and case when p_proba is null
+                then strpos(s.endpoint, '/api/proba-push?') = 0
+                else strpos(s.endpoint, '/api/proba-push?') > 0
+                     and right(s.endpoint, length(p_proba) + 3) = '&p=' || p_proba
+           end
      order by s.endpoint
      limit p_limit
        for update skip locked
@@ -180,7 +203,8 @@ $$;
 create or replace function count_due_subscriptions(
   p_run   uuid,
   p_today date,
-  p_force boolean default false
+  p_force boolean default false,
+  p_proba text default null
 )
 returns bigint
 language sql
@@ -190,7 +214,12 @@ as $$
     from push_subscriptions s
    where s.last_run is distinct from p_run
      and (p_force or s.last_sent_on is distinct from p_today)
-     and (p_force or s.claimed_at is null or s.claimed_at < now() - interval '2 minutes');
+     and (p_force or s.claimed_at is null or s.claimed_at < now() - interval '2 minutes')
+     and case when p_proba is null
+              then strpos(s.endpoint, '/api/proba-push?') = 0
+              else strpos(s.endpoint, '/api/proba-push?') > 0
+                   and right(s.endpoint, length(p_proba) + 3) = '&p=' || p_proba
+         end;
 $$;
 
 
@@ -253,16 +282,65 @@ $$;
 
 
 -- ─────────────────────────────────────────────────────────────────────
+--  Brava — dva slanja nikad istovremeno
+--
+--  Preuzimanje porcija već čuva od duplikata (`skip locked` + posudba),
+--  pa brava nije tu zbog tačnosti nego zbog reda: drugi okidač u istom
+--  trenutku ne udvostruči posao, a proba ne može ići uz pravo slanje.
+--
+--  Brava je posudba s rokom, ne sesija: funkcija koja padne ne pusti je,
+--  pa je pusti vrijeme (`p_seconds`, duže od `maxDuration` rute). Ruta je
+--  u produkciji zove "otvorenih vrata" — greška ovdje ne zaustavlja slanje.
+-- ─────────────────────────────────────────────────────────────────────
+
+create table if not exists push_lock (
+  name   text primary key,
+  holder uuid not null,
+  until  timestamptz not null
+);
+
+alter table push_lock enable row level security;
+
+-- true = brava je naša (nova, istekla tuđa, ili već naša pa produžena)
+create or replace function take_push_lock(p_name text, p_holder uuid, p_seconds int default 90)
+returns boolean
+language sql
+as $$
+  with t as (
+    insert into push_lock as l (name, holder, until)
+    values (p_name, p_holder, now() + make_interval(secs => p_seconds))
+    on conflict (name) do update
+       set holder = excluded.holder,
+           until  = excluded.until
+     where l.until < now() or l.holder = excluded.holder
+    returning 1
+  )
+  select exists (select 1 from t);
+$$;
+
+create or replace function release_push_lock(p_name text, p_holder uuid)
+returns void
+language sql
+as $$
+  delete from push_lock where name = p_name and holder = p_holder;
+$$;
+
+
+-- ─────────────────────────────────────────────────────────────────────
 --  Dozvole: sve ide preko service-role ključa sa servera.
 -- ─────────────────────────────────────────────────────────────────────
 
-revoke all on function claim_due_subscriptions(uuid, date, int, boolean)     from public, anon, authenticated;
-revoke all on function count_due_subscriptions(uuid, date, boolean)          from public, anon, authenticated;
-revoke all on function finish_push_batch(text[], text[], text[], text, date) from public, anon, authenticated;
+revoke all on function claim_due_subscriptions(uuid, date, int, boolean, text) from public, anon, authenticated;
+revoke all on function count_due_subscriptions(uuid, date, boolean, text)      from public, anon, authenticated;
+revoke all on function finish_push_batch(text[], text[], text[], text, date)   from public, anon, authenticated;
+revoke all on function take_push_lock(text, uuid, int)                         from public, anon, authenticated;
+revoke all on function release_push_lock(text, uuid)                           from public, anon, authenticated;
 
-grant execute on function claim_due_subscriptions(uuid, date, int, boolean)     to service_role;
-grant execute on function count_due_subscriptions(uuid, date, boolean)          to service_role;
-grant execute on function finish_push_batch(text[], text[], text[], text, date) to service_role;
+grant execute on function claim_due_subscriptions(uuid, date, int, boolean, text) to service_role;
+grant execute on function count_due_subscriptions(uuid, date, boolean, text)      to service_role;
+grant execute on function finish_push_batch(text[], text[], text[], text, date)   to service_role;
+grant execute on function take_push_lock(text, uuid, int)                         to service_role;
+grant execute on function release_push_lock(text, uuid)                           to service_role;
 
 
 -- ─────────────────────────────────────────────────────────────────────

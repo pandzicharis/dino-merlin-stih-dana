@@ -218,6 +218,10 @@ uzima u porcijama, kroz `claim_due_subscriptions`:
 - ruta iznad par stotina na redu **sama sebe podigne u više paralelnih
   workera**, jer jedan serverless poziv ne stigne odraditi desetak hiljada
   šifrovanja i HTTPS rundi prije nego istekne
+- svaki worker drži **100 obavijesti u zraku, svaki pokušaj s rokom od 8 s**,
+  prolazne greške ponavlja (pa drugi krug), a **brava** u bazi drži da dva
+  slanja ne idu istovremeno (lib/push-send.ts). Izdrži li to 5000 ljudi,
+  provjerava proba bez telefona: `scripts/proba-5000.mjs` (DEPLOY.md)
 
 Pravila koja se lako prekrše pri sljedećoj izmjeni:
 

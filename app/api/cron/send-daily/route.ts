@@ -1,10 +1,12 @@
-import { Agent } from 'node:https'
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { SEND_HOUR, TZ, hourInTz, todayInTz } from '@/lib/date'
 import { INVITE } from '@/lib/notify'
+import { PROBA_PATH, bypassHeaders, isOznaka, probaDay, probaHour, probaOn } from '@/lib/proba'
+import { addTally, emptyTally, sendAll, type Row, type SendResult, type Store, type Tally } from '@/lib/push-send'
 
 /**
  * Šalje dnevni poziv: "Vrijeme je za stih dana! Uzmi svoj!".
@@ -31,6 +33,8 @@ import { INVITE } from '@/lib/notify'
  * postavljalo preuzimanje — pa je svaki pad između preuzimanja i slanja, i
  * svaki test, značio da pravi prolaz zatekne prazan red i mirno javi da je
  * sve poslano. Ono što ne prođe ostaje neoznačeno i čeka sljedeći poziv.
+ * `last_sent_on` je tako i dnevnik isporuka: jedan red po (pretplata, dan),
+ * pa duplikat za isti dan ne može ni nastati.
  *
  * `?force=1` zato NE troši dan: obavijest ode, ali oznaka se ne upisuje, pa
  * pravo slanje u podne i dalje ima kome otići.
@@ -42,41 +46,47 @@ import { INVITE } from '@/lib/notify'
  * zasebno šifrovanje plus zasebna HTTPS runda do Googlea ili Applea, a
  * serverless funkcija ima tvrd rok. Zato se posao dijeli:
  *
- *   dispatcher  odredi koliko ih je na redu i podigne N paralelnih workera
- *   worker      u petlji uzima porciju iz baze i šalje je
+ *   dispatcher  uzme bravu, odredi koliko ih je na redu i podigne N
+ *               paralelnih workera
+ *   worker      bazen od 100 obavijesti u zraku, s timeoutom i ponovnim
+ *               pokušajima (lib/push-send.ts)
  *
  * Ko šta šalje ne dogovara se ovdje nego u bazi: `claim_due_subscriptions`
- * u jednoj transakciji uzme porciju i odmah je označi kao poslanu
- * (`for update skip locked`). Dva workera zato ne mogu dobiti istog
- * čovjeka, a ni dva cron prolaza koja se preklope.
+ * u jednoj transakciji uzme porciju i posudi je (`for update skip locked`).
+ * Dva workera zato ne mogu dobiti istog čovjeka, a ni dva cron prolaza koja
+ * se preklope. Brava (`take_push_lock`) uz to drži da dva slanja ne idu
+ * istovremeno — u produkciji "otvorenih vrata": ako brava ne radi, slanje
+ * ide bez nje, jer bi propušten dan bio gori od dvostrukog posla.
+ *
+ * ── Proba opterećenja ───────────────────────────────────────────────
+ * `?proba=<oznaka>&dan=2099-MM-DD&sat=12` (uz tajnu, kao svaki poziv) šalje
+ * SAMO lažnim pretplatama te probe (scripts/proba-5000.mjs, lib/proba.ts),
+ * za izmišljen dan i po glumljenom satu. Pravi korisnici tad ne dobiju
+ * ništa, a pravo slanje lažne nikad ne dira — baza ih drži odvojeno.
+ * Lokalno (`next dev`) se ti parametri ignorišu.
  */
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-/** Koliko pretplatnika worker uzme iz baze odjednom. */
-const BATCH = 250
-
-/** Koliko obavijesti jedan worker drži u zraku istovremeno. */
-const CONCURRENCY = 40
-
 /** Iznad ovoliko na redu, dispatcher dijeli posao umjesto da ga radi sam. */
 const INLINE_LIMIT = 400
 
-/** Ciljano opterećenje po workeru i gornja granica paralelizma. */
-const PER_WORKER = 1500
-const MAX_WORKERS = 8
+/** Ciljano opterećenje po workeru i gornja granica paralelizma (svaki drži 100 u zraku). */
+const PER_WORKER = 2000
+const MAX_WORKERS = 6
 
-/** Koliko sekundi ostaviti za uredan završetak prije `maxDuration`. */
-const WORKER_BUDGET_MS = 45_000
+/** Rokovi, s rezervom za uredan završetak prije `maxDuration`. */
+const WORKER_BUDGET_MS = 47_000
 const DISPATCH_BUDGET_MS = 52_000
 
-/**
- * Bez ovoga svaka obavijest plaća novi TLS handshake prema push servisu.
- * Na deset hiljada poruka to je nekoliko minuta čistog čekanja na mrežu;
- * s održanom vezom isti posao stane u nekoliko sekundi.
- */
-const agent = new Agent({ keepAlive: true, keepAliveMsecs: 10_000, maxSockets: CONCURRENCY })
+/** Brava: rok duži od `maxDuration`, pa je funkcija koja padne ne zaključa zauvijek. */
+const LOCK = 'slanje'
+const LOCK_TTL_S = 90
+/** Koliko poziv čeka da drugo slanje završi prije nego odustane. */
+const LOCK_WAIT_MS = 10_000
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 /**
  * Prihvata oba načina slanja tajne:
@@ -112,149 +122,88 @@ function selfOrigin(req: Request): string {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : own
 }
 
-/**
- * N poslova, najviše `size` u zraku. Ne fiksni blokovi — kod blokova cijela
- * grupa čeka najsporiji zahtjev u njoj, a jedan uspavan push servis tako
- * lako udvostruči ukupno vrijeme.
- */
-async function pool<T>(items: T[], size: number, fn: (item: T) => Promise<void>): Promise<void> {
-  let next = 0
-  const worker = async () => {
-    while (next < items.length) await fn(items[next++])
-  }
-  await Promise.all(Array.from({ length: Math.min(size, items.length) }, worker))
-}
-
-type Row = { endpoint: string; p256dh: string; auth: string }
-type Tally = { sent: number; removed: number; retry: number; failed: number; batches: number }
-
-const emptyTally = (): Tally => ({ sent: 0, removed: 0, retry: 0, failed: 0, batches: 0 })
-
-function add(a: Tally, b: Tally): Tally {
-  return {
-    sent: a.sent + b.sent,
-    removed: a.removed + b.removed,
-    retry: a.retry + b.retry,
-    failed: a.failed + b.failed,
-    batches: a.batches + b.batches,
-  }
-}
+const workersFor = (due: number) => (due <= INLINE_LIMIT ? (due ? 1 : 0) : Math.min(MAX_WORKERS, Math.ceil(due / PER_WORKER)))
 
 /**
- * Jedna porcija: pošalji i razvrstaj ishode.
+ * Baza iz ugla slanja.
  *
- *   uspjeh   → upisuje se `stamp` (sarajevski datum) i dan je zatvoren
+ *   uspjeh   → upisuje se `today` (sarajevski datum) i dan je zatvoren
  *   404/410  uređaj više ne postoji  → briše se
- *   429/5xx  prolazno kod servisa    → ostaje neoznačen, ide u idući prolaz
- *   ostalo   naša greška (npr. pogrešan VAPID ključ) → takođe ostaje neoznačen
+ *   ostalo   ostaje neoznačen; `last_run` ga drži van ovog prolaza, pa ga
+ *            pokupi tek sljedeći poziv rute
  *
- * Zadnja dva reda su ista stvar za bazu, a razdvojena su samo u brojkama:
- * `failed` je naša greška i jedini broj koji traži da odmah pogledaš. Ranije
- * je takav red ostajao označen kao poslan — jedna pogrešna varijabla okoline
- * tako je tiho pojela dan svima. Sad se i on vrati u red, a u petlju ne može:
- * `last_run` ga drži van ovog prolaza, a sljedeći okidač je dvadeset minuta
- * dalje.
- *
- * `stamp` je null kad je pozvan `?force=1` — tada obavijest ode, a dan ostaje
- * otvoren, da test ne pojede pravo slanje.
+ * `p_proba` ide samo na probi: produkcija zove isti potpis kao prije, pa
+ * radi i dok supabase/schema.sql još nije pokrenut ponovo.
  */
-async function sendBatch(rows: Row[], payload: string, stamp: string | null): Promise<Tally> {
-  const t = emptyTally()
-  const ok: string[] = []
-  const dead: string[] = []
-  // Sve što nije prošlo ide istim putem nazad u red — bez obzira čija je greška.
-  const again: string[] = []
-  let firstError: string | null = null
-
-  await pool(rows, CONCURRENCY, async (s) => {
-    try {
-      await webpush.sendNotification(
-        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        payload,
-        // `high`: Android (posebno Samsung) inače drži obavijest dok telefon
-        // miruje i isporuči je tek kad se probudi — stih stigne sat-dva kasnije
-        { TTL: 12 * 3600, agent, urgency: 'high' },
-      )
-      ok.push(s.endpoint)
-    } catch (e) {
-      const err = e as { statusCode?: number; body?: string; message?: string }
-      const code = err?.statusCode ?? 0
-      if (code === 404 || code === 410) {
-        dead.push(s.endpoint)
-      } else {
-        again.push(s.endpoint)
-        if (code === 429 || code >= 500) t.retry++
-        else t.failed++
-        firstError ??= `${code} ${err.body ?? err.message ?? ''}`.trim().slice(0, 300)
-      }
-    }
-  })
-
-  t.sent = ok.length
-  t.removed = dead.length
-  t.batches = 1
-
-  const db = supabase()
-  if (db && (ok.length || dead.length || again.length)) {
-    const { error } = await db.rpc('finish_push_batch', {
-      p_ok: ok,
-      p_dead: dead,
-      p_retry: again,
-      p_error: firstError,
-      p_today: stamp,
-    })
-    // Neuspjeh ovdje ne smije srušiti prolaz: obavijesti su već otišle. Dan
-    // tad ostaje otvoren, pa ih sljedeći okidač može pokupiti još jednom —
-    // ista `tag` oznaka na telefonu samo zamijeni staru obavijest.
-    if (error) console.error('finish_push_batch:', error.message)
+function dbStore(db: SupabaseClient, run: string, today: string, force: boolean, proba: string | null): Store {
+  return {
+    async claim(limit) {
+      const { data, error } = await db.rpc('claim_due_subscriptions', {
+        p_run: run,
+        p_today: today,
+        p_limit: limit,
+        p_force: force,
+        ...(proba ? { p_proba: proba } : {}),
+      })
+      if (error) throw new Error(error.message)
+      return (data ?? []) as Row[]
+    },
+    async finish({ ok, dead, retry, error }) {
+      const { error: e } = await db.rpc('finish_push_batch', {
+        p_ok: ok,
+        p_dead: dead,
+        p_retry: retry,
+        p_error: error,
+        // `?force=1` ne troši dan — da test ne pojede pravo slanje
+        p_today: force ? null : today,
+      })
+      if (e) throw new Error(e.message)
+    },
   }
-
-  return t
 }
 
-/**
- * Worker: uzimaj porciju i šalji dok ima posla ili dok ima vremena.
- * Prekid po budžetu nije gubitak — neposlani ostaju neoznačeni, pa ih pokupi
- * sljedeći poziv rute.
- */
-async function runWorker(
+function runSend(
+  db: SupabaseClient,
   run: string,
   today: string,
   force: boolean,
+  proba: string | null,
   payload: string,
   deadline: number,
-) {
-  const db = supabase()
-  if (!db) return { ...emptyTally(), error: 'baza nije konfigurisana' }
+): Promise<SendResult> {
+  return sendAll(dbStore(db, run, today, force, proba), {
+    payload,
+    deadline,
+    // lažni push servis je na ovom (zaštićenom) preview deployu
+    headersFor: (endpoint) => (endpoint.includes(`${PROBA_PATH}?`) ? bypassHeaders() : undefined),
+  })
+}
 
-  let total = emptyTally()
-  let truncated = false
+type Lock = { taken: boolean; busy?: boolean; skipped?: string; error?: string }
 
+/**
+ * Drugo slanje u toku → čekaj do `LOCK_WAIT_MS`. Greška same brave: u
+ * produkciji se šalje bez nje (preuzimanje porcija ionako ne da duplikat),
+ * na probi (`strict`) je to greška — proba i provjerava bravu.
+ */
+async function takeLock(db: SupabaseClient, holder: string, strict: boolean): Promise<Lock> {
+  const giveUp = Date.now() + LOCK_WAIT_MS
   for (;;) {
-    if (Date.now() > deadline) {
-      truncated = true
-      break
+    const { data, error } = await db.rpc('take_push_lock', { p_name: LOCK, p_holder: holder, p_seconds: LOCK_TTL_S })
+    if (error) {
+      if (strict) return { taken: false, error: `brava: ${error.message} — pokreni supabase/schema.sql` }
+      console.error('take_push_lock:', error.message)
+      return { taken: false, skipped: error.message }
     }
-
-    const { data, error } = await db.rpc('claim_due_subscriptions', {
-      p_run: run,
-      p_today: today,
-      p_limit: BATCH,
-      p_force: force,
-    })
-    if (error) return { ...total, error: error.message }
-
-    // Prekid ide isključivo na praznu porciju. Manja porcija od tražene ne
-    // znači da je red prazan — znači i da drugi worker trenutno drži te redove
-    // zaključanim. Da se tu stalo, posao bi pod paralelizmom znao ostati
-    // nedovršen tačno onda kad je najviše ljudi na redu.
-    const rows = (data ?? []) as Row[]
-    if (rows.length === 0) break
-
-    total = add(total, await sendBatch(rows, payload, force ? null : today))
+    if (data === true) return { taken: true }
+    if (Date.now() + 1_500 > giveUp) return { taken: false, busy: true }
+    await sleep(1_500)
   }
+}
 
-  return { ...total, truncated }
+async function releaseLock(db: SupabaseClient, holder: string) {
+  const { error } = await db.rpc('release_push_lock', { p_name: LOCK, p_holder: holder })
+  if (error) console.error('release_push_lock:', error.message)
 }
 
 /** Vanjski cron servisi često šalju GET — isto radi. */
@@ -278,25 +227,40 @@ export async function POST(req: Request) {
   // ?force=1  šalje i onima koji su stih za ovaj dan već dobili; NE upisuje
   //           oznaku dana, pa test ne može pojesti pravo slanje
   // ?dry=1    ništa ne šalje, samo javi kome bi otišlo
-  // ?worker=  interno: ovaj zahtjev je jedan od podignutih workera
+  // ?worker=  interno: ovaj zahtjev je jedan od podignutih workera (&rok= ms)
   // ?now=1    ručni test (GitHub → Run workflow) — bez provjere sata
   const q = new URL(req.url).searchParams
-  const force = q.get('force') === '1'
   const dry = q.get('dry') === '1'
   const workerRun = q.get('worker')
 
+  // ?proba=<oznaka>&dan=2099-MM-DD&sat=12 — proba opterećenja (vidi gore)
+  const probaParam = probaOn() ? q.get('proba') : null
+  const proba = isOznaka(probaParam) ? probaParam : null
+  if (probaParam !== null && !proba) {
+    return NextResponse.json({ error: 'neispravna oznaka probe' }, { status: 400 })
+  }
+  const fakeDay = proba ? probaDay(q.get('dan')) : null
+  if (proba && !fakeDay) {
+    return NextResponse.json({ error: 'proba traži izmišljen dan: dan=2099-MM-DD' }, { status: 400 })
+  }
+  const fakeHour = proba ? probaHour(q.get('sat')) : null
+  const force = !proba && q.get('force') === '1'
+
   // podne po sarajevskom satu — ljeti i zimi isto (vidi gore)
   if (!workerRun && !force && !dry && q.get('now') !== '1') {
-    const h = hourInTz()
+    const h = fakeHour ?? hourInTz()
     // par minuta ranije je isto podne — okidač čiji sat malo žuri ne preskoči dan
-    const m = Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, minute: '2-digit' }).format(new Date()))
+    const m =
+      fakeHour !== null
+        ? 0
+        : Number(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, minute: '2-digit' }).format(new Date()))
     const early = h === SEND_HOUR - 1 && m >= 55
     if (!early && (h < SEND_HOUR || h > SEND_HOUR + 2)) {
       return NextResponse.json({ skipped: `U Sarajevu je ${h}h — obavijest ide u ${SEND_HOUR}h`, due: 0 })
     }
   }
 
-  const today = todayInTz()
+  const today = fakeDay ?? todayInTz()
   // poziv, ne stih — dodir otvara aplikaciju, a stih se tamo izvlači
   const payload = JSON.stringify({
     ...INVITE,
@@ -307,7 +271,10 @@ export async function POST(req: Request) {
   /* ── worker ──────────────────────────────────────────────────────── */
 
   if (workerRun) {
-    const out = await runWorker(workerRun, today, force, payload, started + WORKER_BUDGET_MS)
+    // rok dispatchera, da njegov odgovor stigne prije njegovog `maxDuration`
+    const rok = Number(q.get('rok'))
+    const deadline = Math.min(started + WORKER_BUDGET_MS, Number.isFinite(rok) && rok > started ? rok : Infinity)
+    const out = await runSend(db, workerRun, today, force, proba, payload, deadline)
     return NextResponse.json({ worker: workerRun, ...out, ms: Date.now() - started })
   }
 
@@ -315,103 +282,129 @@ export async function POST(req: Request) {
 
   const run = randomUUID()
 
-  const { data: dueRaw, error: countError } = await db.rpc('count_due_subscriptions', {
-    p_run: run,
-    p_today: today,
-    p_force: force,
-  })
-  if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
-  const due = Number(dueRaw ?? 0)
+  const countDue = async () => {
+    const { data, error } = await db.rpc('count_due_subscriptions', {
+      p_run: run,
+      p_today: today,
+      p_force: force,
+      ...(proba ? { p_proba: proba } : {}),
+    })
+    return { due: Number(data ?? 0), error }
+  }
 
   if (dry) {
-    const { count } = await db
-      .from('push_subscriptions')
-      .select('*', { count: 'exact', head: true })
-    return NextResponse.json({
-      dry: true,
-      date: today,
-      subscribers: count ?? 0,
-      due,
-      workers: due <= INLINE_LIMIT ? (due ? 1 : 0) : Math.min(MAX_WORKERS, Math.ceil(due / PER_WORKER)),
-    })
+    const { due, error } = await countDue()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const { count } = await db.from('push_subscriptions').select('*', { count: 'exact', head: true })
+    return NextResponse.json({ dry: true, date: today, subscribers: count ?? 0, due, workers: workersFor(due) })
   }
 
-  if (due === 0) {
-    // Odgovor sam kaže zašto je prazan — inače `due: 0` izgleda kao kvar,
-    // a najčešće znači da je stih za ovaj dan već otišao.
+  const lock = await takeLock(db, run, proba !== null)
+  if (lock.error) return NextResponse.json({ error: lock.error }, { status: 503 })
+  if (lock.busy) {
+    // nije greška: drugo slanje radi isti posao
     return NextResponse.json({
       date: today,
-      due: 0,
-      sent: 0,
-      note: force
-        ? 'nema nijedne pretplate u bazi'
-        : 'stih za ovaj dan je već poslan svima — ?force=1 šalje ponovo, bez diranja oznake dana',
+      busy: true,
+      note: 'drugo slanje je u toku — ovaj poziv ne šalje ništa',
       ms: Date.now() - started,
     })
   }
+  const lockNote = lock.skipped ? { brava: `bez brave (${lock.skipped.slice(0, 120)})` } : {}
 
-  // Mali broj na redu se odradi odmah — dijeljenje posla bi tu koštalo više
-  // nego što donese.
-  if (due <= INLINE_LIMIT) {
-    const out = await runWorker(run, today, force, payload, started + DISPATCH_BUDGET_MS)
-    return NextResponse.json({
-      date: today,
-      due,
-      workers: 1,
-      ...out,
-      ms: Date.now() - started,
-    })
-  }
+  try {
+    const { due, error: countError } = await countDue()
+    if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
 
-  const workers = Math.min(MAX_WORKERS, Math.ceil(due / PER_WORKER))
-  const origin = selfOrigin(req)
-  const secret = process.env.CRON_SECRET as string
-
-  const url = new URL('/api/cron/send-daily', origin)
-  url.searchParams.set('worker', run)
-  if (force) url.searchParams.set('force', '1')
-
-  const results = await Promise.allSettled(
-    Array.from({ length: workers }, () =>
-      fetch(url, {
-        method: 'POST',
-        headers: { 'x-cron-secret': secret },
-        cache: 'no-store',
-      }).then((r) => r.json() as Promise<Tally & { error?: string; truncated?: boolean }>),
-    ),
-  )
-
-  let total = emptyTally()
-  const errors: string[] = []
-  let truncated = false
-
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      total = add(total, { ...emptyTally(), ...r.value })
-      if (r.value.error) errors.push(r.value.error)
-      if (r.value.truncated) truncated = true
-    } else {
-      errors.push(String((r.reason as Error)?.message ?? r.reason))
+    if (due === 0) {
+      // Odgovor sam kaže zašto je prazan — inače `due: 0` izgleda kao kvar,
+      // a najčešće znači da je stih za ovaj dan već otišao.
+      return NextResponse.json({
+        date: today,
+        due: 0,
+        sent: 0,
+        note: force
+          ? 'nema nijedne pretplate u bazi'
+          : 'stih za ovaj dan je već poslan svima — ?force=1 šalje ponovo, bez diranja oznake dana',
+        ...lockNote,
+        ms: Date.now() - started,
+      })
     }
-  }
 
-  // Nijedan worker nije ništa poslao (adresa iza zaštite, mreža, rok) —
-  // dispatcher šalje sam, koliko stigne do svog roka. Ostatak (ako ga ima)
-  // pokupi sljedeći poziv okidača: ruta se smije zvati više puta.
-  if (!total.sent && errors.length) {
-    const out = await runWorker(run, today, force, payload, started + DISPATCH_BUDGET_MS)
-    total = add(total, { ...emptyTally(), ...out })
-    if ('error' in out && out.error) errors.push(out.error)
-    if ('truncated' in out && out.truncated) truncated = true
-  }
+    const deadline = started + DISPATCH_BUDGET_MS
 
-  return NextResponse.json({
-    date: today,
-    due,
-    workers,
-    ...total,
-    ...(truncated ? { truncated: true } : {}),
-    ...(errors.length ? { errors } : {}),
-    ms: Date.now() - started,
-  })
+    // Mali broj na redu se odradi odmah — dijeljenje posla bi tu koštalo više
+    // nego što donese.
+    if (due <= INLINE_LIMIT) {
+      const out = await runSend(db, run, today, force, proba, payload, deadline)
+      return NextResponse.json({
+        date: today,
+        ...(proba ? { proba } : {}),
+        due,
+        workers: 1,
+        ...out,
+        ...lockNote,
+        ms: Date.now() - started,
+      })
+    }
+
+    const workers = workersFor(due)
+    const url = new URL('/api/cron/send-daily', selfOrigin(req))
+    url.searchParams.set('worker', run)
+    url.searchParams.set('rok', String(deadline - 2_000))
+    if (force) url.searchParams.set('force', '1')
+    if (proba) {
+      url.searchParams.set('proba', proba)
+      url.searchParams.set('dan', today)
+    }
+
+    const results = await Promise.allSettled(
+      Array.from({ length: workers }, () =>
+        fetch(url, {
+          method: 'POST',
+          headers: { 'x-cron-secret': process.env.CRON_SECRET as string, ...bypassHeaders() },
+          cache: 'no-store',
+          signal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
+        }).then((r) => r.json() as Promise<Partial<Tally> & { error?: string; truncated?: boolean }>),
+      ),
+    )
+
+    let total = emptyTally()
+    const errors: string[] = []
+    let truncated = false
+
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        total = addTally(total, r.value)
+        if (r.value.error) errors.push(r.value.error)
+        if (r.value.truncated) truncated = true
+      } else {
+        errors.push(String((r.reason as Error)?.message ?? r.reason))
+      }
+    }
+
+    // Nijedan worker nije ništa poslao (adresa iza zaštite, mreža, rok) —
+    // dispatcher šalje sam, koliko stigne do svog roka. Ostatak (ako ga ima)
+    // pokupi sljedeći poziv okidača: ruta se smije zvati više puta.
+    if (!total.sent && errors.length) {
+      const out = await runSend(db, run, today, force, proba, payload, deadline)
+      total = addTally(total, out)
+      if (out.error) errors.push(out.error)
+      if (out.truncated) truncated = true
+    }
+
+    return NextResponse.json({
+      date: today,
+      ...(proba ? { proba } : {}),
+      due,
+      workers,
+      ...total,
+      ...(truncated ? { truncated: true } : {}),
+      ...(errors.length ? { errors } : {}),
+      ...lockNote,
+      ms: Date.now() - started,
+    })
+  } finally {
+    if (lock.taken) await releaseLock(db, run)
+  }
 }
