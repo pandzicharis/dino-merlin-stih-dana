@@ -260,7 +260,8 @@ export function SheetBackdrop({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * Panel: na telefonu odozdo cijelom visinom, na širokom ekranu 48px uz fade.
+ * Panel: na telefonu i tabletu odozdo, od ivice do ivice; na računaru 440 px,
+ * 48px uz fade.
  * `away`: panel ostaje montiran, sklonjen ispod ekrana (plejer pjesama) —
  * otvaranje je samo kretnja, bez ponovnog slaganja sadržaja.
  */
@@ -271,14 +272,11 @@ export function SheetSlide({
   children,
   away = false,
   rise = false,
-  edge = false,
   onShown,
 }: {
   children: ReactNode
   away?: boolean
   rise?: boolean
-  /** na telefonu od ivice do ivice (bez 440 px) — ladice pjesme i sačuvanih */
-  edge?: boolean
   /** panel je sjeo (otvaranje gotovo) */
   onShown?: () => void
 }) {
@@ -317,7 +315,7 @@ export function SheetSlide({
   const resume = { ...shown, opacity: 1, visibility: 'visible' as const, transition: rise ? RISE : OPEN }
   return (
     <motion.div
-      className={`relative flex w-full justify-center ${edge ? 'wide:max-w-[440px]' : 'max-w-[440px]'}`}
+      className="relative flex w-full justify-center wide:max-w-[440px]"
       style={{ willChange: 'transform' }}
       // `away`: panel stalno montiran, sklonjen ispod ekrana — kad sjedne
       // dolje, ne crta se (visibility), a otvara se bez ikakvog slaganja

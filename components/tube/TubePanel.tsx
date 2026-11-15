@@ -19,7 +19,7 @@ import { DrawerHeader } from '../DrawerIcon'
 import { Search } from './icons'
 import { TubeDrawer } from './TubeDrawer'
 import { MiniSong } from './MiniSong'
-import { NowPlaying, SongBackdrop } from './NowPlaying'
+import { NowPlaying, SHEET_RESIZE, SongBackdrop } from './NowPlaying'
 import { Albums, Slips, SongList, VIEWS, searchSongs, uniqueSongs, type TubeView } from './TubeViews'
 
 const SCOPE = 'saved'
@@ -201,7 +201,7 @@ export default function TubePanel({ open, onClose }: { open: boolean; onOpen: ()
       {open && (
         <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center wide:items-center">
           <SheetBackdrop onClose={onClose} />
-          <SheetSlide edge>
+          <SheetSlide>
             <motion.div
               role="dialog"
               aria-modal="true"
@@ -210,8 +210,8 @@ export default function TubePanel({ open, onClose }: { open: boolean; onOpen: ()
               {...sheetDrag}
               initial={false}
               animate={{ height }}
-              // visina klizi mirno (bez opruge — ne odbija se na kraju)
-              transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
+              // visina klizi mekano, isto gore i dole (bez opruge — ne odbija se na kraju)
+              transition={SHEET_RESIZE}
               style={{
                 ...sheetDrag.style,
                 background: `radial-gradient(120% 60% at 50% 0%, ${BRAND.gold}1a 0%, transparent 60%), linear-gradient(180deg, #121010 0%, #0c0b0b 100%)`,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, type Transition } from 'motion/react'
 import { albumOf, softOf, thumbOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
@@ -33,8 +33,16 @@ import { LyricsView, useTubeLyrics } from './TubeLyrics'
  *   podnožje   znakovi platformi (Listen.tsx)
  *
  * Ladica je visoka koliko joj treba (`onHeight` — visina koju traži):
- * zatvoren tekst — sadržaj, otvoren — do vrha ekrana.
+ * zatvoren tekst — sadržaj, otvoren — do vrha ekrana. Visina klizi
+ * `SHEET_RESIZE`, isto u oba smjera, a ništa u ladici ne skače: pri
+ * zatvaranju tekst ostaje dok se ladica spušta (i gasi se), pa tek onda
+ * nestane — ladica je tad već na mjeri bez njega.
  */
+
+/** Kako klizi visina ladice s pjesmom (TubeDrawer, TubePanel) — mekano, bez naglog starta. */
+export const SHEET_RESIZE: Transition = { duration: 0.5, ease: [0.4, 0, 0.2, 1] }
+const RESIZE_MS = 500
+
 export function NowPlaying({
   verse,
   id,
@@ -63,13 +71,22 @@ export function NowPlaying({
     new Image().src = `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`
   }, [tube.next])
   const [open, setOpen] = useState(false)
-  const wide = open && has
+  // tekst je u ladici: otvoren, ili se upravo zatvara (ladica se spušta, tekst se gasi)
+  const [shown, setShown] = useState(false)
+  const toggle = () => {
+    haptic(6)
+    if (!open) setShown(true)
+    setOpen(!open)
+  }
+  const wide = shown && has
   const playing = tube.status === 'playing'
   const m = MOODS[verse.mood]
   const cover = albumOf(verse.album)?.cover
 
-  // koliko ladica treba: zatvoren tekst — koliko je sadržaj, otvoren — do vrha
+  // koliko ladica treba: zatvoren tekst — koliko je sadržaj, otvoren — do vrha, a dok se
+  // zatvara — mjera bez teksta (zapamćena), da se spušta ravno na nju
   const inner = useRef<HTMLDivElement>(null)
+  const closedH = useRef(0)
   const report = useRef(onHeight)
   useEffect(() => {
     report.current = onHeight
@@ -77,13 +94,30 @@ export function NowPlaying({
   useLayoutEffect(() => {
     const el = inner.current
     if (!el) return
-    if (wide) return void report.current?.(fullHeight())
-    const send = () => report.current?.(el.offsetHeight)
+    if (wide && open) return void report.current?.(fullHeight())
+    if (wide) {
+      // zatvara se: ladica klizi na mjeru bez teksta, a tekst nestane tek kad stigne —
+      // tad je sadržaj već te visine. Ne po satu: telefon koji kasni s kadrovima bi
+      // inače izgubio tekst usred kretnje (i dno bi skočilo). Sat je samo osigurač.
+      report.current?.(closedH.current || el.offsetHeight)
+      const arrived = () => el.offsetHeight <= closedH.current + 1 && setShown(false)
+      const ro = new ResizeObserver(arrived)
+      ro.observe(el)
+      const late = window.setTimeout(() => setShown(false), RESIZE_MS * 5)
+      return () => {
+        ro.disconnect()
+        clearTimeout(late)
+      }
+    }
+    const send = () => {
+      closedH.current = el.offsetHeight
+      report.current?.(el.offsetHeight)
+    }
     send()
     const ro = new ResizeObserver(send)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [wide])
+  }, [wide, open])
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -132,10 +166,7 @@ export function NowPlaying({
           <div className={`mt-7 flex flex-col ${wide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
             <button
               type="button"
-              onClick={() => {
-                haptic(6)
-                setOpen((o) => !o)
-              }}
+              onClick={toggle}
               aria-expanded={open}
               // traka je uvijek u tonu (i otvorena) — pod prstom još malo jača
               className="flex h-14 shrink-0 items-center gap-3 bg-white/[0.08] px-5 text-left transition-colors hover:bg-white/[0.1] active:bg-white/[0.11]"
@@ -158,18 +189,27 @@ export function NowPlaying({
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </button>
-            {/* otvoren tekst se pretopi dok ladica raste; zatvoren nestane odmah — ladica se
-                smanjuje na mjeru bez njega, ništa se ne preslaže usput */}
+            {/* otvoren tekst se pretopi dok ladica raste; zatvoren se ugasi dok se ladica
+                spušta i tek onda nestane — ništa se ne preslaže usput */}
             {wide && (
-              <motion.div key="lyrics" className="relative flex min-h-0 flex-1 flex-col" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.12 }}>
+              <motion.div
+                key="lyrics"
+                className="relative flex min-h-0 flex-1 flex-col"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: open ? 1 : 0 }}
+                transition={open ? { duration: 0.3, delay: 0.12 } : { duration: 0.22 }}
+              >
                 <LyricsView verse={verse} lyrics={lyrics} anchor={0.34} />
               </motion.div>
             )}
           </div>
         )}
 
-        {/* podnožje: "Slušaj na" i platforme — bez linija, malo niže (više mjesta iznad) */}
-        <div className={`relative mx-[10px] shrink-0 pb-[max(0.6rem,env(safe-area-inset-bottom))] ${wide ? 'pt-5' : 'pt-8'}`}>
+        {/* podnožje: "Slušaj na" i platforme — bez linija, malo niže (više mjesta iznad);
+            razmak iznad klizi zajedno s visinom ladice */}
+        <div
+          className={`relative mx-[10px] shrink-0 pb-[max(0.6rem,env(safe-area-inset-bottom))] transition-[padding] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${open && has ? 'pt-5' : 'pt-8'}`}
+        >
           <ListenFooter verse={verse} videoId={id} />
         </div>
       </div>

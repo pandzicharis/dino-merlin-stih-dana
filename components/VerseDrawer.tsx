@@ -70,7 +70,7 @@ export function VerseDrawer({
               aria-modal="true"
               aria-label={label}
               {...rest}
-              className={`os-sheet relative flex w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 wide:rounded-[30px] wide:border-b ${height}`}
+              className={`os-sheet relative flex w-full wide:max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 wide:rounded-[30px] wide:border-b ${height}`}
               {...sheetDrag}
               style={{ ...sheetDrag.style, background: m.gradient[0] }}
             >

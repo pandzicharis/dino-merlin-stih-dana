@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, animate, motion, useMotionValue, useTransform } from 'motion/react'
 import { lockScroll } from '@/lib/scroll-lock'
 import { closeTube, minimizeTube, tubeVerse, useTube } from '@/lib/youtube'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from '../Sheet'
-import { NowPlaying, SongBackdrop } from './NowPlaying'
+import { NowPlaying, SHEET_RESIZE, SongBackdrop } from './NowPlaying'
 
 /**
  * Ladica s pjesmom (YouTube — lib/youtube.ts) — ponaša se kao ostale
@@ -23,6 +23,23 @@ export function TubeDrawer({ scope, z = 90, minimize = false }: { scope: string;
 
   // visina koju pjesma traži (zatvoren tekst — sadržaj, otvoren — do vrha)
   const [height, setHeight] = useState(0)
+  // nova ladica se mjeri iznova (zatvorena zadrži mjeru dok se spušta)
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (open) setHeight(0)
+  }
+  // Visina je UVIJEK zapisana na ladici: prva mjera se samo postavi, svaka sljedeća
+  // klizi (SHEET_RESIZE). Bez toga je ladica visoka koliko sadržaj — a tekst pjesme
+  // pri otvaranju u istom kadru naraste na cijelu pjesmu, pa je razvuče daleko iznad
+  // ekrana, i tek onda se spušta na svoju mjeru (skok gore).
+  const sheetH = useMotionValue(0)
+  const sheetHeight = useTransform(sheetH, (v) => (v > 0 ? v : 'auto'))
+  useLayoutEffect(() => {
+    if (!height || !sheetH.get()) return void sheetH.set(height)
+    const a = animate(sheetH, height, SHEET_RESIZE)
+    return () => a.stop()
+  }, [height, sheetH])
 
   useSheetOpen(open)
   const sheetDrag = useSheetDrag(close, open)
@@ -43,7 +60,7 @@ export function TubeDrawer({ scope, z = 90, minimize = false }: { scope: string;
       {open && verse && tube.videoId && (
         <SheetLayer key="tube" className="fixed inset-0 flex items-end justify-center wide:items-center" z={z}>
           <SheetBackdrop onClose={close} />
-          <SheetSlide edge>
+          <SheetSlide>
             <motion.div
               role="dialog"
               aria-modal="true"
@@ -51,11 +68,7 @@ export function TubeDrawer({ scope, z = 90, minimize = false }: { scope: string;
               data-tube-drawer
               className="os-sheet relative flex w-full flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 wide:max-w-[440px] wide:rounded-[30px] wide:border-b"
               {...sheetDrag}
-              initial={false}
-              animate={height ? { height } : undefined}
-              // visina klizi mirno (bez opruge — ne odbija se na kraju)
-              transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
-              style={{ ...sheetDrag.style, background: '#0c0b0b' }}
+              style={{ ...sheetDrag.style, height: sheetHeight, background: '#0c0b0b' }}
             >
               <SongBackdrop verse={verse} />
               <NowPlaying verse={verse} id={tube.videoId} onClose={close} onHeight={setHeight} minimize={minimize} />

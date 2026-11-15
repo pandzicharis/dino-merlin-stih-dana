@@ -463,12 +463,13 @@ function GiftCard({
               aria-modal="true"
               aria-label={`Stih za tebe — ${verse.song}`}
               data-gift
-              className="os-sheet relative flex h-[86dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[26px] border border-b-0 border-white/15 shadow-[0_24px_60px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.1)] wide:h-[80dvh] wide:rounded-[26px] wide:border-b"
+              className="os-sheet relative flex h-[86dvh] w-full wide:max-w-[440px] flex-col overflow-hidden rounded-t-[26px] border border-b-0 border-white/15 shadow-[0_24px_60px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.1)] wide:h-[80dvh] wide:rounded-[26px] wide:border-b"
               {...sheetDrag}
               style={{ ...sheetDrag.style, background: m.gradient[0], fontFamily: 'var(--font-sans), sans-serif' }}
             >
-              {/* atmosfera albuma kao na raširenoj karti (u em od širine karte) */}
-              <div className="pointer-events-none absolute inset-0" style={{ '--cw': 'min(100vw, 440px)', fontSize: 'calc(var(--cw) / 390)' } as React.CSSProperties} aria-hidden>
+              {/* atmosfera albuma kao na raširenoj karti (u em od širine karte — ladica je
+                  preko cijele širine, na računaru 440 px) */}
+              <div className="pointer-events-none absolute inset-0 [--cw:100vw] wide:[--cw:440px]" style={{ fontSize: 'calc(var(--cw) / 390)' }} aria-hidden>
                 <CardAtmosphere mood={verse.mood} cover={album?.cover} lift={album?.lift} />
               </div>
 
