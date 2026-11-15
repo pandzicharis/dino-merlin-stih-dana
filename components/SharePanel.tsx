@@ -276,9 +276,9 @@ export default function SharePanel({
                   initial={{ opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                  className="absolute inset-y-0 flex"
+                  className="absolute inset-0 flex"
                 >
-                  <GiftCard verse={verse} qr={qr} />
+                  <GiftCard verse={verse} qr={qr} className="w-full" />
                 </motion.div>
               )}
             </div>

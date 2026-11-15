@@ -75,13 +75,13 @@ export function GiftCard({
       style={{ background: '#F6F1E7' }}
     >
       <div className={`aspect-square ${qrClass}`}>{qr && <QrCode qr={qr} className="h-full w-full" title={`QR kod — ${verse.song}`} />}</div>
-      <p className="mt-2 max-w-[15rem] truncate text-[15px] text-[#1a1614]" style={{ fontFamily: 'var(--font-serif), serif' }}>
+      <p className="mt-2 max-w-full truncate text-[15px] text-[#1a1614]" style={{ fontFamily: 'var(--font-serif), serif' }}>
         {paperText(verse.text)}
       </p>
-      <p className="mt-1 max-w-[15rem] truncate text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#8C7449' }}>
+      <p className="mt-1 max-w-full truncate text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#8C7449' }}>
         {verse.song}
       </p>
-      <p className="mt-0.5 max-w-[15rem] truncate text-[8px] font-medium uppercase tracking-[0.24em]" style={{ color: '#8C7449b8' }}>
+      <p className="mt-0.5 max-w-full truncate text-[8px] font-medium uppercase tracking-[0.24em]" style={{ color: '#8C7449b8' }}>
         {albumLine(verse)}
       </p>
     </div>
