@@ -90,17 +90,19 @@ export function GiftCard({
 
 /**
  * Ista kartica, položena — u plejeru stane na mjesto videa (iste mjere kao
- * video, ladica ne skače): kod lijevo, desno stih, pjesma i album.
+ * video, ladica ne skače): kod lijevo, desno gore stih, pjesma i album, a
+ * dole desno `onBack` — nazad na pjesmu.
  */
-export function GiftCardWide({ verse, qr }: { verse: Verse; qr: QrMatrix | null }) {
+export function GiftCardWide({ verse, qr, onBack }: { verse: Verse; qr: QrMatrix | null; onBack?: () => void }) {
   return (
-    <div className="flex aspect-video min-h-[200px] w-full items-center gap-4 rounded-[18px] p-4" style={{ background: '#F6F1E7' }}>
-      <div className="aspect-square h-full shrink-0">{qr && <QrCode qr={qr} className="h-full w-full" title={`QR kod — ${verse.song}`} />}</div>
-      <div className="min-w-0 flex-1 pr-1">
-        <p className="line-clamp-4 text-[15px] leading-snug text-[#1a1614]" style={{ fontFamily: 'var(--font-serif), serif' }}>
+    <div className="flex aspect-video min-h-[200px] w-full items-stretch gap-4 rounded-[18px] p-4" style={{ background: '#F6F1E7' }}>
+      <div className="aspect-square h-full shrink-0 self-center">{qr && <QrCode qr={qr} className="h-full w-full" title={`QR kod — ${verse.song}`} />}</div>
+      {/* tekst u ravni s vrhom koda (kod ima svoju tihu zonu) */}
+      <div className="flex min-w-0 flex-1 flex-col pt-1.5">
+        <p className="line-clamp-3 text-[15px] leading-snug text-[#1a1614]" style={{ fontFamily: 'var(--font-serif), serif' }}>
           {paperText(verse.text)}
         </p>
-        <p className="mt-3 truncate text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#8C7449' }}>
+        <p className="mt-2.5 truncate text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#8C7449' }}>
           {verse.song}
         </p>
         {/* uska kolona: album pa godina, svako u svom redu (ne lomi se na tački) */}
@@ -108,6 +110,19 @@ export function GiftCardWide({ verse, qr }: { verse: Verse; qr: QrMatrix | null 
           {albumLine({ album: verse.album, description: verse.description })}
           {verse.year ? <span className="block">{verse.year}</span> : null}
         </p>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Nazad na pjesmu"
+            className="mt-auto flex h-8 shrink-0 items-center gap-1.5 self-end rounded-full border border-[#1a1614]/15 bg-[#1a1614]/[0.05] pl-2.5 pr-3 text-[9.5px] font-semibold uppercase tracking-[0.2em] text-[#1a1614]/80 transition-[background-color,transform] duration-150 hover:bg-[#1a1614]/10 active:scale-95"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            Pjesma
+          </button>
+        )}
       </div>
     </div>
   )

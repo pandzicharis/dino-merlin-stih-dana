@@ -88,23 +88,46 @@ function PlayGlyph({ playing, size }: { playing: boolean; size: number }) {
   )
 }
 
-export function Transport() {
+/** `onPlay`: pjesma će krenuti (pusti, nazad, sljedeća) — u plejeru se tad vrati video umjesto QR koda. */
+export function Transport({ onPlay }: { onPlay?: () => void } = {}) {
   const tube = useTube()
   const on = !tube.min && (tube.status === 'playing' || tube.status === 'loading')
   return (
     <div className="flex shrink-0 items-center">
       {tube.list && (
-        <Btn label="Prethodna" onPress={prevTube} size={41}>
+        <Btn
+          label="Prethodna"
+          onPress={() => {
+            onPlay?.()
+            prevTube()
+          }}
+          size={41}
+        >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
             {PREV}
           </svg>
         </Btn>
       )}
-      <Btn label={on ? 'Pauza' : 'Pusti'} onPress={toggleTube} size={47}>
+      <Btn
+        label={on ? 'Pauza' : 'Pusti'}
+        onPress={() => {
+          if (!on) onPlay?.()
+          toggleTube()
+        }}
+        size={47}
+      >
         <PlayGlyph playing={on} size={31} />
       </Btn>
       {tube.list && (
-        <Btn label="Sljedeća" onPress={nextTube} size={41} disabled={!tube.next}>
+        <Btn
+          label="Sljedeća"
+          onPress={() => {
+            onPlay?.()
+            nextTube()
+          }}
+          size={41}
+          disabled={!tube.next}
+        >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
             {NEXT}
           </svg>

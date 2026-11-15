@@ -103,6 +103,14 @@ export function NowPlaying({
     setQrFor(id)
     setQrOn(false)
   }
+  // pjesma krenula dok je QR na mjestu videa (pusti, nazad, sljedeća) — vrati se video:
+  // YouTube svira samo dok se vidi
+  const showVideo = () => setQrOn(false)
+  const [lastStatus, setLastStatus] = useState(tube.status)
+  if (lastStatus !== tube.status) {
+    setLastStatus(tube.status)
+    if (qrOn && tube.status === 'playing') setQrOn(false)
+  }
 
   // koliko ladica treba: zatvoren tekst — koliko je sadržaj, otvoren — do vrha, a dok se
   // zatvara — mjera bez teksta (zapamćena), da se spušta ravno na nju
@@ -166,7 +174,7 @@ export function NowPlaying({
                   animate={{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 380, damping: 30, delay: 0.08 } }}
                   exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.18 } }}
                 >
-                  <GiftCardWide verse={verse} qr={gift.qr} />
+                  <GiftCardWide verse={verse} qr={gift.qr} onBack={toggleQr} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -199,7 +207,7 @@ export function NowPlaying({
             <p className="mt-1.5 truncate text-[10px] uppercase tracking-[0.22em] text-white/55">{albumLine(verse)}</p>
           </div>
           {/* pjesma iz liste: nazad, pusti, sljedeća — tiho, uz pjesmu */}
-          {tube.list && <Transport />}
+          {tube.list && <Transport onPlay={showVideo} />}
         </div>
 
         {/* tekst pjesme — harmonika preko cijele širine ladice: "Tekst pjesme" je tamnija
