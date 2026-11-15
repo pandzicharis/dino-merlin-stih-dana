@@ -8,6 +8,7 @@ import { MOODS } from '@/data/moods'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import { albumLine } from '@/lib/text'
+import { AUTOPLAY } from '@/lib/player'
 import { openTube, useTube, videoOf, warmTube } from '@/lib/youtube'
 import { FitLines } from '../deck/FitLines'
 import { EqBars } from '../EqBars'
@@ -30,6 +31,17 @@ export function TubeSong({ verse, scope = 'home', z = 90 }: { verse: Verse; scop
     const t = window.setTimeout(() => warmTube(verse), 2500)
     return () => clearTimeout(t)
   }, [verse])
+  // "Mir svim dobrim ljudima" (prvi stih): kad uvod završi, ladica s pjesmom se
+  // otvori i pjesma krene sama (DailyVerse) — iPhone i iPad tiho, dok se ne
+  // dodirne video (lib/youtube.ts)
+  useEffect(() => {
+    if (scope !== 'home') return
+    const go = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === verse.id) openTube(verse, scope)
+    }
+    window.addEventListener(AUTOPLAY, go)
+    return () => window.removeEventListener(AUTOPLAY, go)
+  }, [verse, scope])
   const playing = tube.scope === scope && tube.verseId === verse.id && tube.status === 'playing'
   // bez pjesme: samo naziv i album
   if (!videoOf(verse))

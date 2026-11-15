@@ -61,7 +61,7 @@ export function playable(verse: Verse): boolean {
 export type Player = HTMLAudioElement & { fails?: Set<() => void> }
 
 /** Zvuk pjesme: statični fajl, pa server ako fajla nema. `data-want`: treba svirati. */
-/** stih otvoren — njegova pjesma krene sama (detail: id stiha; components/SongCredit.tsx) */
+/** stih otvoren — njegova pjesma krene sama (detail: id stiha; components/SongCredit.tsx, components/tube/TubeSong.tsx) */
 export const AUTOPLAY = 'stihdana:autoplay'
 
 export function createPlayer(src: string, fallback: string): Player {

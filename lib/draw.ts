@@ -28,6 +28,8 @@ const hasSong = (v: Verse) => (OWN_AUDIO ? playable(v) : Boolean(youtubeId(v.you
  *             iste pjesme tek kad u krugu prođu sve ostale.
  *   dan       izvučen stih se zapamti za taj datum — isti dan je uvijek isti
  *             stih, i izmjena u adminu ga ne dira.
+ *   prvi      prvi stih na uređaju je dobrodošlica "Mir svim dobrim ljudima"
+ *             (pjesma krene sama) — samo tad; u izvlačenju je inače nema.
  *   obavijest ne nosi stih nego poziv "Izvuci svoj stih" (lib/notify.ts) —
  *             stih se otkriva tek kad se izvuče, pa nema šta da se razilazi.
  *   niz       dani zaredom ("7. stih dana") — broji se iz same istorije: dan
@@ -52,7 +54,11 @@ type Entry = {
    *  dan; obavijest istog dana ga zamijeni pravim izvlačenjem (`unseat`) */
   pre?: 1
 }
-type State = { days: Record<string, Entry> }
+type State = {
+  days: Record<string, Entry>
+  /** prvi stih je viđen (papirić sletio) — dobrodošlica se više nikad ne daje */
+  welcomed?: 1
+}
 
 const KEY = 'stihdana:draw'
 const EVENT = 'stihdana:draw'
@@ -177,25 +183,30 @@ function settle(s: State, today: string, pool: string[], byId: Map<string, Verse
     days[d] = e
   }
   if (!days[today]) {
-    // prvi stih ikad na ovom uređaju — uvod, probni: svima "Mir svim dobrim
-    // ljudima" (ako ga ima u katalogu). Zamjena probnog (`avoid`) je pravi
-    // stih — inače bi ga obavijest mijenjala u krug.
-    const firstEver = !Object.keys(s.days).length && !avoid
+    // prvi stih na ovom uređaju — uvod, probni: svima "Mir svim dobrim
+    // ljudima" (ako ga ima u katalogu), samo dok nijedan stih nije viđen. U
+    // browseru se stih izvuče i prije instalacije, a kapija ga ne pokaže —
+    // dobrodošlica čeka prvo pravo otvaranje. Zamjena probnog (`avoid`) je
+    // pravi stih — inače bi ga obavijest mijenjala u krug.
+    const firstEver = !s.welcomed && !Object.values(s.days).some((e) => e.seen) && !avoid
     const e = firstEver && first ? { id: first, r: 0 } : next(days, Object.keys(days).sort(), pool, byId, avoid)
     days[today] = firstEver ? { ...e, pre: 1 } : e
   }
-  return { days }
+  return { ...s, days }
 }
 
 /**
  * Iz čega se izvlači: aktivni stihovi čija je pjesma već u aplikaciji — bez
  * nje bi plejer ispod stiha bio nijem. Pjesma stigne (admin, workflow) → stih
  * ulazi u izvlačenje. Nijedan nema pjesmu (ili su svi arhivirani) → svi, da
- * špil nikad nije prazan.
+ * špil nikad nije prazan. Dobrodošlice ("Mir svim dobrim ljudima") nema —
+ * ona je samo prvi stih.
  */
 function poolOf(verses: ListVerse[]): string[] {
-  const a = verses.filter((v) => v.active !== false)
-  const base = a.length ? a : verses
+  const rest = verses.filter((v) => !isFirstVerse(v.text))
+  const list = rest.length ? rest : verses
+  const a = list.filter((v) => v.active !== false)
+  const base = a.length ? a : list
   const ready = base.filter(hasSong)
   return (ready.length ? ready : base).map((v) => v.id)
 }
@@ -240,6 +251,7 @@ export function markSeen(date: string) {
   const e = s.days[date]
   if (!e || e.seen) return
   s.days[date] = { ...e, seen: 1 }
+  s.welcomed = 1
   save(s)
 }
 

@@ -182,6 +182,8 @@ export function IntroHost({
       }
       // bez izvlačenja — savjeti odmah (u prezentaciji ih pokreće njihov korak)
       setHold(false)
+      // bez animacija nema uvoda, a stih je već na ekranu — pjesma prvog stiha ipak krene (DailyVerse)
+      if (reduced && (fresh || force)) window.dispatchEvent(new CustomEvent(INTRO_DONE, { detail: { first: true } }))
       if (!inDeck()) startTips()
     }
     const draw = () => {
