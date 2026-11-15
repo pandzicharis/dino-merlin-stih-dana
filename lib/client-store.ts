@@ -116,18 +116,24 @@ export function useMounted(): boolean {
   )
 }
 
-const WIDE = '(min-width: 640px)'
+/**
+ * Računar: širok ekran i miš. Telefon i tablet (i uski prozor) imaju isti
+ * raspored — donju traku i ladice odozdo; računar dugmad u zaglavlju i ladice
+ * kao panel na sredini. Isti uslov je u CSS-u kao `wide:` (app/globals.css),
+ * pa se JS i stilovi ne mogu razići.
+ */
+export const WIDE_MEDIA = '(min-width: 1024px) and (pointer: fine)'
 function subscribeWide(cb: () => void) {
-  const mq = window.matchMedia(WIDE)
+  const mq = window.matchMedia(WIDE_MEDIA)
   mq.addEventListener('change', cb)
   return () => mq.removeEventListener('change', cb)
 }
 /**
- * Širi ekran (od 640 px): dugmad su gore u zaglavlju; na telefonu su u donjoj
- * traci (components/NavBar.tsx). Na serveru i u prvom kadru — telefon.
+ * Računar (`WIDE_MEDIA`): dugmad su gore u zaglavlju; na telefonu i tabletu
+ * su u donjoj traci (components/NavBar.tsx). Na serveru i u prvom kadru — telefon.
  */
 export function useWide(): boolean {
-  return useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false)
+  return useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE_MEDIA).matches, () => false)
 }
 
 /* ── favoriti i niz dana ────────────────────────────────────── */

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { albumOf, softOf, thumbOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
 import type { Verse } from '@/data/verses'
+import { WIDE_MEDIA } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { albumLine, asWritten } from '@/lib/text'
 import { tubeNext, useTube, videoOf } from '@/lib/youtube'
@@ -179,7 +180,7 @@ export function NowPlaying({
 /** visina ladice do vrha ekrana (ispod izreza); na širokom ekranu panel na sredini */
 export function fullHeight(): number {
   const h = window.innerHeight
-  if (window.matchMedia('(min-width: 640px)').matches) return Math.round(h * 0.82)
+  if (window.matchMedia(WIDE_MEDIA).matches) return Math.round(h * 0.82)
   const probe = document.createElement('div')
   probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);visibility:hidden'
   document.body.append(probe)

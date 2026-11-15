@@ -4,8 +4,8 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { BRAND } from '@/lib/brand'
 
 /**
- * Donja traka na telefonu (components/VerseScreen.tsx): Moji stihovi (s
- * brojem), Moj kalendar i Postavke — na širem ekranu su to dugmad gore u
+ * Donja traka na telefonu i tabletu (components/VerseScreen.tsx): Moji stihovi (s
+ * brojem), Moj kalendar i Postavke — na računaru su to dugmad gore u
  * zaglavlju. Staklena traka preko cijele širine, uz dno ekrana: pozadina iza
  * nje zamućena, ravna (bez sjene i tamnjenja), gornja ivica se kratko pretopi.
  */

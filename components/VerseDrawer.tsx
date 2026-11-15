@@ -19,7 +19,7 @@ export function VerseDrawer({
   open,
   verse,
   label,
-  height = 'h-[86dvh] sm:h-[80dvh]',
+  height = 'h-[86dvh] wide:h-[80dvh]',
   above,
   header,
   children,
@@ -61,7 +61,7 @@ export function VerseDrawer({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <SheetLayer className="fixed inset-0 z-[115] flex items-end justify-center sm:items-center">
+        <SheetLayer className="fixed inset-0 z-[115] flex items-end justify-center wide:items-center">
           <SheetBackdrop onClose={onClose} />
           {above}
           <SheetSlide>
@@ -70,7 +70,7 @@ export function VerseDrawer({
               aria-modal="true"
               aria-label={label}
               {...rest}
-              className={`os-sheet relative flex w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:rounded-[30px] sm:border-b ${height}`}
+              className={`os-sheet relative flex w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 wide:rounded-[30px] wide:border-b ${height}`}
               {...sheetDrag}
               style={{ ...sheetDrag.style, background: m.gradient[0] }}
             >

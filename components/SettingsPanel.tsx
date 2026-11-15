@@ -82,7 +82,7 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
   return createPortal(
     <AnimatePresence>
       {open && (
-        <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+        <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center wide:items-center">
           <SheetBackdrop onClose={onClose} />
 
           <SheetSlide>
@@ -90,7 +90,7 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
               role="dialog"
               aria-modal="true"
               aria-label="Postavke"
-              className="os-sheet relative flex max-h-[88dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b sm:rounded-[30px]"
+              className="os-sheet relative flex max-h-[88dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 wide:border-b wide:rounded-[30px]"
               {...sheetDrag}
               style={{
                 ...sheetDrag.style,

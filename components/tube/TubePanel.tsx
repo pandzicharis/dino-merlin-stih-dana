@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useIsPresent } from 'motion/react'
 import { albumOf } from '@/data/albums'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
-import { useFavorites } from '@/lib/client-store'
+import { WIDE_MEDIA, useFavorites } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { lockScroll } from '@/lib/scroll-lock'
 import { pruneFavorites } from '@/lib/storage'
@@ -59,7 +59,7 @@ function safeTop(): number {
 function sheetSizes(): { low: number; full: number } {
   if (typeof window === 'undefined') return { low: 0, full: 0 }
   const h = window.innerHeight
-  if (window.matchMedia('(min-width: 640px)').matches) return { low: Math.round(h * 0.82), full: Math.round(h * 0.82) }
+  if (window.matchMedia(WIDE_MEDIA).matches) return { low: Math.round(h * 0.82), full: Math.round(h * 0.82) }
   return { low: Math.round(h * 0.76), full: h - Math.max(safeTop(), 12) }
 }
 /**
@@ -199,14 +199,14 @@ export default function TubePanel({ open, onClose }: { open: boolean; onOpen: ()
   return createPortal(
     <AnimatePresence>
       {open && (
-        <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+        <SheetLayer className="fixed inset-0 z-[100] flex items-end justify-center wide:items-center">
           <SheetBackdrop onClose={onClose} />
           <SheetSlide edge>
             <motion.div
               role="dialog"
               aria-modal="true"
               aria-label="Sačuvani stihovi"
-              className="os-sheet relative flex w-full flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:max-w-[440px] sm:rounded-[30px] sm:border-b"
+              className="os-sheet relative flex w-full flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 wide:max-w-[440px] wide:rounded-[30px] wide:border-b"
               {...sheetDrag}
               initial={false}
               animate={{ height }}

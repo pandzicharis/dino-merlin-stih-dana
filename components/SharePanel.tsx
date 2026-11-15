@@ -225,7 +225,7 @@ export default function SharePanel({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <SheetLayer className="fixed inset-0 z-[120] flex items-end justify-center sm:items-center">
+        <SheetLayer className="fixed inset-0 z-[120] flex items-end justify-center wide:items-center">
           <SheetBackdrop onClose={onClose} />
 
           <SheetSlide>
@@ -233,7 +233,7 @@ export default function SharePanel({
             role="dialog"
             aria-modal="true"
             aria-label="Podijeli stih"
-            className="os-sheet relative flex max-h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:border-b px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-[30px] sm:pb-6"
+            className="os-sheet relative flex max-h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 wide:border-b px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] wide:rounded-[30px] wide:pb-6"
             {...sheetDrag}
             style={{
               ...sheetDrag.style,

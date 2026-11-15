@@ -41,7 +41,7 @@ export function TubeDrawer({ scope, z = 90, minimize = false }: { scope: string;
   return createPortal(
     <AnimatePresence>
       {open && verse && tube.videoId && (
-        <SheetLayer key="tube" className="fixed inset-0 flex items-end justify-center sm:items-center" z={z}>
+        <SheetLayer key="tube" className="fixed inset-0 flex items-end justify-center wide:items-center" z={z}>
           <SheetBackdrop onClose={close} />
           <SheetSlide edge>
             <motion.div
@@ -49,7 +49,7 @@ export function TubeDrawer({ scope, z = 90, minimize = false }: { scope: string;
               aria-modal="true"
               aria-label={`Pjesma — ${verse.song}`}
               data-tube-drawer
-              className="os-sheet relative flex w-full flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 sm:max-w-[440px] sm:rounded-[30px] sm:border-b"
+              className="os-sheet relative flex w-full flex-col overflow-hidden rounded-t-[30px] border border-b-0 border-white/10 wide:max-w-[440px] wide:rounded-[30px] wide:border-b"
               {...sheetDrag}
               initial={false}
               animate={height ? { height } : undefined}

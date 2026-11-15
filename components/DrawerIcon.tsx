@@ -62,7 +62,7 @@ export function DrawerHeader({
   return (
     <div className={`relative z-10 shrink-0 border-b border-white/[0.09] bg-white/[0.075] px-5 pb-3 pt-3 backdrop-blur-xl ${className}`}>
       <span className="pointer-events-none absolute inset-x-10 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${BRAND.gold}80, transparent)` }} aria-hidden />
-      <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden />
+      <span className="os-grabber mx-auto mb-3 block h-1 w-10 rounded-full bg-white/15 wide:hidden" aria-hidden />
       <div className="flex items-center gap-3">
         <Ring size={36} strong>
           {icon}

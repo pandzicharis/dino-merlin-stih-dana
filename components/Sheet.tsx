@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { animate, motion, useIsPresent, useMotionValue } from 'motion/react'
+import { WIDE_MEDIA } from '@/lib/client-store'
 
 /*
  * Donji paneli (sačuvani, dijeljenje) kao na nativnoj aplikaciji:
@@ -281,7 +282,7 @@ export function SheetSlide({
   /** panel je sjeo (otvaranje gotovo) */
   onShown?: () => void
 }) {
-  const [wide] = useState(() => window.matchMedia('(min-width: 640px)').matches)
+  const [wide] = useState(() => window.matchMedia(WIDE_MEDIA).matches)
   const hidden = wide ? { transform: 'translateY(48px)', opacity: 0 } : { transform: 'translateY(100%)' }
   const shown = wide ? { transform: 'translateY(0px)', opacity: 1 } : { transform: 'translateY(0%)' }
   // Otvaranje u dva koraka: panel prvo stane na svoje mjesto nevidljiv
@@ -316,7 +317,7 @@ export function SheetSlide({
   const resume = { ...shown, opacity: 1, visibility: 'visible' as const, transition: rise ? RISE : OPEN }
   return (
     <motion.div
-      className={`relative flex w-full justify-center ${edge ? 'sm:max-w-[440px]' : 'max-w-[440px]'}`}
+      className={`relative flex w-full justify-center ${edge ? 'wide:max-w-[440px]' : 'max-w-[440px]'}`}
       style={{ willChange: 'transform' }}
       // `away`: panel stalno montiran, sklonjen ispod ekrana — kad sjedne
       // dolje, ne crta se (visibility), a otvara se bez ikakvog slaganja

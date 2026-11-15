@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* `wide:` — računar (širok ekran i miš). Telefon i tablet dijele isti raspored:
+   donja traka i ladice odozdo. Isti uslov je u JS-u: WIDE_MEDIA (lib/client-store.ts). */
+@custom-variant wide (@media (min-width: 1024px) and (pointer: fine));
+
 :root {
   color-scheme: dark;
 }
@@ -283,10 +287,10 @@ html[data-deck] .dev-pad {
   }
 }
 
-/* ladice pjesme i sačuvanih (components/tube): na telefonu do vrha ekrana (ispod
-   izreza), na širokom ekranu panel na sredini */
+/* ladice pjesme i sačuvanih (components/tube): na telefonu i tabletu do vrha
+   ekrana (ispod izreza), na računaru panel na sredini (isti uslov kao `wide:`) */
 .sheet-full { height: calc(100dvh - max(env(safe-area-inset-top), 12px)); }
-@media (min-width: 640px) {
+@media (min-width: 1024px) and (pointer: fine) {
   .sheet-full { height: 82dvh; }
 }
 
