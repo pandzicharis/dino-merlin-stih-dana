@@ -78,10 +78,10 @@ export function GiftCard({
       <p className="mt-2 max-w-full truncate text-[15px] text-[#1a1614]" style={{ fontFamily: 'var(--font-serif), serif' }}>
         {paperText(verse.text)}
       </p>
-      <p className="mt-1 max-w-full truncate text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#8C7449' }}>
+      <p className="mt-1.5 max-w-full truncate text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: '#8C7449' }}>
         {verse.song}
       </p>
-      <p className="mt-0.5 max-w-full truncate text-[8px] font-medium uppercase tracking-[0.24em]" style={{ color: '#8C7449b8' }}>
+      <p className="mt-1 max-w-full truncate text-[9.5px] font-medium uppercase tracking-[0.2em]" style={{ color: '#8C7449b8' }}>
         {albumLine(verse)}
       </p>
     </div>
@@ -102,11 +102,11 @@ export function GiftCardWide({ verse, qr, onBack }: { verse: Verse; qr: QrMatrix
         <p className="line-clamp-3 text-[15px] leading-snug text-[#1a1614]" style={{ fontFamily: 'var(--font-serif), serif' }}>
           {paperText(verse.text)}
         </p>
-        <p className="mt-2.5 truncate text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: '#8C7449' }}>
+        <p className="mt-2.5 truncate text-[11px] font-semibold uppercase tracking-[0.24em]" style={{ color: '#8C7449' }}>
           {verse.song}
         </p>
         {/* uska kolona: album pa godina, svako u svom redu (ne lomi se na tački) */}
-        <p className="mt-1 text-[8px] font-medium uppercase leading-relaxed tracking-[0.22em]" style={{ color: '#8C7449b8' }}>
+        <p className="mt-1 text-[9.5px] font-medium uppercase leading-relaxed tracking-[0.2em]" style={{ color: '#8C7449b8' }}>
           {albumLine({ album: verse.album, description: verse.description })}
           {verse.year ? <span className="block">{verse.year}</span> : null}
         </p>
