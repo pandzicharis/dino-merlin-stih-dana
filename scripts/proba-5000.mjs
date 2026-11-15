@@ -105,7 +105,7 @@ if (SAMO_CISTI) {
   }
 }
 
-if (!Number.isInteger(N) || N < 10 || N > 20_000) stani('broj korisnika: 10–20000')
+if (!Number.isInteger(N) || N < 10 || N > 100_000) stani('broj korisnika: 10–100000')
 
 // Pravo slanje ide u podne (ruta šalje do 14:59). Proba i pravo slanje
 // dijele bravu: proba bi tad držala pravi cron da čeka — pa ne.
