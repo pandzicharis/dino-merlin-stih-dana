@@ -155,7 +155,7 @@ function itemsOf(lines: string[], synced: { t: number }[] | null): Item[] {
  * krupna serifna slova. S vremenom: red koji se pjeva je
  * pun, ostali utihnu, tekst sam klizi (prst ga preuzme na par sekundi),
  * dodir na red premota; na pauzi (uvod, instrumental) između redova titra
- * znak muzike. Bez vremena: stoji, otvori se na tvom stihu. Tvoj
+ * znak muzike. Bez vremena: stoji i otvori se od početka. Tvoj
  * stih je u zlatu. Bez teksta: samo stih.
  */
 export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyrics: LyricsData | null | 'loading'; /** gdje stoji red koji se pjeva (dio visine) */ anchor?: number }) {
@@ -221,14 +221,7 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
     }
   }, [synced, items, shift])
 
-  // bez vremena: otvori se na tvom stihu (red u `items` — gore je i pauza)
-  const first = items.findIndex(({ i }) => i >= 0 && Boolean(lines[i]) && mine(lines[i]))
-  useEffect(() => {
-    const el = scroller.current
-    const row = first >= 0 ? rows.current[first] : null
-    if (synced || !el || !row) return
-    el.scrollTop = Math.max(0, row.offsetTop + row.offsetHeight / 2 - el.clientHeight * at.current)
-  }, [synced, first])
+  // bez vremena tekst se uvijek otvara od početka (tvoj stih je u zlatu, gdje god bio)
 
   if (lyrics === 'loading') return <div className="flex-1" />
   if (!data)
