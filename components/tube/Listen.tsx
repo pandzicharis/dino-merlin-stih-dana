@@ -63,12 +63,16 @@ export function listenLinks(v: Verse, videoId: string): { key: Key; href: string
   })
 }
 
+/** znakovi se smanje i narastu zajedno s ladicom (NowPlaying.tsx SHEET_RESIZE) */
+const GROW = '0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+
 /**
  * Podnožje ladice pjesme: "Slušaj na" tankim velikim slovima, a ispod
  * zvanični znakovi platformi u nizu, tiho (bijeli), pod prstom puni.
- * Odlaskom pjesma ovdje stane (da ne sviraju obje).
+ * Odlaskom pjesma ovdje stane (da ne sviraju obje). `small`: otvoren tekst
+ * pjesme — sitniji znakovi, više mjesta za tekst.
  */
-export function ListenFooter({ verse, videoId }: { verse: Verse; videoId: string }) {
+export function ListenFooter({ verse, videoId, small = false }: { verse: Verse; videoId: string; small?: boolean }) {
   return (
     <nav aria-label="Slušaj na" className="flex flex-col items-center">
       {/* razmak slova i s lijeva — natpis stoji tačno na sredini */}
@@ -90,9 +94,10 @@ export function ListenFooter({ verse, videoId }: { verse: Verse; videoId: string
               }}
               aria-label={`${b.name} — ${verse.song}`}
               title={b.name}
-              className="flex h-11 w-[52px] items-center justify-center rounded-full text-white/70 transition-[color,transform,background] duration-200 hover:bg-white/[0.06] hover:text-white active:scale-90"
+              className={`flex w-[52px] items-center justify-center rounded-full text-white/70 hover:bg-white/[0.06] hover:text-white active:scale-90 ${small ? 'h-8' : 'h-11'}`}
+              style={{ transition: `height ${GROW}, color 0.2s, transform 0.2s, background 0.2s` }}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={small ? 'h-[17px] w-[17px]' : 'h-[22px] w-[22px]'} style={{ transition: `width ${GROW}, height ${GROW}` }}>
                 <path d={b.path} />
               </svg>
             </a>

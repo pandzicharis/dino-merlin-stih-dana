@@ -8,8 +8,9 @@
  * (developers.google.com/youtube/terms): vidi se dok svira (najmanje
  * 200×200 px), nema pozadine ni samo zvuka.
  *
- * JEDAN plejer (iframe) za cijelu aplikaciju, s YouTubeovim kontrolama (pusti,
- * pauza, traka). Svaka pjesma ima red — kad završi, sljedeća krene sama: lista
+ * JEDAN plejer (iframe) za cijelu aplikaciju, bez YouTubeovih kontrola — pusti,
+ * pauza, traka, nasumično i ponovi su naši, ispod pjesme (Transport.tsx). Svaka
+ * pjesma ima red — kad završi, sljedeća krene sama: lista
  * iz koje je puštena (sačuvani), inače sačuvane pjesme ili sve pjesme (`defaultLine`).
  * Pluta iznad svog mjesta na ekranu (TubeStage); uz video ide tekst koji
  * prati pjesmu (vrijeme se čita iz plejera). `scope`: odakle je
@@ -108,8 +109,10 @@ function engine(): Promise<YTPlayer> {
           host: 'https://www.youtube-nocookie.com',
           width: '100%',
           height: '100%',
-          // YouTubeove kontrole — pusti, pauza i traka su njegovi
-          playerVars: { playsinline: 1, controls: 1, rel: 0, iv_load_policy: 3, origin: location.origin },
+          // bez YouTubeovih kontrola (traka, pusti, glasnoća, titlovi, cijeli ekran, tipke) — sve
+          // vodi naš plejer ispod videa (components/tube/Transport.tsx). Naziv videa i znak
+          // YouTubea ostaju: YouTube ih traži, ne smiju se sakriti ni prekriti
+          playerVars: { playsinline: 1, controls: 0, fs: 0, disablekb: 1, rel: 0, iv_load_policy: 3, origin: location.origin },
           events: {
             onReady: () => res((yt = p)),
             onStateChange: (e: { data: number }) => changed(e.data),
@@ -129,18 +132,24 @@ export type TubeStatus = 'idle' | 'loading' | 'playing' | 'paused'
  * `min`: ladica spuštena — pjesma čeka (stoji: bez videa na ekranu nema zvuka);
  * `list`: pjesma je iz liste (ima red — nazad, pusti, sljedeća);
  * `next`: stih sljedeće pjesme u redu, ili null;
- * `muted`: svira bez zvuka — iPhone ne pušta zvuk dok se jednom ne dodirne video
+ * `muted`: svira bez zvuka — iPhone ne pušta zvuk dok se jednom ne dodirne video;
+ * `shuffle`: nasumično — sljedeća je slučajna pjesma iz reda; `repeat`: pjesma kad
+ * završi krene ispočetka (oboje ostaje i kad se pjesma zatvori)
  */
-export type TubeSnap = { verseId: string | null; videoId: string | null; scope: string | null; status: TubeStatus; min: boolean; list: boolean; next: string | null; muted: boolean }
-const IDLE: TubeSnap = { verseId: null, videoId: null, scope: null, status: 'idle', min: false, list: false, next: null, muted: false }
+export type TubeSnap = { verseId: string | null; videoId: string | null; scope: string | null; status: TubeStatus; min: boolean; list: boolean; next: string | null; muted: boolean; shuffle: boolean; repeat: boolean }
+const IDLE: TubeSnap = { verseId: null, videoId: null, scope: null, status: 'idle', min: false, list: false, next: null, muted: false, shuffle: false, repeat: false }
 let snap = IDLE
 let current: Verse | null = null
 /** red pjesama — lista iz koje je pjesma puštena (sačuvani), samo one s videom */
 let queue: Verse[] = []
+/** sljedeća iz reda — izabrana unaprijed (nasumično: slučajna), da se pripremi baš ona */
+let upcoming: Verse | null = null
+/** pjesme koje su svirale prije ove — u nasumičnom "nazad" vraća stvarno prethodnu */
+let played: Verse[] = []
 const subs = new Set<() => void>()
 function set(next: Partial<TubeSnap>) {
   const s = { ...snap, ...next }
-  if (s.verseId === snap.verseId && s.videoId === snap.videoId && s.scope === snap.scope && s.status === snap.status && s.min === snap.min && s.list === snap.list && s.next === snap.next && s.muted === snap.muted) return
+  if ((Object.keys(s) as (keyof TubeSnap)[]).every((k) => s[k] === snap[k])) return
   snap = s
   subs.forEach((f) => f())
 }
@@ -157,7 +166,7 @@ export const tubeSnap = () => snap
 /** Stih čija je pjesma u plejeru. */
 export const tubeVerse = () => current
 /** Sljedeća pjesma u redu (pripremi se unaprijed — tekst, slika), ili null. */
-export const tubeNext = () => after(current)
+export const tubeNext = () => upcoming
 
 /** video u plejeru je krenuo (ili čeka dodir na YouTubeov "pusti") — tek tad se okvir vidi, do tad slika pjesme */
 let started = false
@@ -183,11 +192,18 @@ export function warmTube(v?: Verse) {
   })
 }
 
-/** Pjesma poslije `v` u redu (poslije zadnje — opet prva), ili null. */
-function after(v: Verse | null): Verse | null {
+/**
+ * Pjesma poslije `v` u redu (poslije zadnje — opet prva), ili null.
+ * Nasumično: slučajna druga — prvo one koje još nisu svirale.
+ */
+function after(v: Verse | null, shuffle = snap.shuffle): Verse | null {
   const i = v ? queue.findIndex((x) => x.id === v.id) : -1
   if (i < 0 || queue.length < 2) return null
-  return queue[(i + 1) % queue.length]
+  if (!shuffle) return queue[(i + 1) % queue.length]
+  const others = queue.filter((_, k) => k !== i)
+  const fresh = others.filter((x) => !played.some((p) => p.id === x.id))
+  const pool = fresh.length ? fresh : others
+  return pool[Math.floor(Math.random() * pool.length)]
 }
 
 /** ista pjesma (drugi stih iste pjesme je ista pjesma) */
@@ -226,10 +242,14 @@ export function openTube(v: Verse, scope: string, list?: Verse[]): boolean {
   if (!id) return false
   const same = snap.videoId === id
   const was = snap.min
+  // druga lista (ili pjesma van liste) — nov red, i "nazad" ne ide u stari
+  if (list ? list !== queue : !same) played = []
   if (list) queue = list.filter((x) => videoOf(x))
   else if (!same) queue = defaultLine(v)
   current = v
-  set({ verseId: v.id, videoId: id, scope, min: false, list: queue.length > 0, next: after(v)?.id ?? null, status: same ? snap.status : 'loading' })
+  // vraćena ista pjesma zadrži već izabranu sljedeću
+  if (!same || list || !upcoming) upcoming = after(v)
+  set({ verseId: v.id, videoId: id, scope, min: false, list: queue.length > 0, next: upcoming?.id ?? null, status: same ? snap.status : 'loading' })
   if (same && loadedId === id) {
     // spuštena (ili završena) pjesma se vrati i nastavi gdje je stala — iz dodira
     if (was || snap.status !== 'playing') resumeTube()
@@ -245,8 +265,8 @@ export function openTube(v: Verse, scope: string, list?: Verse[]): boolean {
     p.unMute?.()
     p.loadVideoById({ videoId: id })
     // nije krenuo sam — iPhone ne pušta zvuk bez dodira u samom videu (YouTube u
-    // okviru): krene bez zvuka (to smije), YouTube u videu pokaže "uključi zvuk",
-    // a jedan dodir u videu pusti zvuk — i svakoj sljedećoj pjesmi. Drugdje (računar,
+    // okviru): krene bez zvuka (to smije), a dodir na našem "Uključi zvuk"
+    // (NowPlaying.tsx, `unmuteTube`) pusti zvuk — i svakoj sljedećoj pjesmi. Drugdje (računar,
     // Android) se ništa ne utišava: spor video samo pričeka, ili YouTubeov "pusti"
     window.setTimeout(() => {
       if (mine !== ask || started || (ytState !== UNSTARTED && ytState !== CUED)) return
@@ -306,6 +326,15 @@ export function seekTube(t: number) {
   yt.playVideo()
 }
 
+/**
+ * Premotaj na sekundu `t` s trake napretka — pauza ostaje pauza. Dok se
+ * vuče (`final` false) YouTube ne traži nove dijelove videa, tek na kraju.
+ */
+export function scrubTube(t: number, final: boolean) {
+  if (!yt || !started || !snap.videoId || loadedId !== snap.videoId) return
+  yt.seekTo(Math.max(0, t), final)
+}
+
 /** Stane (ladica ostaje) — kad se mjesto pokrije ili aplikacija ode u pozadinu. */
 export function pauseTube() {
   if (yt && loadedId === snap.videoId) yt.pauseVideo()
@@ -340,22 +369,40 @@ export function restoreTube(scope = snap.scope ?? '') {
 
 /** Sljedeća pjesma iz reda (iz dodira, ili sama kad pjesma završi). `false`: nema je. */
 export function nextTube(): boolean {
-  const n = after(current)
-  return n ? openTube(n, snap.scope ?? '', queue) : false
+  const n = upcoming
+  if (!n) return false
+  // ova ide u odsvirane — nasumično "nazad" vraća nju
+  if (current) played = [...played, current].slice(-100)
+  return openTube(n, snap.scope ?? '', queue)
 }
 
 /**
  * Nazad — iz dodira: pjesma je odmakla (više od 3 s) ili prethodne nema —
- * ispočetka; inače prethodna iz reda. Spuštena se vrati gore (svira samo dok se vidi).
+ * ispočetka; inače prethodna iz reda (nasumično: ona koja je stvarno svirala prije).
+ * Spuštena se vrati gore (svira samo dok se vidi).
  */
 export function prevTube() {
   if (!yt || !snap.videoId || loadedId !== snap.videoId) return
   const i = current ? queue.findIndex((x) => x.id === current!.id) : -1
-  const p = i > 0 ? queue[i - 1] : null
-  if (p && (yt.getCurrentTime() || 0) <= 3) return void openTube(p, snap.scope ?? '', queue)
+  const p = snap.shuffle ? played[played.length - 1] : i > 0 ? queue[i - 1] : undefined
+  if (p && (yt.getCurrentTime() || 0) <= 3) {
+    if (snap.shuffle) played = played.slice(0, -1)
+    return void openTube(p, snap.scope ?? '', queue)
+  }
   set({ min: false })
   yt.seekTo(0, true)
   yt.playVideo()
+}
+
+/**
+ * Uključi zvuk — iz dodira. iPhone pusti pjesmu bez zvuka (bez dodira u videu ne
+ * smije sa zvukom); dodir na našem dugmetu ide YouTubeu porukom koja nosi dodir.
+ */
+export function unmuteTube() {
+  if (!yt || !snap.videoId || loadedId !== snap.videoId) return
+  yt.unMute?.()
+  if (snap.status !== 'playing') yt.playVideo()
+  watchSound()
 }
 
 /** Pusti / pauza — iz dodira. Spuštena se vrati gore i nastavi. */
@@ -363,6 +410,18 @@ export function toggleTube() {
   if (snap.min) return restoreTube()
   if (snap.status === 'playing' || snap.status === 'loading') pauseTube()
   else resumeTube()
+}
+
+/** Nasumično — sljedeća se odmah izabere iznova (da se pripremi baš ona). */
+export function toggleTubeShuffle() {
+  const shuffle = !snap.shuffle
+  upcoming = after(current, shuffle)
+  set({ shuffle, next: upcoming?.id ?? null })
+}
+
+/** Ponovi pjesmu — kad završi, krene ispočetka. */
+export function toggleTubeRepeat() {
+  set({ repeat: !snap.repeat })
 }
 
 /** Zatvori: pjesma stane i izađe iz plejera. */
@@ -373,7 +432,10 @@ export function closeTube() {
   loadedId = ''
   current = null
   queue = []
-  set(IDLE)
+  upcoming = null
+  played = []
+  // nasumično i ponovi ostaju za sljedeću pjesmu
+  set({ ...IDLE, shuffle: snap.shuffle, repeat: snap.repeat })
 }
 
 /* ── događaji YouTube plejera ── */
@@ -388,8 +450,12 @@ function changed(s: number) {
     set({ status: 'playing', muted })
     if (muted) watchSound()
   } else if (s === ENDED) {
-    // red (sačuvani): sljedeća krene sama — dok se video vidi (spuštena ionako stoji)
-    if (snap.min || !nextTube()) set({ status: 'paused' })
+    // ponovi: ista ispočetka; inače red (sačuvani): sljedeća krene sama — dok se
+    // video vidi (spuštena ionako stoji)
+    if (snap.repeat && !snap.min && yt) {
+      yt.seekTo(0, true)
+      yt.playVideo()
+    } else if (snap.min || !nextTube()) set({ status: 'paused' })
   } else if (s === PAUSED) set({ status: 'paused' })
 }
 

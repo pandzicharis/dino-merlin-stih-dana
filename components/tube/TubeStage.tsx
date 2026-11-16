@@ -9,7 +9,7 @@ import { SLOT_EVENT, pauseTube, setTubeHost, slotsOf, tubeShown, tubeSnap, useTu
  * se učitao iznova), nego mu se svaki kadar postave položaj i veličina mjesta.
  *
  * Dok video ne krene, providan je — na mjestu je slika pjesme, a video se
- * pretopi preko nje. Poslije je to običan YouTube plejer sa svojim kontrolama.
+ * pretopi preko nje. Poslije je to samo video — kontrole su naše, ispod pjesme.
  * Mjesto pokriveno (panel preko ladice) — pjesma stane.
  */
 export function TubeStage() {

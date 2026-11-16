@@ -152,8 +152,8 @@ function itemsOf(lines: string[], synced: { t: number }[] | null): Item[] {
 
 /**
  * Tekst pjesme ispod videa (components/tube/NowPlaying.tsx): centriran,
- * krupna serifna slova. S vremenom: red koji se pjeva je
- * pun, ostali utihnu, tekst sam klizi (prst ga preuzme na par sekundi),
+ * serifna slova. S vremenom: red koji se pjeva je pun, krupniji i
+ * stoji na sredini prozora (`anchor`), ostali utihnu, tekst sam klizi (prst ga preuzme na par sekundi),
  * dodir na red premota; na pauzi (uvod, instrumental) između redova titra
  * znak muzike. Bez vremena: stoji i otvori se od početka. Tvoj
  * stih je u zlatu. Bez teksta: samo stih.
@@ -262,7 +262,7 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
             const now = Boolean(synced) && j === active
             return (
               // na samom početku niža (iznad nje nema ničega), između strofa s razmakom oko sebe
-              <div key={j} ref={(el) => void (rows.current[j] = el)} className={`flex items-center justify-center ${j === 0 ? 'h-9' : 'h-14'}`} aria-hidden>
+              <div key={j} ref={(el) => void (rows.current[j] = el)} className={`flex items-center justify-center ${j === 0 ? 'h-8' : 'h-12'}`} aria-hidden>
                 <span className="transition-opacity duration-500" style={{ opacity: now ? 1 : 0.4 }}>
                   {/* isti znak kao uz "Tekst pjesme" — boja stiha, iste veličine */}
                   <EqBars accent={MOODS[verse.mood].accent} on={playing && (now || !synced)} h={14} />
@@ -288,7 +288,9 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
               }
               // isti razmak svuda: red koji se prelomi i dva reda su jednako razmaknuti
               // (bez dodatka među redovima) — veći razmak je samo pauza među strofama
-              className={`transition-[opacity,color] duration-500 [text-wrap:balance] ${note ? 'py-1 text-[14px] italic leading-snug' : 'text-[22px] leading-[1.42]'} ${synced ? 'cursor-pointer' : ''}`}
+              // red koji se pjeva je ~30% krupniji (slova rastu, ne povećanje slike — oštro, a
+              // susjedi se razmaknu); tekst za njim klizi, pa ostaje na sredini
+              className={`transition-[opacity,color,font-size,line-height] duration-500 [text-wrap:balance] ${note ? 'py-1 text-[13px] italic leading-snug' : now ? 'text-[25px] leading-[1.45]' : 'text-[19px] leading-[1.7]'} ${synced ? 'cursor-pointer' : ''}`}
               style={{
                 fontFamily: SERIF,
                 color: gold ? BRAND.gold : '#fff',

@@ -8,7 +8,7 @@ import type { Verse } from '@/data/verses'
 import { WIDE_MEDIA } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { albumLine, asWritten } from '@/lib/text'
-import { pauseTube, resumeTube, tubeNext, useTube, videoOf } from '@/lib/youtube'
+import { pauseTube, resumeTube, tubeNext, unmuteTube, useTube, videoOf } from '@/lib/youtube'
 import { primeLyrics } from '../Lyrics'
 import { DrawerHeader } from '../DrawerIcon'
 import { GiftCardWide, useGiftLink } from '../GiftLink'
@@ -16,29 +16,30 @@ import { QrToggle } from '../VerseQr'
 import { EqBars } from '../EqBars'
 import { ListenFooter } from './Listen'
 import { Slot } from './Slot'
-import { Transport } from './Transport'
+import { TubeControls } from './Transport'
 import { LyricsView, useTubeLyrics } from './TubeLyrics'
 
 /*
  * Pjesma koja svira — ista ladica na početnoj (components/tube/TubeDrawer.tsx)
  * i u sačuvanima (components/tube/TubePanel.tsx): zatvori zatvara samo pjesmu.
- * Jedna pjesma — pusti, pauza i traka su u YouTube videu.
  *
  *   zaglavlje  kao na ostalim ladicama — "Stih · <stih u jednom redu>", zatvori
  *   video      YouTube plejer
  *   pjesma     red kao u plejeru sačuvanih na developu: omot, "Trenutno" sa
- *              znakom muzike, pjesma u boji stiha, album — poravnat s videom;
- *              desno tiho nazad, pusti i sljedeća kad pjesma ima red (sačuvani —
- *              Transport.tsx)
+ *              znakom muzike, pjesma u boji stiha, album — poravnat s videom
+ *   kontrole   kao u plejeru sačuvanih: traka napretka s vremenom, pa nasumično,
+ *              nazad, pusti, sljedeća, ponovi (Transport.tsx `TubeControls`)
  *   tekst      harmonika, zatvorena: otvorena raširi ladicu do vrha i tekst
  *              prati pjesmu (TubeLyrics.tsx)
- *   podnožje   znakovi platformi (Listen.tsx)
+ *   podnožje   znakovi platformi (Listen.tsx); uz otvoren tekst sitniji, a na niskom
+ *              ekranu sklonjeni
  *
  * Ladica je visoka koliko joj treba (`onHeight` — visina koju traži):
  * zatvoren tekst — sadržaj, otvoren — do vrha ekrana. Visina klizi
  * `SHEET_RESIZE`, isto u oba smjera, a ništa u ladici ne skače: pri
  * zatvaranju tekst ostaje dok se ladica spušta (i gasi se), pa tek onda
- * nestane — ladica je tad već na mjeri bez njega.
+ * nestane — ladica je tad već na mjeri bez njega. Nikad nije viša od ekrana:
+ * na malom telefonu se sadržaj pomjera unutar nje.
  */
 
 /** Kako klizi visina ladice s pjesmom (TubeDrawer, TubePanel) — mekano, bez naglog starta. */
@@ -116,6 +117,8 @@ export function NowPlaying({
   // zatvara — mjera bez teksta (zapamćena), da se spušta ravno na nju
   const inner = useRef<HTMLDivElement>(null)
   const closedH = useRef(0)
+  // sadržaj viši od ekrana (mali telefon): ladica je do vrha, a sadržaj se pomjera u njoj
+  const [tall, setTall] = useState(false)
   const report = useRef(onHeight)
   useEffect(() => {
     report.current = onHeight
@@ -128,7 +131,7 @@ export function NowPlaying({
       // zatvara se: ladica klizi na mjeru bez teksta, a tekst nestane tek kad stigne —
       // tad je sadržaj već te visine. Ne po satu: telefon koji kasni s kadrovima bi
       // inače izgubio tekst usred kretnje (i dno bi skočilo). Sat je samo osigurač.
-      report.current?.(closedH.current || el.offsetHeight)
+      report.current?.(Math.min(closedH.current || el.offsetHeight, fullHeight()))
       const arrived = () => el.offsetHeight <= closedH.current + 1 && setShown(false)
       const ro = new ResizeObserver(arrived)
       ro.observe(el)
@@ -140,7 +143,9 @@ export function NowPlaying({
     }
     const send = () => {
       closedH.current = el.offsetHeight
-      report.current?.(el.offsetHeight)
+      const full = fullHeight()
+      setTall(el.offsetHeight > full)
+      report.current?.(Math.min(el.offsetHeight, full))
     }
     send()
     const ro = new ResizeObserver(send)
@@ -149,7 +154,7 @@ export function NowPlaying({
   }, [wide, open])
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div className={`relative flex min-h-0 flex-1 flex-col ${tall ? 'overflow-y-auto overflow-x-hidden overscroll-contain' : ''}`}>
       <div ref={inner} className={`flex flex-col ${wide ? 'min-h-0 flex-1' : ''}`}>
         <DrawerHeader
           icon={<NoteIcon />}
@@ -181,8 +186,8 @@ export function NowPlaying({
           </div>
         </div>
 
-        {/* pjesma — kao u plejeru sačuvanih, poravnata s videom; video, pjesma i tekst po 28 px razmaka */}
-        <div className="flex shrink-0 items-center gap-2.5 px-[10px] pt-7">
+        {/* pjesma — kao u plejeru sačuvanih, poravnata s videom */}
+        <div className="flex shrink-0 items-center gap-2.5 px-[10px] pt-6">
           <span
             className="block h-[58px] w-[58px] shrink-0 rounded-[10px] bg-cover bg-center"
             style={{
@@ -196,25 +201,47 @@ export function NowPlaying({
             {/* trenutno slušaš — trake titraju dok svira (stoje kad je pauza) */}
             <div className="mb-1.5 flex items-center gap-1.5">
               <EqBars accent={m.accent} on={playing} h={9} />
-              {/* svira bez zvuka (iPhone prije prvog dodira u videu) — kaže kako se pušta zvuk */}
-              <span className="whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.26em]" style={{ color: m.accent }}>
-                {tube.muted ? 'Dodirni video za zvuk' : tube.status === 'paused' ? 'Pauzirano' : 'Trenutno'}
-              </span>
+              {tube.muted ? (
+                // svira bez zvuka (iPhone prije prvog dodira) — u videu nema YouTubeovih
+                // kontrola, pa zvuk pušta naše dugme
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic(6)
+                    unmuteTube()
+                  }}
+                  className="relative -my-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-[3px] text-[8.5px] font-semibold uppercase leading-none tracking-[0.22em] transition-transform before:absolute before:-inset-2 before:content-[''] active:scale-95"
+                  style={{ color: m.accent, borderColor: `${m.accent}66`, background: `${m.accent}1a` }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M11 5 6 9H2v6h4l5 4z" />
+                    <path d="m22 9-6 6M16 9l6 6" />
+                  </svg>
+                  Uključi zvuk
+                </button>
+              ) : (
+                <span className="whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.26em]" style={{ color: m.accent }}>
+                  {tube.status === 'paused' ? 'Pauzirano' : 'Trenutno'}
+                </span>
+              )}
             </div>
             <p className="truncate text-[12.5px] font-semibold uppercase leading-tight tracking-[0.18em]" style={{ color: m.accent }}>
               {verse.song}
             </p>
             <p className="mt-1.5 truncate text-[10px] uppercase tracking-[0.22em] text-white/55">{albumLine(verse)}</p>
           </div>
-          {/* pjesma iz liste: nazad, pusti, sljedeća — tiho, uz pjesmu */}
-          {tube.list && <Transport onPlay={showVideo} />}
+        </div>
+
+        {/* traka napretka i kontrole — nasumično, nazad, pusti, sljedeća, ponovi */}
+        <div className="shrink-0 px-[10px] pt-3">
+          <TubeControls accent={m.accent} onPlay={showVideo} />
         </div>
 
         {/* tekst pjesme — harmonika preko cijele širine ladice: "Tekst pjesme" je tamnija
             traka od ivice do ivice, a otvoren tekst teče ispod nje preko atmosfere pjesme —
             bez okvira, pa ništa ne sužava prostor */}
         {has && (
-          <div className={`mt-7 flex flex-col ${wide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
+          <div className={`mt-5 flex flex-col ${wide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
             <button
               type="button"
               onClick={toggle}
@@ -250,18 +277,21 @@ export function NowPlaying({
                 animate={{ opacity: open ? 1 : 0 }}
                 transition={open ? { duration: 0.3, delay: 0.12 } : { duration: 0.22 }}
               >
-                <LyricsView verse={verse} lyrics={lyrics} anchor={0.34} />
+                <LyricsView verse={verse} lyrics={lyrics} anchor={0.5} />
               </motion.div>
             )}
           </div>
         )}
 
         {/* podnožje: "Slušaj na" i platforme — bez linija, malo niže (više mjesta iznad);
-            razmak iznad klizi zajedno s visinom ladice */}
+            razmak iznad klizi zajedno s visinom ladice. Otvoren tekst: sitniji znakovi, a na
+            niskom ekranu (do 760 px) podnožje se skloni — tekstu ostane mjesta */}
         <div
-          className={`relative mx-[10px] shrink-0 pb-[max(0.6rem,env(safe-area-inset-bottom))] transition-[padding] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${open && has ? 'pt-5' : 'pt-8'}`}
+          className={`relative mx-[10px] grid shrink-0 pb-[max(0.6rem,env(safe-area-inset-bottom))] transition-[padding,grid-template-rows,opacity,visibility] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${open && has ? 'grid-rows-[1fr] pt-3 [@media(max-height:760px)]:invisible [@media(max-height:760px)]:grid-rows-[0fr] [@media(max-height:760px)]:pt-0 [@media(max-height:760px)]:opacity-0' : 'grid-rows-[1fr] pt-8'}`}
         >
-          <ListenFooter verse={verse} videoId={id} />
+          <div className="min-h-0 overflow-hidden">
+            <ListenFooter verse={verse} videoId={id} small={open && has} />
+          </div>
         </div>
       </div>
     </div>
