@@ -268,8 +268,8 @@ export function TubeControls({ accent, onPlay }: { accent: string; onPlay?: () =
 
       {/* kontrole — krupni bijeli znakovi, sitni prekidači sa strane */}
       <div className="mt-2 flex items-center justify-between px-1">
-        <Btn label="Nasumično" onPress={toggleTubeShuffle} size={36} pressed={tube.shuffle} color={tube.shuffle ? accent : 'rgba(255,255,255,0.5)'}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <Btn label="Nasumično" onPress={toggleTubeShuffle} size={38} pressed={tube.shuffle} color={tube.shuffle ? accent : 'rgba(255,255,255,0.5)'}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             {SHUFFLE}
           </svg>
         </Btn>
@@ -279,9 +279,9 @@ export function TubeControls({ accent, onPlay }: { accent: string; onPlay?: () =
             onPlay?.()
             prevTube()
           }}
-          size={42}
+          size={46}
         >
-          <svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor" {...BOLD} aria-hidden>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" {...BOLD} aria-hidden>
             {PREV}
           </svg>
         </Btn>
@@ -291,9 +291,9 @@ export function TubeControls({ accent, onPlay }: { accent: string; onPlay?: () =
             if (!on) onPlay?.()
             toggleTube()
           }}
-          size={48}
+          size={52}
         >
-          <PlayGlyph playing={on} size={32} bold />
+          <PlayGlyph playing={on} size={36} bold />
         </Btn>
         <Btn
           label="Sljedeća"
@@ -301,15 +301,15 @@ export function TubeControls({ accent, onPlay }: { accent: string; onPlay?: () =
             onPlay?.()
             nextTube()
           }}
-          size={42}
+          size={46}
           disabled={!tube.next}
         >
-          <svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor" {...BOLD} aria-hidden>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" {...BOLD} aria-hidden>
             {NEXT}
           </svg>
         </Btn>
-        <Btn label="Ponovi pjesmu" onPress={toggleTubeRepeat} size={36} pressed={tube.repeat} color={tube.repeat ? accent : 'rgba(255,255,255,0.5)'}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <Btn label="Ponovi pjesmu" onPress={toggleTubeRepeat} size={38} pressed={tube.repeat} color={tube.repeat ? accent : 'rgba(255,255,255,0.5)'}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             {REPEAT}
           </svg>
         </Btn>
