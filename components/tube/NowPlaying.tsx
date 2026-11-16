@@ -283,11 +283,11 @@ export function NowPlaying({
           </div>
         )}
 
-        {/* podnožje: "Slušaj na" i platforme — bez linija, malo niže (više mjesta iznad);
+        {/* podnožje: "Slušaj na" i platforme — bez linija, nisko, pri dnu (više mjesta iznad);
             razmak iznad klizi zajedno s visinom ladice. Otvoren tekst: sitniji znakovi, a na
             niskom ekranu (do 760 px) podnožje se skloni — tekstu ostane mjesta */}
         <div
-          className={`relative mx-[10px] grid shrink-0 pb-[max(0.6rem,env(safe-area-inset-bottom))] transition-[padding,grid-template-rows,opacity,visibility] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${open && has ? 'grid-rows-[1fr] pt-3 [@media(max-height:760px)]:invisible [@media(max-height:760px)]:grid-rows-[0fr] [@media(max-height:760px)]:pt-0 [@media(max-height:760px)]:opacity-0' : 'grid-rows-[1fr] pt-8'}`}
+          className={`relative mx-[10px] grid shrink-0 pb-[max(0.15rem,calc(env(safe-area-inset-bottom)-0.75rem))] transition-[padding,grid-template-rows,opacity,visibility] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${open && has ? 'grid-rows-[1fr] pt-4 [@media(max-height:760px)]:invisible [@media(max-height:760px)]:grid-rows-[0fr] [@media(max-height:760px)]:pt-0 [@media(max-height:760px)]:opacity-0' : 'grid-rows-[1fr] pt-10'} wide:pb-3`}
         >
           <div className="min-h-0 overflow-hidden">
             <ListenFooter verse={verse} videoId={id} small={open && has} />
