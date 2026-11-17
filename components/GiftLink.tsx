@@ -140,7 +140,8 @@ export function GiftLinkActions({ send, onDone }: { send: () => void; onDone: ()
         type="button"
         onClick={send}
         whileTap={{ scale: 0.98 }}
-        className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl text-[14px] font-semibold tracking-wide text-black"
+        // `relative`: kartica je iznad u svom sloju (absolute) — bez ovoga njena sjenka pada preko dugmadi
+        className="relative mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl text-[14px] font-semibold tracking-wide text-black"
         style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
       >
         <ShareIcon />
@@ -152,7 +153,7 @@ export function GiftLinkActions({ send, onDone }: { send: () => void; onDone: ()
           haptic(6)
           setScan(true)
         }}
-        className="mt-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 text-[14px] text-white/80 transition-colors hover:bg-white/5"
+        className="relative mt-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 text-[14px] text-white/80 transition-colors hover:bg-white/5"
       >
         <ScanIcon />
         Skeniraj stih

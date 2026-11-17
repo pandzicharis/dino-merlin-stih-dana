@@ -285,7 +285,7 @@ export default function SharePanel({
 
             {/* format: segmentirana kontrola (za link — adresa) */}
             {link ? (
-              <p className="mt-4 flex h-[46px] items-center justify-center truncate rounded-full border border-white/[0.08] bg-white/[0.03] px-4 text-[12px] text-white/55">
+              <p className="relative mt-4 flex h-[46px] items-center justify-center truncate rounded-full border border-white/[0.08] bg-white/[0.03] px-4 text-[12px] text-white/55">
                 {url.replace(/^https?:\/\//, '')}
               </p>
             ) : (
@@ -324,7 +324,8 @@ export default function SharePanel({
               onClick={() => (link ? sendLink() : run('share'))}
               disabled={!link && (!ready || busy !== null || recording)}
               whileTap={{ scale: 0.98 }}
-              className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl text-[14px] font-semibold tracking-wide text-black disabled:opacity-60"
+              // `relative`: pregled je iznad u svom sloju (absolute) — bez ovoga njegova sjenka pada preko dugmeta
+              className="relative mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl text-[14px] font-semibold tracking-wide text-black disabled:opacity-60"
               style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
             >
               {busy === 'share' && !link ? <Spinner /> : <ShareIcon />}
@@ -333,7 +334,7 @@ export default function SharePanel({
             {link && (
               <button
                 onClick={copyLink}
-                className="mt-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 text-[14px] text-white/80 transition-colors hover:bg-white/5"
+                className="relative mt-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 text-[14px] text-white/80 transition-colors hover:bg-white/5"
               >
                 <CopyIcon />
                 Kopiraj link
