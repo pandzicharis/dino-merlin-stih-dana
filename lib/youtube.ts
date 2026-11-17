@@ -84,6 +84,10 @@ let yt: YTPlayer | null = null
 let made: Promise<YTPlayer> | null = null
 /** video koji je u plejeru i njegovo stanje (YouTube) */
 let loadedId = ''
+/** video pripremljen unaprijed (warmTube) — dodir ga samo pusti, još u dodiru (sa zvukom) */
+let cued = ''
+/** utišano okruglom ikonicom (NowPlaying.tsx) — ostaje i za sljedeće pjesme, dodir ga ne pali */
+let quiet = false
 let ytState = -1
 
 /** sklonjeno mjesto (nema TubeStage) — plejer nikad ne padne u stranicu ispod sadržaja */
@@ -189,6 +193,7 @@ export function warmTube(v?: Verse) {
     // već nešto svira ili je učitano — ne dira se
     if (!id || snap.videoId || loadedId) return
     p.cueVideoById?.({ videoId: id })
+    cued = id
   })
 }
 
@@ -256,32 +261,39 @@ export function openTube(v: Verse, scope: string, list?: Verse[]): boolean {
     return true
   }
   const mine = ++ask
-  void engine().then((p) => {
+  const start = (p: YTPlayer) => {
     if (mine !== ask) return
     loadedId = id
     started = false
-    // zvuk uvijek uključen prije pjesme — YouTube pamti utišano (i od prošlog
-    // otvaranja, i od tihog pokretanja na iPhoneu), pa bi i ova svirala bez zvuka
-    p.unMute?.()
-    p.loadVideoById({ videoId: id })
-    // nije krenuo sam — iPhone ne pušta zvuk bez dodira u samom videu (YouTube u
-    // okviru): krene bez zvuka (to smije), a dodir na našem "Uključi zvuk"
-    // (NowPlaying.tsx, `unmuteTube`) pusti zvuk — i svakoj sljedećoj pjesmi. Drugdje (računar,
-    // Android) se ništa ne utišava: spor video samo pričeka, ili YouTubeov "pusti"
+    // zvuk uključen prije pjesme — YouTube pamti utišano (i od prošlog otvaranja, i od
+    // tihog pokretanja na iPhoneu), pa bi i ova svirala bez zvuka; utišano ikonicom ostaje
+    if (quiet) p.mute?.()
+    else p.unMute?.()
+    // pripremljena pjesma (warmTube) samo krene: poruka YouTubeu ide još u dodiru, pa
+    // smije sa zvukom — i na iPhoneu. Ostale se učitaju i krenu kad video stigne
+    if (cued === id) p.playVideo()
+    else p.loadVideoById({ videoId: id })
+    cued = ''
+    // nije krenuo sam — iPhone ne pušta zvuk bez dodira: krene bez zvuka (to smije), a
+    // prvi sljedeći dodir na dugme (ili okrugla ikonica zvuka uz pjesmu) uključi zvuk —
+    // i svakoj sljedećoj pjesmi. Drugdje se ništa ne utišava: spor video samo pričeka
     window.setTimeout(() => {
       if (mine !== ask || started || (ytState !== UNSTARTED && ytState !== CUED)) return
       if (IOS) {
         p.mute?.()
         p.playVideo()
       }
-      // ni tako nije krenuo — pokaže se YouTubeov "pusti"
+      // ni tako nije krenuo — stoji, a naš "pusti" ga pokrene (iz dodira, sa zvukom)
       window.setTimeout(() => {
         if (mine !== ask || started) return
         started = true
         if (ytState !== BUFFERING) set({ status: 'paused' })
       }, IOS ? 1500 : 500)
     }, 1000)
-  })
+  }
+  // plejer spreman — odmah, još u dodiru; inače kad se napravi
+  if (yt) start(yt)
+  else void engine().then(start)
   return true
 }
 
@@ -300,6 +312,23 @@ function watchSound() {
       set({ muted: false })
     }
   }, 600)
+}
+
+/**
+ * Svira bez zvuka — prvi sljedeći dodir na bilo koje dugme uključi zvuk (dodir ide
+ * YouTubeu s porukom). Samo `click`: povlačenje (listanje teksta) nije dodir, a
+ * uključen zvuk bez dodira iPhone bi zaustavio.
+ */
+let tapArmed = false
+function unmuteOnTap() {
+  if (tapArmed) return
+  tapArmed = true
+  const on = () => {
+    document.removeEventListener('click', on, true)
+    tapArmed = false
+    if (snap.muted && !quiet) unmuteTube()
+  }
+  document.addEventListener('click', on, true)
 }
 
 /** zadnje vrijeme koje je plejer javio i kad (sat stranice) */
@@ -399,10 +428,18 @@ export function prevTube() {
  * smije sa zvukom); dodir na našem dugmetu ide YouTubeu porukom koja nosi dodir.
  */
 export function unmuteTube() {
+  quiet = false
   if (!yt || !snap.videoId || loadedId !== snap.videoId) return
   yt.unMute?.()
-  if (snap.status !== 'playing') yt.playVideo()
   watchSound()
+}
+
+/** Utišaj — okrugla ikonica uz pjesmu; ostaje utišano dok se zvuk ne uključi njome. */
+export function muteTube() {
+  quiet = true
+  window.clearInterval(sound)
+  yt?.mute?.()
+  set({ muted: true })
 }
 
 /** Pusti / pauza — iz dodira. Spuštena se vrati gore i nastavi. */
@@ -448,7 +485,10 @@ function changed(s: number) {
     // svira bez zvuka (iPhone prije prvog dodira u videu) — natpis uz pjesmu dok se ne uključi
     const muted = Boolean(yt?.isMuted?.())
     set({ status: 'playing', muted })
-    if (muted) watchSound()
+    if (muted && !quiet) {
+      watchSound()
+      unmuteOnTap()
+    }
   } else if (s === ENDED) {
     // ponovi: ista ispočetka; inače red (sačuvani): sljedeća krene sama — dok se
     // video vidi (spuštena ionako stoji)

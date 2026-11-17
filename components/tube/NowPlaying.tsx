@@ -8,7 +8,7 @@ import type { Verse } from '@/data/verses'
 import { WIDE_MEDIA } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { albumLine, asWritten } from '@/lib/text'
-import { pauseTube, resumeTube, tubeNext, unmuteTube, useTube, videoOf } from '@/lib/youtube'
+import { muteTube, pauseTube, resumeTube, tubeNext, unmuteTube, useTube, videoOf } from '@/lib/youtube'
 import { primeLyrics } from '../Lyrics'
 import { DrawerHeader } from '../DrawerIcon'
 import { GiftCardWide, useGiftLink } from '../GiftLink'
@@ -201,35 +201,38 @@ export function NowPlaying({
             {/* trenutno slušaš — trake titraju dok svira (stoje kad je pauza) */}
             <div className="mb-1.5 flex items-center gap-1.5">
               <EqBars accent={m.accent} on={playing} h={9} />
-              {tube.muted ? (
-                // svira bez zvuka (iPhone prije prvog dodira) — u videu nema YouTubeovih
-                // kontrola, pa zvuk pušta naše dugme
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptic(6)
-                    unmuteTube()
-                  }}
-                  className="relative -my-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-[3px] text-[8.5px] font-semibold uppercase leading-none tracking-[0.22em] transition-transform before:absolute before:-inset-2 before:content-[''] active:scale-95"
-                  style={{ color: m.accent, borderColor: `${m.accent}66`, background: `${m.accent}1a` }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M11 5 6 9H2v6h4l5 4z" />
-                    <path d="m22 9-6 6M16 9l6 6" />
-                  </svg>
-                  Uključi zvuk
-                </button>
-              ) : (
-                <span className="whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.26em]" style={{ color: m.accent }}>
-                  {tube.status === 'paused' ? 'Pauzirano' : 'Trenutno'}
-                </span>
-              )}
+              <span className="whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.26em]" style={{ color: m.accent }}>
+                {tube.status === 'paused' ? 'Pauzirano' : 'Trenutno'}
+              </span>
             </div>
             <p className="truncate text-[12.5px] font-semibold uppercase leading-tight tracking-[0.18em]" style={{ color: m.accent }}>
               {verse.song}
             </p>
             <p className="mt-1.5 truncate text-[10px] uppercase tracking-[0.22em] text-white/55">{albumLine(verse)}</p>
           </div>
+          {/* zvuk — okrugla ikonica gore desno (u videu nema YouTubeovih kontrola): dodir
+              utiša ili uključi; bez zvuka je u boji stiha (i iPhone prije prvog dodira) */}
+          <motion.button
+            type="button"
+            onClick={() => {
+              haptic(6)
+              if (tube.muted) unmuteTube()
+              else muteTube()
+            }}
+            aria-label={tube.muted ? 'Uključi zvuk' : 'Utišaj'}
+            className="flex h-9 w-9 shrink-0 items-center justify-center self-start rounded-full border transition-colors duration-300"
+            style={
+              tube.muted
+                ? { color: m.accent, borderColor: `${m.accent}66`, background: `${m.accent}1f` }
+                : { color: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)' }
+            }
+            whileTap={{ scale: 0.9 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M11 5 6 9H2v6h4l5 4z" />
+              {tube.muted ? <path d="m22 9-6 6M16 9l6 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />}
+            </svg>
+          </motion.button>
         </div>
 
         {/* traka napretka i kontrole — nasumično, nazad, pusti, sljedeća, ponovi */}

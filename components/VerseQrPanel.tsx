@@ -17,7 +17,7 @@ import { QrIcon } from './tube/icons'
  * kopiraj. Kod nosi link poklona: skeniran, stih doleti drugom telefonu.
  */
 export default function VerseQrPanel({ open, onClose, verse }: { open: boolean; onClose: () => void; verse: Verse }) {
-  const { url, qr, copy, send } = useGiftLink(verse, open)
+  const { qr, send } = useGiftLink(verse, open)
 
   useSheetOpen(open)
   const sheetDrag = useSheetDrag(onClose, open)
@@ -73,7 +73,7 @@ export default function VerseQrPanel({ open, onClose, verse }: { open: boolean; 
                 </motion.div>
               </div>
 
-              <GiftLinkActions url={url} send={send} copy={copy} />
+              <GiftLinkActions send={send} onDone={onClose} />
             </motion.div>
           </SheetSlide>
         </SheetLayer>

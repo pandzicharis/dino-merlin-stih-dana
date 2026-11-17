@@ -115,8 +115,6 @@ export function TubeCapsule({
       {/* pozadina: zamućen omot albuma (unaprijed zamućen — bez CSS blura), zatamnjen */}
       {soft && <span className="absolute inset-0 -z-10 scale-110 bg-cover bg-center opacity-70" style={{ backgroundImage: `url(${soft})` }} aria-hidden />}
       <span className="absolute inset-0 -z-10" style={{ background: `linear-gradient(100deg, rgba(12,10,10,0.86) 25%, rgba(12,10,10,0.55) 100%), radial-gradient(120% 140% at 100% 0%, ${accent}26, transparent 60%)` }} aria-hidden />
-      {/* blag odsjaj pređe preko kartice */}
-      <span className="tube-sheen pointer-events-none absolute inset-0 -z-10" aria-hidden />
 
       {/* omot albuma — dok pjesma svira, na njemu trake */}
       <span

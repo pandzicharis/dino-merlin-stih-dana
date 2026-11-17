@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
@@ -9,7 +9,8 @@ import type { QrMatrix } from '@/lib/qr'
 import { bumpMonth } from '@/lib/storage'
 import { albumLine, paperText } from '@/lib/text'
 import { QrCode } from './deck/QrCode'
-import { giftUrl } from './GiftArrival'
+import { giftUrl, openGift } from './GiftArrival'
+import { QrScanner, giftFromQr } from './QrScanner'
 import { Icon, TOAST_OK, toast } from './Toast'
 
 /*
@@ -129,12 +130,12 @@ export function GiftCardWide({ verse, qr, onBack }: { verse: Verse; qr: QrMatrix
 }
 
 /** Adresa, „Pošalji link“ i „Kopiraj link“ — kao „Link i QR“ u dijeljenju. */
-export function GiftLinkActions({ url, send, copy }: { url: string; send: () => void; copy: () => void }) {
+export function GiftLinkActions({ send, onDone }: { send: () => void; onDone: () => void }) {
+  // "Skeniraj stih" — kamera u aplikaciji (isto kao u postavkama): pročitan kod stiha
+  // zatvori ladicu i otvori poklon odmah (components/GiftArrival.tsx)
+  const [scan, setScan] = useState(false)
   return (
     <>
-      <p className="mt-4 flex h-[46px] items-center justify-center truncate rounded-full border border-white/[0.08] bg-white/[0.03] px-4 text-[12px] text-white/55">
-        {url.replace(/^https?:\/\//, '')}
-      </p>
       <motion.button
         type="button"
         onClick={send}
@@ -147,13 +148,42 @@ export function GiftLinkActions({ url, send, copy }: { url: string; send: () => 
       </motion.button>
       <button
         type="button"
-        onClick={copy}
+        onClick={() => {
+          haptic(6)
+          setScan(true)
+        }}
         className="mt-2 flex h-12 items-center justify-center gap-2 rounded-2xl border border-white/10 text-[14px] text-white/80 transition-colors hover:bg-white/5"
       >
-        <CopyIcon />
-        Kopiraj link
+        <ScanIcon />
+        Skeniraj stih
       </button>
+      <AnimatePresence>
+        {scan && (
+          <QrScanner
+            key="scan"
+            onClose={() => setScan(false)}
+            onCode={(text) => {
+              const id = giftFromQr(text)
+              if (!id) return false
+              haptic([10, 40, 16])
+              setScan(false)
+              onDone()
+              openGift(id)
+              return true
+            }}
+          />
+        )}
+      </AnimatePresence>
     </>
+  )
+}
+
+/** okvir kamere s crtom skeniranja — kao "Skeniraj stih" u postavkama */
+function ScanIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M7 12h10" />
+    </svg>
   )
 }
 
