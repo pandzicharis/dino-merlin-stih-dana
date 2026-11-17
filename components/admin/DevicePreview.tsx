@@ -57,7 +57,10 @@ function PreviewFrame({
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
   }, [frameRef])
-  const reveal = { opacity: shown ? 1 : 0, transition: 'opacity 0.2s ease' }
+  // 0.999, ne 1: potpuno neproziran iframe Chrome smatra pravougaonikom koji sve
+  // ispod sebe pokriva — pa okvir telefona u donjim uglovima (van zaobljenja
+  // ekrana) ne nacrta, i rub izgleda presječen. Neprimjetno providan ga crta.
+  const reveal = { opacity: shown ? 0.999 : 0, transition: 'opacity 0.2s ease' }
   if (device === 'phone') {
     const o = deviceOuter('iphone')
     const k = width / o.w
