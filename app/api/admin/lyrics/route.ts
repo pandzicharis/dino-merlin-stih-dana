@@ -2,16 +2,21 @@ import { NextResponse } from 'next/server'
 import { isAdmin } from '@/lib/admin-auth'
 import { CAN_FETCH, readAlias, readDurations } from '@/lib/audio-files'
 import { audioFile } from '@/lib/audio-name'
+import { readCatalog } from '@/lib/catalog'
+import { OWN_AUDIO } from '@/lib/flags'
 import { setLyricsOffset, storeLyrics } from '@/lib/lyrics-store'
 import { GITHUB_TOKEN, dispatchAudio } from '@/lib/github'
+import { audioSlug } from '@/lib/text'
+import { lyricsDuration } from '@/lib/yt-duration'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
  * Preuzmi tekst pjesme sada (admin → "Preuzmi tekst"), ili
- * sačuvaj pomak teksta (`offset`, kad LRC kasni ili žuri za pjesmom). Tekst ide
- * uz pjesmu (vrijeme redova po trajanju fajla), pa pjesma mora biti preuzeta.
+ * sačuvaj pomak teksta (`offset`, kad LRC kasni ili žuri za pjesmom). Vremena
+ * redova idu po trajanju YouTube videa (lib/yt-duration.ts); uz vlastite pjesme
+ * (lib/flags.ts) po našem fajlu, pa tad pjesma mora biti preuzeta.
  * Lokalno odmah, u pozadini (stanje u /api/admin/audio); na produkciji GitHub
  * (`npm run audio`, LYRICS_RESYNC).
  */
@@ -35,10 +40,15 @@ export async function POST(req: Request) {
   }
 
   if (CAN_FETCH) {
-    const [alias, secs] = await Promise.all([readAlias(), readDurations()])
+    const [alias, secs, cat] = await Promise.all([readAlias(), readDurations(), readCatalog()])
     const file = audioFile(song, alias)
-    if (!(file in secs)) return NextResponse.json({ error: 'Prvo pjesma — tekst ide uz nju.' }, { status: 409 })
-    storeLyrics(file, song, secs[file], true).catch(() => {})
+    if (OWN_AUDIO && !(file in secs)) return NextResponse.json({ error: 'Prvo pjesma — tekst ide uz nju.' }, { status: 409 })
+    // link (vremena po videu, titlovi) i stih (pjesma po stihu) iz kataloga
+    const of = cat.verses.filter((v) => audioSlug(v.song) === audioSlug(song))
+    const youtube = of.find((v) => v.youtube)?.youtube
+    lyricsDuration(file, youtube, secs)
+      .then((d) => storeLyrics(file, song, d, true, { youtube, verse: of[0]?.text }))
+      .catch(() => {})
     return NextResponse.json({ state: 'loading' })
   }
   const fail = await dispatchAudio('lyrics-sync', { song })

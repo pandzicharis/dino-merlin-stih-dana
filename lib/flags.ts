@@ -9,6 +9,8 @@
  *             u workflowu repo varijabla FF_OWN_AUDIO=1
  *
  * Ugašen (zadano): pjesme idu preko YouTube plejera (lib/youtube.ts), s novim
- * dizajnom početne i plejera (components/tube).
+ * dizajnom početne i plejera (components/tube). U adminu tad nema ničeg o
+ * preuzimanju pjesama (♪, "bez pjesme", "Preuzmi"), a Sinhronizacija sređuje
+ * samo tekstove — vremena redova po trajanju YouTube videa (lib/yt-duration.ts).
  */
 export const OWN_AUDIO = process.env.NEXT_PUBLIC_FF_OWN_AUDIO === '1'

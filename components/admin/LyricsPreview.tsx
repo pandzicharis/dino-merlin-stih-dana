@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { BRAND } from '@/lib/brand'
+import { OWN_AUDIO } from '@/lib/flags'
 
 /** stanje teksta pjesme iz /api/admin/audio (lib/lyrics-store.ts) */
 type LyricsState = 'synced' | 'plain' | 'missing' | 'loading'
@@ -163,8 +164,8 @@ export function LyricsRow({
     )
   }
 
-  // bez spremljenog teksta — napomena kao za pjesmu
-  const ready = info?.state === 'ready'
+  // bez spremljenog teksta — napomena kao za pjesmu; preko YouTubea tekst ne čeka pjesmu (lib/flags.ts)
+  const ready = !OWN_AUDIO || info?.state === 'ready'
   return (
     <p className="col-span-2 -mt-1 flex items-center gap-2 text-[11px] text-white/45" data-lyrics-hint>
       <span style={{ color: BRAND.gold }} className="flex">

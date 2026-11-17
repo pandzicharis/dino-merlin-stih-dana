@@ -17,6 +17,8 @@ import { SongEdit, SongPicker, SongPlayer, type KnownSong } from './SongPicker'
 import { LyricsBadge, LyricsRow } from './LyricsPreview'
 import { SyncModule } from './SyncModule'
 import { audioFile } from '@/lib/audio-name'
+// vlastite pjesme (preuzimanje, ♪, "bez pjesme") samo uz prekidač — inače pjesme idu preko YouTubea, a admin sređuje tekst
+import { OWN_AUDIO } from '@/lib/flags'
 import { DrawerIcon } from '../DrawerIcon'
 import { Icon, TOAST_BAD, TOAST_OK, toast } from '../Toast'
 
@@ -55,6 +57,27 @@ const PRINT_ICON = (
 
 function oneLine(t: string) {
   return asWritten(t).replace(/\s*\n\s*/g, ' / ')
+}
+
+/**
+ * Dugme u zaglavlju admina. Na uskom ekranu (telefon, uski pregled) samo znak
+ * u krugu — natpisi bi istisnuli naslov i izašli preko ivice; natpis od sm naviše.
+ */
+function HeadButton({ label, children, ...rest }: { label: string; children: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      {...rest}
+      className="flex h-9 w-9 items-center justify-center gap-2 rounded-full border border-white/10 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white disabled:opacity-40 sm:h-auto sm:w-auto sm:px-3.5 sm:py-2"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {children}
+      </svg>
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  )
 }
 
 /**
@@ -158,44 +181,19 @@ export function AdminPanel() {
         </>
       }
       right={
-        <div className="flex items-center gap-2">
-        {/* pjesme i tekstovi koji fale — izabrane, u jednom potezu */}
-        <button
-          type="button"
-          onClick={() => setSyncing(true)}
-          disabled={!data || !songs.mode || songs.mode === 'off'}
-          data-sync
-          className="flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white disabled:opacity-40"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* tekstovi (i pjesme) koji fale — izabrane, u jednom potezu */}
+          <HeadButton label="Sinhronizacija" onClick={() => setSyncing(true)} disabled={!data || !songs.mode || songs.mode === 'off'} data-sync>
             {SYNC_ICON}
-          </svg>
-          Sinhronizacija
-        </button>
-        {/* papirići za pult — A4 za štampu na papir u boji */}
-        <button
-          type="button"
-          onClick={() => setPrinting(true)}
-          disabled={!data}
-          data-print
-          className="flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white disabled:opacity-40"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2" />
-            <rect x="6" y="14" width="12" height="7" rx="1" />
-          </svg>
-          Štampa
-        </button>
-        <button
-          onClick={logout}
-          className="flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-[11px] uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-white"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          </HeadButton>
+          {/* papirići za pult — A4 za štampu na papir u boji */}
+          <HeadButton label="Štampa" onClick={() => setPrinting(true)} disabled={!data} data-print>
+            {PRINT_ICON}
+          </HeadButton>
+          <HeadButton label="Odjava" onClick={logout}>
             <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
             <path d="M10 8l-4 4 4 4M6 12h10" />
-          </svg>
-          Odjava
-        </button>
+          </HeadButton>
         </div>
       }
     >
@@ -257,7 +255,7 @@ export function AdminPanel() {
           </AnimatePresence>
           <AnimatePresence>
             {syncing && (
-              <Sheet key="sync" wide eyebrow="Pjesme i tekstovi" title="Sinhronizacija" icon={SYNC_ICON} onClose={() => setSyncing(false)}>
+              <Sheet key="sync" wide eyebrow={OWN_AUDIO ? 'Pjesme i tekstovi' : 'Tekstovi pjesama'} title="Sinhronizacija" icon={SYNC_ICON} onClose={() => setSyncing(false)}>
                 <SyncModule verses={data.verses} info={songs.of} onDone={songs.reload} flash={flash} />
               </Sheet>
             )}
@@ -289,8 +287,13 @@ export function AdminPanel() {
                   setEditor(null)
                   if (!editor.verse) setLibKey((k) => k + 1)
                   songs.reload()
-                  // pjesma se sprema odmah — dok stih uđe u izvlačenje, pušta se bez čekanja
-                  if (draft.youtube.trim() && songs.of(draft.song)?.state !== 'ready') songs.fetch(draft.song, draft.youtube)
+                  if (!draft.youtube.trim()) return
+                  // pjesma se sprema odmah — dok stih uđe u izvlačenje, pušta se bez čekanja;
+                  // preko YouTubea samo tekst nove pjesme
+                  const info = songs.of(draft.song)
+                  if (OWN_AUDIO) {
+                    if (info?.state !== 'ready') songs.fetch(draft.song, draft.youtube)
+                  } else if (!info?.lyrics || info.lyrics === 'missing') songs.fetchLyrics(draft.song)
                 }}
               />
             )}
@@ -766,9 +769,9 @@ function Library({
             <span className="mx-1 w-px shrink-0 self-stretch bg-white/10" aria-hidden />
             {(
               [
-                ['song', 'Bez pjesme', noSong, setNoSong, hasSong],
-                ['sync', 'Tekst ne prati', noSync, setNoSync, synced],
-              ] as const
+                ...(OWN_AUDIO ? [['song', 'Bez pjesme', noSong, setNoSong, hasSong] as const] : []),
+                ['sync', 'Tekst ne prati', noSync, setNoSync, synced] as const,
+              ]
             ).map(([k, label, on, set, has]) => (
               <Switch
                 key={k}
@@ -823,9 +826,9 @@ function Library({
                 </p>
                 <p className="mt-1 flex min-w-0 items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
                   <span className="shrink-0" style={{ color: BRAND.gold }}>{v.song}</span>
-                  {songs.of(v.song)?.state === 'ready' && <SongBadge info={songs.of(v.song)} mode={songs.mode} onFetch={() => {}} />}
+                  {OWN_AUDIO && songs.of(v.song)?.state === 'ready' && <SongBadge info={songs.of(v.song)} mode={songs.mode} onFetch={() => {}} />}
                   {/* tekst: spremljen (prati pjesmu / bez vremena), preuzima se, ili nije */}
-                  {songs.of(v.song)?.state === 'ready' && <LyricsBadge info={songs.of(v.song)} />}
+                  {(!OWN_AUDIO || songs.of(v.song)?.state === 'ready') && <LyricsBadge info={songs.of(v.song)} />}
                   <span className="truncate">
                   <span className="text-white/30">
                     {albumLine(v)}
@@ -833,9 +836,9 @@ function Library({
                   </span>
                 </p>
               </div>
-              {/* pjesma koja nije preuzeta: natpis i diskretno dugme, pored ikonica */}
+              {/* pjesma koja nije preuzeta: natpis i diskretno dugme, pored ikonica (samo vlastite pjesme) */}
               {v.youtube ? (
-                <SongIssue info={songs.of(v.song)} mode={songs.mode} onRetry={() => songs.fetch(v.song, v.youtube)} />
+                OWN_AUDIO && <SongIssue info={songs.of(v.song)} mode={songs.mode} onRetry={() => songs.fetch(v.song, v.youtube)} />
               ) : (
                 // bez linka — ispod stiha je samo naziv pjesme, bez plejera
                 <span
@@ -1425,7 +1428,7 @@ function Editor({
             <SongPicker
               value={d.song}
               songs={[...knownSongs.values()]}
-              ready={(s) => songOf(s)?.state === 'ready'}
+              ready={(s) => OWN_AUDIO && songOf(s)?.state === 'ready'}
               onType={setSong}
               // izbor s liste: link, album i godina te pjesme
               onPick={(s) =>
@@ -1519,8 +1522,8 @@ function Editor({
           </label>
           {/* pregled videa — da se vidi da je link prava pjesma */}
           {youtubeId(d.youtube) && <YouTubePreview key={youtubeId(d.youtube)!} id={youtubeId(d.youtube)!} />}
-          {/* svaki stih ima pjesmu koja se pušta odmah — postojeća se može pustiti ovdje */}
-          {song?.state === 'ready' ? (
+          {/* svaki stih ima pjesmu koja se pušta odmah — postojeća se može pustiti ovdje (samo vlastite pjesme) */}
+          {!OWN_AUDIO ? null : song?.state === 'ready' ? (
             <SongPlayer key={audioSlug(d.song)} song={d.song} />
           ) : (
             // bez linka nema pjesme — ni napomene o preuzimanju

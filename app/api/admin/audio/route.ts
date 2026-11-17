@@ -3,6 +3,7 @@ import { isAdmin } from '@/lib/admin-auth'
 import { readCatalog } from '@/lib/catalog'
 import { CAN_FETCH, prepareSong, readAlias, readDurations, songState, type SongState } from '@/lib/audio-files'
 import { audioFile } from '@/lib/audio-name'
+import { OWN_AUDIO } from '@/lib/flags'
 import { lyricsState, readLyrics, type StoredLyrics } from '@/lib/lyrics-store'
 import { audioSlug } from '@/lib/text'
 import BUNDLED_LYRICS from '@/data/lyrics.json'
@@ -49,13 +50,16 @@ function remote(job: Job | null): { state: SongState; error?: string } {
   }
 }
 
-/** Stanje svake pjesme iz kataloga: { slug: stanje } — zvuk i tekst (data/lyrics.json). */
+/**
+ * Stanje svake pjesme iz kataloga: { slug: stanje } — zvuk i tekst (data/lyrics.json).
+ * Pjesme preko YouTubea (lib/flags.ts): samo tekst — zvuk se ne provjerava.
+ */
 export async function GET() {
   if (!(await isAdmin())) return denied()
   const [cat, durations, job, alias, stored] = await Promise.all([
     readCatalog(),
     readDurations(),
-    CAN_FETCH ? null : lastJob(),
+    CAN_FETCH || !OWN_AUDIO ? null : lastJob(),
     readAlias(),
     // tekstovi: lokalno svježi, na produkciji iz builda (kao trajanja)
     CAN_FETCH ? readLyrics() : (BUNDLED_LYRICS as Record<string, StoredLyrics>),
@@ -64,8 +68,13 @@ export async function GET() {
   for (const v of cat.verses) {
     const slug = audioSlug(v.song)
     if (slug in songs) continue
+    const lyrics = lyricsState(audioFile(v.song, alias), stored)
+    if (!OWN_AUDIO) {
+      songs[slug] = { state: 'missing', lyrics }
+      continue
+    }
     const st = await songState(v.song, durations)
-    songs[slug] = { ...(st.state === 'ready' || CAN_FETCH ? st : remote(job)), lyrics: lyricsState(audioFile(v.song, alias), stored) }
+    songs[slug] = { ...(st.state === 'ready' || CAN_FETCH ? st : remote(job)), lyrics }
   }
   return NextResponse.json(
     { mode: CAN_FETCH ? 'local' : GITHUB_TOKEN ? 'github' : 'off', job: job?.url ?? null, songs },
@@ -80,6 +89,7 @@ export async function POST(req: Request) {
   const song = String(body?.song ?? '').trim().slice(0, 120)
   const youtube = String(body?.youtube ?? '').trim().slice(0, 200)
   if (!song) return NextResponse.json({ error: 'Nedostaje naziv pjesme.' }, { status: 400 })
+  if (!OWN_AUDIO) return NextResponse.json({ error: 'Pjesme idu preko YouTubea — preuzimanje je isključeno (FF_OWN_AUDIO).' }, { status: 409 })
 
   if ((await songState(song)).state === 'ready') return NextResponse.json({ state: 'ready' })
 

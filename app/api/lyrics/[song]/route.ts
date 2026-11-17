@@ -30,10 +30,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ song: string }>
   song = song.slice(0, 120)
   const stored = (STORED as Record<string, StoredLyrics>)[audioFile(song)]
   const known = (DURATIONS as Record<string, number>)[audioFile(song)] ?? 0
+  // vremena redova vrijede za snimak uz koji su nađena (spremljeno trajanje, npr. YouTube video), inače za naš fajl
+  const ref = stored?.duration ?? known
   // telefon kratko (ispravka iz admina stigne brzo), CDN sedmicu — nova objava ga ionako očisti
   if (stored)
     return NextResponse.json(
-      { ...stored, ...(stored.synced && known ? { duration: known } : {}) },
+      { ...stored, ...(stored.synced && ref ? { duration: ref } : {}) },
       { headers: { 'Cache-Control': 'public, max-age=300, s-maxage=604800, stale-while-revalidate=2592000' } },
     )
   // trajanje videa s telefona — samo cijele sekunde u razumnim granicama (ključ CDN-a)

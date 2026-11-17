@@ -17,7 +17,7 @@ on:
     # audio: preuzmi pjesme (i tekstove) koje fale; audio-rename: admin je preimenovao
     # pjesmu; lyrics-offset: admin je podesio pomak teksta; lyrics-sync: ponovo traži
     # vremena redova za tekstove koji ne prate pjesmu (song: naziv ili *); sync: admin →
-    # Sinhronizacija, izabrane pjesme (songs: red po red) — zvuk koji fali i tekst iznova
+    # Sinhronizacija, izabrane pjesme (songs: red po red) — tekst iznova (i zvuk koji fali, uz FF_OWN_AUDIO)
     types: [audio, audio-rename, lyrics-offset, lyrics-sync, sync]
   workflow_dispatch:
 
@@ -83,6 +83,8 @@ jobs:
         if: github.event.action == 'lyrics-sync'
         env:
           STIH_AUDIO_FETCH: '1'
+          # vlastite pjesme (lib/flags.ts) — bez njih skripta sređuje samo tekst
+          NEXT_PUBLIC_FF_OWN_AUDIO: ${{ vars.FF_OWN_AUDIO }}
           LYRICS_RESYNC: ${{ github.event.client_payload.song }}
         run: npx -y tsx@4.23.13 scripts/audio-sync.ts --lyrics
 
@@ -90,6 +92,7 @@ jobs:
         if: github.event.action == 'sync'
         env:
           STIH_AUDIO_FETCH: '1'
+          NEXT_PUBLIC_FF_OWN_AUDIO: ${{ vars.FF_OWN_AUDIO }}
           SYNC_SONGS: ${{ github.event.client_payload.songs }}
         run: npx -y tsx@4.23.13 scripts/audio-sync.ts
 
@@ -100,6 +103,7 @@ jobs:
         # naziv i link idu kroz env, ne u skriptu — bez ubacivanja u shell
         env:
           STIH_AUDIO_FETCH: '1'
+          NEXT_PUBLIC_FF_OWN_AUDIO: ${{ vars.FF_OWN_AUDIO }}
           AUDIO_SONG: ${{ github.event.client_payload.song }}
           AUDIO_YOUTUBE: ${{ github.event.client_payload.youtube }}
         run: npx -y tsx@4.23.13 scripts/audio-sync.ts

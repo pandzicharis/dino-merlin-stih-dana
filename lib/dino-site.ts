@@ -188,9 +188,46 @@ export function siteLyrics(p: string): Promise<SiteLyrics> {
   return remember(`page:${p}`, async () => ({ ...parseLyrics(await page(url)), url }))
 }
 
-/** Tekst pjesme po nazivu iz kataloga — null ako je nema na sajtu. */
-export async function lyricsOf(song: string): Promise<(SiteLyrics & { title: string }) | null> {
-  const hit = findSiteSong(song, await siteSongs())
+/**
+ * Tekst pjesme po nazivu iz kataloga, a kad je po nazivu nema (drugi naziv,
+ * greška u kucanju) — po stihu (`verse`) koji je u njoj. null ako je nema na sajtu.
+ */
+export async function lyricsOf(song: string, verse?: string): Promise<(SiteLyrics & { title: string; album: string }) | null> {
+  const list = await siteSongs()
+  const hit = findSiteSong(song, list) ?? (verse ? await findByVerse(verse, list) : undefined)
   if (!hit) return null
-  return { ...(await siteLyrics(hit.page)), title: hit.title }
+  return { ...(await siteLyrics(hit.page)), title: hit.title, album: hit.album }
+}
+
+/**
+ * Pjesma po stihu: tekstovi sa sajta se čitaju redom (po šest odjednom) dok
+ * se ne nađe onaj u kojem su svi redovi stiha — bez kvačica, razmaka i
+ * interpunkcije. Stranice ostaju u memoriji (sat), pa je sljedeća brza.
+ */
+async function findByVerse(verse: string, list: SiteSong[]): Promise<SiteSong | undefined> {
+  const want = verse
+    .split('\n')
+    .map(songKey)
+    .filter((k) => k.length >= 6)
+  if (!want.length) return undefined
+  for (let i = 0; i < list.length; i += 6) {
+    const batch = list.slice(i, i + 6)
+    const pages = await Promise.all(batch.map((s) => siteLyrics(s.page).catch(() => null)))
+    const at = pages.findIndex((p) => {
+      const all = p?.lines.map(songKey).join('') ?? ''
+      return all && want.every((k) => all.includes(k))
+    })
+    if (at >= 0) return batch[at]
+  }
+  return undefined
+}
+
+/**
+ * Drugi nazivi pjesme iz naslova sa sajta: ono u zagradi i naslov bez zagrada —
+ * "Laku noć, moja mala barbiko (Ja sam na te navik'o)" → "Ja sam na te navik'o",
+ * "Laku noć, moja mala barbiko". Po njima se traži i na LRCLIB-u.
+ */
+export function altTitles(title: string): string[] {
+  const inner = [...title.matchAll(/\(([^)]+)\)/g)].map((m) => m[1].trim())
+  return [...inner, bare(title).replace(/\s+/g, ' ').trim()].filter((t) => t && t !== title)
 }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Verse } from '@/data/verses'
 import { BRAND } from '@/lib/brand'
+import { OWN_AUDIO } from '@/lib/flags'
 import { albumLine, audioSlug } from '@/lib/text'
 
 /** stanje pjesme iz /api/admin/audio (AdminPanel → useSongs) */
@@ -14,10 +15,11 @@ const GREEN = '#9BCB8E'
 const RED = '#E6A4A4'
 
 /**
- * Sinhronizacija (admin → modal): sve pjesme iz baze sa stanjem zvuka i
- * teksta. Filteri "Bez muzike" i "Tekst ne prati", izbor pjesama i jedno
- * dugme — za izabrane se preuzme zvuk koji fali i tekst iznova (LRCLIB,
- * vremena redova). Rezultat svake pjesme se vidi odmah u njenom redu:
+ * Sinhronizacija (admin → modal): pjesme iz baze kojima tekst ne prati
+ * pjesmu, filter "Tekst ne prati", izbor pjesama i jedno dugme — za izabrane
+ * se tekst traži iznova (LRCLIB, vremena redova po YouTube videu). Uz vlastite
+ * pjesme (lib/flags.ts) još i stanje zvuka, filter "Bez muzike" i preuzimanje
+ * zvuka koji fali. Rezultat svake pjesme se vidi odmah u njenom redu:
  * lokalno dok posao ide, na produkciji provjera teksta odmah, a spremi GitHub.
  */
 export function SyncModule({
@@ -60,7 +62,7 @@ export function SyncModule({
   const result = new Map(items.map((i) => [audioSlug(i.song), i]))
   // samo pjesme kojima nešto fali (muzika ili tekst koji prati) — i one iz zadnje
   // akcije, da im se vidi rezultat i kad su sad potpune
-  const lacking = songs.filter((v) => !hasAudio(v) || !synced(v) || result.has(audioSlug(v.song)))
+  const lacking = songs.filter((v) => (OWN_AUDIO && !hasAudio(v)) || !synced(v) || result.has(audioSlug(v.song)))
   const shown = lacking.filter((v) => (!noAudio || !hasAudio(v)) && (!noSync || !synced(v)))
   const allOn = shown.length > 0 && shown.every((v) => sel.has(audioSlug(v.song)))
 
@@ -115,7 +117,7 @@ export function SyncModule({
     <div className="flex min-h-0 flex-col gap-4" data-sync-module>
       {/* filteri */}
       <div className="flex flex-wrap items-center gap-2">
-        <Pill on={noAudio} onClick={() => setNoAudio((x) => !x)} label="Bez muzike" count={lacking.filter((v) => !hasAudio(v)).length} />
+        {OWN_AUDIO && <Pill on={noAudio} onClick={() => setNoAudio((x) => !x)} label="Bez muzike" count={lacking.filter((v) => !hasAudio(v)).length} />}
         <Pill on={noSync} onClick={() => setNoSync((x) => !x)} label="Tekst ne prati" count={lacking.filter((v) => !synced(v)).length} />
         <button
           type="button"
@@ -157,7 +159,9 @@ export function SyncModule({
       {/* pjesme */}
       <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/[0.08]">
         {shown.length === 0 && (
-          <p className="px-4 py-6 text-center text-[13px] text-white/45">{lacking.length ? 'Nema takvih pjesama' : 'Sve pjesme imaju muziku i tekst koji prati'}</p>
+          <p className="px-4 py-6 text-center text-[13px] text-white/45">
+            {lacking.length ? 'Nema takvih pjesama' : OWN_AUDIO ? 'Sve pjesme imaju muziku i tekst koji prati' : 'Sve pjesme imaju tekst koji prati'}
+          </p>
         )}
         {shown.map((v) => {
           const k = audioSlug(v.song)
@@ -225,7 +229,7 @@ function State({ info }: { info: Info }) {
   const l = info?.lyrics
   return (
     <span className="flex shrink-0 items-center gap-1.5 text-[10.5px]">
-      <Chip tone={audio === 'ok' ? 'ok' : audio === 'run' ? 'run' : 'bad'}>{audio === 'ok' ? 'muzika' : audio === 'run' ? 'preuzima se' : 'bez muzike'}</Chip>
+      {OWN_AUDIO && <Chip tone={audio === 'ok' ? 'ok' : audio === 'run' ? 'run' : 'bad'}>{audio === 'ok' ? 'muzika' : audio === 'run' ? 'preuzima se' : 'bez muzike'}</Chip>}
       <Chip tone={l === 'synced' ? 'ok' : l === 'loading' ? 'run' : l === 'plain' ? 'mid' : 'bad'}>{l === 'synced' ? 'prati' : l === 'loading' ? 'tekst…' : l === 'plain' ? 'bez vremena' : 'bez teksta'}</Chip>
     </span>
   )

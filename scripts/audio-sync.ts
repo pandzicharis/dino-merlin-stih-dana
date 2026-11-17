@@ -2,11 +2,13 @@
  * Svaki stih mora imati pjesmu koja se pušta odmah. Ova skripta to provjeri
  * i sredi što fali: preuzme pjesmu, kodira je (HE-AAC) i upiše trajanje —
  * isto što admin uradi sam kad se stih sačuva lokalno (lib/audio-files.ts).
+ * Zvuk samo uz vlastite pjesme (lib/flags.ts, FF_OWN_AUDIO); inače pjesme idu
+ * preko YouTubea i skripta sređuje samo tekstove (vremena po YouTube videu).
  *
  *   npm run audio                  stihovi s produkcije (/api/verses)
  *   npm run audio -- --local       stihovi iz lokalnog admina (.data/catalog.json)
  *   npm run audio -- --check       samo provjera, ništa ne preuzima (izlaz 1 ako fali)
- *   npm run audio -- --lyrics      samo tekstovi pjesama koje već imaju zvuk
+ *   npm run audio -- --lyrics      samo tekstovi (uz vlastite pjesme: pjesme koje već imaju zvuk)
  *
  * Uz svaku pjesmu sa zvukom jednom se spremi i njen tekst (data/lyrics.json,
  * lib/lyrics-store.ts) — aplikacija ga onda ne traži ni od jednog sajta.
@@ -23,8 +25,10 @@ import { audioSlug, youtubeId } from '../lib/text'
 import { prepareSong, readAlias, readDurations, songState } from '../lib/audio-files'
 import { readLyrics, storeLyrics } from '../lib/lyrics-store'
 import { audioFile } from '../lib/audio-name'
+import { OWN_AUDIO } from '../lib/flags'
+import { lyricsDuration } from '../lib/yt-duration'
 
-type V = { id: string; song: string; youtube?: string; active?: boolean }
+type V = { id: string; song: string; youtube?: string; text?: string; active?: boolean }
 
 const local = process.argv.includes('--local')
 const check = process.argv.includes('--check')
@@ -56,7 +60,8 @@ async function main() {
   console.log(`\n${list.length} stihova · ${local ? '.data/catalog.json' : PUBLIC_URL}\n`)
 
   // pjesma → stihovi iz nje (više stihova može biti iz iste pjesme)
-  const songs = new Map<string, { song: string; youtube?: string; ids: string[] }>()
+  // (link: vremena redova po videu i titlovi; stih: pjesma po stihu kad je po nazivu nema)
+  const songs = new Map<string, { song: string; youtube?: string; verse?: string; ids: string[] }>()
   let noLink = 0
   for (const v of list) {
     if (!youtubeId(v.youtube)) {
@@ -67,6 +72,7 @@ async function main() {
     const s = songs.get(k) ?? { song: v.song, ids: [] }
     s.ids.push(v.id)
     if (!s.youtube && youtubeId(v.youtube)) s.youtube = v.youtube
+    if (!s.verse && v.text) s.verse = v.text
     songs.set(k, s)
   }
 
@@ -75,12 +81,14 @@ async function main() {
 
   const durations = await readDurations()
   const todo: string[] = []
-  for (const [k, s] of [...songs].sort()) {
-    const st = await songState(s.song, durations)
-    const ok = st.state === 'ready'
-    if (!ok) todo.push(k)
-    console.log(`  ${ok ? '✓' : '·'}  ${s.song.padEnd(26)} ${ok ? `${durations[k].toFixed(0)} s` : 'fali'}   ${s.ids.join(', ')}`)
-  }
+  // zvuk samo uz vlastite pjesme — preko YouTubea ovdje ide samo tekst
+  if (OWN_AUDIO)
+    for (const [k, s] of [...songs].sort()) {
+      const st = await songState(s.song, durations)
+      const ok = st.state === 'ready'
+      if (!ok) todo.push(k)
+      console.log(`  ${ok ? '✓' : '·'}  ${s.song.padEnd(26)} ${ok ? `${durations[k].toFixed(0)} s` : 'fali'}   ${s.ids.join(', ')}`)
+    }
 
   if (todo.length && !check && !lyricsOnly) {
     console.log(`\nPreuzimam ${todo.length}…`)
@@ -96,14 +104,16 @@ async function main() {
   }
 
   const left = (await Promise.all(todo.map((k) => songState(songs.get(k)!.song)))).filter((s) => s.state !== 'ready').length
-  console.log(`\n${songs.size} pjesama za ${list.length} stihova · ${left ? `${left} bez zvuka` : 'sve spremne'}${noLink ? ` · ${noLink} bez linka` : ''}\n`)
+  const audioNote = OWN_AUDIO ? ` · ${left ? `${left} bez zvuka` : 'sve spremne'}` : ''
+  console.log(`\n${songs.size} pjesama za ${list.length} stihova${audioNote}${noLink ? ` · ${noLink} bez linka` : ''}\n`)
 
-  // tekstovi: pjesma sa zvukom, a bez spremljenog teksta (trajanje treba za vrijeme redova);
-  // uz LYRICS_RESYNC i oni bez vremena redova
+  // tekstovi: pjesma bez spremljenog teksta — vremena redova po trajanju YouTube videa
+  // (uz vlastite pjesme po fajlu, pa tad samo pjesma sa zvukom); uz LYRICS_RESYNC i oni bez vremena redova
   const [stored, alias, secs] = await Promise.all([readLyrics(), readAlias(), readDurations()])
   const again = (s: { song: string }) =>
     !stored[audioFile(s.song, alias)]?.synced && (only.has(audioSlug(s.song)) || (Boolean(resync) && (resync === '*' || audioSlug(resync) === audioSlug(s.song))))
-  const bare = [...songs.values()].filter((s) => audioFile(s.song, alias) in secs && (!(audioFile(s.song, alias) in stored) || again(s)))
+  const can = (s: { song: string; youtube?: string }) => (OWN_AUDIO ? audioFile(s.song, alias) in secs : Boolean(youtubeId(s.youtube)))
+  const bare = [...songs.values()].filter((s) => can(s) && (!(audioFile(s.song, alias) in stored) || again(s)))
   let lyricsLeft = bare.length
   if (bare.length && !check) {
     console.log(`Tekstovi: ${bare.length}…`)
@@ -117,7 +127,7 @@ async function main() {
       const failed: typeof bare = []
       for (const s of todoLyrics) {
         const f = audioFile(s.song, alias)
-        const ok = await storeLyrics(f, s.song, secs[f], true).catch(() => false)
+        const ok = await storeLyrics(f, s.song, await lyricsDuration(f, s.youtube, secs), true, { youtube: s.youtube, verse: s.verse }).catch(() => false)
         if (ok) lyricsLeft--
         else failed.push(s)
         const l = ok ? (await readLyrics())[f] : null

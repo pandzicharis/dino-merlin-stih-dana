@@ -13,7 +13,6 @@
  * nema yt-dlp-a, a public/ je zaključan poslije builda.
  */
 
-import { spawn } from 'node:child_process'
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -23,6 +22,10 @@ import BUNDLED_ALIAS from '../data/audio-alias.json'
 import { audioFile } from './audio-name'
 import { OWN_AUDIO } from './flags'
 import { storeLyrics, updateLyrics } from './lyrics-store'
+import { run, watch, ytdlp } from './ytdlp'
+
+// yt-dlp i pokretanje alata žive u lib/ytdlp.ts (koristi ih i tekst — titlovi videa); ovdje ostaju dostupni kao i prije
+export { run, watch, ytdlp }
 
 const ROOT = process.cwd()
 export const AUDIO_DIR = path.join(ROOT, 'public', 'audio')
@@ -106,7 +109,7 @@ function prepareFile(slug: string, song: string, youtube?: string): Promise<void
         }
         const secs = await finalizeSong(slug, src, tmp)
         // tekst uz pjesmu, jednom (ne čeka se — pjesma je spremna odmah); ne uspije li, `npm run audio` ga spremi
-        storeLyrics(slug, song, secs).then(
+        storeLyrics(slug, song, secs, false, { youtube }).then(
           (ok) => !ok && console.warn('[tekst]', slug, 'izvor nije odgovorio — npm run audio -- --lyrics'),
           (e: Error) => console.error('[tekst]', slug, e.message),
         )
@@ -245,45 +248,4 @@ export async function renameSong(from: string, to: string, file: string): Promis
     changed = true
   }
   return { changed }
-}
-
-/* ── yt-dlp ─────────────────────────────────────────────────── */
-
-export const watch = (id: string) => `https://www.youtube.com/watch?v=${id}`
-
-export async function ytdlp(args: string[]): Promise<string> {
-  // GitHub: YouTube servere bez prijave zna odbiti ("not a bot") — kolačići naloga (YT_COOKIES)
-  const cookies = process.env.YTDLP_COOKIES
-  if (!cookies) return ytdlpRun(args)
-  try {
-    return await ytdlpRun(['--cookies', cookies, ...args])
-  } catch (e) {
-    // istekli kolačići znaju biti gori od nikakvih (okrnjeni formati) — još jednom bez njih
-    try {
-      return await ytdlpRun(args)
-    } catch {
-      throw e
-    }
-  }
-}
-
-async function ytdlpRun(args: string[]): Promise<string> {
-  try {
-    return await run(process.env.YTDLP_PATH || 'yt-dlp', args)
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') return run('python3', ['-m', 'yt_dlp', ...args])
-    throw e
-  }
-}
-
-export function run(cmd: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
-    let out = ''
-    let err = ''
-    child.stdout.on('data', (d) => (out += d))
-    child.stderr.on('data', (d) => (err += d))
-    child.on('error', reject)
-    child.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(err.trim() || `${cmd} exit ${code}`))))
-  })
 }
