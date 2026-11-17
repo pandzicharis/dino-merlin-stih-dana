@@ -15,7 +15,7 @@ import type { Verse } from '@/data/verses'
 import { BRAND, MAGAZA_BESIDE, MAGAZA_DROP, MAGAZA_RATIO } from './brand'
 import { formatFullDateBs } from './date'
 import { albumLine, asWritten } from './text'
-import { LIMITS, VERSE_FONTS, caseOf, lookScale, lookSpacing, parseFont, styleOf, type FontMap } from './fonts'
+import { LIMITS, VERSE_FONTS, caseOf, lookScale, lookSpacing, parseFont, styleOf, type FontMap, type WordStyle } from './fonts'
 
 /* ── formati i stilovi ──────────────────────────────────────── */
 
@@ -129,7 +129,8 @@ function fontFamilies() {
 
 /* ── stih po riječima, svaka u svom fontu (lib/fonts.ts) — kao na ekranu ── */
 
-type Run = { text: string; css: string; width: number; pad: number; ls: number; accent: boolean; color?: string }
+/** `bold`: debljina obrisa u px kad font nema podebljan rez (vidi `runCss`), inače 0. */
+type Run = { text: string; css: string; width: number; pad: number; ls: number; bold: number; accent: boolean; color?: string }
 /** `above` / `below`: koliko red ide iznad i ispod osnovne linije — zbir je visina reda. */
 type VLine = { runs: Run[]; width: number; above: number; below: number }
 
@@ -157,9 +158,16 @@ function runCss(map: FontMap, i: number, size: number, serif: string): string {
   // Fraunces (i kurziv) iz istog upečenog fonta kao ekran — `serif` ga već nosi
   const family = st.font === 'fraunces' ? serif : cs.getPropertyValue(f.family.slice(4, -1)).trim() || serif
   const px = size * (st.font === 'fraunces' ? 1 : f.scale) * ((st.size ?? 100) / 100)
-  // podebljan Fraunces je na ekranu wght 620 (lib/fonts.ts), ne 700
-  return `${st.italic ? 'italic ' : ''}${st.bold ? (st.font === 'fraunces' ? 620 : 700) : 400} ${px}px ${family}`
+  // podebljan Fraunces je na ekranu wght 620 (lib/fonts.ts), ne 700. Font bez
+  // podebljanog reza (Great Vibes, Allura…) ostaje 400 — debljinu mu daje obris
+  // (`fillWord`): Safari bi ga sam podebljao crtajući slova nekoliko puta, malo
+  // pomjerena, pa slova na slici dobiju pruge.
+  const weight = st.bold && f.bold ? (st.font === 'fraunces' ? 620 : 700) : 400
+  return `${st.italic ? 'italic ' : ''}${weight} ${px}px ${family}`
 }
+
+/** Debljina obrisa za podebljanu riječ u fontu bez podebljanog reza — kao Chromeov lažni bold (em/32). */
+const fakeBold = (st: WordStyle, em: number) => (st.bold && !VERSE_FONTS[st.font].bold ? em / 32 : 0)
 
 /** Razmak slova na platnu (dizajn stiha) — gdje ga preglednik zna; pisani bez razmaka. */
 function setSpacing(ctx: CanvasRenderingContext2D, px: number) {
@@ -180,15 +188,25 @@ function wordWidth(ctx: CanvasRenderingContext2D, word: string, ls: number) {
   }
   return ctx.measureText(word).width + [...word].length * ls
 }
-function fillWord(ctx: CanvasRenderingContext2D, word: string, x: number, y: number, ls: number) {
+function fillWord(ctx: CanvasRenderingContext2D, word: string, x: number, y: number, ls: number, bold = 0) {
+  // `bold`: obris iste boje oko slova (font bez podebljanog reza)
+  if (bold) {
+    ctx.lineWidth = bold
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = ctx.fillStyle
+  }
+  const paint = (t: string, px: number) => {
+    ctx.fillText(t, px, y)
+    if (bold) ctx.strokeText(t, px, y)
+  }
   if (nativeLs(ctx) || !ls) {
     setSpacing(ctx, ls)
-    return ctx.fillText(word, x, y)
+    return paint(word, x)
   }
   const chars = [...word]
   let before = ''
   chars.forEach((ch, i) => {
-    ctx.fillText(ch, x + (before ? ctx.measureText(before).width : 0) + i * ls, y)
+    paint(ch, x + (before ? ctx.measureText(before).width : 0) + i * ls)
     before += ch
   })
 }
@@ -232,7 +250,7 @@ function layoutVerse(ctx: CanvasRenderingContext2D, text: string, maxW: number, 
       line.width += (line.runs.length ? space : 0) + ww
       line.above = Math.max(line.above, a)
       line.below = Math.max(line.below, b)
-      line.runs.push({ text: word, css, width: ww, pad, ls, accent: Boolean(st.accent), color: st.color && `#${st.color}` })
+      line.runs.push({ text: word, css, width: ww, pad, ls, bold: fakeBold(st, em), accent: Boolean(st.accent), color: st.color && `#${st.color}` })
     }
     if (line.runs.length) out.push(line)
   }
@@ -269,27 +287,41 @@ type VerseOpts = { bare?: boolean; boxes?: WordBox[]; marks?: Mark[] }
  * Stih sa sjenom kao na ekranu (VerseText): `0 2px 30px rgba(0,0,0,.5)` i
  * aura u boji naglaska `0 0 48px accent/18%` — u pikselima ekrana širokog
  * 390, pa umnoženo na širinu slike. Ranije je sjena bila oko dva puta uža i
- * tik uz slova, pa su slova izgledala udvostručeno. Aura se crta samo kao
- * sjena: slova su tad van platna (pomak), pa se ne pojačaju dvaput.
+ * tik uz slova, pa su slova izgledala udvostručeno.
+ *
+ * Slova idu prvo na svoj sloj, bez sjene, a sjenu baca cijeli sloj odjednom:
+ * riječ se crta u više poteza (podebljanje obrisom, slovo po slovo kad treba
+ * razmak), a sjena svakog poteza bi pala preko prethodnog i zatamnila slova.
+ * Aura se crta samo kao sjena: sloj je tad van platna (pomak), pa se slova ne
+ * pojačaju dvaput. `band`: gdje je stih po visini (od, do) — sloj je samo toliki.
  */
-function drawVerseShadowed(ctx: CanvasRenderingContext2D, W: number, light: boolean, draw: (opts?: { quiet?: boolean }) => void) {
-  if (light) return draw()
+function drawVerseShadowed(ctx: CanvasRenderingContext2D, W: number, light: boolean, band: [number, number], draw: (c: CanvasRenderingContext2D) => void) {
+  if (light) return draw(ctx)
   const k = W / 390
   const glow = ctx.fillStyle
+  const top = Math.max(0, Math.floor(band[0]))
+  const layer = document.createElement('canvas')
+  layer.width = ctx.canvas.width
+  layer.height = Math.max(1, Math.min(ctx.canvas.height, Math.ceil(band[1])) - top)
+  const lc = layer.getContext('2d')!
+  lc.translate(0, -top)
+  draw(lc)
   ctx.save()
   const off = W * 4
   ctx.translate(-off, 0)
   ctx.shadowOffsetX = off
   ctx.shadowColor = typeof glow === 'string' && glow.startsWith('#') ? rgba(glow, 0.18) : 'rgba(0,0,0,0)'
   ctx.shadowBlur = 48 * k
-  draw({ quiet: true })
+  ctx.drawImage(layer, 0, top)
   ctx.restore()
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.5)'
   ctx.shadowBlur = 30 * k
   ctx.shadowOffsetY = 2 * k
-  draw()
+  ctx.drawImage(layer, 0, top)
   ctx.restore()
+  // memorija sloja odmah natrag (Safari je drži dok je ne isprazniš)
+  layer.width = layer.height = 0
 }
 
 /**
@@ -313,7 +345,7 @@ function drawVerse(ctx: CanvasRenderingContext2D, lines: VLine[], cx: number, to
     for (const r of l.runs) {
       ctx.font = r.css
       ctx.fillStyle = r.color ?? (r.accent && accent ? accent : base)
-      fillWord(ctx, r.text, x + r.pad, y + l.above, r.ls)
+      fillWord(ctx, r.text, x + r.pad, y + l.above, r.ls, r.bold)
       opts.boxes?.push({ x, y, w: r.width, h, line: i })
       x += r.width + space
     }
@@ -760,10 +792,12 @@ async function render(input: ShareInput, opts: VerseOpts = {}): Promise<HTMLCanv
     ctx.font = `400 ${size}px ${fonts.serif}`
     // aura u boji naglaska (kao na ekranu), pa slova u boji stiha
     ctx.fillStyle = p.accent
-    drawVerseShadowed(ctx, W, p.light, (o) => {
-      ctx.fillStyle = o?.quiet ? p.accent : p.text
-      drawVerse(ctx, lines, W / 2, y, size, fonts.serif, p.accent, o?.quiet ? { bare: opts.bare } : opts)
-    })
+    // sloj s rezervom gore i dole — pisani fontovi imaju repove van reda
+    if (!opts.bare)
+      drawVerseShadowed(ctx, W, p.light, [y - size * 1.5, y + verseH + size * 1.5], (c) => {
+        c.fillStyle = p.text
+        drawVerse(c, lines, W / 2, y, size, fonts.serif, p.accent, opts)
+      })
     ctx.restore()
     y += verseH + g1
 
@@ -975,10 +1009,12 @@ async function render(input: ShareInput, opts: VerseOpts = {}): Promise<HTMLCanv
   ctx.font = `400 ${size}px ${fonts.serif}`
   // aura u boji naglaska (kao na ekranu), pa slova u boji stiha
   ctx.fillStyle = p.accent
-  drawVerseShadowed(ctx, W, p.light, (o) => {
-    ctx.fillStyle = o?.quiet ? p.accent : p.text
-    drawVerse(ctx, lines, W / 2, verseTop, size, fonts.serif, p.accent, o?.quiet ? { bare: opts.bare } : opts)
-  })
+  // sloj s rezervom gore i dole — pisani fontovi imaju repove van reda
+  if (!opts.bare)
+    drawVerseShadowed(ctx, W, p.light, [verseTop - size * 1.5, verseTop + blockH + size * 1.5], (c) => {
+      c.fillStyle = p.text
+      drawVerse(c, lines, W / 2, verseTop, size, fonts.serif, p.accent, opts)
+    })
   ctx.restore()
 
 
