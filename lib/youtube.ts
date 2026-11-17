@@ -86,8 +86,6 @@ let made: Promise<YTPlayer> | null = null
 let loadedId = ''
 /** video pripremljen unaprijed (warmTube) — dodir ga samo pusti, još u dodiru (sa zvukom) */
 let cued = ''
-/** utišano okruglom ikonicom (NowPlaying.tsx) — ostaje i za sljedeće pjesme, dodir ga ne pali */
-let quiet = false
 let ytState = -1
 
 /** sklonjeno mjesto (nema TubeStage) — plejer nikad ne padne u stranicu ispod sadržaja */
@@ -266,9 +264,8 @@ export function openTube(v: Verse, scope: string, list?: Verse[]): boolean {
     loadedId = id
     started = false
     // zvuk uključen prije pjesme — YouTube pamti utišano (i od prošlog otvaranja, i od
-    // tihog pokretanja na iPhoneu), pa bi i ova svirala bez zvuka; utišano ikonicom ostaje
-    if (quiet) p.mute?.()
-    else p.unMute?.()
+    // tihog pokretanja na iPhoneu), pa bi i ova svirala bez zvuka
+    p.unMute?.()
     // pripremljena pjesma (warmTube) samo krene: poruka YouTubeu ide još u dodiru, pa
     // smije sa zvukom — i na iPhoneu. Ostale se učitaju i krenu kad video stigne
     if (cued === id) p.playVideo()
@@ -326,7 +323,7 @@ function unmuteOnTap() {
   const on = () => {
     document.removeEventListener('click', on, true)
     tapArmed = false
-    if (snap.muted && !quiet) unmuteTube()
+    if (snap.muted) unmuteTube()
   }
   document.addEventListener('click', on, true)
 }
@@ -428,18 +425,9 @@ export function prevTube() {
  * smije sa zvukom); dodir na našem dugmetu ide YouTubeu porukom koja nosi dodir.
  */
 export function unmuteTube() {
-  quiet = false
   if (!yt || !snap.videoId || loadedId !== snap.videoId) return
   yt.unMute?.()
   watchSound()
-}
-
-/** Utišaj — okrugla ikonica uz pjesmu; ostaje utišano dok se zvuk ne uključi njome. */
-export function muteTube() {
-  quiet = true
-  window.clearInterval(sound)
-  yt?.mute?.()
-  set({ muted: true })
 }
 
 /** Pusti / pauza — iz dodira. Spuštena se vrati gore i nastavi. */
@@ -485,7 +473,7 @@ function changed(s: number) {
     // svira bez zvuka (iPhone prije prvog dodira u videu) — natpis uz pjesmu dok se ne uključi
     const muted = Boolean(yt?.isMuted?.())
     set({ status: 'playing', muted })
-    if (muted && !quiet) {
+    if (muted) {
       watchSound()
       unmuteOnTap()
     }

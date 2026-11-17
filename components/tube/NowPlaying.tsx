@@ -8,7 +8,7 @@ import type { Verse } from '@/data/verses'
 import { WIDE_MEDIA } from '@/lib/client-store'
 import { haptic } from '@/lib/haptic'
 import { albumLine, asWritten } from '@/lib/text'
-import { muteTube, pauseTube, resumeTube, tubeNext, unmuteTube, useTube, videoOf } from '@/lib/youtube'
+import { pauseTube, resumeTube, tubeNext, unmuteTube, useTube, videoOf } from '@/lib/youtube'
 import { primeLyrics } from '../Lyrics'
 import { DrawerHeader } from '../DrawerIcon'
 import { GiftCardWide, useGiftLink } from '../GiftLink'
@@ -210,29 +210,32 @@ export function NowPlaying({
             </p>
             <p className="mt-1.5 truncate text-[10px] uppercase tracking-[0.22em] text-white/55">{albumLine(verse)}</p>
           </div>
-          {/* zvuk — okrugla ikonica gore desno (u videu nema YouTubeovih kontrola): dodir
-              utiša ili uključi; bez zvuka je u boji stiha (i iPhone prije prvog dodira) */}
-          <motion.button
-            type="button"
-            onClick={() => {
-              haptic(6)
-              if (tube.muted) unmuteTube()
-              else muteTube()
-            }}
-            aria-label={tube.muted ? 'Uključi zvuk' : 'Utišaj'}
-            className="flex h-9 w-9 shrink-0 items-center justify-center self-start rounded-full border transition-colors duration-300"
-            style={
-              tube.muted
-                ? { color: m.accent, borderColor: `${m.accent}66`, background: `${m.accent}1f` }
-                : { color: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)' }
-            }
-            whileTap={{ scale: 0.9 }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M11 5 6 9H2v6h4l5 4z" />
-              {tube.muted ? <path d="m22 9-6 6M16 9l6 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />}
-            </svg>
-          </motion.button>
+          {/* svira bez zvuka (iPhone prije prvog dodira) — okrugla ikonica gore desno uključi
+              zvuk (u videu nema YouTubeovih kontrola); dok zvuk radi, nema je */}
+          <AnimatePresence>
+            {tube.muted && (
+              <motion.button
+                key="zvuk"
+                type="button"
+                onClick={() => {
+                  haptic(6)
+                  unmuteTube()
+                }}
+                aria-label="Uključi zvuk"
+                className="flex h-9 w-9 shrink-0 items-center justify-center self-start rounded-full border"
+                style={{ color: m.accent, borderColor: `${m.accent}66`, background: `${m.accent}1f` }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M11 5 6 9H2v6h4l5 4z" />
+                  <path d="m22 9-6 6M16 9l6 6" />
+                </svg>
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* traka napretka i kontrole — nasumično, nazad, pusti, sljedeća, ponovi */}
