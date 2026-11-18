@@ -14,6 +14,7 @@ import { DrawerHeader } from '../DrawerIcon'
 import { GiftCardWide, useGiftLink } from '../GiftLink'
 import { QrToggle } from '../VerseQr'
 import { EqBars } from '../EqBars'
+import { ExpandMorph } from '../ExpandIcon'
 import { ListenFooter } from './Listen'
 import { Slot } from './Slot'
 import { TubeControls } from './Transport'
@@ -316,26 +317,9 @@ export function NowPlaying({
                     className="absolute bottom-3 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/75 backdrop-blur-md transition-[color,transform] hover:text-white active:scale-95"
                     style={focus ? { color: m.accent, borderColor: `${m.accent}66` } : undefined}
                   >
-                    <AnimatePresence initial={false} mode="popLayout">
-                      <motion.svg
-                        key={focus ? 'in' : 'out'}
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden
-                        initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
-                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                        exit={{ opacity: 0, scale: 0.5, rotate: 90 }}
-                        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                      >
-                        {focus ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
-                      </motion.svg>
-                    </AnimatePresence>
+                    {/* isti znak kao "Raširi" na karti u sačuvanima: strelice se okrenu
+                        (svaka oko svoje sredine) i iz "raširi" postanu "skupi" — ništa ne trepne */}
+                    <ExpandMorph size={16} layer={focus ? FLIP_IN : FLIP_OUT} />
                   </button>
                 )}
               </motion.div>
@@ -357,6 +341,11 @@ export function NowPlaying({
     </div>
   )
 }
+
+/** strelice znaka raširi ⇄ skupi: okretanje u istom ritmu kao sklapanje ladice */
+const FLIP = 'transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)'
+const FLIP_OUT: CSSProperties = { transform: 'rotate(0deg)', transition: FLIP }
+const FLIP_IN: CSSProperties = { transform: 'rotate(180deg)', transition: FLIP }
 
 /**
  * Sklapanje dijela ladice (tekst preko ekrana): visina na nulu u istom potezu
