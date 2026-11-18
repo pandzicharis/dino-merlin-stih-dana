@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { AnimatePresence, motion, type Transition } from 'motion/react'
 import { albumOf, softOf, thumbOf } from '@/data/albums'
 import { MOODS } from '@/data/moods'
@@ -76,11 +76,16 @@ export function NowPlaying({
   const [open, setOpen] = useState(false)
   // tekst je u ladici: otvoren, ili se upravo zatvara (ladica se spušta, tekst se gasi)
   const [shown, setShown] = useState(false)
+  // tekst preko cijelog ekrana: zaglavlje, pjesma i podnožje se sklone, a video
+  // (YouTube ga traži vidljivog) i kontrole ostaju — sve ostalo je tekst
+  const [focus, setFocus] = useState(false)
   const toggle = () => {
     haptic(6)
     if (!open) setShown(true)
+    else setFocus(false)
     setOpen(!open)
   }
+  const big = focus && open
   const wide = shown && has
   const playing = tube.status === 'playing'
   const m = MOODS[verse.mood]
@@ -156,14 +161,20 @@ export function NowPlaying({
   return (
     <div className={`relative flex min-h-0 flex-1 flex-col ${tall ? 'overflow-y-auto overflow-x-hidden overscroll-contain' : ''}`}>
       <div ref={inner} className={`flex flex-col ${wide ? 'min-h-0 flex-1' : ''}`}>
-        <DrawerHeader
-          icon={<NoteIcon />}
-          eyebrow="Stih"
-          title={asWritten(verse.text).replace(/\s*\n\s*/g, ' ')}
-          onClose={onClose}
-          minimize={minimize}
-          action={<QrToggle on={qrOn} onClick={toggleQr} />}
-        />
+        {/* tekst preko ekrana: zaglavlje i pjesma se sklope i pretope (ne nestanu u
+            kadru) — video, kontrole i tekst klize gore u istom potezu kao podnožje dole */}
+        <div className="grid shrink-0" style={fold(big)} inert={big}>
+          <div className="min-h-0 overflow-hidden">
+            <DrawerHeader
+              icon={<NoteIcon />}
+              eyebrow="Stih"
+              title={asWritten(verse.text).replace(/\s*\n\s*/g, ' ')}
+              onClose={onClose}
+              minimize={minimize}
+              action={<QrToggle on={qrOn} onClick={toggleQr} />}
+            />
+          </div>
+        </div>
 
         <div className="shrink-0 px-[10px] pt-3">
           <div className="relative rounded-[18px] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
@@ -186,8 +197,10 @@ export function NowPlaying({
           </div>
         </div>
 
-        {/* pjesma — kao u plejeru sačuvanih, poravnata s videom */}
-        <div className="flex shrink-0 items-center gap-2.5 px-[10px] pt-6">
+        {/* pjesma — kao u plejeru sačuvanih, poravnata s videom (tekst preko ekrana: sklopljena) */}
+        <div className="grid shrink-0" style={fold(big)} inert={big}>
+        <div className="min-h-0 overflow-hidden">
+        <div className="flex items-center gap-2.5 px-[10px] pt-6">
           <span
             className="block h-[58px] w-[58px] shrink-0 rounded-[10px] bg-cover bg-center"
             style={{
@@ -237,6 +250,8 @@ export function NowPlaying({
             )}
           </AnimatePresence>
         </div>
+        </div>
+        </div>
 
         {/* traka napretka i kontrole — nasumično, nazad, pusti, sljedeća, ponovi */}
         <div className="shrink-0 px-[10px] pt-3">
@@ -248,31 +263,33 @@ export function NowPlaying({
             bez okvira, pa ništa ne sužava prostor */}
         {has && (
           <div className={`mt-5 flex flex-col ${wide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
-            <button
-              type="button"
-              onClick={toggle}
-              aria-expanded={open}
-              // traka je uvijek u tonu (i otvorena) — pod prstom još malo jača
-              className="flex h-14 shrink-0 items-center gap-3 bg-white/[0.08] px-5 text-left transition-colors hover:bg-white/[0.1] active:bg-white/[0.11]"
-            >
-              {/* znak muzike — titra dok pjesma svira */}
-              <EqBars accent={m.accent} on={playing} h={14} />
-              <span className="flex-1 text-[12px] font-bold uppercase leading-none tracking-[0.2em] text-white/90">Tekst pjesme</span>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`text-white/60 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
-                aria-hidden
+            <div className="flex h-14 shrink-0 items-stretch bg-white/[0.08]">
+              <button
+                type="button"
+                onClick={toggle}
+                aria-expanded={open}
+                // traka je uvijek u tonu (i otvorena) — pod prstom još malo jača
+                className="flex min-w-0 flex-1 items-center gap-3 pl-5 pr-3 text-left transition-colors hover:bg-white/[0.03] active:bg-white/[0.04]"
               >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
+                {/* znak muzike — titra dok pjesma svira */}
+                <EqBars accent={m.accent} on={playing} h={14} />
+                <span className="flex-1 text-[12px] font-bold uppercase leading-none tracking-[0.2em] text-white/90">Tekst pjesme</span>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`text-white/60 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+                  aria-hidden
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+            </div>
             {/* otvoren tekst se pretopi dok ladica raste; zatvoren se ugasi dok se ladica
                 spušta i tek onda nestane — ništa se ne preslaže usput */}
             {wide && (
@@ -283,7 +300,44 @@ export function NowPlaying({
                 animate={{ opacity: open ? 1 : 0 }}
                 transition={open ? { duration: 0.3, delay: 0.12 } : { duration: 0.22 }}
               >
-                <LyricsView verse={verse} lyrics={lyrics} anchor={0.5} />
+                <LyricsView verse={verse} lyrics={lyrics} anchor={0.5} big={big} />
+                {/* tekst preko cijelog ekrana i nazad — dole desno, kao kod videa */}
+                {open && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic(6)
+                      setFocus(!focus)
+                    }}
+                    aria-pressed={focus}
+                    aria-label={focus ? 'Tekst u ladici' : 'Tekst preko cijelog ekrana'}
+                    title={focus ? 'Tekst u ladici' : 'Tekst preko cijelog ekrana'}
+                    data-lyrics-focus
+                    className="absolute bottom-3 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/75 backdrop-blur-md transition-[color,transform] hover:text-white active:scale-95"
+                    style={focus ? { color: m.accent, borderColor: `${m.accent}66` } : undefined}
+                  >
+                    <AnimatePresence initial={false} mode="popLayout">
+                      <motion.svg
+                        key={focus ? 'in' : 'out'}
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                        initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
+                        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                        exit={{ opacity: 0, scale: 0.5, rotate: 90 }}
+                        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        {focus ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+                      </motion.svg>
+                    </AnimatePresence>
+                  </button>
+                )}
               </motion.div>
             )}
           </div>
@@ -293,7 +347,7 @@ export function NowPlaying({
             razmak iznad klizi zajedno s visinom ladice. Otvoren tekst: sitniji znakovi, a na
             niskom ekranu (do 760 px) podnožje se skloni — tekstu ostane mjesta */}
         <div
-          className={`relative mx-[10px] grid shrink-0 pb-[max(0.15rem,calc(env(safe-area-inset-bottom)-0.75rem))] transition-[padding,grid-template-rows,opacity,visibility] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${open && has ? 'grid-rows-[1fr] pt-4 [@media(max-height:760px)]:invisible [@media(max-height:760px)]:grid-rows-[0fr] [@media(max-height:760px)]:pt-0 [@media(max-height:760px)]:opacity-0' : 'grid-rows-[1fr] pt-10'} wide:pb-3`}
+          className={`relative mx-[10px] grid shrink-0 pb-[max(0.15rem,calc(env(safe-area-inset-bottom)-0.75rem))] transition-[padding,grid-template-rows,opacity,visibility] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${big ? 'invisible grid-rows-[0fr] pt-0 opacity-0' : open && has ? 'grid-rows-[1fr] pt-4 [@media(max-height:760px)]:invisible [@media(max-height:760px)]:grid-rows-[0fr] [@media(max-height:760px)]:pt-0 [@media(max-height:760px)]:opacity-0' : 'grid-rows-[1fr] pt-10'} wide:pb-3`}
         >
           <div className="min-h-0 overflow-hidden">
             <ListenFooter verse={verse} videoId={id} small={open && has} />
@@ -302,6 +356,19 @@ export function NowPlaying({
       </div>
     </div>
   )
+}
+
+/**
+ * Sklapanje dijela ladice (tekst preko ekrana): visina na nulu u istom potezu
+ * kao podnožje i slova teksta; sadržaj se pretopi brže dok se sklapa, a pri
+ * vraćanju tek kad se mjesto otvori.
+ */
+function fold(gone: boolean): CSSProperties {
+  return {
+    gridTemplateRows: gone ? '0fr' : '1fr',
+    opacity: gone ? 0 : 1,
+    transition: `grid-template-rows 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity ${gone ? '0.22s ease-out' : '0.32s ease-out 0.16s'}`,
+  }
 }
 
 /** visina ladice do vrha ekrana (ispod izreza); na širokom ekranu panel na sredini */

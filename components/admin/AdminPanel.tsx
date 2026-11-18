@@ -9,6 +9,8 @@ import { ALBUMS, albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
 import { albumLine, audioSlug, paperText, sameVerse, youtubeId } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
+import { useWide } from '@/lib/client-store'
+import { verseDayInTz } from '@/lib/date'
 import { PageShell } from '../PageShell'
 import { DevicePreview, DeviceSwitch, phoneWidth, useWarmPreview, type Device } from './DevicePreview'
 import { PrintSlips } from './PrintSlips'
@@ -16,6 +18,8 @@ import { VerseDesigner } from './VerseDesigner'
 import { SongEdit, SongPicker, SongPlayer, type KnownSong } from './SongPicker'
 import { LyricsBadge, LyricsRow } from './LyricsPreview'
 import { SyncModule } from './SyncModule'
+import { StatsModule } from './StatsModule'
+import { VerseCard } from './VerseCard'
 import { audioFile } from '@/lib/audio-name'
 // vlastite pjesme (preuzimanje, ♪, "bez pjesme") samo uz prekidač — inače pjesme idu preko YouTubea, a admin sređuje tekst
 import { OWN_AUDIO } from '@/lib/flags'
@@ -45,8 +49,39 @@ type Op =
 
 /** stihova po stranici liste */
 const PAGE = 10
+/** karata po stranici (2, 3 ili 4 u redu) */
+const CARDS_PAGE = 12
+/** lista ili karte — pamti se na ovom uređaju */
+const VIEW_KEY = 'stihdana:admin-view'
+type View = 'list' | 'cards'
+/** visina telefona desno od liste (računar) */
+const SIDE_H = 560
 /** printer — dugme u zaglavlju i znak modala za štampu */
 const SYNC_ICON = <path d="M20 11a8 8 0 0 0-14.9-3.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.9 3.9L20 16M20 20v-4h-4" />
+
+/** stupci — statistika */
+const STATS_ICON = <path d="M5 20V11M10 20V5M15 20v-7M20 20v-4M3.5 20h17" />
+
+/** oko — pregled stiha iz liste */
+const EYE_ICON = (
+  <>
+    <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="2.8" />
+  </>
+)
+
+/** prikaz liste: redovi ili karte (stih kako izgleda u aplikaciji) */
+const VIEWS: [View, string, React.ReactNode][] = [
+  ['list', 'Lista', <path key="list" d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />],
+  [
+    'cards',
+    'Karte',
+    <g key="cards">
+      <rect x="3.5" y="3.5" width="7.5" height="17" rx="2" />
+      <rect x="13" y="3.5" width="7.5" height="17" rx="2" />
+    </g>,
+  ],
+]
 
 const PRINT_ICON = (
   <>
@@ -93,10 +128,14 @@ export function AdminPanel() {
   // novi stih — lista iznova (bez filtera, prva strana: novi je na vrhu)
   const [libKey, setLibKey] = useState(0)
   const [archiving, setArchiving] = useState<AdminVerse | null>(null)
+  // pregled stiha iz liste (oko na kartici) — s listom iz koje je, za ‹ ›
+  const [previewing, setPreviewing] = useState<{ verse: AdminVerse; list: AdminVerse[] } | null>(null)
   // papirići za štampu (modal)
   const [printing, setPrinting] = useState(false)
   // Sinhronizacija — modal s pjesmama: zvuk i tekst koji fale, u jednom potezu
   const [syncing, setSyncing] = useState(false)
+  // statistika: otvaranja, čuvanja, dijeljenja (bez ličnih podataka)
+  const [stats, setStats] = useState(false)
   const [printCount, setPrintCount] = useState(0)
   // pregled u uređivanju se učita unaprijed, u pozadini — otvori se odmah
   useWarmPreview(data?.verses)
@@ -183,6 +222,9 @@ export function AdminPanel() {
           <HeadButton label="Sinhronizacija" onClick={() => setSyncing(true)} disabled={!data || !songs.mode || songs.mode === 'off'} data-sync>
             {SYNC_ICON}
           </HeadButton>
+          <HeadButton label="Statistika" onClick={() => setStats(true)} disabled={!data} data-stats-open>
+            {STATS_ICON}
+          </HeadButton>
           {/* papirići za pult — A4 za štampu na papir u boji */}
           <HeadButton label="Štampa" onClick={() => setPrinting(true)} disabled={!data} data-print>
             {PRINT_ICON}
@@ -218,7 +260,52 @@ export function AdminPanel() {
             </button>
           </div>
 
-          <Library key={libKey} data={data} busy={busy} songs={songs} onEdit={(v) => setEditor({ verse: v })} onArchive={setArchiving} onRestore={(v) => send({ op: 'restore', id: v.id }, 'Stih je vraćen u izvlačenje')} />
+          <Library
+            key={libKey}
+            data={data}
+            busy={busy}
+            songs={songs}
+            onEdit={(v) => setEditor({ verse: v })}
+            onPreview={(verse, list) => setPreviewing({ verse, list })}
+            onArchive={setArchiving}
+            onRestore={(v) => send({ op: 'restore', id: v.id }, 'Stih je vraćen u izvlačenje')}
+          />
+
+          {/* pregled stiha iz liste — kako izgleda na telefonu, bez otvaranja forme */}
+          <AnimatePresence>
+            {previewing && (
+              <Sheet
+                key="preview"
+                wide
+                eyebrow="Pregled"
+                title={paperText(previewing.verse.text)}
+                icon={EYE_ICON}
+                onClose={() => setPreviewing(null)}
+                actions={
+                  data.writable && previewing.verse.active ? (
+                    <button
+                      type="button"
+                      data-preview-edit
+                      onClick={() => {
+                        setEditor({ verse: previewing.verse })
+                        setPreviewing(null)
+                      }}
+                      className="flex h-9 items-center gap-2 rounded-full px-4 text-[12px] font-semibold text-black"
+                      style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
+                    >
+                      Uredi
+                    </button>
+                  ) : undefined
+                }
+              >
+                <QuickPreview
+                  verse={previewing.verse}
+                  list={previewing.list}
+                  onPick={(verse) => setPreviewing({ verse, list: previewing.list })}
+                />
+              </Sheet>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {printing && (
@@ -247,6 +334,13 @@ export function AdminPanel() {
                 }
               >
                 <PrintSlips verses={data.verses} onCount={setPrintCount} />
+              </Sheet>
+            )}
+          </AnimatePresence>
+          <AnimatePresence>
+            {stats && (
+              <Sheet key="stats" wide eyebrow="Stihovi" title="Statistika" icon={STATS_ICON} onClose={() => setStats(false)}>
+                <StatsModule />
               </Sheet>
             )}
           </AnimatePresence>
@@ -705,71 +799,34 @@ function LyricsFind({ find, onRetry }: { find: Find; onRetry: () => void }) {
   )
 }
 
-/** 1 pjesma, 2–4 pjesme, 5+ pjesama (i 11–14 pjesama) */
-function songsWord(n: number) {
-  const d = n % 10
-  const h = n % 100
-  return d === 1 && h !== 11 ? 'pjesma' : d >= 2 && d <= 4 && (h < 12 || h > 14) ? 'pjesme' : 'pjesama'
-}
-
 /** Mali omot albuma (public/albumi/sm); bez albuma — ikonica aplikacije. `ring`: obrub izbora. */
-function AlbumIcon({ id, size, ring }: { id: string; size: number; ring?: string }) {
+function AlbumIcon({ id, size, round }: { id: string; size: number; round?: boolean }) {
   return (
     <span
       className="block shrink-0 bg-white/[0.06] bg-cover bg-center"
       style={{
         width: size,
         height: size,
-        borderRadius: Math.round(size * 0.26),
+        borderRadius: round ? '50%' : Math.round(size * 0.26),
         backgroundImage: `url(${id ? `/albumi/sm/${id}.webp` : '/icons/icon-192.png'})`,
-        boxShadow: ring ? `0 0 0 2px rgba(10,9,8,0.95), 0 0 0 3.5px ${ring}` : 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+        boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
       }}
       aria-hidden
     />
   )
 }
 
-/** Aktivan filter ispod pretrage: šta filtrira i × koji ga briše. */
-function FilterChip({ id, onClear, children }: { id: string; onClear: () => void; children: React.ReactNode }) {
+/** Pregled stiha iz liste: telefon (ili računar) s pravim ekranom — samo za pogled. */
+function QuickPreview({ verse, list, onPick }: { verse: AdminVerse; list: AdminVerse[]; onPick: (v: AdminVerse) => void }) {
+  const [full, setFull] = useState(false)
+  const [device, setDevice] = useState<Device>('phone')
+  const at = Math.max(0, list.findIndex((v) => v.id === verse.id))
   return (
-    <span
-      className="flex h-8 items-center gap-1.5 rounded-full border pl-2.5 text-[12px] text-white/90"
-      style={{ borderColor: `${BRAND.gold}55`, background: `${BRAND.gold}14` }}
-    >
-      {children}
-      <button
-        type="button"
-        data-filter-clear={id}
-        aria-label="Ukloni filter"
-        onClick={onClear}
-        className="flex h-full items-center pl-0.5 pr-2.5 text-white/50 transition-colors hover:text-white"
-      >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
-          <path d="M6 6l12 12M18 6 6 18" />
-        </svg>
-      </button>
-    </span>
-  )
-}
-
-/** Prekidač filtera u listi: samo stihovi kojima nešto fali (broj desno). */
-function Switch({ data, label, on, count, onChange }: { data: string; label: string; on: boolean; count: number; onChange: (on: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      data-missing-filter={data}
-      onClick={() => onChange(!on)}
-      className="flex h-8 shrink-0 items-center gap-2 whitespace-nowrap px-1 text-[11px] transition-colors"
-      style={{ color: on ? '#fff' : 'rgba(255,255,255,0.5)' }}
-    >
-      <span className="relative h-[18px] w-[30px] shrink-0 rounded-full border transition-colors" style={{ borderColor: on ? BRAND.gold : 'rgba(255,255,255,0.15)', background: on ? `${BRAND.gold}33` : 'rgba(255,255,255,0.04)' }}>
-        <span className="absolute top-[2px] h-3 w-3 rounded-full transition-all" style={{ left: on ? 14 : 2, background: on ? BRAND.gold : 'rgba(255,255,255,0.45)' }} />
-      </span>
-      {label}
-      <span className="tabular opacity-60">{count}</span>
-    </button>
+    <div className="flex flex-col items-center gap-3 pb-2" data-quick-preview>
+      <DeviceSwitch device={device} onDevice={setDevice} />
+      <DevicePreview verse={verse} maxHeight={520} full={full} onFull={setFull} device={device} />
+      {list.length > 1 && <PreviewNav verse={verse} at={at} total={list.length} onStep={(d) => list[at + d] && onPick(list[at + d])} />}
+    </div>
   )
 }
 
@@ -820,6 +877,7 @@ function Library({
   busy,
   songs,
   onEdit,
+  onPreview,
   onArchive,
   onRestore,
 }: {
@@ -827,72 +885,98 @@ function Library({
   busy: boolean
   songs: Songs
   onEdit: (v: AdminVerse) => void
+  /** pregled u modalu (telefon, tablet) — s listom, da se može listati */
+  onPreview: (v: AdminVerse, list: AdminVerse[]) => void
   onArchive: (v: AdminVerse) => void
   onRestore: (v: AdminVerse) => void
 }) {
   const [q, setQ] = useState('')
-  const [mood, setMood] = useState<Mood | null>(null)
+
   // album (id iz data/albums.ts); '' = bez albuma (singl, uživo), null = svi
   const [album, setAlbum] = useState<string | null>(null)
-  // panel filtera (ikonica pored pretrage)
-  const [panel, setPanel] = useState(false)
-  useEffect(() => {
-    if (!panel) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPanel(false)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [panel])
   const albumId = (v: AdminVerse) => albumOf(v.album)?.id ?? ''
-  // samo stihovi kojima fali pjesma u aplikaciji, ili tekst koji prati pjesmu (vremena redova)
-  const [noSong, setNoSong] = useState(false)
-  const [noSync, setNoSync] = useState(false)
-  const hasSong = (v: AdminVerse) => songs.of(v.song)?.state === 'ready'
-  const synced = (v: AdminVerse) => songs.of(v.song)?.lyrics === 'synced'
   const [archived, setArchived] = useState(false)
   const [page, setPage] = useState(0)
   const writable = Boolean(data.writable)
+  // računar: telefon desno od liste, lista se lista dugmadima ispod njega
+  // (u prezentaciji ne — admin tamo izgleda kao i dosad)
+  const wide = useWide() && !inDeck()
+  // lista ili karte (stih kako izgleda u aplikaciji) — u prezentaciji uvijek lista
+  const [view, setView] = useState<View>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'list'
+    } catch {
+      return 'list'
+    }
+  })
+  const cards = view === 'cards' && !inDeck()
+  // telefon desno samo uz listu — karte već pokazuju kako stih izgleda
+  const side = wide && !cards
+  const pickView = (v: View) => {
+    setView(v)
+    setPage(0)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {}
+  }
+  // stih u telefonu desno (računar)
+  const [focusId, setFocusId] = useState<string | null>(null)
 
   const list = data.verses
     .filter(
       (v) =>
         v.active !== archived &&
-        (!mood || v.mood === mood) &&
         (album === null || albumId(v) === album) &&
-        (!noSong || !hasSong(v)) &&
-        (!noSync || !synced(v)) &&
         (!q || `${v.text} ${v.song} ${v.album}`.toLowerCase().includes(q.toLowerCase())),
     )
     // najnoviji prvi — to je ono što urednik najčešće traži
     .reverse()
-  const pages = Math.max(1, Math.ceil(list.length / PAGE))
+  const per = cards ? CARDS_PAGE : PAGE
+  const pages = Math.max(1, Math.ceil(list.length / per))
   const p = Math.min(page, pages - 1)
-  const shown = list.slice(p * PAGE, p * PAGE + PAGE)
+  const shown = list.slice(p * per, p * per + per)
   // nova stranica počinje od vrha liste
   const listRef = useRef<HTMLDivElement>(null)
   const go = (n: number) => {
     setPage(n)
-    listRef.current?.scrollTo({ top: 0 })
+    // vrh liste iza zaglavlja — nova stranica počinje od vrha liste
+    const top = listRef.current?.getBoundingClientRect().top ?? 0
+    if (top < 96) listRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    // telefon desno prati stranicu — prvi stih na njoj
+    if (side && list[n * per]) setFocusId(list[n * per].id)
+  }
+  // telefon desno: izabrani stih, ili prvi u listi (i kad filter izbaci izabrani)
+  const focusAt = Math.max(0, list.findIndex((v) => v.id === focusId))
+  const focus = side ? (list[focusAt] ?? null) : null
+  const step = (d: number) => {
+    const n = focusAt + d
+    if (!list[n]) return
+    setFocusId(list[n].id)
+    // stranica liste ide za njim — izabrani red je uvijek vidljiv
+    const pg = Math.floor(n / per)
+    if (pg !== p) setPage(pg)
+    requestAnimationFrame(() => listRef.current?.querySelector(`[data-row="${list[n].id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
   }
   const archivedCount = data.verses.filter((v) => !v.active).length
   // tabovi albuma: najnoviji prvi, s brojem pjesama (ne stihova) u aktivnim ili arhivi
   const scope = data.verses.filter((v) => v.active !== archived)
   const songsIn = (id: string) => new Set(scope.filter((v) => albumId(v) === id).map((v) => audioSlug(v.song))).size
   const albumTabs = [
-    ...[...ALBUMS].reverse().map((a) => ({ id: a.id, title: a.title, year: a.year, songs: songsIn(a.id) })),
-    { id: '', title: 'Ostalo', year: 0, songs: songsIn('') },
+    ...[...ALBUMS].reverse().map((a) => ({ id: a.id, title: a.title, songs: songsIn(a.id) })),
+    { id: '', title: 'Ostalo', songs: songsIn('') },
   ].filter((t) => t.songs > 0)
-  const chosenAlbum = album === null ? null : albumTabs.find((t) => t.id === album)
-  const active = Number(Boolean(mood)) + Number(album !== null) + Number(noSync) + Number(noSong)
-  const clearAll = () => {
-    setMood(null)
-    setAlbum(null)
-    setNoSync(false)
-    setNoSong(false)
-    setPage(0)
-  }
-
+  // traka tabova albuma: točkić i miš je listaju vodoravno
+  const tabsRef = useRef<HTMLDivElement>(null)
+  useStripScroll(tabsRef)
+  // datum na kartama (kao na karti u sačuvanima) — današnji
+  const today = verseDayInTz()
+  // "Svi": broj pjesama u aktivnim (ili arhivi)
+  const allSongs = new Set(scope.map((v) => audioSlug(v.song))).size
   return (
-    <>
+    // `wide:` je isti uslov kao useWide (u pikselima) — `lg:` je u rem, pa bi uz
+    // veći font preglednika telefon pao ispod liste
+    <div className="wide:flex wide:items-start wide:gap-8">
+      <div className="min-w-0 wide:flex-1">
       {/* aktivni / arhiva — jasno, kao dvije kartice, a ne skriven prekidač */}
       <div className="mb-3 grid grid-cols-2 rounded-full border border-white/10 bg-white/[0.035] p-1 backdrop-blur-xl">
         {(
@@ -950,8 +1034,7 @@ function Library({
         })}
       </div>
 
-      {/* pretraga, a pored nje filteri: ikonica otvara panel (stil, album, tekst);
-          aktivni filteri stoje ispod kao čipovi, × ih briše */}
+      {/* pretraga i prikaz (lista / karte) */}
       <div className="mb-3 flex items-center gap-2">
         <input
           value={q}
@@ -963,245 +1046,155 @@ function Library({
           data-search
           className="h-11 min-w-0 flex-1 rounded-full border border-white/10 bg-black/30 px-4 text-[13px] text-white outline-none placeholder:text-white/25 focus:border-[#BFA87F]/50"
         />
-        <button
-          type="button"
-          data-filters-open
-          aria-expanded={panel}
-          aria-label={active ? `Filteri (${active})` : 'Filteri'}
-          onClick={() => setPanel(!panel)}
-          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors"
-          style={{
-            borderColor: panel || active ? `${BRAND.gold}99` : 'rgba(255,255,255,0.1)',
-            background: panel ? `${BRAND.gold}1f` : 'rgba(0,0,0,0.3)',
-            color: panel || active ? BRAND.gold : 'rgba(255,255,255,0.65)',
-          }}
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
-            <circle cx="16" cy="6" r="2" />
-            <circle cx="10" cy="12" r="2" />
-            <circle cx="18" cy="18" r="2" />
-          </svg>
-          {active > 0 && (
-            <span
-              className="tabular absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold"
-              style={{ background: BRAND.gold, color: '#14100A' }}
-            >
-              {active}
-            </span>
-          )}
-        </button>
+        {/* lista / karte (stih kako izgleda) */}
+        {!inDeck() && (
+          <div className="flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-black/30 p-1" role="group" aria-label="Prikaz">
+            {VIEWS.map(([k, label, icon]) => (
+              <button
+                key={k}
+                type="button"
+                data-view={k}
+                aria-pressed={view === k}
+                aria-label={label}
+                title={label}
+                onClick={() => pickView(k)}
+                className="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
+                style={view === k ? { background: `${BRAND.gold}24`, color: BRAND.gold } : { color: 'rgba(255,255,255,0.5)' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  {icon}
+                </svg>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <AnimatePresence initial={false}>
-        {panel && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="overflow-hidden"
-            data-filters-panel
-          >
-            <div className="mb-3 space-y-4 rounded-2xl border border-white/10 bg-white/[0.035] p-3.5">
-              <section>
-                <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">Stil</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {MOOD_KEYS.map((k) => {
-                    const m = MOODS[k]
-                    const on = mood === k
-                    const n = scope.filter((v) => v.mood === k).length
-                    return (
-                      <button
-                        key={k}
-                        type="button"
-                        data-filter={k}
-                        aria-pressed={on}
-                        onClick={() => {
-                          setMood(on ? null : k)
-                          setPage(0)
-                        }}
-                        className="flex h-9 shrink-0 items-center gap-2 rounded-xl pl-2.5 pr-3 text-[12px] transition-[opacity,box-shadow] duration-200"
-                        style={{
-                          background: `radial-gradient(circle at 15% 20%, ${m.gradient[2]} 0%, transparent 75%), radial-gradient(circle at 90% 90%, ${m.gradient[1]} 0%, transparent 70%), ${m.gradient[0]}`,
-                          boxShadow: on ? `inset 0 0 0 1.5px ${m.accent}` : 'inset 0 0 0 1px rgba(255,255,255,0.05)',
-                          color: on ? '#fff' : 'rgba(255,255,255,0.78)',
-                          opacity: mood && !on ? 0.45 : n || on ? 1 : 0.55,
-                        }}
-                      >
-                        <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: m.accent, boxShadow: `0 0 8px ${m.accent}` }} />
-                        {m.label}
-                        <span className="tabular text-[10.5px] opacity-50">{n}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </section>
-
-              <section>
-                <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">Album</p>
-                <div className="grid grid-cols-1 gap-0.5 min-[480px]:grid-cols-2">
-                  {albumTabs.map((t) => {
-                    const on = album === t.id
-                    return (
-                      <button
-                        key={t.id || 'ostalo'}
-                        type="button"
-                        data-album={t.id || 'ostalo'}
-                        aria-pressed={on}
-                        onClick={() => {
-                          setAlbum(on ? null : t.id)
-                          setPage(0)
-                        }}
-                        className="flex min-w-0 items-center gap-2.5 rounded-xl px-1.5 py-1.5 text-left transition-colors hover:bg-white/[0.05]"
-                        style={on ? { background: `${BRAND.gold}1f`, boxShadow: `inset 0 0 0 1px ${BRAND.gold}66` } : undefined}
-                      >
-                        <AlbumIcon id={t.id} size={34} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[12.5px]" style={{ color: on ? BRAND.gold : 'rgba(255,255,255,0.88)' }}>
-                            {t.title}
-                          </span>
-                          <span className="block text-[10px] uppercase tracking-[0.14em] text-white/40">
-                            {t.year ? `${t.year} · ` : ''}
-                            {t.songs} {songsWord(t.songs)}
-                          </span>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </section>
-
-              {songs.mode && (
-                <section>
-                  <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-white/40">Tekst</p>
-                  <div className="flex flex-wrap items-center gap-3">
-            {(
-              [
-                ...(OWN_AUDIO ? [['song', 'Bez pjesme', noSong, setNoSong, hasSong] as const] : []),
-                ['sync', 'Tekst ne prati', noSync, setNoSync, synced] as const,
-              ]
-            ).map(([k, label, on, set, has]) => (
-              <Switch
-                key={k}
-                data={k}
-                label={label}
-                on={on}
-                count={data.verses.filter((v) => v.active !== archived && !has(v)).length}
-                onChange={(next) => {
-                  set(next)
+      {/* albumi kao tabovi: omot, naziv i broj pjesama — listaju se vodoravno (do ivica,
+          koje se pretope); na računaru i točkićem i povlačenjem mišem */}
+      <div
+        ref={tabsRef}
+        className="-mx-5 mb-4 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ maskImage: TABS_FADE, WebkitMaskImage: TABS_FADE }}
+        data-album-tabs
+      >
+        <div className="flex w-max gap-1.5">
+          {[{ id: null, title: 'Svi', songs: allSongs }, ...albumTabs].map((t) => {
+            const on = album === t.id
+            return (
+              <button
+                key={t.id ?? 'svi'}
+                type="button"
+                data-album={t.id ?? 'svi'}
+                aria-pressed={on}
+                onClick={() => {
+                  setAlbum(t.id)
                   setPage(0)
                 }}
-              />
-            ))}
-                  </div>
-                </section>
-              )}
-
-              <div className="flex items-center justify-between border-t border-white/[0.06] pt-3">
-                <button
-                  type="button"
-                  onClick={clearAll}
-                  disabled={!active}
-                  className="text-[12px] text-white/50 transition-colors hover:text-white disabled:opacity-30"
+                className={`flex h-10 shrink-0 items-center gap-2 rounded-full border pr-1.5 text-[12.5px] transition-colors ${t.id === null ? 'pl-3.5' : 'pl-1'}`}
+                style={
+                  on
+                    ? { borderColor: `${BRAND.gold}8c`, background: `${BRAND.gold}1a`, color: '#fff' }
+                    : { borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.72)' }
+                }
+              >
+                {t.id !== null && <AlbumIcon id={t.id} size={30} round />}
+                <span className="whitespace-nowrap">{t.title}</span>
+                <span
+                  className="tabular flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold"
+                  style={on ? { background: BRAND.gold, color: '#14100A' } : { background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}
                 >
-                  Poništi sve
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPanel(false)}
-                  className="h-9 rounded-full px-4 text-[12px] font-semibold text-black"
-                  style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
-                >
-                  Prikaži {list.length}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* aktivni filteri — vide se i kad je panel zatvoren */}
-      {active > 0 && (
-        <div className="mb-4 flex flex-wrap gap-1.5" data-active-filters>
-          {mood && (
-            <FilterChip
-              id="mood"
-              onClear={() => {
-                setMood(null)
-                setPage(0)
-              }}
-            >
-              <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: MOODS[mood].accent, boxShadow: `0 0 8px ${MOODS[mood].accent}` }} />
-              {MOODS[mood].label}
-            </FilterChip>
-          )}
-          {chosenAlbum && (
-            <FilterChip
-              id="album"
-              onClear={() => {
-                setAlbum(null)
-                setPage(0)
-              }}
-            >
-              <AlbumIcon id={chosenAlbum.id} size={18} />
-              {chosenAlbum.title}
-            </FilterChip>
-          )}
-          {noSync && (
-            <FilterChip
-              id="sync"
-              onClear={() => {
-                setNoSync(false)
-                setPage(0)
-              }}
-            >
-              Tekst ne prati
-            </FilterChip>
-          )}
-          {noSong && (
-            <FilterChip
-              id="song"
-              onClear={() => {
-                setNoSong(false)
-                setPage(0)
-              }}
-            >
-              Bez pjesme
-            </FilterChip>
-          )}
+                  {t.songs}
+                </span>
+              </button>
+            )
+          })}
         </div>
-      )}
-      {!active && <div className="mb-1" />}
+      </div>
 
-      {/* lista ima svoju visinu i skrola se unutra — filteri i kartice ostaju na mjestu */}
-      <div
-        ref={listRef}
-        className="relative max-h-[min(62dvh,640px)] overflow-y-auto overscroll-contain"
-      >
+      {/* lista teče sa stranicom (jedan skrol); stranice je drže kratkom */}
+      <div ref={listRef} className="relative scroll-mt-24">
         {/* izmjena ide na server — tanka zlatna traka dok traje */}
         {busy && <LoadBar />}
-        <motion.div key={`${p}-${archived}-${mood}-${album}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="space-y-1.5">
-        {shown.map((v) => {
+        <motion.div
+          key={`${p}-${archived}-${album}-${cards}`}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22 }}
+          className={cards ? 'grid grid-cols-2 gap-x-3 gap-y-4 pb-1 sm:grid-cols-3 lg:grid-cols-4' : 'space-y-1.5'}
+          data-cards={cards || undefined}
+        >
+        {cards && shown.map((v) => {
           const m = MOODS[v.mood]
-          // klik na stih (bilo gdje na kartici) otvara uređivanje — dugmad unutra rade svoje
           const editable = writable && !archived && !busy
+          // dodir na kartu: uređivanje; u arhivi (ili dok traje izmjena) — pregled
+          const open = () => (editable ? onEdit(v) : onPreview(v, list))
+          return (
+            <div key={v.id} data-row={v.id} className="min-w-0 scroll-mt-24">
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label={`${editable ? 'Uredi' : 'Pregled'}: ${paperText(v.text)}`}
+                onClick={open}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault()
+                    open()
+                  }
+                }}
+                className="cursor-pointer rounded-[26px] outline-none transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-[#BFA87F]/60"
+              >
+                <VerseCard verse={v} day={today} />
+              </div>
+              <div className="mt-1.5 flex items-center gap-0.5 pl-1">
+                <p className="flex min-w-0 flex-1 items-center gap-1.5 text-[9.5px] uppercase tracking-[0.14em] text-white/45">
+                  <i className="block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: m.accent, boxShadow: `0 0 6px ${m.accent}` }} />
+                  <span className="truncate">{m.label}</span>
+                </p>
+                {writable &&
+                  (archived ? (
+                    <IconBtn label="Vrati" disabled={busy} onClick={() => onRestore(v)}>
+                      <path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5M4 4v4.5h4.5" />
+                    </IconBtn>
+                  ) : (
+                    <IconBtn label="Arhiviraj" disabled={busy} onClick={() => onArchive(v)}>
+                      <path d="M4 7h16v3H4zM6 10v9h12v-9M10 14h4" />
+                    </IconBtn>
+                  ))}
+              </div>
+            </div>
+          )
+        })}
+        {!cards && shown.map((v) => {
+          const m = MOODS[v.mood]
+          // klik na stih (bilo gdje na kartici) otvara uređivanje — dugmad unutra rade svoje;
+          // na računaru (telefon desno) klik izabere stih za telefon, a uređuje se olovkom ili dvoklikom
+          const editable = writable && !archived && !busy
+          const inPhone = focus?.id === v.id
+          const pick = () => (side ? setFocusId(v.id) : editable && onEdit(v))
           return (
             <div
               key={v.id}
-              role={editable ? 'button' : undefined}
-              tabIndex={editable ? 0 : undefined}
-              aria-label={editable ? `Uredi: ${paperText(v.text)}` : undefined}
+              data-row={v.id}
+              data-in-phone={inPhone || undefined}
+              role={side || editable ? 'button' : undefined}
+              tabIndex={side || editable ? 0 : undefined}
+              aria-label={side ? `Na telefonu: ${paperText(v.text)}` : editable ? `Uredi: ${paperText(v.text)}` : undefined}
+              aria-pressed={side ? inPhone : undefined}
               onClick={(e) => {
-                if (editable && !(e.target as Element).closest('button, a, input, label')) onEdit(v)
+                if (!(e.target as Element).closest('button, a, input, label')) pick()
+              }}
+              onDoubleClick={(e) => {
+                if (side && editable && !(e.target as Element).closest('button, a, input, label')) onEdit(v)
               }}
               onKeyDown={(e) => {
-                if (editable && e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                   e.preventDefault()
-                  onEdit(v)
+                  pick()
                 }
               }}
-              className={`flex items-center gap-3 rounded-2xl bg-white/[0.035] py-2.5 pl-2.5 pr-2 transition-colors hover:bg-white/[0.07] sm:gap-4 ${editable ? 'cursor-pointer' : ''}`}
+              className={`flex scroll-mt-24 items-center gap-3 rounded-2xl py-2.5 pl-2.5 pr-2 transition-colors sm:gap-4 ${inPhone ? 'bg-white/[0.075]' : 'bg-white/[0.035] hover:bg-white/[0.07]'} ${side || editable ? 'cursor-pointer' : ''}`}
+              style={inPhone ? { boxShadow: `inset 0 0 0 1px ${BRAND.gold}59` } : undefined}
             >
               <AlbumIcon id={albumId(v)} size={46} />
               <div className="min-w-0 flex-1">
@@ -1236,14 +1229,13 @@ function Library({
                   <span className="hidden sm:inline">bez YouTube linka</span>
                 </span>
               )}
-              {writable && (
-                <div className="flex shrink-0 gap-1">
-                  {!archived && (
+              <div className="flex shrink-0 gap-1">
+                  {writable && !archived && (
                     <IconBtn label="Uredi" disabled={busy} onClick={() => onEdit(v)}>
                       <path d="M4 20h4L19 9l-4-4L4 16z" />
                     </IconBtn>
                   )}
-                  {archived ? (
+                  {!writable ? null : archived ? (
                     <button
                       onClick={() => onRestore(v)}
                       disabled={busy}
@@ -1258,7 +1250,6 @@ function Library({
                     </IconBtn>
                   )}
                 </div>
-              )}
             </div>
           )
         })}
@@ -1274,7 +1265,7 @@ function Library({
       {pages > 1 && (
         <div className="mt-4 flex items-center justify-between gap-3 text-[12px] text-white/50">
           <span className="tabular">
-            {p * PAGE + 1}–{Math.min(list.length, p * PAGE + PAGE)} od {list.length}
+            {p * per + 1}–{Math.min(list.length, p * per + per)} od {list.length}
           </span>
           <span className="flex items-center gap-1">
             <button
@@ -1320,8 +1311,134 @@ function Library({
           </span>
         </div>
       )}
-    </>
+      </div>
+
+      {/* računar: telefon desno — stih kako izgleda, ‹ › kroz listu */}
+      {focus && <SidePhone verse={focus} at={focusAt} total={list.length} onStep={step} />}
+    </div>
   )
+}
+
+/** Telefon desno od liste (računar): stih na pravom ekranu aplikacije, ‹ › i strelice na tastaturi kroz listu. */
+function SidePhone({ verse, at, total, onStep }: { verse: AdminVerse; at: number; total: number; onStep: (d: number) => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      // ne dok se kuca, ni dok je otvoren modal (uređivanje, štampa…)
+      const t = e.target instanceof Element ? e.target : null
+      if (e.altKey || e.metaKey || e.ctrlKey || t?.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('[aria-modal="true"]')) return
+      e.preventDefault()
+      onStep(e.key === 'ArrowLeft' ? -1 : 1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onStep])
+  return (
+    <aside className="sticky top-[84px] flex shrink-0 flex-col items-center" style={{ width: Math.max(phoneWidth(SIDE_H), 240) }} data-side-phone>
+      <DevicePreview verse={verse} maxHeight={SIDE_H} full={false} onFull={noop} device="phone" />
+      <PreviewNav verse={verse} at={at} total={total} onStep={onStep} />
+    </aside>
+  )
+}
+
+const noop = () => {}
+
+/** ‹ pjesma · 3 / 27 › — listanje kroz stihove u pregledu */
+function PreviewNav({ verse, at, total, onStep }: { verse: AdminVerse; at: number; total: number; onStep: (d: number) => void }) {
+  return (
+    <div className="mt-4 flex w-full max-w-[320px] items-center gap-2" data-preview-nav>
+      <NavArrow dir="l" disabled={at <= 0} onClick={() => onStep(-1)} />
+      <div className="min-w-0 flex-1 text-center">
+        <p className="truncate text-[10px] uppercase tracking-[0.16em]" style={{ color: BRAND.gold }}>
+          {verse.song}
+        </p>
+        <p className="tabular mt-0.5 text-[11px] text-white/40">
+          {at + 1} / {total}
+        </p>
+      </div>
+      <NavArrow dir="r" disabled={at >= total - 1} onClick={() => onStep(1)} />
+    </div>
+  )
+}
+
+function NavArrow({ dir, disabled, onClick }: { dir: 'l' | 'r'; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={dir === 'l' ? 'Prethodni stih' : 'Sljedeći stih'}
+      title={dir === 'l' ? 'Prethodni stih' : 'Sljedeći stih'}
+      data-step={dir === 'l' ? 'prev' : 'next'}
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/80 transition-colors hover:bg-white/10 disabled:opacity-25"
+    >
+      <Chevron dir={dir} />
+    </button>
+  )
+}
+
+/** ivice trake tabova se pretope — vidi se da ih ima još */
+const TABS_FADE = 'linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%)'
+
+/**
+ * Vodoravna traka (tabovi albuma) na računaru: točkić je lista vodoravno dok
+ * ima kuda (na kraju trake skrola se stranica), a miš je može i povući —
+ * povlačenje nije klik na tab. Prst i trackpad je listaju sami.
+ */
+function useStripScroll(ref: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const wheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+      const max = el.scrollWidth - el.clientWidth
+      if ((e.deltaY > 0 && el.scrollLeft >= max - 1) || (e.deltaY < 0 && el.scrollLeft <= 0)) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+    let s: { x: number; left: number; id: number; moved: boolean } | null = null
+    const down = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button === 0) s = { x: e.clientX, left: el.scrollLeft, id: e.pointerId, moved: false }
+    }
+    const move = (e: PointerEvent) => {
+      if (!s || e.pointerId !== s.id) return
+      const dx = e.clientX - s.x
+      if (!s.moved) {
+        if (Math.abs(dx) < 6) return
+        s.moved = true
+        try {
+          el.setPointerCapture(s.id)
+        } catch {}
+      }
+      el.scrollLeft = s.left - dx
+    }
+    const up = () => {
+      const moved = s?.moved
+      s = null
+      if (!moved) return
+      const stop = (c: MouseEvent) => {
+        c.stopPropagation()
+        c.preventDefault()
+      }
+      el.addEventListener('click', stop, { capture: true, once: true })
+      window.setTimeout(() => el.removeEventListener('click', stop, { capture: true }), 0)
+    }
+    const noDrag = (e: DragEvent) => e.preventDefault()
+    el.addEventListener('wheel', wheel, { passive: false })
+    el.addEventListener('pointerdown', down)
+    el.addEventListener('pointermove', move)
+    el.addEventListener('pointerup', up)
+    el.addEventListener('pointercancel', up)
+    el.addEventListener('dragstart', noDrag)
+    return () => {
+      el.removeEventListener('wheel', wheel)
+      el.removeEventListener('pointerdown', down)
+      el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerup', up)
+      el.removeEventListener('pointercancel', up)
+      el.removeEventListener('dragstart', noDrag)
+    }
+  }, [ref])
 }
 
 /** Brojevi stranica oko trenutne; -1 je "…". */

@@ -3,6 +3,7 @@
  *
  * Ključ (ljubav, nostalgija…) je ono što stih nosi u bazi — NE mijenjati ga.
  * `label` je naziv stila u adminu (Velvet, Sepia…) — slobodno.
+ * Boje: tople i pastelne — tamna, prigušena pozadina i nježan naglasak, ništa naglo.
  *
  * Ovaj fajl NE diraš kad dodaješ stihove — ovdje se samo podešava izgled.
  * Stihove ubacuješ u `data/verses.ts`.
@@ -45,8 +46,8 @@ export type MoodStyle = {
 export const MOODS = {
   ljubav: {
     label: 'Velvet',
-    gradient: ['#260E18', '#541F32', '#702D43'],
-    accent: '#F2A7B8',
+    gradient: ['#22121A', '#4A2633', '#6B3A4A'],
+    accent: '#F5C3CF',
     text: '#FFF4F6',
     speed: 0.9,
     drift: 40,
@@ -61,8 +62,8 @@ export const MOODS = {
   },
   nostalgija: {
     label: 'Sepia',
-    gradient: ['#101218', '#252936', '#3D404F'],
-    accent: '#D9C3A0',
+    gradient: ['#16120F', '#2E2620', '#4A3D33'],
+    accent: '#E8D3B4',
     text: '#F3EEE6',
     speed: 0.55,
     drift: 24,
@@ -77,8 +78,8 @@ export const MOODS = {
   },
   nada: {
     label: 'Halo',
-    gradient: ['#0D141E', '#1A313F', '#254755'],
-    accent: '#F4C77B',
+    gradient: ['#121514', '#2A3330', '#3F4B45'],
+    accent: '#F3D9A4',
     text: '#FBF6EC',
     speed: 1,
     drift: 46,
@@ -93,8 +94,8 @@ export const MOODS = {
   },
   sloboda: {
     label: 'Azure',
-    gradient: ['#0C101A', '#18293F', '#243C62'],
-    accent: '#7FD0E8',
+    gradient: ['#10141B', '#22303F', '#36485C'],
+    accent: '#BFDDEB',
     text: '#EEF7FB',
     speed: 1.35,
     drift: 62,
@@ -110,8 +111,8 @@ export const MOODS = {
   // sporo i tamno ljubičasto — sjeta, rastanak
   tuga: {
     label: 'Dusk',
-    gradient: ['#100E1C', '#221B3A', '#352A55'],
-    accent: '#B9A7F0',
+    gradient: ['#15121C', '#2C2538', '#443A55'],
+    accent: '#D6CBF0',
     text: '#F5F2FD',
     speed: 0.5,
     drift: 22,
@@ -127,8 +128,8 @@ export const MOODS = {
   // žar — crveno prema narandžastom, brže i toplije od ljubavi
   strast: {
     label: 'Ember',
-    gradient: ['#1E0A0A', '#4A1414', '#6E2116'],
-    accent: '#FF9B6A',
+    gradient: ['#1F1210', '#45271F', '#66392B'],
+    accent: '#F6C2A6',
     text: '#FFF3EE',
     speed: 1.2,
     drift: 52,
@@ -144,8 +145,8 @@ export const MOODS = {
   // Bosna, kuća, behar — tamna šuma i blaga zelena
   zavicaj: {
     label: 'Moss',
-    gradient: ['#0B1410', '#16301F', '#22472E'],
-    accent: '#B5DDA4',
+    gradient: ['#121611', '#283325', '#3D4B37'],
+    accent: '#CFE3BF',
     text: '#F1F8EF',
     speed: 0.75,
     drift: 34,
@@ -161,8 +162,8 @@ export const MOODS = {
   // mirno i toplo, kao svitanje — breskva na tamnom
   mir: {
     label: 'Dawn',
-    gradient: ['#14100F', '#2C2220', '#45332D'],
-    accent: '#F3C6A5',
+    gradient: ['#18120F', '#33261F', '#523D31'],
+    accent: '#F7D2B6',
     text: '#FCF4EE',
     speed: 0.45,
     drift: 20,
@@ -178,8 +179,8 @@ export const MOODS = {
   // crno i grafit, srebrni naglasak — strogo, kao film
   noir: {
     label: 'Noir',
-    gradient: ['#0A0A0B', '#1A1B1E', '#2A2C31'],
-    accent: '#D9DCE1',
+    gradient: ['#0E0D0C', '#1E1C1A', '#302D29'],
+    accent: '#E6E1D8',
     text: '#F7F7F8',
     speed: 0.6,
     drift: 26,
@@ -195,8 +196,8 @@ export const MOODS = {
   // tamno smeđe i zlato — svečano
   aurum: {
     label: 'Aurum',
-    gradient: ['#0F0B06', '#2A1E0E', '#3E2C12'],
-    accent: '#E9C46A',
+    gradient: ['#13100B', '#2E2417', '#463622'],
+    accent: '#EED9A8',
     text: '#FFF8EA',
     speed: 0.8,
     drift: 34,
@@ -212,8 +213,8 @@ export const MOODS = {
   // hladno plavo-sivo, ledeni naglasak — zima, daljina
   frost: {
     label: 'Frost',
-    gradient: ['#0B1016', '#1A2632', '#2A3B4D'],
-    accent: '#BFE3FF',
+    gradient: ['#111418', '#252B33', '#3A4450'],
+    accent: '#DCE7EE',
     text: '#F2F8FD',
     speed: 0.65,
     drift: 30,
@@ -229,8 +230,8 @@ export const MOODS = {
   // ljubičasto u tirkizno, neon menta — apstraktno, moderno
   abstract: {
     label: 'Abstract',
-    gradient: ['#0E0A1A', '#2B1446', '#0F3A4A'],
-    accent: '#7DF2C8',
+    gradient: ['#14111A', '#33263F', '#26393C'],
+    accent: '#BEE6D6',
     text: '#F3FFFA',
     speed: 1.15,
     drift: 56,
@@ -246,8 +247,8 @@ export const MOODS = {
   // nježna romansa — šljiva i ruž
   rose: {
     label: 'Rosé',
-    gradient: ['#1B1018', '#3E2333', '#63384F'],
-    accent: '#FFD1DD',
+    gradient: ['#1D1418', '#3E2A33', '#5E414C'],
+    accent: '#F9D5DE',
     text: '#FFF6F9',
     speed: 0.7,
     drift: 32,
@@ -263,8 +264,8 @@ export const MOODS = {
   // noćna romansa — ponoć i mjesečina
   moonlight: {
     label: 'Moonlight',
-    gradient: ['#070B18', '#141C38', '#222C55'],
-    accent: '#F4E7C2',
+    gradient: ['#10121A', '#222738', '#363C54'],
+    accent: '#F2E6C8',
     text: '#FBF8EE',
     speed: 0.55,
     drift: 26,
@@ -280,8 +281,8 @@ export const MOODS = {
   // sevdah — čežnja i ljubav, bordo u tamni tirkiz, ružičasto zlato
   sevdah: {
     label: 'Sevdah',
-    gradient: ['#160A10', '#3A1222', '#123236'],
-    accent: '#E9B49B',
+    gradient: ['#1A1114', '#3A2229', '#2B3A3B'],
+    accent: '#EEC4B0',
     text: '#FFF4EF',
     speed: 0.6,
     drift: 30,
@@ -297,8 +298,8 @@ export const MOODS = {
   // behar — proljeće, cvijet na tamnoj grani
   behar: {
     label: 'Behar',
-    gradient: ['#0E120F', '#1F2B22', '#3A2A35'],
-    accent: '#F4F1E6',
+    gradient: ['#121411', '#2A3127', '#45363F'],
+    accent: '#F6EEE6',
     text: '#FBFAF4',
     speed: 0.85,
     drift: 40,
@@ -314,8 +315,8 @@ export const MOODS = {
   // serenada — ljubičasta noć i toplo zlato
   serenade: {
     label: 'Serenade',
-    gradient: ['#0D0A1C', '#211A42', '#3B2A5E'],
-    accent: '#F2C879',
+    gradient: ['#14111B', '#2D2640', '#463A5C'],
+    accent: '#F1D7A6',
     text: '#FFF8EC',
     speed: 0.75,
     drift: 36,

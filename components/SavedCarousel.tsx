@@ -48,6 +48,8 @@ export const CARD_RATIO = SH / W
  * ~26 em ispod njih. Prazno dno (pod plejerom u starom plejeru) se odsiječe.
  */
 export const CARD_CUT = SH - 74
+/** visina odsječene karte prema širini (admin: karte u listi) */
+export const CARD_CUT_RATIO = CARD_CUT / W
 /** mjesto sa svake strane prednje karte — tu vire susjedne */
 const SIDE = 54
 /** zraka unutar karte, lijevo i desno (em od W) */
@@ -564,8 +566,11 @@ function CardFaceView({
   actionsZoom,
   toggle = true,
   cut = SH,
+  day,
 }: {
   verse: Verse
+  /** datum na karti (admin: pregled karte) — inače dan kad je stih sačuvan */
+  day?: string
   o?: number
   /** mala karta visoka ovoliko em (do SH) — raspored isti, prazno dno odsječeno */
   cut?: number
@@ -596,7 +601,8 @@ function CardFaceView({
   // je li stih (još) sačuvan — srce gore prati dugme "Sačuvano" na raširenoj karti
   const kept = useFavorites().includes(verse.id)
   // karte postoje samo na klijentu (poslije hidratacije) — smije se čitati odmah
-  const [saved] = useState(() => savedDay(verse.id))
+  // (admin: zadan dan — ne upisuje se kao dan čuvanja)
+  const [saved] = useState(() => day ?? savedDay(verse.id))
   // isti elementi iz rendera u render: FitLines mjeri samo kad se stih stvarno
   // promijeni, a ne pri svakom prevlačenju špila (inače mjere sve karte — trzaj)
   const dateLine = useMemo(() => <span>{formatFullDateBs(saved)}</span>, [saved])
@@ -865,5 +871,6 @@ export const CardFace = memo(
     a.onCollapse === b.onCollapse &&
     a.actionsZoom === b.actionsZoom &&
     a.toggle === b.toggle &&
-    a.cut === b.cut,
+    a.cut === b.cut &&
+    a.day === b.day,
 )

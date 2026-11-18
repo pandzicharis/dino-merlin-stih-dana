@@ -396,3 +396,30 @@ create table if not exists catalog_meta (
 alter table verses enable row level security;
 alter table catalog_meta enable row level security;
 alter table verse_schedule enable row level security;
+
+-- Statistika stihova (admin → Statistika) — bez ijednog ličnog podatka:
+-- koliko je koji stih otvoren, sačuvan i podijeljen, po danu. Uređaj isti
+-- stih broji jednom dnevno po radnji (lib/stats-client.ts), upis ide kroz
+-- /api/stats → bump_verse_stat.
+create table if not exists verse_stats (
+  verse_id text not null,
+  day      date not null default current_date,
+  opens    integer not null default 0,
+  saves    integer not null default 0,
+  shares   integer not null default 0,
+  primary key (verse_id, day)
+);
+
+create or replace function bump_verse_stat(vid text, kind text)
+returns void
+language sql
+as $$
+  insert into verse_stats (verse_id, day, opens, saves, shares)
+  values (vid, current_date, (kind = 'open')::int, (kind = 'save')::int, (kind = 'share')::int)
+  on conflict (verse_id, day) do update set
+    opens  = verse_stats.opens  + excluded.opens,
+    saves  = verse_stats.saves  + excluded.saves,
+    shares = verse_stats.shares + excluded.shares;
+$$;
+
+alter table verse_stats enable row level security;

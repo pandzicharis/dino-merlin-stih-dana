@@ -1113,7 +1113,7 @@ function useDeskScene(run: (s: DeskScene) => Promise<void>) {
       }
       const search = q('[data-search]') as HTMLInputElement | null
       if (search?.value) setValue(search, '')
-      all('[data-filter-clear], [data-song-filter][aria-pressed="true"]').forEach((f) => f.click())
+      all('[data-album="svi"][aria-pressed="false"], [data-song-filter][aria-pressed="true"]').forEach((f) => f.click())
       if (q('[data-scope="archive"]')?.style.color.includes('20, 16, 10')) q('[data-scope="active"]')?.click()
       q('[data-page="1"]')?.click()
       if (!alive) return
@@ -1127,9 +1127,9 @@ function useDeskScene(run: (s: DeskScene) => Promise<void>) {
   }, [desk, manual])
 }
 
-/** Biblioteka: pretraga, filter po raspoloženju, arhiva. */
+/** Biblioteka: pretraga, albumi kao tabovi, arhiva. */
 function Biblioteka() {
-  useDeskScene(async ({ wait, find, click, type, clear, alive }) => {
+  useDeskScene(async ({ wait, find, all, click, type, clear, alive }) => {
     // pravi ekran odmah na ulasku: lista stihova, bez starih filtera
     const search = await find('[data-search]')
     if (!search) return
@@ -1147,15 +1147,14 @@ function Biblioteka() {
     if (!alive()) return
     clear('[data-search]')
     await wait(700)
-    // filter po stilu — ikonica pored pretrage otvara panel, izbor, pa × na čipu
-    await click('[data-filters-open]')
-    await wait(900)
-    await click('[data-filter="nostalgija"]')
-    await wait(1800)
-    await click('[data-filter-clear="mood"]')
-    await wait(500)
-    await click('[data-filters-open]')
-    await wait(700)
+    // albumi kao tabovi ispod pretrage: jedan album, pa nazad na sve
+    const tab = all('[data-album-tabs] [data-album]')[1]
+    if (tab) {
+      await click(tab)
+      await wait(1800)
+      await click('[data-album="svi"]')
+      await wait(700)
+    }
     if (!alive()) return
     // filter po pjesmi: stihovi čija je pjesma u aplikaciji (♪)
     if (await click('[data-song-filter="with"]')) {
@@ -1179,7 +1178,7 @@ function Biblioteka() {
     <>
       <Text>
         Svi aktivni stihovi su špil iz kojeg svako izvlači svoj — nema kalendara ni rasporeda za održavanje. Pretraga,
-        filter po raspoloženju i po pjesmi (s njom ili bez nje) i stranice po 10.
+        albumi kao tabovi s brojem pjesama, lista ili karte, i stranice po 10.
       </Text>
       <Bullets
         items={[
@@ -1268,7 +1267,7 @@ function Dizajn() {
     // lista kao na početku — prezenter je možda prošao "Listu stihova" usred
     // filtera; čeka se samo ako je zaista nešto vraćeno
     const search = all('[data-search]')[0] as HTMLInputElement | undefined
-    const filters = all('[data-filter-clear]')
+    const filters = all('[data-album="svi"][aria-pressed="false"]')
     const archive = all('[data-scope="archive"]').find((b) => b.style.color.includes('20, 16, 10'))
     if (search?.value) clear(search)
     filters.forEach((f) => f.click())

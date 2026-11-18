@@ -5,6 +5,7 @@
 
 import { getActiveDate, shownDay } from './date'
 import { audioFile } from './audio-name'
+import { trackStat } from './stats-client'
 
 const NOTIFY = 'stihdana:notify'
 
@@ -153,6 +154,8 @@ export function toggleFavorite(id: string): boolean {
   else delete dates[id]
   write(FAVORITE_DATES, dates)
   window.dispatchEvent(new Event('favchange'))
+  // statistika (bez ličnih podataka) — samo kad se sačuva
+  if (on) trackStat(id, 'save')
   return on
 }
 

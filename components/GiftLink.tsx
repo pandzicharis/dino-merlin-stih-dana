@@ -7,6 +7,7 @@ import { BRAND } from '@/lib/brand'
 import { haptic } from '@/lib/haptic'
 import type { QrMatrix } from '@/lib/qr'
 import { bumpMonth } from '@/lib/storage'
+import { trackStat } from '@/lib/stats-client'
 import { albumLine, paperText } from '@/lib/text'
 import { QrCode } from './deck/QrCode'
 import { giftUrl, openGift } from './GiftArrival'
@@ -48,6 +49,7 @@ export function useGiftLink(verse: Verse, on: boolean) {
     try {
       await navigator.share({ url, title: `${verse.song} — Dino Merlin` })
       bumpMonth('shared')
+      trackStat(verse.id, 'share')
     } catch {}
   }
 

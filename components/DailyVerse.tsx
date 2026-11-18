@@ -20,6 +20,9 @@ import { Tips } from './Tips'
 import { UpdatePrompt } from './UpdatePrompt'
 import { PullRefresh } from './PullRefresh'
 import { INTRO_DONE, IntroHost, playDraw } from './IntroSplash'
+import { primeLyrics } from './Lyrics'
+import { trackStat } from '@/lib/stats-client'
+import { Icon, toast } from './Toast'
 
 /**
  * Rješava KOJI stih se prikazuje.
@@ -206,6 +209,25 @@ export function DailyVerse({
 
   // niz dana zaredom — iz istorije izvučenih, raste kad papirić sleti
   const streak = useStreak(date)
+
+  // rad bez mreže: tekst današnje pjesme se tiho pripremi (public/sw.js ga
+  // zapamti), a kad mreža nestane — kratka poruka šta i dalje radi
+  const song = verse?.youtube ? verse.song : ''
+  useEffect(() => {
+    if (!song || !navigator.onLine) return
+    const idle = window.requestIdleCallback ?? ((fn: () => void) => window.setTimeout(fn, 1500))
+    idle(() => primeLyrics(song))
+  }, [song])
+  // statistika: stih dana je otvoren (jednom dnevno po uređaju, bez ličnih podataka)
+  const shownId = verseId ? '' : (verse?.id ?? '')
+  useEffect(() => {
+    if (shownId) trackStat(shownId, 'open')
+  }, [shownId])
+  useEffect(() => {
+    const off = () => toast({ id: 'mreza', title: 'Bez mreže', sub: 'Stih i tekst su tu — pjesma kad se mreža vrati.', icon: <Icon.info /> }, 4200)
+    window.addEventListener('offline', off)
+    return () => window.removeEventListener('offline', off)
+  }, [])
 
   const tone = mood ?? verse?.mood ?? 'nostalgija'
   // ostali aktivni stihovi — papirići u gomili na prvom otvaranju

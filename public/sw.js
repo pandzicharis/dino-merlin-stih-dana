@@ -3,10 +3,14 @@
  *
  * Sadržaj se mijenja svaki dan, pa se stranica uvijek traži s mreže;
  * offline fallback za zadnji viđeni ekran + push notifikacije.
- * Jedino JS/CSS/fontovi (imena s hešom, nikad se ne mijenjaju) i logotipi
- * idu iz keša — aplikacija se otvori bez čekanja na njih. Pjesma koja se
- * pusti ostaje u svom kešu: nastavak i povratak u aplikaciju je ne skidaju
- * iznova. Ništa se ne preuzima unaprijed, u pozadini.
+ * Jedino JS/CSS/fontovi (imena s hešom, nikad se ne mijenjaju), logotipi,
+ * omoti, karte i ikonice idu iz keša — aplikacija se otvori bez čekanja na
+ * njih. Pjesma koja se pusti ostaje u svom kešu: nastavak i povratak u
+ * aplikaciju je ne skidaju iznova.
+ *
+ * Rad bez mreže: početna (stih je u njoj) i tekst pjesme — tekst se uvijek
+ * pita mreže, a bez nje stiže zadnji spremljen (aplikacija današnji tekst
+ * pripremi čim se stih otvori, lib Lyrics `primeLyrics`).
  */
 
 const CACHE = 'stihdana-v1.0'
@@ -29,7 +33,11 @@ const markDraw = () =>
  * imenom dobije novi ključ, a stara se obriše.
  */
 const AUDIO = 'stihdana-audio-v1'
-const KEEP = [CACHE, MARK, AUDIO]
+/** Tekstovi pjesama za rad bez mreže — trajni keš, nova verzija ga ne briše. */
+const LYRICS = 'stihdana-tekst-v1'
+const KEEP = [CACHE, MARK, AUDIO, LYRICS]
+/** najviše tekstova u kešu — najstariji izlaze */
+const TEXTS = 80
 /** najviše pjesama u kešu — najstarije izlaze */
 const SONGS = 120
 
@@ -69,6 +77,9 @@ self.addEventListener('activate', (e) => {
  * Keš je vezan za verziju (CACHE), pa ga nova verzija očisti.
  */
 const STATIC = /^\/(_next\/static|brand)\//
+/** omoti, karte, ikonice i fontovi iz public/ — rijetko se mijenjaju; nova verzija (CACHE) ih osvježi */
+const ASSET = /^\/(albumi|karte|icons|fonts)\//
+const LYRIC = /^\/api\/lyrics\//
 const SONG = /^\/audio\/[^/]+\.(m4a|mp3)$/
 
 /**
@@ -84,7 +95,9 @@ self.addEventListener('fetch', (e) => {
   if (SONG.test(url.pathname) && url.searchParams.has('v')) return song(e, url.href)
   if (url.origin !== self.location.origin) return
 
-  if (STATIC.test(url.pathname)) {
+  if (LYRIC.test(url.pathname)) return e.respondWith(lyrics(e, req))
+
+  if (STATIC.test(url.pathname) || ASSET.test(url.pathname)) {
     e.respondWith(
       caches.open(CACHE).then((c) =>
         c.match(req).then(
@@ -116,6 +129,27 @@ self.addEventListener('fetch', (e) => {
     )
   }
 })
+
+/**
+ * Tekst pjesme: mreža prvo (ispravka iz admina stiže odmah), a kad mreže
+ * nema — zadnji spremljen, i bez `?d=` (trajanje videa) ako baš tog nema.
+ */
+function lyrics(e, req) {
+  return fetch(req)
+    .then((res) => {
+      if (res.ok && res.type === 'basic') {
+        const copy = res.clone()
+        e.waitUntil(caches.open(LYRICS).then((c) => c.put(req, copy).then(() => trim(c, TEXTS))))
+      }
+      return res
+    })
+    .catch(() =>
+      caches
+        .open(LYRICS)
+        .then((c) => c.match(req).then((hit) => hit || c.match(req, { ignoreSearch: true })))
+        .then((hit) => hit || Response.error()),
+    )
+}
 
 /* ── pjesme ── */
 

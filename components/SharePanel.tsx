@@ -20,6 +20,7 @@ import { bumpMonth } from '@/lib/storage'
 import { SheetBackdrop, SheetLayer, SheetSlide, useSheetDrag, useSheetOpen } from './Sheet'
 import { CopyIcon, GiftCard, ShareIcon, useGiftLink } from './GiftLink'
 import { lockScroll } from '@/lib/scroll-lock'
+import { trackStat } from '@/lib/stats-client'
 
 type Target = 'share' | 'save'
 
@@ -119,6 +120,7 @@ export default function SharePanel({
           // Viber… Na desktopu toga nema, pa se slika preuzme.
           if (await shareImage(true)) {
             bumpMonth('shared')
+            trackStat(verse.id, 'share')
             toast({ id: 'share', title: 'Podijeljeno', color: TOAST_OK, icon: <Icon.ok /> })
             break
           }
@@ -126,6 +128,7 @@ export default function SharePanel({
           if (file) {
             download(file)
             bumpMonth('shared')
+            trackStat(verse.id, 'share')
             toast({ id: 'share', title: 'Slika je preuzeta', sub: 'Dijeljenje nije podržano', icon: <Icon.download /> })
           }
           break

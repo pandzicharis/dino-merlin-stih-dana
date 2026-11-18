@@ -158,7 +158,24 @@ function itemsOf(lines: string[], synced: { t: number }[] | null): Item[] {
  * znak muzike. Bez vremena: stoji i otvori se od početka. Tvoj
  * stih je u zlatu. Bez teksta: samo stih.
  */
-export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyrics: LyricsData | null | 'loading'; /** gdje stoji red koji se pjeva (dio visine) */ anchor?: number }) {
+/** red koji se pjeva: uvećanje i svjetlo mekano (slova ostaju iste veličine); veličina slova
+ *  se mijenja samo s tekstom preko cijelog ekrana — u istom potezu kao ladica */
+const LINE_TRANSITION =
+  'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease, color 0.5s ease, font-size 0.5s cubic-bezier(0.4, 0, 0.2, 1), line-height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+
+export function LyricsView({
+  verse,
+  lyrics,
+  anchor = 0.3,
+  big = false,
+}: {
+  verse: Verse
+  lyrics: LyricsData | null | 'loading'
+  /** gdje stoji red koji se pjeva (dio visine) */
+  anchor?: number
+  /** tekst preko cijelog ekrana (plejer): krupnija slova */
+  big?: boolean
+}) {
   const mine = useMemo(() => verseMatcher(verse.text), [verse.text])
   const data = lyrics && lyrics !== 'loading' ? lyrics : null
   const synced = data?.synced?.length ? data.synced : null
@@ -186,8 +203,12 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
     let last = -2
     // prvi put tekst odmah stoji na redu koji traje (dok se pretapa) — ne klizi od vrha
     let placed = false
+    let prev = 0
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
+      // korak po vremenu, ne po kadru — isto klizi na 60 i na 120 Hz (iPhone Pro)
+      const dt = prev ? Math.min(64, now - prev) : 16.7
+      prev = now
       const t = tubeTime().t
       let k = -1
       if (t > 0) while (k + 1 < items.length && items[k + 1].t <= t + LEAD + shift) k++
@@ -207,7 +228,8 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
       }
       if (pos < 0) pos = el.scrollTop
       const gap = target - pos
-      pos += gap * (Math.abs(gap) > 80 ? 0.08 : 0.16)
+      // mekano usporavanje do reda — otprilike koliko traje i pretapanje reda (0,6 s)
+      pos += gap * (1 - Math.pow(1 - (Math.abs(gap) > 80 ? 0.08 : 0.1), dt / 16.7))
       if (Math.abs(target - pos) < 0.4) pos = target
       el.scrollTop = pos
     }
@@ -287,14 +309,17 @@ export function LyricsView({ verse, lyrics, anchor = 0.3 }: { verse: Verse; lyri
                   : undefined
               }
               // isti razmak svuda: red koji se prelomi i dva reda su jednako razmaknuti
-              // (bez dodatka među redovima) — veći razmak je samo pauza među strofama
-              // red koji se pjeva je ~30% krupniji (slova rastu, ne povećanje slike — oštro, a
-              // susjedi se razmaknu); tekst za njim klizi, pa ostaje na sredini
-              className={`transition-[opacity,color,font-size,line-height] duration-500 [text-wrap:balance] ${note ? 'py-1 text-[13px] italic leading-snug' : now ? 'text-[25px] leading-[1.45]' : 'text-[19px] leading-[1.7]'} ${synced ? 'cursor-pointer' : ''}`}
+              // (bez dodatka među redovima) — veći razmak je samo pauza među strofama.
+              // Svi redovi su iste veličine: red koji se pjeva se samo malo poveća (slika,
+              // ne slova) i zasvijetli — ništa se ne preslaže ni ne prelama usput, pa prelaz s
+              // reda na red teče glatko, a tekst za njim mekano klizi (ostaje na sredini)
+              className={`origin-center [text-wrap:balance] ${note ? 'py-1 text-[13px] italic leading-snug' : big ? 'text-[24px] leading-[1.55]' : 'text-[20px] leading-[1.6]'} ${synced ? 'cursor-pointer' : ''}`}
               style={{
                 fontFamily: SERIF,
                 color: gold ? BRAND.gold : '#fff',
                 opacity: synced ? (now ? 1 : past ? 0.3 : 0.45) : note ? 0.5 : gold ? 1 : 0.82,
+                transform: now ? 'scale(1.1)' : undefined,
+                transition: LINE_TRANSITION,
               }}
             >
               {note ? text.replace(/^\*\s*/, '') : text}
