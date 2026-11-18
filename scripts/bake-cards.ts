@@ -10,18 +10,20 @@
  *
  *   npm run dev                       (drugi terminal)
  *   npm run brand:cards [http://localhost:3111]
+ *   npm run brand:cards -- --missing   samo karte kojih nema (novo raspoloženje ili album)
  *
  * Pokreni ponovo kad se promijeni album, raspoloženje ili izgled atmosfere.
  */
 import { spawn } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { ALBUMS } from '../data/albums'
 import { MOODS } from '../data/moods'
 
-const BASE = process.argv[2] ?? 'http://localhost:3111'
+const BASE = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'http://localhost:3111'
+const MISSING = process.argv.includes('--missing')
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const PORT = 9347
 const W = 390
@@ -73,6 +75,11 @@ async function main() {
     const keys: string[] = []
     const combos = [...ALBUMS.map((a) => a.id), 'bez'].flatMap((album) => Object.keys(MOODS).map((mood) => ({ album, mood })))
     for (const { album, mood } of combos) {
+      // --missing: postojeće karte ostaju kakve jesu
+      if (MISSING && existsSync(join(OUT, `${album}-${mood}.webp`))) {
+        keys.push(`${album}-${mood}`)
+        continue
+      }
       await c.send('Page.navigate', { url: `${BASE}/dev/karta?album=${album}&mood=${mood}` })
       let ok = false
       for (let i = 0; i < 80 && !ok; i++) {

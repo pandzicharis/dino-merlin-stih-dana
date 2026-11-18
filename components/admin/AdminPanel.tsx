@@ -7,7 +7,7 @@ import type { Verse } from '@/data/verses'
 import { MOODS, MOOD_KEYS, type Mood } from '@/data/moods'
 import { ALBUMS, albumOf } from '@/data/albums'
 import { BRAND } from '@/lib/brand'
-import { albumLine, audioSlug, asWritten, sameVerse, youtubeId } from '@/lib/text'
+import { albumLine, audioSlug, paperText, sameVerse, youtubeId } from '@/lib/text'
 import { inDeck } from '@/lib/deck'
 import { PageShell } from '../PageShell'
 import { DevicePreview, DeviceSwitch, phoneWidth, useWarmPreview, type Device } from './DevicePreview'
@@ -55,9 +55,6 @@ const PRINT_ICON = (
   </>
 )
 
-function oneLine(t: string) {
-  return asWritten(t).replace(/\s*\n\s*/g, ' / ')
-}
 
 /**
  * Dugme u zaglavlju admina. Na uskom ekranu (telefon, uski pregled) samo znak
@@ -270,6 +267,7 @@ export function AdminPanel() {
                 fetchSong={songs.fetch}
                 fetchLyrics={songs.fetchLyrics}
                 songsMode={songs.mode}
+                reloadSongs={songs.reload}
                 onSongSaved={(snap, note) => {
                   setData(snap)
                   songs.reload()
@@ -277,7 +275,7 @@ export function AdminPanel() {
                 }}
                 busy={busy}
                 onClose={() => setEditor(null)}
-                onSave={async (draft) => {
+                onSave={async (draft, found) => {
                   if (data.verses.some((v) => v.id !== editor.verse?.id && sameVerse(v, draft)))
                     return flash('Ovaj stih već postoji', true)
                   const ok = editor.verse
@@ -293,7 +291,8 @@ export function AdminPanel() {
                   const info = songs.of(draft.song)
                   if (OWN_AUDIO) {
                     if (info?.state !== 'ready') songs.fetch(draft.song, draft.youtube)
-                  } else if (!info?.lyrics || info.lyrics === 'missing') songs.fetchLyrics(draft.song)
+                    // tekst nađen u formi (produkcija ga ne može spremiti sama) ili ga još nema — spremi GitHub
+                  } else if (found || !info?.lyrics || info.lyrics === 'missing') songs.fetchLyrics(draft.song)
                 }}
               />
             )}
@@ -310,7 +309,7 @@ export function AdminPanel() {
                 }}
               >
                 <p className="text-[15px] leading-snug text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                  {oneLine(archiving.text)}
+                  {paperText(archiving.text)}
                 </p>
                 <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: BRAND.gold }}>
                   {archiving.song}
@@ -560,6 +559,199 @@ function YouTubePreview({ id }: { id: string }) {
   )
 }
 
+/* ── tekst pjesme se traži sam (forma stiha) ─────────────────── */
+
+type FindStep = { key: 'video' | 'site' | 'verse' | 'lrclib' | 'captions'; state: 'run' | 'ok' | 'none' | 'skip' | 'fail' }
+type FindResult = { title: string; lines: number; synced: number }
+type Find = { key: string; status: 'idle' | 'run' | 'done' | 'fail'; steps: FindStep[]; result: FindResult | null; stored: boolean }
+
+/**
+ * Tekst pjesme se traži sam, čim je pjesma izabrana i link nađen — koraci
+ * stižu redom s /api/admin/lyrics/find i forma ih pokazuje. `on`: treba li
+ * tražiti (nova pjesma, ili tekst još nije spremljen). `onStored`: tekst je
+ * spremljen (lokalno) — stanje pjesama iznova.
+ */
+function useLyricsFind(song: string, youtube: string, verse: string, on: boolean, onStored: () => void) {
+  const [again, setAgain] = useState(0)
+  const key = on || again ? `${audioSlug(song)}|${youtubeId(youtube) ?? ''}|${again}` : ''
+  const [find, setFind] = useState<Find>({ key: '', status: 'idle', steps: [], result: null, stored: false })
+  const latest = useRef({ song, youtube, verse, onStored })
+  useEffect(() => {
+    latest.current = { song, youtube, verse, onStored }
+  })
+  useEffect(() => {
+    if (!key) return
+    const ctrl = new AbortController()
+    // kratko čekanje: dok se naziv kuca, ne traži se za svako slovo
+    const t = window.setTimeout(async () => {
+      const set = (fn: (f: Find) => Find) => !ctrl.signal.aborted && setFind((f) => (f.key === key ? fn(f) : f))
+      setFind({ key, status: 'run', steps: [], result: null, stored: false })
+      try {
+        const { song: s, youtube: y, verse: v } = latest.current
+        const r = await fetch('/api/admin/lyrics/find', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ song: s, youtube: y, verse: v }),
+          signal: ctrl.signal,
+        })
+        if (!r.ok || !r.body) throw new Error(String(r.status))
+        const reader = r.body.getReader()
+        const dec = new TextDecoder()
+        let buf = ''
+        for (;;) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buf += dec.decode(value, { stream: true })
+          for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
+            const line = buf.slice(0, i).trim()
+            buf = buf.slice(i + 1)
+            if (!line) continue
+            const e = JSON.parse(line) as { type: string; key?: FindStep['key']; state?: FindStep['state']; result?: FindResult | null; stored?: boolean }
+            if (e.type === 'step' && e.key && e.state) {
+              const step = { key: e.key, state: e.state }
+              set((f) => ({ ...f, steps: f.steps.some((x) => x.key === step.key) ? f.steps.map((x) => (x.key === step.key ? step : x)) : [...f.steps, step] }))
+            } else if (e.type === 'done') {
+              set((f) => ({ ...f, status: 'done', result: e.result ?? null, stored: Boolean(e.stored) }))
+              if (e.stored) latest.current.onStored()
+            } else if (e.type === 'error') set((f) => ({ ...f, status: 'fail' }))
+          }
+        }
+        set((f) => (f.status === 'run' ? { ...f, status: 'fail' } : f))
+      } catch {
+        set((f) => ({ ...f, status: 'fail' }))
+      }
+    }, 600)
+    return () => {
+      clearTimeout(t)
+      ctrl.abort()
+    }
+  }, [key])
+  // traženje je zakazano (čeka da se kucanje smiri) — računa se kao da traje
+  const now: Find = !key ? { key: '', status: 'idle', steps: [], result: null, stored: false } : find.key === key ? find : { key, status: 'run', steps: [], result: null, stored: false }
+  return { ...now, retry: () => setAgain((n) => n + 1) }
+}
+
+/** 1 red, 2–4 reda, 5+ redova (i 11–14 redova) */
+function rowsWord(n: number) {
+  const d = n % 10
+  const h = n % 100
+  return d === 1 && h !== 11 ? 'red' : d >= 2 && d <= 4 && (h < 12 || h > 14) ? 'reda' : 'redova'
+}
+
+const FIND_LABEL: Record<FindStep['key'], string> = {
+  video: 'Trajanje videa',
+  site: 'Tekst na dinomerlin.com',
+  verse: 'Pjesma po stihu',
+  lrclib: 'Vremena na LRCLIB-u',
+  captions: 'Titlovi na YouTubeu',
+}
+const FIND_NOTE: Record<FindStep['state'], string> = { run: '', ok: 'nađeno', none: 'nema', skip: 'GitHub, poslije čuvanja', fail: 'ne odgovara' }
+
+/** Napredak traženja teksta u formi: šta se upravo radi, svaki korak, pa rezultat. */
+function LyricsFind({ find, onRetry }: { find: Find; onRetry: () => void }) {
+  const run = find.status === 'run'
+  const r = find.result
+  const current = [...find.steps].reverse().find((s) => s.state === 'run')
+  const head = run
+    ? current
+      ? `${FIND_LABEL[current.key]}…`
+      : 'Tražim tekst…'
+    : find.status === 'fail'
+      ? 'Traženje nije uspjelo'
+      : !r
+        ? 'Tekst nije nađen'
+        : r.synced
+          ? `Tekst prati pjesmu · ${r.synced} ${rowsWord(r.synced)}`
+          : `Tekst bez vremena · ${r.lines} ${rowsWord(r.lines)}`
+  const tone = run ? BRAND.gold : find.status === 'done' && r?.synced ? '#9BCB8E' : find.status === 'done' && r ? 'rgba(255,255,255,0.75)' : '#E6A4A4'
+  return (
+    <div className="col-span-2 -mt-1 rounded-xl border border-white/[0.08] bg-black/30 px-3.5 py-3" data-lyrics-find={find.status}>
+      <p className="flex items-center gap-2 text-[12px] font-medium" style={{ color: tone }}>
+        {run ? (
+          <span className="block h-3 w-3 shrink-0 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" aria-hidden />
+        ) : (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            {find.status === 'done' && r ? <path d="m5 12.5 4.5 4.5L19 7.5" /> : <path d="M12 8v5M12 16.5v.5M10.3 3.9 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />}
+          </svg>
+        )}
+        <span className="min-w-0 flex-1 truncate">{head}</span>
+        {!run && (
+          <button type="button" onClick={onRetry} className="shrink-0 text-[11px] font-normal text-white/45 transition-colors hover:text-white" data-lyrics-again>
+            Traži ponovo
+          </button>
+        )}
+      </p>
+      {find.steps.length > 0 && (
+        <ul className="mt-2 space-y-1 pl-5">
+          {find.steps.map((s) => (
+            <li key={s.key} className="flex items-center gap-2 text-[11px] text-white/50" data-find-step={s.key}>
+              <span className="flex w-3 shrink-0 justify-center" style={{ color: s.state === 'ok' ? '#9BCB8E' : s.state === 'fail' ? '#E6A4A4' : s.state === 'run' ? BRAND.gold : 'rgba(255,255,255,0.3)' }}>
+                {s.state === 'run' ? (
+                  <span className="block h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" aria-hidden />
+                ) : s.state === 'ok' ? (
+                  '✓'
+                ) : (
+                  '–'
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{FIND_LABEL[s.key]}</span>
+              <span className="shrink-0 text-white/35">{FIND_NOTE[s.state]}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {find.status === 'done' && r && !find.stored && <p className="mt-2 pl-5 text-[10.5px] text-white/35">Tekst se spremi kad sačuvaš stih.</p>}
+    </div>
+  )
+}
+
+/** 1 pjesma, 2–4 pjesme, 5+ pjesama (i 11–14 pjesama) */
+function songsWord(n: number) {
+  const d = n % 10
+  const h = n % 100
+  return d === 1 && h !== 11 ? 'pjesma' : d >= 2 && d <= 4 && (h < 12 || h > 14) ? 'pjesme' : 'pjesama'
+}
+
+/** Mali omot albuma (public/albumi/sm); bez albuma — ikonica aplikacije. `ring`: obrub izbora. */
+function AlbumIcon({ id, size, ring }: { id: string; size: number; ring?: string }) {
+  return (
+    <span
+      className="block shrink-0 bg-white/[0.06] bg-cover bg-center"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: Math.round(size * 0.26),
+        backgroundImage: `url(${id ? `/albumi/sm/${id}.webp` : '/icons/icon-192.png'})`,
+        boxShadow: ring ? `0 0 0 2px rgba(10,9,8,0.95), 0 0 0 3.5px ${ring}` : 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+      }}
+      aria-hidden
+    />
+  )
+}
+
+/** Aktivan filter ispod pretrage: šta filtrira i × koji ga briše. */
+function FilterChip({ id, onClear, children }: { id: string; onClear: () => void; children: React.ReactNode }) {
+  return (
+    <span
+      className="flex h-8 items-center gap-1.5 rounded-full border pl-2.5 text-[12px] text-white/90"
+      style={{ borderColor: `${BRAND.gold}55`, background: `${BRAND.gold}14` }}
+    >
+      {children}
+      <button
+        type="button"
+        data-filter-clear={id}
+        aria-label="Ukloni filter"
+        onClick={onClear}
+        className="flex h-full items-center pl-0.5 pr-2.5 text-white/50 transition-colors hover:text-white"
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
+    </span>
+  )
+}
+
 /** Prekidač filtera u listi: samo stihovi kojima nešto fali (broj desno). */
 function Switch({ data, label, on, count, onChange }: { data: string; label: string; on: boolean; count: number; onChange: (on: boolean) => void }) {
   return (
@@ -640,6 +832,17 @@ function Library({
 }) {
   const [q, setQ] = useState('')
   const [mood, setMood] = useState<Mood | null>(null)
+  // album (id iz data/albums.ts); '' = bez albuma (singl, uživo), null = svi
+  const [album, setAlbum] = useState<string | null>(null)
+  // panel filtera (ikonica pored pretrage)
+  const [panel, setPanel] = useState(false)
+  useEffect(() => {
+    if (!panel) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setPanel(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [panel])
+  const albumId = (v: AdminVerse) => albumOf(v.album)?.id ?? ''
   // samo stihovi kojima fali pjesma u aplikaciji, ili tekst koji prati pjesmu (vremena redova)
   const [noSong, setNoSong] = useState(false)
   const [noSync, setNoSync] = useState(false)
@@ -654,6 +857,7 @@ function Library({
       (v) =>
         v.active !== archived &&
         (!mood || v.mood === mood) &&
+        (album === null || albumId(v) === album) &&
         (!noSong || !hasSong(v)) &&
         (!noSync || !synced(v)) &&
         (!q || `${v.text} ${v.song} ${v.album}`.toLowerCase().includes(q.toLowerCase())),
@@ -670,6 +874,22 @@ function Library({
     listRef.current?.scrollTo({ top: 0 })
   }
   const archivedCount = data.verses.filter((v) => !v.active).length
+  // tabovi albuma: najnoviji prvi, s brojem pjesama (ne stihova) u aktivnim ili arhivi
+  const scope = data.verses.filter((v) => v.active !== archived)
+  const songsIn = (id: string) => new Set(scope.filter((v) => albumId(v) === id).map((v) => audioSlug(v.song))).size
+  const albumTabs = [
+    ...[...ALBUMS].reverse().map((a) => ({ id: a.id, title: a.title, year: a.year, songs: songsIn(a.id) })),
+    { id: '', title: 'Ostalo', year: 0, songs: songsIn('') },
+  ].filter((t) => t.songs > 0)
+  const chosenAlbum = album === null ? null : albumTabs.find((t) => t.id === album)
+  const active = Number(Boolean(mood)) + Number(album !== null) + Number(noSync) + Number(noSong)
+  const clearAll = () => {
+    setMood(null)
+    setAlbum(null)
+    setNoSync(false)
+    setNoSong(false)
+    setPage(0)
+  }
 
   return (
     <>
@@ -730,43 +950,132 @@ function Library({
         })}
       </div>
 
-      <input
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value)
-          setPage(0)
-        }}
-        placeholder="Traži stih, pjesmu ili album…"
-        data-search
-        className="mb-3 h-10 w-full rounded-full border border-white/10 bg-black/30 px-4 text-[13px] text-white outline-none placeholder:text-white/25 focus:border-[#BFA87F]/50"
-      />
+      {/* pretraga, a pored nje filteri: ikonica otvara panel (stil, album, tekst);
+          aktivni filteri stoje ispod kao čipovi, × ih briše */}
+      <div className="mb-3 flex items-center gap-2">
+        <input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value)
+            setPage(0)
+          }}
+          placeholder="Traži stih, pjesmu ili album…"
+          data-search
+          className="h-11 min-w-0 flex-1 rounded-full border border-white/10 bg-black/30 px-4 text-[13px] text-white outline-none placeholder:text-white/25 focus:border-[#BFA87F]/50"
+        />
+        <button
+          type="button"
+          data-filters-open
+          aria-expanded={panel}
+          aria-label={active ? `Filteri (${active})` : 'Filteri'}
+          onClick={() => setPanel(!panel)}
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors"
+          style={{
+            borderColor: panel || active ? `${BRAND.gold}99` : 'rgba(255,255,255,0.1)',
+            background: panel ? `${BRAND.gold}1f` : 'rgba(0,0,0,0.3)',
+            color: panel || active ? BRAND.gold : 'rgba(255,255,255,0.65)',
+          }}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+            <circle cx="16" cy="6" r="2" />
+            <circle cx="10" cy="12" r="2" />
+            <circle cx="18" cy="18" r="2" />
+          </svg>
+          {active > 0 && (
+            <span
+              className="tabular absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold"
+              style={{ background: BRAND.gold, color: '#14100A' }}
+            >
+              {active}
+            </span>
+          )}
+        </button>
+      </div>
 
-      {/* raspoloženja u jednom redu — na uskom ekranu klize vodoravno */}
-      <div className="no-scrollbar -mx-5 mb-4 flex gap-2 overflow-x-auto px-5">
-        {MOOD_KEYS.map((k) => (
-          <button
-            key={k}
-            data-filter={k}
-            aria-pressed={mood === k}
-            onClick={() => {
-              setMood(mood === k ? null : k)
-              setPage(0)
-            }}
-            className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[11px] transition-colors"
-            style={{
-              borderColor: mood === k ? MOODS[k].accent : 'rgba(255,255,255,0.08)',
-              color: mood === k ? '#fff' : 'rgba(255,255,255,0.5)',
-              background: mood === k ? `${MOODS[k].accent}14` : 'transparent',
-            }}
+      <AnimatePresence initial={false}>
+        {panel && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="overflow-hidden"
+            data-filters-panel
           >
-            <i className="block h-2 w-2 rounded-full" style={{ background: MOODS[k].accent }} />
-            {MOODS[k].label}
-          </button>
-        ))}
-        {/* bez pjesme / tekst bez vremena redova — tek kad je stanje pjesama stiglo */}
-        {songs.mode && (
-          <>
-            <span className="mx-1 w-px shrink-0 self-stretch bg-white/10" aria-hidden />
+            <div className="mb-3 space-y-4 rounded-2xl border border-white/10 bg-white/[0.035] p-3.5">
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">Stil</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {MOOD_KEYS.map((k) => {
+                    const m = MOODS[k]
+                    const on = mood === k
+                    const n = scope.filter((v) => v.mood === k).length
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        data-filter={k}
+                        aria-pressed={on}
+                        onClick={() => {
+                          setMood(on ? null : k)
+                          setPage(0)
+                        }}
+                        className="flex h-9 shrink-0 items-center gap-2 rounded-xl pl-2.5 pr-3 text-[12px] transition-[opacity,box-shadow] duration-200"
+                        style={{
+                          background: `radial-gradient(circle at 15% 20%, ${m.gradient[2]} 0%, transparent 75%), radial-gradient(circle at 90% 90%, ${m.gradient[1]} 0%, transparent 70%), ${m.gradient[0]}`,
+                          boxShadow: on ? `inset 0 0 0 1.5px ${m.accent}` : 'inset 0 0 0 1px rgba(255,255,255,0.05)',
+                          color: on ? '#fff' : 'rgba(255,255,255,0.78)',
+                          opacity: mood && !on ? 0.45 : n || on ? 1 : 0.55,
+                        }}
+                      >
+                        <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: m.accent, boxShadow: `0 0 8px ${m.accent}` }} />
+                        {m.label}
+                        <span className="tabular text-[10.5px] opacity-50">{n}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40">Album</p>
+                <div className="grid grid-cols-1 gap-0.5 min-[480px]:grid-cols-2">
+                  {albumTabs.map((t) => {
+                    const on = album === t.id
+                    return (
+                      <button
+                        key={t.id || 'ostalo'}
+                        type="button"
+                        data-album={t.id || 'ostalo'}
+                        aria-pressed={on}
+                        onClick={() => {
+                          setAlbum(on ? null : t.id)
+                          setPage(0)
+                        }}
+                        className="flex min-w-0 items-center gap-2.5 rounded-xl px-1.5 py-1.5 text-left transition-colors hover:bg-white/[0.05]"
+                        style={on ? { background: `${BRAND.gold}1f`, boxShadow: `inset 0 0 0 1px ${BRAND.gold}66` } : undefined}
+                      >
+                        <AlbumIcon id={t.id} size={34} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12.5px]" style={{ color: on ? BRAND.gold : 'rgba(255,255,255,0.88)' }}>
+                            {t.title}
+                          </span>
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-white/40">
+                            {t.year ? `${t.year} · ` : ''}
+                            {t.songs} {songsWord(t.songs)}
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {songs.mode && (
+                <section>
+                  <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-white/40">Tekst</p>
+                  <div className="flex flex-wrap items-center gap-3">
             {(
               [
                 ...(OWN_AUDIO ? [['song', 'Bez pjesme', noSong, setNoSong, hasSong] as const] : []),
@@ -785,19 +1094,95 @@ function Library({
                 }}
               />
             ))}
-          </>
+                  </div>
+                </section>
+              )}
+
+              <div className="flex items-center justify-between border-t border-white/[0.06] pt-3">
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  disabled={!active}
+                  className="text-[12px] text-white/50 transition-colors hover:text-white disabled:opacity-30"
+                >
+                  Poništi sve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPanel(false)}
+                  className="h-9 rounded-full px-4 text-[12px] font-semibold text-black"
+                  style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
+                >
+                  Prikaži {list.length}
+                </button>
+              </div>
+            </div>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
+
+      {/* aktivni filteri — vide se i kad je panel zatvoren */}
+      {active > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5" data-active-filters>
+          {mood && (
+            <FilterChip
+              id="mood"
+              onClear={() => {
+                setMood(null)
+                setPage(0)
+              }}
+            >
+              <i className="block h-2 w-2 shrink-0 rounded-full" style={{ background: MOODS[mood].accent, boxShadow: `0 0 8px ${MOODS[mood].accent}` }} />
+              {MOODS[mood].label}
+            </FilterChip>
+          )}
+          {chosenAlbum && (
+            <FilterChip
+              id="album"
+              onClear={() => {
+                setAlbum(null)
+                setPage(0)
+              }}
+            >
+              <AlbumIcon id={chosenAlbum.id} size={18} />
+              {chosenAlbum.title}
+            </FilterChip>
+          )}
+          {noSync && (
+            <FilterChip
+              id="sync"
+              onClear={() => {
+                setNoSync(false)
+                setPage(0)
+              }}
+            >
+              Tekst ne prati
+            </FilterChip>
+          )}
+          {noSong && (
+            <FilterChip
+              id="song"
+              onClear={() => {
+                setNoSong(false)
+                setPage(0)
+              }}
+            >
+              Bez pjesme
+            </FilterChip>
+          )}
+        </div>
+      )}
+      {!active && <div className="mb-1" />}
 
       {/* lista ima svoju visinu i skrola se unutra — filteri i kartice ostaju na mjestu */}
       <div
         ref={listRef}
-        className="relative max-h-[min(62dvh,640px)] overflow-y-auto overscroll-contain rounded-[20px] border border-white/10 bg-white/[0.035] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl"
+        className="relative max-h-[min(62dvh,640px)] overflow-y-auto overscroll-contain"
       >
         {/* izmjena ide na server — tanka zlatna traka dok traje */}
         {busy && <LoadBar />}
-        <motion.div key={`${p}-${archived}-${mood}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
-        {shown.map((v, i) => {
+        <motion.div key={`${p}-${archived}-${mood}-${album}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="space-y-1.5">
+        {shown.map((v) => {
           const m = MOODS[v.mood]
           // klik na stih (bilo gdje na kartici) otvara uređivanje — dugmad unutra rade svoje
           const editable = writable && !archived && !busy
@@ -806,7 +1191,7 @@ function Library({
               key={v.id}
               role={editable ? 'button' : undefined}
               tabIndex={editable ? 0 : undefined}
-              aria-label={editable ? `Uredi: ${oneLine(v.text)}` : undefined}
+              aria-label={editable ? `Uredi: ${paperText(v.text)}` : undefined}
               onClick={(e) => {
                 if (editable && !(e.target as Element).closest('button, a, input, label')) onEdit(v)
               }}
@@ -816,15 +1201,16 @@ function Library({
                   onEdit(v)
                 }
               }}
-              className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-white/[0.03] sm:gap-4 ${editable ? 'cursor-pointer' : ''}`}
-              style={{ borderTop: i ? '1px solid rgba(255,255,255,0.05)' : undefined }}
+              className={`flex items-center gap-3 rounded-2xl bg-white/[0.035] py-2.5 pl-2.5 pr-2 transition-colors hover:bg-white/[0.07] sm:gap-4 ${editable ? 'cursor-pointer' : ''}`}
             >
-              <i className="block h-9 w-1 shrink-0 rounded-full" style={{ background: m.accent }} />
+              <AlbumIcon id={albumId(v)} size={46} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] text-white/90" style={{ fontFamily: 'var(--font-serif), serif' }}>
-                  {oneLine(v.text)}
+                  {paperText(v.text)}
                 </p>
                 <p className="mt-1 flex min-w-0 items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
+                  {/* raspoloženje — tačkica u njegovoj boji */}
+                  <i className="block h-1.5 w-1.5 shrink-0 rounded-full" title={m.label} style={{ background: m.accent, boxShadow: `0 0 6px ${m.accent}` }} />
                   <span className="shrink-0" style={{ color: BRAND.gold }}>{v.song}</span>
                   {OWN_AUDIO && songs.of(v.song)?.state === 'ready' && <SongBadge info={songs.of(v.song)} mode={songs.mode} onFetch={() => {}} />}
                   {/* tekst: spremljen (prati pjesmu / bez vremena), preuzima se, ili nije */}
@@ -1140,6 +1526,7 @@ function Editor({
   fetchLyrics,
   songsMode,
   onSongSaved,
+  reloadSongs,
   busy,
   onClose,
   onSave,
@@ -1155,9 +1542,12 @@ function Editor({
   songsMode: Songs['mode']
   /** pjesma preimenovana (lista pjesama → olovka) — nova lista stihova */
   onSongSaved: (snap: Snapshot, note: string | null) => void
+  /** stanje pjesama iznova (tekst je upravo spremljen) */
+  reloadSongs: () => void
   busy: boolean
   onClose: () => void
-  onSave: (d: Draft) => void
+  /** `found`: tekst nađen u formi, a još nije spremljen (produkcija — spremi ga GitHub) */
+  onSave: (d: Draft, found: FindResult | null) => void
 }) {
   // forma s historijom: nazad / naprijed (dugmad u zaglavlju, ⌘Z / ⇧⌘Z)
   const history = useHistory<Draft>({
@@ -1294,6 +1684,16 @@ function Editor({
     return () => clearTimeout(t)
   }, [linkLook])
   const song = d.song.trim() ? songOf(d.song) : null
+  // tekst pjesme se traži sam (pjesme preko YouTubea), čim su pjesma i link tu:
+  // nova pjesma, ili tekst još nije spremljen (ili ne prati, a pjesma je promijenjena)
+  const songMoved = !initial || audioSlug(initial.song) !== audioSlug(d.song) || youtubeId(initial.youtube) !== youtubeId(d.youtube)
+  const wantLyrics =
+    !OWN_AUDIO &&
+    Boolean(d.song.trim() && youtubeId(d.youtube)) &&
+    linkLook !== 'look' &&
+    (!song?.lyrics || song.lyrics === 'missing' || (songMoved && song.lyrics !== 'synced'))
+  const lyrics = useLyricsFind(d.song, d.youtube, d.text, wantLyrics, reloadSongs)
+  const searching = linkLook === 'look' || lyrics.status === 'run'
   // uredi pjesmu iz liste: naziv i ime fajla
   const [editSong, setEditSong] = useState<KnownSong | null>(null)
   const saveSong = async (s: KnownSong, to: string, file: string): Promise<string | null> => {
@@ -1385,7 +1785,8 @@ function Editor({
         className="flex min-w-0 flex-col gap-6 md:gap-4"
         onSubmit={(e) => {
           e.preventDefault()
-          onSave(d)
+          if (searching) return
+          onSave(d, lyrics.status === 'done' && !lyrics.stored ? lyrics.result : null)
         }}
       >
         {/* stih — veliko polje u slovima stiha, s brojačima ispod */}
@@ -1558,13 +1959,14 @@ function Editor({
               </p>
             )
           )}
-          {/* tekst pjesme — pregled kad je spremljen, inače napomena i preuzimanje, kao za pjesmu */}
-          {d.song.trim() && youtubeId(d.youtube) && (
+          {/* tekst pjesme: traži se sam (napredak korak po korak), a spremljen se vidi i podešava ovdje */}
+          {lyrics.status !== 'idle' && <LyricsFind find={lyrics} onRetry={lyrics.retry} />}
+          {d.song.trim() && youtubeId(d.youtube) && (OWN_AUDIO || lyrics.status === 'idle') && (
             <LyricsRow
               key={`tekst-${audioSlug(d.song)}`}
               song={d.song}
               info={song}
-              canFetch={songsMode !== 'off'}
+              canFetch={OWN_AUDIO && songsMode !== 'off'}
               onFetch={() => fetchLyrics(d.song)}
               onOffset={async (offset) => {
                 if (inDeck()) return 'U prezentaciji se tekst ne mijenja.'
@@ -1611,13 +2013,16 @@ function Editor({
           </div>
         </div>
 
+        {/* dok se traži link ili tekst pjesme, stih čeka — da ne ode bez teksta */}
         <button
           type="submit"
-          disabled={busy}
-          className="mt-auto h-12 rounded-2xl text-[14px] font-semibold text-black disabled:opacity-50"
+          disabled={busy || searching}
+          data-save
+          className="mt-auto flex h-12 items-center justify-center gap-2 rounded-2xl text-[14px] font-semibold text-black disabled:opacity-50"
           style={{ background: `linear-gradient(180deg, #E2CFA6, ${BRAND.gold})` }}
         >
-          {busy ? 'Čuvam…' : initial ? 'Sačuvaj izmjene' : 'Dodaj stih'}
+          {searching && !busy && <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-black border-t-transparent" aria-hidden />}
+          {busy ? 'Čuvam…' : searching ? (linkLook === 'look' ? 'Tražim link…' : 'Tražim tekst…') : initial ? 'Sačuvaj izmjene' : 'Dodaj stih'}
         </button>
       </form>
       <AnimatePresence>
@@ -1763,11 +2168,11 @@ function Skeleton() {
       </div>
       <div className="mb-3 h-11 animate-pulse rounded-full bg-white/[0.04]" />
       <div className="mb-4 h-10 animate-pulse rounded-full bg-white/[0.03]" />
-      <div className="relative overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.035]">
+      <div className="relative space-y-1.5 overflow-hidden">
         <LoadBar />
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="flex items-center gap-4 px-4 py-3.5" style={{ borderTop: i ? '1px solid rgba(255,255,255,0.05)' : undefined }}>
-            <i className="block h-9 w-1 shrink-0 rounded-full bg-white/10" />
+          <div key={i} className="flex items-center gap-3 rounded-2xl bg-white/[0.035] py-2.5 pl-2.5 pr-2">
+            <i className="block h-[46px] w-[46px] shrink-0 animate-pulse rounded-xl bg-white/[0.06]" />
             <div className="min-w-0 flex-1 space-y-2">
               <div className="h-3.5 animate-pulse rounded bg-white/[0.07]" style={{ width: `${72 - ((i * 13) % 30)}%`, animationDelay: `${i * 90}ms` }} />
               <div className="h-2.5 w-40 animate-pulse rounded bg-white/[0.04]" style={{ animationDelay: `${i * 90}ms` }} />

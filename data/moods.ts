@@ -1,6 +1,9 @@
 /**
  * MOODS — paleta i atmosfera po raspoloženju stiha.
  *
+ * Ključ (ljubav, nostalgija…) je ono što stih nosi u bazi — NE mijenjati ga.
+ * `label` je naziv stila u adminu (Velvet, Sepia…) — slobodno.
+ *
  * Ovaj fajl NE diraš kad dodaješ stihove — ovdje se samo podešava izgled.
  * Stihove ubacuješ u `data/verses.ts`.
  *
@@ -41,7 +44,7 @@ export type MoodStyle = {
 
 export const MOODS = {
   ljubav: {
-    label: 'Ljubav',
+    label: 'Velvet',
     gradient: ['#260E18', '#541F32', '#702D43'],
     accent: '#F2A7B8',
     text: '#FFF4F6',
@@ -57,7 +60,7 @@ export const MOODS = {
     vignette: 0.55,
   },
   nostalgija: {
-    label: 'Nostalgija',
+    label: 'Sepia',
     gradient: ['#101218', '#252936', '#3D404F'],
     accent: '#D9C3A0',
     text: '#F3EEE6',
@@ -73,7 +76,7 @@ export const MOODS = {
     vignette: 0.68,
   },
   nada: {
-    label: 'Nada',
+    label: 'Halo',
     gradient: ['#0D141E', '#1A313F', '#254755'],
     accent: '#F4C77B',
     text: '#FBF6EC',
@@ -89,7 +92,7 @@ export const MOODS = {
     vignette: 0.42,
   },
   sloboda: {
-    label: 'Sloboda i sreća',
+    label: 'Azure',
     gradient: ['#0C101A', '#18293F', '#243C62'],
     accent: '#7FD0E8',
     text: '#EEF7FB',
@@ -103,6 +106,142 @@ export const MOODS = {
     notes: 8,
     grain: 0.24,
     vignette: 0.4,
+  },
+  // sporo i tamno ljubičasto — sjeta, rastanak
+  tuga: {
+    label: 'Dusk',
+    gradient: ['#100E1C', '#221B3A', '#352A55'],
+    accent: '#B9A7F0',
+    text: '#F5F2FD',
+    speed: 0.5,
+    drift: 22,
+    bloom: 0.35,
+    figure: 0.18,
+    blend: 'screen',
+    focus: '50% 9%',
+    sweep: false,
+    notes: 2,
+    grain: 0.5,
+    vignette: 0.7,
+  },
+  // žar — crveno prema narandžastom, brže i toplije od ljubavi
+  strast: {
+    label: 'Ember',
+    gradient: ['#1E0A0A', '#4A1414', '#6E2116'],
+    accent: '#FF9B6A',
+    text: '#FFF3EE',
+    speed: 1.2,
+    drift: 52,
+    bloom: 0.65,
+    figure: 0.15,
+    blend: 'screen',
+    focus: '50% 10%',
+    sweep: true,
+    notes: 6,
+    grain: 0.3,
+    vignette: 0.5,
+  },
+  // Bosna, kuća, behar — tamna šuma i blaga zelena
+  zavicaj: {
+    label: 'Moss',
+    gradient: ['#0B1410', '#16301F', '#22472E'],
+    accent: '#B5DDA4',
+    text: '#F1F8EF',
+    speed: 0.75,
+    drift: 34,
+    bloom: 0.45,
+    figure: 0.17,
+    blend: 'screen',
+    focus: '50% 10%',
+    sweep: false,
+    notes: 4,
+    grain: 0.4,
+    vignette: 0.55,
+  },
+  // mirno i toplo, kao svitanje — breskva na tamnom
+  mir: {
+    label: 'Dawn',
+    gradient: ['#14100F', '#2C2220', '#45332D'],
+    accent: '#F3C6A5',
+    text: '#FCF4EE',
+    speed: 0.45,
+    drift: 20,
+    bloom: 0.5,
+    figure: 0.16,
+    blend: 'screen',
+    focus: '50% 9%',
+    sweep: true,
+    notes: 3,
+    grain: 0.38,
+    vignette: 0.6,
+  },
+  // crno i grafit, srebrni naglasak — strogo, kao film
+  noir: {
+    label: 'Noir',
+    gradient: ['#0A0A0B', '#1A1B1E', '#2A2C31'],
+    accent: '#D9DCE1',
+    text: '#F7F7F8',
+    speed: 0.6,
+    drift: 26,
+    bloom: 0.3,
+    figure: 0.2,
+    blend: 'screen',
+    focus: '50% 9%',
+    sweep: false,
+    notes: 2,
+    grain: 0.55,
+    vignette: 0.72,
+  },
+  // tamno smeđe i zlato — svečano
+  aurum: {
+    label: 'Aurum',
+    gradient: ['#0F0B06', '#2A1E0E', '#3E2C12'],
+    accent: '#E9C46A',
+    text: '#FFF8EA',
+    speed: 0.8,
+    drift: 34,
+    bloom: 0.6,
+    figure: 0.15,
+    blend: 'screen',
+    focus: '50% 10%',
+    sweep: true,
+    notes: 5,
+    grain: 0.32,
+    vignette: 0.5,
+  },
+  // hladno plavo-sivo, ledeni naglasak — zima, daljina
+  frost: {
+    label: 'Frost',
+    gradient: ['#0B1016', '#1A2632', '#2A3B4D'],
+    accent: '#BFE3FF',
+    text: '#F2F8FD',
+    speed: 0.65,
+    drift: 30,
+    bloom: 0.45,
+    figure: 0.16,
+    blend: 'screen',
+    focus: '50% 9%',
+    sweep: false,
+    notes: 3,
+    grain: 0.35,
+    vignette: 0.55,
+  },
+  // ljubičasto u tirkizno, neon menta — apstraktno, moderno
+  abstract: {
+    label: 'Abstract',
+    gradient: ['#0E0A1A', '#2B1446', '#0F3A4A'],
+    accent: '#7DF2C8',
+    text: '#F3FFFA',
+    speed: 1.15,
+    drift: 56,
+    bloom: 0.6,
+    figure: 0.12,
+    blend: 'screen',
+    focus: '50% 12%',
+    sweep: true,
+    notes: 6,
+    grain: 0.3,
+    vignette: 0.45,
   },
 } as const satisfies Record<string, MoodStyle>
 

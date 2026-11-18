@@ -44,23 +44,55 @@ export async function readLyrics(): Promise<Record<string, StoredLyrics>> {
 }
 
 /**
+ * Korak traženja teksta — admin ga pokazuje dok traje (app/api/admin/lyrics/find):
+ * `site` tekst na dinomerlin.com po nazivu, `verse` pa po stihu, `lrclib`
+ * vremena redova, `captions` titlovi na videu. `skip`: korak se ovdje ne
+ * radi (titlovi na Vercelu — tamo nema yt-dlp-a, provjeri ih GitHub).
+ */
+export type LyricsStep = { key: 'site' | 'verse' | 'lrclib' | 'captions'; state: 'run' | 'ok' | 'none' | 'skip' | 'fail' }
+
+/**
  * Tekst iz svih izvora, redom — kad jedan nema, ide se na sljedeći:
  *   tekst     dinomerlin.com po nazivu, pa po stihu; inače LRCLIB
  *   vremena   LRCLIB po nazivu, pa po drugim nazivima sa sajta i po redovima
  *             pjesme; pa titlovi na videu pjesme (gdje ima yt-dlp-a)
- * `duration`: trajanje snimka koji se pušta (lib/yt-duration.ts); `fresh`: LRCLIB iznova.
+ * `duration`: trajanje snimka koji se pušta (lib/yt-duration.ts); `fresh`: LRCLIB iznova;
+ * `step`: javlja svaki korak dok traje.
  * null (pokuša se opet) kad LRCLIB ne odgovori, a vremena nema ni na titlu;
  * ne odgovori li sajt, redovi su s LRCLIB-a (ako ih ima).
  */
-export async function fetchLyrics(song: string, duration: number, fresh = false, hint: LyricsHint = {}): Promise<StoredLyrics | null> {
+export async function fetchLyrics(
+  song: string,
+  duration: number,
+  fresh = false,
+  hint: LyricsHint = {},
+  step: (s: LyricsStep) => void = () => {},
+): Promise<StoredLyrics | null> {
   // undefined: sajt nije odgovorio; null: pjesme na sajtu nema
-  const page = await lyricsOf(song, hint.verse).catch(() => undefined)
+  step({ key: 'site', state: 'run' })
+  let page = await lyricsOf(song).catch(() => undefined)
+  step({ key: 'site', state: page ? 'ok' : page === null ? 'none' : 'fail' })
+  if (page === null && hint.verse) {
+    step({ key: 'verse', state: 'run' })
+    page = await lyricsOf(song, hint.verse).catch(() => undefined)
+    step({ key: 'verse', state: page ? 'ok' : page === null ? 'none' : 'fail' })
+  }
   const verse = hint.verse?.split('\n').filter(Boolean) ?? []
   const ours = page?.lines.length ? page.lines : verse
+  step({ key: 'lrclib', state: 'run' })
   const lrc = await lrcOf(song, duration, fresh, { titles: page ? [page.title, ...altTitles(page.title)] : [], album: page?.album, lines: ours }).catch(() => null)
+  step({ key: 'lrclib', state: !lrc ? 'fail' : lrc.synced ? 'ok' : 'none' })
   // vremena s titla videa — kad ih LRCLIB nema; titl se provjeri po tekstu pjesme
   const check = page?.lines.length ? page.lines : lrc?.plain?.length ? lrc.plain : verse
-  const synced = lrc?.synced ?? (await captionsOf(hint.youtube, check, duration))
+  let synced = lrc?.synced ?? null
+  if (!synced && hint.youtube) {
+    if (process.env.VERCEL) step({ key: 'captions', state: 'skip' })
+    else {
+      step({ key: 'captions', state: 'run' })
+      synced = await captionsOf(hint.youtube, check, duration)
+      step({ key: 'captions', state: synced ? 'ok' : 'none' })
+    }
+  }
   if (!lrc && !synced) return null
   if (page === undefined && !synced && !lrc?.plain?.length) return null
   return {
@@ -113,18 +145,23 @@ export function lyricsState(file: string, stored: Record<string, StoredLyrics>):
   return !l ? 'missing' : l.synced ? 'synced' : 'plain'
 }
 
+/** Spremi nađen tekst pjesme `file` (data/lyrics.json). */
+export function keepLyrics(file: string, l: StoredLyrics): Promise<void> {
+  return updateLyrics((d) => {
+    // tekst koji prati pjesmu ne zamijeni slabiji (LRCLIB zna vratiti manje kad je pretrpan)
+    if (d[file]?.synced && !l.synced) return
+    // podešen pomak ostaje i kad se tekst preuzme iznova
+    d[file] = d[file]?.offset ? { ...l, offset: d[file].offset } : l
+  })
+}
+
 /** Preuzmi i spremi tekst pjesme `file` (ime fajla). false = izvor nije odgovorio. `fresh`: LRCLIB iznova; `hint`: link i stih. */
 export async function storeLyrics(file: string, song: string, duration: number, fresh = false, hint: LyricsHint = {}): Promise<boolean> {
   pending.add(file)
   try {
     const l = await fetchLyrics(song, duration, fresh, hint)
     if (!l) return false
-    await updateLyrics((d) => {
-      // tekst koji prati pjesmu ne zamijeni slabiji (LRCLIB zna vratiti manje kad je pretrpan)
-      if (d[file]?.synced && !l.synced) return
-      // podešen pomak ostaje i kad se tekst preuzme iznova
-      d[file] = d[file]?.offset ? { ...l, offset: d[file].offset } : l
-    })
+    await keepLyrics(file, l)
     return true
   } finally {
     pending.delete(file)

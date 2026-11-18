@@ -1113,7 +1113,7 @@ function useDeskScene(run: (s: DeskScene) => Promise<void>) {
       }
       const search = q('[data-search]') as HTMLInputElement | null
       if (search?.value) setValue(search, '')
-      all('[data-filter][aria-pressed="true"], [data-song-filter][aria-pressed="true"]').forEach((f) => f.click())
+      all('[data-filter-clear], [data-song-filter][aria-pressed="true"]').forEach((f) => f.click())
       if (q('[data-scope="archive"]')?.style.color.includes('20, 16, 10')) q('[data-scope="active"]')?.click()
       q('[data-page="1"]')?.click()
       if (!alive) return
@@ -1147,10 +1147,14 @@ function Biblioteka() {
     if (!alive()) return
     clear('[data-search]')
     await wait(700)
-    // filter po raspoloženju
+    // filter po stilu — ikonica pored pretrage otvara panel, izbor, pa × na čipu
+    await click('[data-filters-open]')
+    await wait(900)
     await click('[data-filter="nostalgija"]')
     await wait(1800)
-    await click('[data-filter="nostalgija"]')
+    await click('[data-filter-clear="mood"]')
+    await wait(500)
+    await click('[data-filters-open]')
     await wait(700)
     if (!alive()) return
     // filter po pjesmi: stihovi čija je pjesma u aplikaciji (♪)
@@ -1264,7 +1268,7 @@ function Dizajn() {
     // lista kao na početku — prezenter je možda prošao "Listu stihova" usred
     // filtera; čeka se samo ako je zaista nešto vraćeno
     const search = all('[data-search]')[0] as HTMLInputElement | undefined
-    const filters = all('[data-filter][aria-pressed="true"]')
+    const filters = all('[data-filter-clear]')
     const archive = all('[data-scope="archive"]').find((b) => b.style.color.includes('20, 16, 10'))
     if (search?.value) clear(search)
     filters.forEach((f) => f.click())
