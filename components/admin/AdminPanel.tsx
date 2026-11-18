@@ -1986,8 +1986,9 @@ function Editor({
 
         {/* raspoloženje — pločice u bojama ekrana koji će stih dobiti */}
         <div>
-          <p className={labelCls}>Raspoloženje</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <p className={labelCls}>Stil</p>
+          {/* kratki nazivi (Velvet, Sepia…) — tri u redu, i sa sedamnaest stilova izbor ostaje pregledan */}
+          <div className="mt-2 grid grid-cols-3 gap-2">
             {MOOD_KEYS.map((k) => {
               const m = MOODS[k]
               const on = d.mood === k
@@ -1997,7 +1998,7 @@ function Editor({
                   key={k}
                   data-edit-mood={k}
                   onClick={() => setD({ ...d, mood: k })}
-                  className="relative flex h-14 items-center gap-2.5 md:h-10 overflow-hidden rounded-2xl border px-3.5 text-left text-[13px] transition-colors"
+                  className="relative flex h-12 min-w-0 items-center gap-2 overflow-hidden rounded-2xl border px-3 text-left text-[12.5px] transition-colors md:h-10"
                   style={{
                     borderColor: on ? m.accent : 'rgba(255,255,255,0.08)',
                     background: `radial-gradient(circle at 15% 20%, ${m.gradient[2]} 0%, transparent 70%), radial-gradient(circle at 90% 90%, ${m.gradient[1]} 0%, transparent 70%), ${m.gradient[0]}`,
@@ -2006,7 +2007,7 @@ function Editor({
                   }}
                 >
                   <i className="block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: m.accent, boxShadow: `0 0 10px ${m.accent}` }} />
-                  {m.label}
+                  <span className="min-w-0 truncate">{m.label}</span>
                 </button>
               )
             })}
